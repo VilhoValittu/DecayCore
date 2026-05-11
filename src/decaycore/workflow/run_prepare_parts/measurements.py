@@ -1,0 +1,361 @@
+# DecayCore
+# Copyright (c) 2026 Vilho Valittu.
+# All rights reserved except as expressly granted in the LICENSE file.
+#
+# This file is part of the public source-available DecayCore repository.
+# Non-commercial use is permitted under the terms of the LICENSE file.
+# Commercial use requires separate written permission.
+#
+# SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
+
+from __future__ import annotations
+
+import logging
+import math
+import time
+import typing
+from datetime import datetime
+
+import numpy as np
+
+from ...application.health_service import compute_health
+from ...application.house_curve_service import load_house_curve
+from ...application.run_request import RunRequest
+from ...application.run_contracts import (
+    PreparedRunInput,
+    ResolvedRunConfig,
+    copy_resolved_data,
+    copy_source_ui_data,
+)
+from ...common.result_postprocess import _irwin_tag
+from ...config.decaycore_config import save_config
+from ...config.decaycore_pipeline import (
+    build_xos_hpf,
+    choose_dash_fs,
+    choose_target_rates,
+    detect_is_wav_source,
+    filter_type_short,
+    log_df_smoothing_toggle,
+)
+from ...io.generated_measurement_source import generated_source_matches_upload, parse_generated_source
+from ...io.measurements_loader import (
+    _try_load_harmonic_sidecar,
+    _try_load_rt60_sidecar,
+    load_bass_integration_measurements,
+    load_measurements_lr,
+    load_raw_irs_lr,
+    load_raw_ir_sub,
+)
+from ...io.measurements_txt import parse_measurements_from_path
+from ...resources.i8n.decaycore_i18n import t
+from ..bridge_types import ProcessRunCallbacks
+
+if typing.TYPE_CHECKING:
+    from ..process_run_flow import ProcessRunSupport
+
+logger = logging.getLogger("DecayCore")
+
+def _get_wav_window_params(data: dict) -> tuple[float, float, int]:
+    try:
+        pre_ms = float(data.get("ir_window_left", 85.0) or 85.0)
+    except Exception:
+        pre_ms = 85.0
+    try:
+        post_ms = float(data.get("ir_window_right", data.get("ir_window", 500.0)) or 500.0)
+    except Exception:
+        post_ms = 500.0
+    try:
+        smoothing_level = int(data.get("smoothing_level", 0) or 0)
+    except Exception:
+        smoothing_level = 0
+    return float(pre_ms), float(post_ms), int(smoothing_level)
+
+def _extract_generated_source_rt60(source: object) -> tuple[float | None, dict[float, float] | None]:
+    if not isinstance(source, dict):
+        return None, None
+
+    try:
+        rt60_val = float(source.get("measured_rt60", None))
+    except (TypeError, ValueError):
+        rt60_val = None
+    if rt60_val is not None and (not np.isfinite(rt60_val) or rt60_val <= 0.0):
+        rt60_val = None
+
+    raw_bands = source.get("measured_rt60_bands", None)
+    rt60_bands: dict[float, float] | None = None
+    if isinstance(raw_bands, dict) and raw_bands:
+        normalized: dict[float, float] = {}
+        for key, value in raw_bands.items():
+            try:
+                freq_hz = float(key)
+                band_rt60 = float(value)
+            except (TypeError, ValueError):
+                continue
+            if np.isfinite(freq_hz) and np.isfinite(band_rt60) and band_rt60 > 0.0:
+                normalized[float(freq_hz)] = float(band_rt60)
+        if normalized:
+            rt60_bands = normalized
+
+    return rt60_val, rt60_bands
+
+def _load_generated_measurement_pair(data: dict) -> tuple | None:
+    generated_l = data.get("generated_measurement_l", None)
+    generated_r = data.get("generated_measurement_r", None)
+    upload_l = data.get("file_l", None)
+    upload_r = data.get("file_r", None)
+    if not generated_source_matches_upload(generated_l, upload_l):
+        return None
+    if not generated_source_matches_upload(generated_r, upload_r):
+        return None
+
+    pre_ms, post_ms, smoothing_level = _get_wav_window_params(data)
+    f_l, m_l, p_l, raw_ir_l, raw_ir_fs_l, harmonic_freq_l, harmonic_mags_l = parse_generated_source(
+        generated_l,
+        pre_ms=pre_ms,
+        post_ms=post_ms,
+        smoothing_level=smoothing_level,
+        logger=logger,
+    )
+    f_r, m_r, p_r, raw_ir_r, raw_ir_fs_r, harmonic_freq_r, harmonic_mags_r = parse_generated_source(
+        generated_r,
+        pre_ms=pre_ms,
+        post_ms=post_ms,
+        smoothing_level=smoothing_level,
+        logger=logger,
+    )
+    if f_l is None or f_r is None:
+        return None
+    return (
+        f_l, m_l, p_l, f_r, m_r, p_r,
+        raw_ir_l, raw_ir_fs_l, raw_ir_r, raw_ir_fs_r,
+        harmonic_freq_l, harmonic_mags_l, harmonic_freq_r, harmonic_mags_r,
+    )
+
+def _prepare_ui_and_measurements(
+    *,
+    request: RunRequest,
+    callbacks: ProcessRunCallbacks,
+    support: ProcessRunSupport,
+) -> dict | None:
+    perf_stats = {
+        "read_s": 0.0,
+        "dsp_s": 0.0,
+        "zip_png_s": 0.0,
+    }
+    per_fs_stats: dict[int, dict[str, float]] = {}
+
+    source_ui_data = copy_source_ui_data(request.raw_ui_data)
+    data = copy_resolved_data(source_ui_data)
+    run_started_at = float(request.run_started_at or time.perf_counter())
+    callbacks.set_auto_selected_bar("")
+
+    try:
+        mode = str(data.get("mode") or "BASIC").strip().upper()
+        hr = compute_health(data, mode)
+        if support.ui_bridge.toast_health_gate_result(hr, mode):
+            return None
+    except Exception:
+        logger.exception("health gate check")
+
+    ir_export_window_mode = data.get("ir_export_window_mode")
+    if not isinstance(ir_export_window_mode, str) or ir_export_window_mode.strip() == "":
+        data["ir_export_window_mode"] = "auto"
+    logger.info(f"UI ir_export_window_mode={data.get('ir_export_window_mode')}")
+
+    try:
+        sh = str(data.get("ir_export_window_shape", "hann") or "hann").strip().lower()
+    except Exception:
+        sh = "hann"
+    if sh not in ("hann", "tukey"):
+        sh = "hann"
+    data["ir_export_window_shape"] = sh
+
+    try:
+        alpha = float(data.get("ir_export_tukey_alpha", 0.25))
+    except Exception:
+        alpha = 0.25
+    if not math.isfinite(alpha):
+        alpha = 0.25
+    data["ir_export_tukey_alpha"] = float(np.clip(alpha, 0.0, 1.0))
+
+    try:
+        if filter_type_short(str(data.get("filter_type", "") or "")) == "Asymmetric":
+            data["ir_export_window_mode"] = "rew_asym"
+            data["ir_window_mode"] = "rew_asym"
+            data["ir_export_window_shape"] = "tukey"
+            data["ir_export_tukey_alpha"] = 0.25
+    except Exception:
+        logger.exception("asymmetric filter window mode set")
+
+    taps_base = int(float(data.get("taps", 65536) or 65536))
+    if not bool(data.get("_headless", False)):
+        save_config(data)
+
+    support.ui_bridge.ensure_progress_bar()
+
+    read_started_at = time.perf_counter()
+    callbacks.status(t("stat_reading"))
+    bass_integration_bundle = None
+    bass_integration_enabled = bool(data.get("bass_integration_enable", False))
+    generated_pair = None
+    if bass_integration_enabled:
+        (
+            bass_integration_bundle,
+            f_l,
+            m_l,
+            p_l,
+            f_r,
+            m_r,
+            p_r,
+        ) = load_bass_integration_measurements(data, logger=logger)
+        if bass_integration_bundle is not None:
+            logger.info(
+                "Bass Integration: decomposed bass integration measurements loaded; "
+                "predicted totals built; xo/hpf phase model retained"
+            )
+    else:
+        generated_pair = _load_generated_measurement_pair(data)
+        if generated_pair is not None:
+            (
+                f_l,
+                m_l,
+                p_l,
+                f_r,
+                m_r,
+                p_r,
+                raw_ir_l,
+                raw_ir_fs_l,
+                raw_ir_r,
+                raw_ir_fs_r,
+                _harmonic_freq_hz_l,
+                _harmonic_mags_l,
+                _harmonic_freq_hz_r,
+                _harmonic_mags_r,
+            ) = generated_pair
+        else:
+            f_l, m_l, p_l, f_r, m_r, p_r = load_measurements_lr(data, logger=logger)
+    perf_stats["read_s"] += max(0.0, float(time.perf_counter() - read_started_at))
+    if f_l is None or f_r is None:
+        return None
+
+    measured_rt60_l, measured_rt60_bands_l = _extract_generated_source_rt60(
+        data.get("generated_measurement_l", None)
+    )
+    measured_rt60_r, measured_rt60_bands_r = _extract_generated_source_rt60(
+        data.get("generated_measurement_r", None)
+    )
+
+    if bass_integration_enabled:
+        _lp_l = str(data.get("local_path_l_main", "") or "").strip()
+        _lp_r = str(data.get("local_path_r_main", "") or "").strip()
+    else:
+        _lp_l = str(data.get("local_path_l", "") or "").strip()
+        _lp_r = str(data.get("local_path_r", "") or "").strip()
+    sidecar_rt60_l, sidecar_rt60_bands_l = _try_load_rt60_sidecar(_lp_l)
+    sidecar_rt60_r, sidecar_rt60_bands_r = _try_load_rt60_sidecar(_lp_r)
+    if measured_rt60_l is None:
+        measured_rt60_l = sidecar_rt60_l
+    if measured_rt60_bands_l is None:
+        measured_rt60_bands_l = sidecar_rt60_bands_l
+    if measured_rt60_r is None:
+        measured_rt60_r = sidecar_rt60_r
+    if measured_rt60_bands_r is None:
+        measured_rt60_bands_r = sidecar_rt60_bands_r
+    if generated_pair is None:
+        _harmonic_freq_hz_l, _harmonic_mags_l = _try_load_harmonic_sidecar(_lp_l)
+        _harmonic_freq_hz_r, _harmonic_mags_r = _try_load_harmonic_sidecar(_lp_r)
+
+    raw_ir_slot_keys = {}
+    if bass_integration_enabled:
+        raw_ir_slot_keys = {
+            "file_key_l": "file_l_main",
+            "path_key_l": "local_path_l_main",
+            "file_key_r": "file_r_main",
+            "path_key_r": "local_path_r_main",
+        }
+
+    if bass_integration_enabled or generated_pair is None:
+        raw_ir_l, raw_ir_fs_l, raw_ir_r, raw_ir_fs_r = load_raw_irs_lr(
+            data,
+            logger=logger,
+            **raw_ir_slot_keys,
+        )
+    if bass_integration_enabled:
+        raw_ir_sub, raw_ir_fs_sub = load_raw_ir_sub(data, logger=logger)
+    else:
+        raw_ir_sub, raw_ir_fs_sub = None, 0
+
+    prepared_input = PreparedRunInput(
+        source_ui_data=source_ui_data,
+        resolved_data=data,
+        f_l=f_l,
+        m_l=m_l,
+        p_l=p_l,
+        f_r=f_r,
+        m_r=m_r,
+        p_r=p_r,
+        bass_integration_bundle=bass_integration_bundle,
+        raw_ir_l=raw_ir_l,
+        raw_ir_fs_l=raw_ir_fs_l,
+        raw_ir_r=raw_ir_r,
+        raw_ir_fs_r=raw_ir_fs_r,
+        raw_ir_sub=raw_ir_sub,
+        raw_ir_fs_sub=raw_ir_fs_sub,
+        measured_rt60_l=measured_rt60_l,
+        measured_rt60_bands_l=measured_rt60_bands_l,
+        measured_rt60_r=measured_rt60_r,
+        measured_rt60_bands_r=measured_rt60_bands_r,
+        harmonic_freq_hz_l=_harmonic_freq_hz_l,
+        harmonic_magnitudes_db_l=_harmonic_mags_l,
+        harmonic_freq_hz_r=_harmonic_freq_hz_r,
+        harmonic_magnitudes_db_r=_harmonic_mags_r,
+    )
+
+    return {
+        "run_started_at": run_started_at,
+        "perf_stats": perf_stats,
+        "per_fs_stats": per_fs_stats,
+        "source_ui_data": source_ui_data,
+        "resolved_data": data,
+        "prepared_input": prepared_input,
+        "data": data,
+        "taps_base": taps_base,
+        "f_l": f_l,
+        "m_l": m_l,
+        "p_l": p_l,
+        "f_r": f_r,
+        "m_r": m_r,
+        "p_r": p_r,
+        "bass_integration_bundle": bass_integration_bundle,
+        "raw_ir_l": raw_ir_l,
+        "raw_ir_fs_l": raw_ir_fs_l,
+        "raw_ir_r": raw_ir_r,
+        "raw_ir_fs_r": raw_ir_fs_r,
+        "raw_ir_sub": raw_ir_sub,
+        "raw_ir_fs_sub": raw_ir_fs_sub,
+        "measured_rt60_l": measured_rt60_l,
+        "measured_rt60_bands_l": measured_rt60_bands_l,
+        "measured_rt60_r": measured_rt60_r,
+        "measured_rt60_bands_r": measured_rt60_bands_r,
+        "harmonic_freq_hz_l": _harmonic_freq_hz_l,
+        "harmonic_magnitudes_db_l": _harmonic_mags_l,
+        "harmonic_freq_hz_r": _harmonic_freq_hz_r,
+        "harmonic_magnitudes_db_r": _harmonic_mags_r,
+    }
+
+
+__all__ = ['_get_wav_window_params', '_extract_generated_source_rt60', '_load_generated_measurement_pair', '_prepare_ui_and_measurements']
+
+
+def _load_sibling_symbols() -> None:
+    import importlib
+    package = __package__
+    for module_name in ['bass_diagnostics', 'measurements', 'target_context']:
+        if module_name == __name__.rsplit('.', 1)[-1]:
+            continue
+        module = importlib.import_module(f"{package}.{module_name}")
+        for symbol in getattr(module, "__all__", ()):
+            globals().setdefault(symbol, getattr(module, symbol))
+
+
+_load_sibling_symbols()

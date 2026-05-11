@@ -1,0 +1,326 @@
+# DecayCore
+# Copyright (c) 2026 Vilho Valittu.
+# All rights reserved except as expressly granted in the LICENSE file.
+#
+# This file is part of the public source-available DecayCore repository.
+# Non-commercial use is permitted under the terms of the LICENSE file.
+# Commercial use requires separate written permission.
+#
+# SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
+
+"""NiceGUI results rendering after a DSP run.
+
+Replaces camillafir_ui._render_results() + results_sections.py.
+
+render_results() has the same signature as _render_results() so ng_bridge.py
+can call it without changes to workflow code.
+"""
+from __future__ import annotations
+
+import html
+import logging
+import math
+import time
+from typing import Any
+
+# ---------------------------------------------------------------------------
+# Interactive plot render cache
+# Key: (run_signature, channel, plot_smoothing_level)
+# Value: plotly Figure object
+# Cleared at the start of each render_results call (per-run semantics).
+# ---------------------------------------------------------------------------
+_PLOT_RENDER_CACHE: dict = {}
+
+from ...resources.i8n.decaycore_i18n import t
+from ...auto_mode.rank_score import calibrated_auto_quality
+from .. import decaycore_plot as plots
+from .. import ui_state
+from ..results_formatters import (
+    anchor_label,
+    boost_diag,
+    fmt_ai_match,
+    fmt_ai_score,
+    fmt_freq_window,
+    fmt_tilt,
+    format_ir_window,
+    gd_grad_max_label,
+    gd_limiter_label,
+    hpf_diff_raw_label,
+    hpf_model_label,
+    metric_row,
+    mixed_blend_label,
+    phase_clamp_label,
+    plot_smoothing_label,
+    safe_float,
+    shared_window_label,
+    stereo_link_mode_label,
+    xo_fc_gd_label,
+)
+
+from ...dsp.lr_difference_metrics import compute_lr_difference_metrics
+
+logger = logging.getLogger("DecayCore")
+
+def _render_ir_alignment(*, l_st_f: dict) -> None:
+    """Renderöi Mittausten IR-infot -osion jos ir_align- tai ir_align_sub-data löytyy."""
+    ir_align = dict(l_st_f.get("ir_align") or {})
+    ir_align_sub = dict(l_st_f.get("ir_align_sub") or {})
+    if not ir_align and not ir_align_sub:
+        return
+
+    def _fmt_ms(v) -> str:
+        try:
+            x = float(v)
+            if math.isfinite(x):
+                return f"{x:+.2f} ms"
+        except Exception:
+            logger.exception("ir align ms format")
+        return "-"
+
+    def _fmt_db(v) -> str:
+        try:
+            x = float(v)
+            if math.isfinite(x):
+                return f"{x:+.1f} dB"
+        except Exception:
+            logger.exception("ir align dB format")
+        return "-"
+
+    def _fmt_deg(v) -> str:
+        try:
+            x = float(v)
+            if math.isfinite(x):
+                return f"{x:+.1f}°"
+        except Exception:
+            logger.exception("ir align deg format")
+        return "-"
+
+    def _fmt_pct(v) -> str:
+        try:
+            x = float(v)
+            if math.isfinite(x):
+                return f"{x * 100.0:.0f}%"
+        except Exception:
+            logger.exception("ir align pct format")
+        return "-"
+
+    def _fmt_dbfs(v) -> str:
+        try:
+            x = float(v)
+            if math.isfinite(x):
+                return f"{x:.1f} dBFS"
+        except Exception:
+            logger.exception("ir align dBFS format")
+        return "-"
+
+    def _polarity_str(d: dict) -> str:
+        inv = bool(d.get("ir_align_polarity_inverted", False)) or bool(d.get("ir_align_xcorr_polarity_flip", False))
+        return t("ir_align_value_inverted") if inv else t("ir_align_value_ok")
+
+    def _xo_label(d: dict) -> str:
+        xo = safe_float(d.get("ir_align_xo_hz"), None)
+        if xo is not None and math.isfinite(xo):
+            return f"{xo:.0f}"
+        return "80"
+
+    rows: list[dict] = []
+
+    if ir_align:
+        rows.append(metric_row(f"── {t('ir_align_group_lr')} ──", "", ""))
+        rows.append(metric_row(
+            t("ir_align_metric_xcorr_offset"),
+            _fmt_ms(ir_align.get("ir_align_xcorr_offset_ms")),
+            _fmt_ms(ir_align.get("ir_align_xcorr_offset_ms")),
+        ))
+        rows.append(metric_row(
+            t("ir_align_metric_xcorr_confidence"),
+            _fmt_pct(ir_align.get("ir_align_xcorr_confidence")),
+            _fmt_pct(ir_align.get("ir_align_xcorr_confidence")),
+        ))
+        rows.append(metric_row(
+            t("ir_align_metric_polarity"),
+            _polarity_str(ir_align),
+            _polarity_str(ir_align),
+        ))
+        rows.append(metric_row(
+            t("ir_align_metric_level_peak"),
+            _fmt_dbfs(ir_align.get("ir_align_level_peak_a_dbfs")),
+            _fmt_dbfs(ir_align.get("ir_align_level_peak_b_dbfs")),
+        ))
+        rows.append(metric_row(
+            t("ir_align_metric_level_diff"),
+            _fmt_db(ir_align.get("ir_align_level_rms_diff_db")),
+            _fmt_db(ir_align.get("ir_align_level_rms_diff_db")),
+        ))
+
+    if ir_align_sub:
+        xo_lbl = _xo_label(ir_align_sub)
+        rows.append(metric_row(f"── {t('ir_align_group_sub')} ──", "", ""))
+        rows.append(metric_row(
+            t("ir_align_metric_xcorr_offset"),
+            _fmt_ms(ir_align_sub.get("ir_align_xcorr_offset_ms")),
+            _fmt_ms(ir_align_sub.get("ir_align_xcorr_offset_ms")),
+        ))
+        rows.append(metric_row(
+            t("ir_align_metric_xcorr_confidence"),
+            _fmt_pct(ir_align_sub.get("ir_align_xcorr_confidence")),
+            _fmt_pct(ir_align_sub.get("ir_align_xcorr_confidence")),
+        ))
+        rows.append(metric_row(
+            t("ir_align_metric_polarity"),
+            _polarity_str(ir_align_sub),
+            _polarity_str(ir_align_sub),
+        ))
+        rows.append(metric_row(
+            t("ir_align_metric_level_peak"),
+            _fmt_dbfs(ir_align_sub.get("ir_align_level_peak_a_dbfs")),
+            _fmt_dbfs(ir_align_sub.get("ir_align_level_peak_b_dbfs")),
+        ))
+        rows.append(metric_row(
+            t("ir_align_metric_level_diff"),
+            _fmt_db(ir_align_sub.get("ir_align_level_rms_diff_db")),
+            _fmt_db(ir_align_sub.get("ir_align_level_rms_diff_db")),
+        ))
+        rows.append(metric_row(
+            t("ir_align_metric_phase_diff").format(xo=xo_lbl),
+            _fmt_deg(ir_align_sub.get("ir_align_phase_diff_deg")),
+            _fmt_deg(ir_align_sub.get("ir_align_phase_diff_deg")),
+        ))
+        rows.append(metric_row(
+            t("ir_align_metric_gd").format(xo=xo_lbl),
+            _fmt_ms(ir_align_sub.get("ir_align_gd_a_ms")),
+            _fmt_ms(ir_align_sub.get("ir_align_gd_b_ms")),
+        ))
+        rows.append(metric_row(
+            t("ir_align_metric_gd_diff"),
+            _fmt_ms(ir_align_sub.get("ir_align_gd_diff_ms")),
+            _fmt_ms(ir_align_sub.get("ir_align_gd_diff_ms")),
+        ))
+
+    # Yhteenvetorivi
+    issues: list[str] = []
+    for d in (ir_align, ir_align_sub):
+        if not d:
+            continue
+        if bool(d.get("ir_align_polarity_inverted")) or bool(d.get("ir_align_xcorr_polarity_flip")):
+            issues.append(t("ir_align_issue_polarity"))
+        off = safe_float(d.get("ir_align_xcorr_offset_ms"), None)
+        if off is not None and math.isfinite(off) and abs(off) >= 5.0:
+            issues.append(t("ir_align_issue_timing"))
+        if not bool(d.get("ir_align_phase_in_phase", True)) and d is ir_align_sub:
+            issues.append(t("ir_align_issue_phase"))
+        rms = safe_float(d.get("ir_align_level_rms_diff_db"), None)
+        if rms is not None and math.isfinite(rms) and abs(rms) >= 10.0:
+            issues.append(t("ir_align_issue_level"))
+
+    seen: set[str] = set()
+    unique_issues = [x for x in issues if not (x in seen or seen.add(x))]
+    if unique_issues:
+        summary_line = t("ir_align_summary_issues").format(issues=", ".join(unique_issues))
+    else:
+        summary_line = t("ir_align_summary_ok")
+
+    _section(t("results_section_ir_alignment"), rows, summary_lines=[summary_line])
+
+def _render_dsp_quality(*, data: dict, l_st_f: dict, r_st_f: dict, psl_str: str) -> None:
+    _section(
+        t("results_section_filter_ir"),
+        [
+            metric_row(
+                t("results_metric_filter_type"),
+                str(data.get("filter_type", "") or ""),
+                str(data.get("filter_type", "") or ""),
+            ),
+            metric_row(t("results_metric_ir_window"), format_ir_window(l_st_f), format_ir_window(r_st_f)),
+            metric_row(
+                t("results_metric_correction_range"),
+                f"{data.get('mag_c_min', 0):.0f}-{data.get('mag_c_max', 0):.0f} Hz",
+                f"{data.get('mag_c_min', 0):.0f}-{data.get('mag_c_max', 0):.0f} Hz",
+            ),
+            metric_row(t("results_metric_plot_smoothing"), psl_str, psl_str),
+        ],
+    )
+    _section(
+        t("results_section_phase_gd"),
+        [
+            metric_row(t("results_metric_xo_phase_model"), xo_fc_gd_label(l_st_f), xo_fc_gd_label(r_st_f)),
+            metric_row(t("results_metric_phase_clamp"), phase_clamp_label(l_st_f), phase_clamp_label(r_st_f)),
+            metric_row(t("results_metric_gd_limiter"), gd_limiter_label(l_st_f), gd_limiter_label(r_st_f)),
+            metric_row(t("results_metric_gd_gradient_max"), gd_grad_max_label(l_st_f), gd_grad_max_label(r_st_f)),
+            metric_row(t("results_metric_hpf_model"), hpf_model_label(l_st_f), hpf_model_label(r_st_f)),
+            metric_row(t("results_metric_hpf_diff_raw"), hpf_diff_raw_label(l_st_f), hpf_diff_raw_label(r_st_f)),
+            metric_row(
+                t("results_metric_mixed_blend_split"),
+                mixed_blend_label(l_st_f, "mixed_blend_split_hz"),
+                mixed_blend_label(r_st_f, "mixed_blend_split_hz"),
+            ),
+            metric_row(
+                t("results_metric_mixed_blend_transition"),
+                mixed_blend_label(l_st_f, "mixed_blend_transition_hz"),
+                mixed_blend_label(r_st_f, "mixed_blend_transition_hz"),
+            ),
+        ],
+    )
+
+def _render_lr_difference(*, l_st_f: dict, r_st_f: dict) -> None:
+    """Render L/R difference metrics section based on measured response data."""
+    try:
+        lr = compute_lr_difference_metrics(l_st_f, r_st_f)
+
+        def _fmtdb(v: float) -> str:
+            return f"{v:.2f} dB" if math.isfinite(v) else "n/a"
+
+        has_any = any(
+            math.isfinite(v)
+            for v in (lr.mag_rms_bass_db, lr.mag_rms_mid_db, lr.mag_rms_band_db, lr.mag_maxabs_band_db)
+        )
+        if not has_any:
+            return
+
+        band_lo = lr.band_lo_hz if math.isfinite(lr.band_lo_hz) else 20.0
+        band_hi = lr.band_hi_hz if math.isfinite(lr.band_hi_hz) else 2000.0
+
+        rows = [
+            metric_row("L/R Mag RMS  20–200 Hz", _fmtdb(lr.mag_rms_bass_db), _fmtdb(lr.mag_rms_bass_db)),
+            metric_row("L/R Mag RMS  200–2000 Hz", _fmtdb(lr.mag_rms_mid_db), _fmtdb(lr.mag_rms_mid_db)),
+            metric_row(
+                f"L/R Mag RMS  {band_lo:.0f}–{band_hi:.0f} Hz",
+                _fmtdb(lr.mag_rms_band_db),
+                _fmtdb(lr.mag_rms_band_db),
+            ),
+            metric_row(
+                f"L/R Mag MaxAbs  {band_lo:.0f}–{band_hi:.0f} Hz",
+                _fmtdb(lr.mag_maxabs_band_db),
+                _fmtdb(lr.mag_maxabs_band_db),
+            ),
+        ]
+        if math.isfinite(lr.gd_rms_band_ms):
+            gd_txt = f"{lr.gd_rms_band_ms:.2f} ms"
+            rows.append(
+                metric_row(f"L/R GD RMS  {band_lo:.0f}–{band_hi:.0f} Hz", gd_txt, gd_txt)
+            )
+
+        _section(
+            t("results_section_lr_difference"),
+            rows,
+            summary_lines=["Computed from measured left-right response data. Lower = more symmetric."],
+        )
+    except Exception:
+        logger.debug("_render_lr_difference failed", exc_info=True)
+
+
+__all__ = ['_render_ir_alignment', '_render_dsp_quality', '_render_lr_difference']
+
+
+def _load_sibling_symbols() -> None:
+    import importlib
+    package = __package__
+    for module_name in ['overview', 'bass_integration', 'quality', 'plots_export']:
+        if module_name == __name__.rsplit('.', 1)[-1]:
+            continue
+        module = importlib.import_module(f"{package}.{module_name}")
+        for symbol in getattr(module, "__all__", ()):
+            globals().setdefault(symbol, getattr(module, symbol))
+
+
+_load_sibling_symbols()
