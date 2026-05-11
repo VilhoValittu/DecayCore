@@ -1,0 +1,240 @@
+# DecayCore
+# Copyright (c) 2026 Vilho Valittu.
+# All rights reserved except as expressly granted in the LICENSE file.
+#
+# This file is part of the public source-available DecayCore repository.
+# Non-commercial use is permitted under the terms of the LICENSE file.
+# Commercial use requires separate written permission.
+#
+# SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Sequence
+
+import numpy as np
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+__all__ = ["RoomModeEvent", "ModalAnalysisResult", "detect_room_modes", "modal_support_for_band"]
+
+@dataclass(frozen=True)
+class RoomModeEvent:
+    freq_hz: float
+    peak_db: float
+    width_hz: float
+    width_oct: float
+    q_estimate: float
+    area_db_oct: float
+
+    gd_excess_ms: float = 0.0
+    decay_severity: float = 0.0
+    confidence: float = 1.0
+    lr_consistency: float = 0.0
+    repeatability: float = 0.0
+
+    severity: float = 0.0
+    correction_priority: float = 0.0
+    cut_priority: float = 0.0
+    safe_cut_db: float = 0.0
+    safe_width_oct: float = 0.0
+    voice_clarity_risk: float = 0.0
+
+    kind: str = "unknown"
+    reasons: tuple[str, ...] = field(default_factory=tuple)
+
+@dataclass(frozen=True)
+class ModalAnalysisResult:
+    events: tuple[RoomModeEvent, ...]
+    worst_mode_hz: float | None
+    worst_mode_severity: float
+    mode_count: int
+    modal_area_db_oct: float
+    voice_band_modal_risk: float
+    analysis_version: int = 1
+
+def _empty_result() -> ModalAnalysisResult:
+    return ModalAnalysisResult(
+        events=(),
+        worst_mode_hz=None,
+        worst_mode_severity=0.0,
+        mode_count=0,
+        modal_area_db_oct=0.0,
+        voice_band_modal_risk=0.0,
+    )
+
+def _as_float_array(value) -> np.ndarray:
+    if value is None:
+        return np.asarray([], dtype=float)
+    try:
+        return np.asarray(value, dtype=float).reshape(-1)
+    except Exception:
+        return np.asarray([], dtype=float)
+
+def _smooth_log_box(freq_hz: np.ndarray, values: np.ndarray, width_oct: float) -> np.ndarray:
+    f = np.asarray(freq_hz, dtype=float).reshape(-1)
+    v = np.asarray(values, dtype=float).reshape(-1)
+    if f.size < 3 or v.size != f.size:
+        return np.copy(v)
+    width = float(np.clip(width_oct, 1.0 / 192.0, 2.0))
+    half = 0.5 * width
+    log_f = np.log2(np.maximum(f, 1e-9))
+    order = np.argsort(log_f)
+    x = np.asarray(log_f[order], dtype=float)
+    y = np.nan_to_num(np.asarray(v[order], dtype=float), nan=0.0, posinf=0.0, neginf=0.0)
+    finite = np.isfinite(v[order]).astype(float)
+    sum_y = np.r_[0.0, np.cumsum(y * finite)]
+    sum_w = np.r_[0.0, np.cumsum(finite)]
+    out = np.empty_like(v, dtype=float)
+    lefts = np.searchsorted(x, x - half, side="left")
+    rights = np.searchsorted(x, x + half, side="right")
+    counts = sum_w[rights] - sum_w[lefts]
+    valid = counts > 0.0
+    out_sorted = np.where(valid, (sum_y[rights] - sum_y[lefts]) / np.where(counts > 0.0, counts, 1.0), y)
+    out[order] = out_sorted
+    return out
+
+def _safe_confidence(confidence_mask: np.ndarray, n: int) -> np.ndarray:
+    if confidence_mask.size < n:
+        return np.ones(n, dtype=float)
+    conf = np.asarray(confidence_mask[:n], dtype=float)
+    finite = conf[np.isfinite(conf)]
+    if finite.size and float(np.nanmax(finite)) > 1.5:
+        conf = conf / 100.0
+    return np.clip(np.nan_to_num(conf, nan=0.0, posinf=0.0, neginf=0.0), 0.0, 1.0)
+
+def _prepare_arrays(
+    freq_axis,
+    measured_mag_db,
+    target_mag_db,
+    corrected_mag_db,
+    group_delay_ms,
+    confidence_mask,
+    left_mag_db,
+    right_mag_db,
+    lo_hz: float,
+    hi_hz: float,
+) -> tuple[np.ndarray, ...] | None:
+    f = _as_float_array(freq_axis)
+    measured = _as_float_array(measured_mag_db)
+    target = _as_float_array(target_mag_db)
+    corrected = _as_float_array(corrected_mag_db)
+    gd = _as_float_array(group_delay_ms)
+    conf = _as_float_array(confidence_mask)
+    left = _as_float_array(left_mag_db)
+    right = _as_float_array(right_mag_db)
+
+    sizes = [f.size, measured.size]
+    if target.size:
+        sizes.append(target.size)
+    if corrected.size:
+        sizes.append(corrected.size)
+    if gd.size:
+        sizes.append(gd.size)
+    if conf.size:
+        sizes.append(conf.size)
+    if left.size and right.size:
+        sizes.extend([left.size, right.size])
+    n = int(min(sizes)) if sizes else 0
+    if n < 8:
+        return None
+
+    f = np.asarray(f[:n], dtype=float)
+    measured = np.asarray(measured[:n], dtype=float)
+    target = np.asarray(target[:n], dtype=float) if target.size >= n else np.zeros(n, dtype=float)
+    corrected = np.asarray(corrected[:n], dtype=float) if corrected.size >= n else np.asarray([], dtype=float)
+    gd = np.asarray(gd[:n], dtype=float) if gd.size >= n else np.asarray([], dtype=float)
+    conf = _safe_confidence(conf, n)
+    left = np.asarray(left[:n], dtype=float) if left.size >= n and right.size >= n else np.asarray([], dtype=float)
+    right = np.asarray(right[:n], dtype=float) if right.size >= n and left.size >= n else np.asarray([], dtype=float)
+
+    if corrected.size >= n:
+        analysis = measured + corrected - target
+    elif target_mag_db is not None and target.size >= n:
+        analysis = measured - target
+    else:
+        analysis = np.asarray(measured, dtype=float)
+
+    valid = np.isfinite(f) & np.isfinite(analysis) & np.isfinite(conf) & (f > 0.0)
+    valid &= (f >= float(lo_hz)) & (f <= float(hi_hz))
+    if gd.size >= n:
+        valid &= np.isfinite(gd)
+    if left.size >= n and right.size >= n:
+        valid &= np.isfinite(left) & np.isfinite(right)
+    if int(np.count_nonzero(valid)) < 8:
+        return None
+
+    f_use = np.asarray(f[valid], dtype=float)
+    analysis_use = np.asarray(analysis[valid], dtype=float)
+    conf_use = np.asarray(conf[valid], dtype=float)
+    gd_use = np.asarray(gd[valid], dtype=float) if gd.size >= n else np.asarray([], dtype=float)
+    left_use = np.asarray(left[valid], dtype=float) if left.size >= n and right.size >= n else np.asarray([], dtype=float)
+    right_use = np.asarray(right[valid], dtype=float) if right.size >= n and left.size >= n else np.asarray([], dtype=float)
+
+    order = np.argsort(f_use)
+    return (
+        f_use[order],
+        analysis_use[order],
+        conf_use[order],
+        gd_use[order] if gd_use.size else gd_use,
+        left_use[order] if left_use.size else left_use,
+        right_use[order] if right_use.size else right_use,
+    )
+
+def _width_bounds(excess: np.ndarray, peak_idx: int, min_floor: float) -> tuple[int, int]:
+    peak = float(max(0.0, excess[int(peak_idx)]))
+    threshold = float(max(min_floor, peak - 3.0, 0.5 * peak))
+    left = int(peak_idx)
+    right = int(peak_idx)
+    while left > 0 and np.isfinite(excess[left - 1]) and float(excess[left - 1]) > threshold:
+        left -= 1
+    while right < excess.size - 1 and np.isfinite(excess[right + 1]) and float(excess[right + 1]) > threshold:
+        right += 1
+    return int(left), int(right)
+
+
+__all__ = ['RoomModeEvent', 'ModalAnalysisResult', '_empty_result', '_as_float_array', '_smooth_log_box', '_safe_confidence', '_prepare_arrays', '_width_bounds']
+
+
+def _load_sibling_symbols() -> None:
+    import importlib
+    package = __package__
+    for module_name in ['modal_analysis_01', 'modal_analysis_02']:
+        if module_name == __name__.rsplit('.', 1)[-1]:
+            continue
+        module = importlib.import_module(f"{package}.{module_name}")
+        for symbol in getattr(module, "__all__", ()):
+            globals().setdefault(symbol, getattr(module, symbol))
+
+
+_load_sibling_symbols()

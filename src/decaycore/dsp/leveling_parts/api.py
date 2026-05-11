@@ -1,0 +1,244 @@
+# DecayCore
+# Copyright (c) 2026 Vilho Valittu.
+# All rights reserved except as expressly granted in the LICENSE file.
+#
+# This file is part of the public source-available DecayCore repository.
+# Non-commercial use is permitted under the terms of the LICENSE file.
+# Commercial use requires separate written permission.
+#
+# SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
+
+from __future__ import annotations
+import copy
+from dataclasses import dataclass
+import hashlib
+import threading
+from typing import Tuple
+import numpy as np
+
+from ..leveling_compute import compute_leveling_impl
+from ..leveling_window import (
+    find_shared_stereo_level_window_impl,
+    find_stable_level_window_impl,
+)
+
+__all__ = [
+    "StereoLinkContext",
+    "find_stable_level_window",
+    "find_shared_stereo_level_window",
+    "compute_leveling",
+]
+
+
+
+
+
+
+
+
+
+
+
+_LEVELING_CACHE: dict[str, tuple[tuple[float, float, float, float, str, float, float], dict[str, object]]] = {}
+_LEVELING_CACHE_LOCK = threading.Lock()
+_LEVELING_CACHE_MAX = 128
+_LEVEL_WINDOW_CACHE: dict[str, tuple[float, float]] = {}
+_LEVEL_WINDOW_CACHE_LOCK = threading.Lock()
+_LEVEL_WINDOW_CACHE_MAX = 256
+_LEVELING_CACHE_ATTRS = (
+    "_lvl_last_error",
+    "_lvl_tilt_slope_db_per_oct",
+    "_lvl_perceptual_enabled",
+    "_lvl_perceptual_strength",
+    "_lvl_perceptual_band_hz",
+    "_lvl_perceptual_error_rms",
+    "_lvl_window_debug",
+)
+
+def find_stable_level_window(
+    freq_axis: np.ndarray,
+    magnitudes: np.ndarray,
+    target_mags: np.ndarray,
+    f_min: float,
+    f_max: float,
+    window_size_octaves: float = 1.0,
+    hpf_freq: float = 0.0,
+    tilt_comp: bool = True,
+    tilt_max_db_per_oct: float = 2.0,
+    perceptual_weighting: bool = False,
+    perceptual_strength: float = 0.18,
+    perceptual_min_hz: float = 250.0,
+    perceptual_max_hz: float = 4000.0,
+    perceptual_tie_only: bool = False,
+) -> Tuple[float, float]:
+    cache_key = None
+    try:
+        cache_key = _stable_level_window_cache_key(
+            freq_axis,
+            magnitudes,
+            target_mags,
+            f_min=f_min,
+            f_max=f_max,
+            window_size_octaves=window_size_octaves,
+            hpf_freq=hpf_freq,
+            tilt_comp=tilt_comp,
+            tilt_max_db_per_oct=tilt_max_db_per_oct,
+            perceptual_weighting=perceptual_weighting,
+            perceptual_strength=perceptual_strength,
+            perceptual_min_hz=perceptual_min_hz,
+            perceptual_max_hz=perceptual_max_hz,
+            perceptual_tie_only=perceptual_tie_only,
+        )
+    except (AttributeError, TypeError, ValueError, FloatingPointError, OverflowError):
+        cache_key = None
+
+    if cache_key is not None:
+        with _LEVEL_WINDOW_CACHE_LOCK:
+            cached = _LEVEL_WINDOW_CACHE.get(cache_key)
+        if cached is not None:
+            return cached
+
+    result = find_stable_level_window_impl(
+        freq_axis,
+        magnitudes,
+        target_mags,
+        f_min,
+        f_max,
+        window_size_octaves=window_size_octaves,
+        hpf_freq=hpf_freq,
+        tilt_comp=tilt_comp,
+        tilt_max_db_per_oct=tilt_max_db_per_oct,
+        perceptual_weighting=perceptual_weighting,
+        perceptual_strength=perceptual_strength,
+        perceptual_min_hz=perceptual_min_hz,
+        perceptual_max_hz=perceptual_max_hz,
+        perceptual_tie_only=perceptual_tie_only,
+        to_float_fn=_to_float,
+        to_bool_fn=_to_bool,
+        resample_log_axis_fn=_resample_log_axis,
+        lower_tail_robust_std_db_fn=_lower_tail_robust_std_db,
+        window_offset_consistency_score_fn=_window_offset_consistency_score,
+        perceptual_shape_score_fn=_perceptual_shape_score,
+    )
+    cached_result = (float(result[0]), float(result[1]))
+    if cache_key is not None:
+        with _LEVEL_WINDOW_CACHE_LOCK:
+            if cache_key not in _LEVEL_WINDOW_CACHE and len(_LEVEL_WINDOW_CACHE) >= _LEVEL_WINDOW_CACHE_MAX:
+                _LEVEL_WINDOW_CACHE.pop(next(iter(_LEVEL_WINDOW_CACHE)))
+            _LEVEL_WINDOW_CACHE[cache_key] = cached_result
+    return cached_result
+
+def find_shared_stereo_level_window(
+    freq_axis_l: np.ndarray,
+    magnitudes_l: np.ndarray,
+    target_mags_l: np.ndarray,
+    freq_axis_r: np.ndarray,
+    magnitudes_r: np.ndarray,
+    target_mags_r: np.ndarray,
+    f_min: float,
+    f_max: float,
+    window_size_octaves: float = 1.0,
+    hpf_freq: float = 0.0,
+    tilt_comp: bool = True,
+    tilt_max_db_per_oct: float = 2.0,
+    perceptual_weighting: bool = False,
+    perceptual_strength: float = 0.18,
+    perceptual_min_hz: float = 250.0,
+    perceptual_max_hz: float = 4000.0,
+    perceptual_tie_only: bool = False,
+) -> Tuple[float, float]:
+    return find_shared_stereo_level_window_impl(
+        freq_axis_l,
+        magnitudes_l,
+        target_mags_l,
+        freq_axis_r,
+        magnitudes_r,
+        target_mags_r,
+        f_min,
+        f_max,
+        window_size_octaves=window_size_octaves,
+        hpf_freq=hpf_freq,
+        tilt_comp=tilt_comp,
+        tilt_max_db_per_oct=tilt_max_db_per_oct,
+        perceptual_weighting=perceptual_weighting,
+        perceptual_strength=perceptual_strength,
+        perceptual_min_hz=perceptual_min_hz,
+        perceptual_max_hz=perceptual_max_hz,
+        perceptual_tie_only=perceptual_tie_only,
+        to_float_fn=_to_float,
+        to_bool_fn=_to_bool,
+        resample_log_axis_fn=_resample_log_axis,
+        lower_tail_robust_std_db_fn=_lower_tail_robust_std_db,
+        window_offset_consistency_score_fn=_window_offset_consistency_score,
+        perceptual_shape_score_fn=_perceptual_shape_score,
+    )
+
+def compute_leveling(
+    cfg,
+    freq_axis: np.ndarray,
+    m_anal: np.ndarray,
+    target_mags: np.ndarray,
+    *,
+    stereo_link_ctx: StereoLinkContext | None = None,
+):
+    cache_key = None
+    try:
+        cache_key = _leveling_cache_key(
+            cfg,
+            freq_axis,
+            m_anal,
+            target_mags,
+            stereo_link_ctx=stereo_link_ctx,
+        )
+    except (AttributeError, TypeError, ValueError, FloatingPointError, OverflowError):
+        cache_key = None
+
+    if cache_key is not None:
+        with _LEVELING_CACHE_LOCK:
+            cached = _LEVELING_CACHE.get(cache_key)
+        if cached is not None:
+            cached_result, cached_state = cached
+            _restore_leveling_state(cfg, cached_state)
+            return cached_result
+
+    result = compute_leveling_impl(
+        cfg,
+        freq_axis,
+        m_anal,
+        target_mags,
+        stereo_link_ctx=stereo_link_ctx,
+        to_float_fn=_to_float,
+        to_bool_fn=_to_bool,
+        remember_leveling_error_fn=_remember_leveling_error,
+        safe_setattr_fn=_safe_setattr,
+        log_median_fn=_log_median,
+        tilt_fit_offset_and_slope_db_per_oct_fn=_tilt_fit_offset_and_slope_db_per_oct,
+        perceptual_shape_score_fn=_perceptual_shape_score,
+        find_stable_level_window_fn=find_stable_level_window,
+    )
+    if cache_key is not None:
+        cached_result = tuple(result)
+        cached_state = _capture_leveling_state(cfg)
+        with _LEVELING_CACHE_LOCK:
+            if cache_key not in _LEVELING_CACHE and len(_LEVELING_CACHE) >= _LEVELING_CACHE_MAX:
+                _LEVELING_CACHE.pop(next(iter(_LEVELING_CACHE)))
+            _LEVELING_CACHE[cache_key] = (cached_result, cached_state)
+        return cached_result
+    return result
+
+
+__all__ = ['find_stable_level_window', 'find_shared_stereo_level_window', 'compute_leveling']
+
+
+def _load_sibling_symbols() -> None:
+    import importlib
+    package = __package__
+    for module_name in ['state_cache', 'tilt_helpers', 'window_scoring', 'api']:
+        if module_name == __name__.rsplit('.', 1)[-1]:
+            continue
+        module = importlib.import_module(f"{package}.{module_name}")
+        for symbol in getattr(module, "__all__", ()):
+            globals().setdefault(symbol, getattr(module, symbol))
+
+
+_load_sibling_symbols()
