@@ -39,18 +39,6 @@ For the best balance between sonic accuracy and system stability, we recommend u
 
 ---
 
-## Step 3: Optional AUTO Bass Integration for subwoofer systems
-Use this path when the subwoofer crossover should be optimized inside the automatic run.
-
-1.  Keep **DecayCore Automatic mode** enabled.
-2.  In the `Basic` tab, enable **Bass Integration**.
-3.  Choose the playback topology:
-    * `AVR / Receiver (LFE+Main)` if the AVR handled bass management during measurement. Load `L main`, `R main`, `L sub`, and `R sub`, then enter the AVR crossover used during measurement.
-    * `Direct DAC / CamillaDSP sub output` if CamillaDSP will split the main and sub paths. Load `L main`, `R main`, `Sub 1`, and optional `Sub 2`. Let AUTO choose the `Main/Sub XO` unless you have a strong reason to override it.
-4.  Run AUTO and review the recommended crossover, cancellation risk, overlap ripple, and sub-dominance diagnostics in the results and summary.
-
----
-
 ## Step 4: Generate and Export
 Now, let the **FIR filter generator** process your data.
 
