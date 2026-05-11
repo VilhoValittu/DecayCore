@@ -1,0 +1,521 @@
+# DecayCore
+# Copyright (c) 2026 Vilho Valittu.
+# All rights reserved except as expressly granted in the LICENSE file.
+#
+# This file is part of the public source-available DecayCore repository.
+# Non-commercial use is permitted under the terms of the LICENSE file.
+# Commercial use requires separate written permission.
+#
+# SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
+
+"""Shared helpers for measurement-derived features (RT60 and harmonics).
+
+All functions are pure and unit-testable. No DSP decision-making lives here.
+"""
+
+from __future__ import annotations
+
+import math
+from typing import TYPE_CHECKING
+
+import numpy as np
+
+if TYPE_CHECKING:
+    pass
+
+
+# ---------------------------------------------------------------------------
+# RT60 normalize / serialize
+# ---------------------------------------------------------------------------
+
+def normalize_rt60_value(value) -> float | None:
+    """Convert any RT60 value representation to float, or None if invalid."""
+    try:
+        v = float(value)
+        if math.isfinite(v) and v > 0.0:
+            return v
+    except (TypeError, ValueError):
+        pass
+    return None
+
+
+def normalize_rt60_bands(bands) -> dict[float, float] | None:
+    """Accept string- or float-keyed RT60 band dicts; return sorted float-keyed dict.
+
+    JSON serialisation uses string keys like "31.5" or "6400.4". This helper
+    converts them deterministically to float keys and filters invalid entries.
+    Returns None if the result is empty.
+    """
+    if not isinstance(bands, dict) or not bands:
+        return None
+    result: dict[float, float] = {}
+    for key, value in bands.items():
+        try:
+            freq = float(key)
+            rt = float(value)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(freq) and freq > 0.0 and math.isfinite(rt) and rt > 0.0:
+            result[float(freq)] = float(rt)
+    if not result:
+        return None
+    return dict(sorted(result.items()))
+
+
+def serialize_rt60_bands(bands) -> dict[str, float] | None:
+    """Convert float-keyed RT60 bands to JSON-safe string-keyed dict.
+
+    Use this shared serialiser everywhere instead of hand-rolling float
+    key formatting in multiple places.
+    """
+    norm = normalize_rt60_bands(bands)
+    if norm is None:
+        return None
+    return {f"{freq:g}": rt for freq, rt in norm.items()}
+
+
+# ---------------------------------------------------------------------------
+# RT60 summary
+# ---------------------------------------------------------------------------
+
+def summarize_rt60_bands(
+    bands,
+    wideband: float | None = None,
+) -> dict:
+    """Summarise RT60 bands into frequency-range group averages.
+
+    Returns a dict with keys:
+      valid, wideband_s, lf_20_120_s, lowmid_120_400_s,
+      mid_400_2000_s, hf_2000_8000_s, source_band_count.
+    """
+    result: dict = {
+        "valid": False,
+        "wideband_s": None,
+        "lf_20_120_s": None,
+        "lowmid_120_400_s": None,
+        "mid_400_2000_s": None,
+        "hf_2000_8000_s": None,
+        "source_band_count": 0,
+    }
+
+    wb = normalize_rt60_value(wideband)
+    if wb is not None:
+        result["wideband_s"] = wb
+
+    norm = normalize_rt60_bands(bands)
+    if norm is None:
+        return result
+
+    freqs = np.array(sorted(norm.keys()), dtype=float)
+    vals = np.array([norm[f] for f in freqs], dtype=float)
+    result["source_band_count"] = int(len(freqs))
+
+    def _band_avg(lo: float, hi: float) -> float | None:
+        mask = (freqs >= lo) & (freqs <= hi) & (vals > 0.05) & (vals < 5.0)
+        if np.any(mask):
+            return float(np.median(vals[mask]))
+        # Log-frequency interpolation fallback when no bands fall directly in range.
+        if freqs.size >= 2:
+            try:
+                lf = np.log(np.maximum(freqs, 1e-6))
+                lv = np.log(np.maximum(vals, 1e-9))
+                mid_log = 0.5 * (np.log(max(lo, 1e-6)) + np.log(max(hi, 1e-6)))
+                interp_lv = float(np.interp(mid_log, lf, lv))
+                v = float(np.exp(interp_lv))
+                if math.isfinite(v) and 0.05 < v < 5.0:
+                    return v
+            except Exception:
+                pass
+        return None
+
+    result["lf_20_120_s"] = _band_avg(20.0, 120.0)
+    result["lowmid_120_400_s"] = _band_avg(120.0, 400.0)
+    result["mid_400_2000_s"] = _band_avg(400.0, 2000.0)
+    result["hf_2000_8000_s"] = _band_avg(2000.0, 8000.0)
+
+    if result["wideband_s"] is None:
+        valid_vals = vals[(vals > 0.05) & (vals < 5.0)]
+        if valid_vals.size > 0:
+            result["wideband_s"] = float(np.median(valid_vals))
+
+    result["valid"] = any(
+        result[k] is not None
+        for k in ("lf_20_120_s", "lowmid_120_400_s", "mid_400_2000_s", "hf_2000_8000_s")
+    )
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Harmonic boost-risk curve
+# ---------------------------------------------------------------------------
+
+def build_harmonic_boost_risk_curve(
+    harmonic_freq_hz,
+    harmonic_magnitudes_db: dict,
+    *,
+    fundamental_freq_hz=None,
+    fundamental_mag_db=None,
+    lo_hz: float = 20.0,
+    hi_hz: float = 800.0,
+) -> tuple[np.ndarray | None, np.ndarray | None, dict]:
+    """Build a frequency-dependent 0..1 harmonic boost-risk curve.
+
+    Uses H2 + H3 (and H4 if available). When fundamental data is provided,
+    uses relative comparison (dBr); otherwise falls back to absolute dB logic.
+
+    Returns (freq_hz, risk_curve_0_1, summary_dict).
+    summary keys: mean_risk_20_80, mean_risk_20_120, mean_risk_20_200,
+                  peak_risk, peak_risk_hz, valid.
+    """
+    empty_summary = {
+        "mean_risk_20_80": 0.0,
+        "mean_risk_20_120": 0.0,
+        "mean_risk_20_200": 0.0,
+        "peak_risk": 0.0,
+        "peak_risk_hz": float("nan"),
+        "valid": False,
+    }
+    try:
+        if harmonic_freq_hz is None or not isinstance(harmonic_magnitudes_db, dict):
+            return None, None, empty_summary
+
+        freq = np.asarray(harmonic_freq_hz, dtype=float).reshape(-1)
+        if freq.size < 4:
+            return None, None, empty_summary
+
+        use_relative = (
+            fundamental_freq_hz is not None
+            and fundamental_mag_db is not None
+        )
+        fund_at_harm: np.ndarray | None = None
+        if use_relative:
+            ff = np.asarray(fundamental_freq_hz, dtype=float).reshape(-1)
+            fm = np.asarray(fundamental_mag_db, dtype=float).reshape(-1)
+            valid_f = np.isfinite(ff) & np.isfinite(fm) & (ff > 0.0)
+            if valid_f.sum() >= 4:
+                fund_at_harm = np.interp(
+                    freq,
+                    ff[valid_f],
+                    fm[valid_f],
+                    left=fm[valid_f][0],
+                    right=fm[valid_f][-1],
+                )
+            else:
+                use_relative = False
+
+        h_arrays: list[np.ndarray] = []
+        for order in (2, 3, 4):
+            arr = harmonic_magnitudes_db.get(order)
+            if arr is None:
+                continue
+            a = np.asarray(arr, dtype=float).reshape(-1)
+            if a.size != freq.size:
+                continue
+            if not np.any(np.isfinite(a)):
+                continue
+            h_arrays.append(a)
+            if order == 3 and len(h_arrays) == 0:
+                break
+
+        if not h_arrays:
+            return None, None, empty_summary
+
+        # Choose threshold logic.
+        if use_relative and fund_at_harm is not None:
+            # Relative: H2/H3 vs fundamental, threshold -30 dBr
+            threshold_db = -30.0
+            range_db = 15.0
+            effective = [h - fund_at_harm for h in h_arrays]
+        else:
+            # Absolute: threshold around -40 dBFS, range 15 dB
+            threshold_db = -40.0
+            range_db = 15.0
+            effective = h_arrays
+
+        # Pointwise worst-case across orders, then normalise to 0..1.
+        worst = np.full(freq.size, float("-inf"), dtype=float)
+        for e in effective:
+            finite_mask = np.isfinite(e)
+            worst[finite_mask] = np.maximum(worst[finite_mask], e[finite_mask])
+
+        nonfinite = ~np.isfinite(worst)
+        if np.all(nonfinite):
+            return None, None, empty_summary
+        worst[nonfinite] = float(threshold_db) - 1.0
+
+        raw_risk = np.clip((worst - threshold_db) / max(range_db, 1e-6), 0.0, 1.0)
+
+        # Smooth on log-frequency axis with ~0.5 octave kernel.
+        band_mask = (freq >= lo_hz) & (freq <= hi_hz) & np.isfinite(freq)
+        if np.any(band_mask) and freq[band_mask].size >= 4:
+            lf = np.log2(np.maximum(freq[band_mask], 1e-6))
+            dlf = np.diff(lf)
+            dlf = dlf[dlf > 0]
+            if dlf.size >= 2:
+                step = float(np.median(dlf))
+                sigma_bins = max(1.0, 0.5 / max(step, 1e-6))
+                half = int(np.ceil(3.0 * sigma_bins))
+                x = np.arange(-half, half + 1, dtype=float)
+                k = np.exp(-0.5 * (x / sigma_bins) ** 2)
+                k /= k.sum()
+                from scipy.signal import fftconvolve  # noqa: PLC0415
+                smoothed = fftconvolve(raw_risk[band_mask], k, mode="same")
+                risk = np.zeros(freq.size, dtype=float)
+                risk[band_mask] = np.clip(smoothed, 0.0, 1.0)
+            else:
+                risk = raw_risk.copy()
+        else:
+            risk = raw_risk.copy()
+
+        def _mean_in_band(lo: float, hi: float) -> float:
+            m = (freq >= lo) & (freq <= hi) & np.isfinite(risk)
+            if np.any(m):
+                return float(np.mean(risk[m]))
+            return 0.0
+
+        if np.any(np.isfinite(risk) & (risk > 0.0)):
+            peak_idx = int(np.argmax(risk))
+            peak_risk = float(risk[peak_idx])
+            peak_risk_hz = float(freq[peak_idx])
+        else:
+            peak_risk = 0.0
+            peak_risk_hz = float("nan")
+
+        summary = {
+            "mean_risk_20_80": _mean_in_band(20.0, 80.0),
+            "mean_risk_20_120": _mean_in_band(20.0, 120.0),
+            "mean_risk_20_200": _mean_in_band(20.0, 200.0),
+            "peak_risk": peak_risk,
+            "peak_risk_hz": peak_risk_hz,
+            "valid": bool(peak_risk > 0.0),
+        }
+        return np.asarray(freq, dtype=float), np.asarray(risk, dtype=float), summary
+
+    except Exception:
+        return None, None, empty_summary
+
+
+# ---------------------------------------------------------------------------
+# Aggregation helpers
+# ---------------------------------------------------------------------------
+
+def aggregate_rt60_bands(
+    bands_list: list,
+    *,
+    mode: str = "median",
+) -> dict[float, float] | None:
+    """Aggregate a list of RT60 band dicts into one, using median or mean per frequency.
+
+    Returns None if no valid inputs exist.
+    """
+    if not bands_list:
+        return None
+
+    normalised = [normalize_rt60_bands(b) for b in bands_list]
+    normalised = [n for n in normalised if n is not None]
+    if not normalised:
+        return None
+
+    # Collect all unique frequencies.
+    all_freqs: set[float] = set()
+    for n in normalised:
+        all_freqs.update(n.keys())
+    if not all_freqs:
+        return None
+
+    result: dict[float, float] = {}
+    for freq in sorted(all_freqs):
+        vals = [n[freq] for n in normalised if freq in n]
+        if not vals:
+            continue
+        arr = np.array(vals, dtype=float)
+        arr = arr[np.isfinite(arr) & (arr > 0.0)]
+        if arr.size == 0:
+            continue
+        if mode == "mean":
+            result[float(freq)] = float(np.mean(arr))
+        else:
+            result[float(freq)] = float(np.median(arr))
+
+    return result if result else None
+
+
+def aggregate_rt60_value(
+    values: list,
+    fallback_bands: list | None = None,
+) -> float | None:
+    """Aggregate a list of RT60 wideband values; fall back to estimating from bands."""
+    clean = [normalize_rt60_value(v) for v in (values or [])]
+    clean = [v for v in clean if v is not None]
+    if clean:
+        return float(np.median(np.array(clean, dtype=float)))
+
+    # Fallback: estimate from the aggregated bands.
+    if fallback_bands:
+        agg = aggregate_rt60_bands(fallback_bands)
+        if agg:
+            s = summarize_rt60_bands(agg)
+            if s.get("wideband_s") is not None:
+                return float(s["wideband_s"])
+    return None
+
+
+def aggregate_harmonic_curves(
+    freqs_list: list,
+    mags_list: list,
+    *,
+    mode: str = "linear_mean",
+) -> tuple[np.ndarray | None, dict[int, np.ndarray] | None]:
+    """Average harmonic curves across takes/positions in the linear amplitude domain.
+
+    Inputs:
+      freqs_list: list of freq_hz arrays (one per take)
+      mags_list: list of {order: mag_db array} dicts
+
+    Returns (common_freq_hz, {order: averaged_mag_db}) or (None, None).
+    """
+    valid_pairs = [
+        (np.asarray(f, dtype=float), dict(m))
+        for f, m in zip(freqs_list or [], mags_list or [], strict=False)
+        if f is not None and m is not None
+    ]
+    if not valid_pairs:
+        return None, None
+
+    # Use the first take's freq axis as common grid (all should match within a session).
+    ref_freq = valid_pairs[0][0]
+    if ref_freq.size < 4:
+        return None, None
+
+    # Collect all harmonic orders present across takes.
+    all_orders: set[int] = set()
+    for _, m in valid_pairs:
+        all_orders.update(m.keys())
+    if not all_orders:
+        return None, None
+
+    averaged: dict[int, np.ndarray] = {}
+    for order in sorted(all_orders):
+        rows = []
+        for f, m in valid_pairs:
+            arr = m.get(order)
+            if arr is None:
+                continue
+            a = np.asarray(arr, dtype=float).reshape(-1)
+            if a.size == ref_freq.size:
+                rows.append(a)
+            elif a.size > 0 and f.size == a.size:
+                # Interpolate to common grid.
+                rows.append(np.interp(ref_freq, f, a, left=a[0], right=a[-1]))
+        if not rows:
+            continue
+        mat = np.vstack(rows)
+        if mode == "linear_mean":
+            linear = np.power(10.0, mat / 20.0)
+            averaged_linear = np.mean(linear, axis=0)
+            averaged[int(order)] = 20.0 * np.log10(np.maximum(averaged_linear, 1e-12))
+        else:
+            averaged[int(order)] = np.median(mat, axis=0)
+
+    if not averaged:
+        return None, None
+    return np.asarray(ref_freq, dtype=float), averaged
+
+
+# ---------------------------------------------------------------------------
+# Distance / outlier helpers
+# ---------------------------------------------------------------------------
+
+def rt60_distance_score(
+    candidate_bands,
+    reference_bands,
+) -> float | None:
+    """Return an RMS log-ratio distance between two RT60 band dicts.
+
+    Returns None if comparison is not possible (too few common bands).
+    Returns 0..inf where 0 = identical, higher = more different.
+    """
+    cand = normalize_rt60_bands(candidate_bands)
+    ref = normalize_rt60_bands(reference_bands)
+    if cand is None or ref is None:
+        return None
+
+    common_freqs = sorted(set(cand.keys()) & set(ref.keys()))
+    if len(common_freqs) < 2:
+        return None
+
+    log_ratios = []
+    for freq in common_freqs:
+        c_val = cand[freq]
+        r_val = ref[freq]
+        if c_val > 0.0 and r_val > 0.0:
+            log_ratios.append(math.log(c_val / r_val))
+
+    if len(log_ratios) < 2:
+        return None
+
+    arr = np.array(log_ratios, dtype=float)
+    return float(np.sqrt(np.mean(arr ** 2)))
+
+
+def harmonic_distance_score(
+    candidate_freq,
+    candidate_mags: dict,
+    ref_freq,
+    ref_mags: dict,
+) -> float | None:
+    """RMS difference between two harmonic curve sets on a common frequency axis.
+
+    Compares H2 and H3 (if both available). Returns None if comparison fails.
+    Returns 0..inf where 0 = identical.
+    """
+    if candidate_freq is None or ref_freq is None:
+        return None
+    if not isinstance(candidate_mags, dict) or not isinstance(ref_mags, dict):
+        return None
+
+    try:
+        cf = np.asarray(candidate_freq, dtype=float).reshape(-1)
+        rf = np.asarray(ref_freq, dtype=float).reshape(-1)
+        if cf.size < 4 or rf.size < 4:
+            return None
+
+        # Use log-spaced comparison grid over 20-800 Hz.
+        grid = np.logspace(np.log10(20.0), np.log10(800.0), 64, dtype=float)
+
+        diffs_sq = []
+        for order in (2, 3):
+            ca = candidate_mags.get(order)
+            ra = ref_mags.get(order)
+            if ca is None or ra is None:
+                continue
+            c_arr = np.asarray(ca, dtype=float).reshape(-1)
+            r_arr = np.asarray(ra, dtype=float).reshape(-1)
+            if c_arr.size != cf.size or r_arr.size != rf.size:
+                continue
+            c_on_grid = np.interp(grid, cf, c_arr, left=c_arr[0], right=c_arr[-1])
+            r_on_grid = np.interp(grid, rf, r_arr, left=r_arr[0], right=r_arr[-1])
+            diff = c_on_grid - r_on_grid
+            diffs_sq.append(diff ** 2)
+
+        if not diffs_sq:
+            return None
+
+        all_sq = np.concatenate(diffs_sq)
+        return float(np.sqrt(np.mean(all_sq)))
+    except Exception:
+        return None
+
+
+__all__ = [
+    "normalize_rt60_value",
+    "normalize_rt60_bands",
+    "serialize_rt60_bands",
+    "summarize_rt60_bands",
+    "build_harmonic_boost_risk_curve",
+    "aggregate_rt60_bands",
+    "aggregate_rt60_value",
+    "aggregate_harmonic_curves",
+    "rt60_distance_score",
+    "harmonic_distance_score",
+]

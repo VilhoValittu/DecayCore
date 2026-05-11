@@ -1,0 +1,207 @@
+# DecayCore
+# Copyright (c) 2026 Vilho Valittu.
+# All rights reserved except as expressly granted in the LICENSE file.
+#
+# This file is part of the public source-available DecayCore repository.
+# Non-commercial use is permitted under the terms of the LICENSE file.
+# Commercial use requires separate written permission.
+#
+# SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
+
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional, Tuple
+import logging
+import math
+import numpy as np
+
+from ...auto_mode.filter_priors import get_auto_mode_filter_auto_defaults
+from ...auto_mode.shared import AUTO_MODE_GOAL_FLAT, _auto_bass_integration_profile_norm, _auto_goal_norm
+from ...config.mode_policy import MODE_DEFAULTS
+from ...config.models import StereoAutoPolicyConfig
+from ...dsp.bass_integration import normalize_sub_combine_mode
+from ...ui_i18n import (
+    LAYOUT_MONO,
+    LVL_ALGO_MEDIAN,
+    LVL_MODE_AUTO,
+    LVL_MODE_MANUAL,
+    OUTPUT_TILT_SOURCE_MANUAL_TARGET_TILT,
+    OUTPUT_TILT_SOURCE_OFF,
+    lvl_algo_legacy_name,
+    lvl_mode_legacy_name,
+    normalize_layout_value,
+    normalize_lvl_algo_value,
+    normalize_lvl_mode_value,
+    normalize_output_tilt_source_value,
+)
+
+logger = logging.getLogger("DecayCore")
+
+
+_AUTO_MODE_DEFAULT_CFG_TO_UI = {
+    "global_gain_db": "gain",
+    "mag_c_min": "mag_c_min",
+    "mag_c_max": "mag_c_max",
+    "max_boost_db": "max_boost",
+    "max_cut_db": "max_cut_db",
+    "phase_limit": "phase_limit",
+    "reg_strength": "reg_strength",
+    "fdw_cycles": "fdw_cycles",
+    "filter_smooth": "filter_smooth",
+    "tdc_strength": "tdc_strength",
+    "tdc_max_reduction_db": "tdc_max_reduction_db",
+    "tdc_slope_db_per_oct": "tdc_slope_db_per_oct",
+    "low_bass_cut_hz": "low_bass_cut_hz",
+    "hpf_enable": "hpf_enable",
+    "hpf_freq": "hpf_freq",
+    "hpf_slope": "hpf_slope",
+    "ir_window_ms": "ir_window",
+    "ir_window_ms_left": "ir_window_left",
+    "ir_window_right": "ir_window",
+    "ir_window_left": "ir_window_left",
+    "mixed_split_freq": "mixed_freq",
+    "trans_width": "trans_width",
+    "bass_first_mode_max_hz": "bass_first_mode_max_hz",
+    "max_slope_db_per_oct": "max_slope_db_per_oct",
+    "max_slope_boost_db_per_oct": "max_slope_boost_db_per_oct",
+    "max_slope_cut_db_per_oct": "max_slope_cut_db_per_oct",
+    "lvl_manual_db": "lvl_manual_db",
+    "manual_target_tilt_db_per_oct": "manual_target_tilt_db_per_oct",
+    "output_tilt_db_per_oct": "output_tilt_db_per_oct",
+    "lvl_min": "lvl_min",
+    "lvl_max": "lvl_max",
+    "conf_pull_floor": "conf_pull_floor",
+    "conf_pull_max_hz": "conf_pull_max_hz",
+    "conf_pull_gamma_cut": "conf_pull_gamma_cut",
+    "conf_pull_gamma_boost": "conf_pull_gamma_boost",
+    "low_bass_cut_strength": "low_bass_cut_strength",
+    "filter_type_str": "filter_type",
+    "plot_smoothing_level": "plot_smoothing_level",
+    "lvl_mode": "lvl_mode",
+    "lvl_algo": "lvl_algo",
+    "stereo_link_strategy": "stereo_link_strategy",
+    "enable_mag_correction": "mag_correct",
+    "unsafe_raw_dsp": "unsafe_raw_dsp",
+    "exc_prot": "exc_prot",
+    "enable_tdc": "enable_tdc",
+    "enable_afdw": "enable_afdw",
+    "df_smoothing": "df_smoothing",
+    "comparison_mode": "comparison_mode",
+    "bass_first_ai": "bass_first_ai",
+    "phase_safe_2058": "phase_safe_2058",
+    "stereo_link": "stereo_link",
+    "low_bass_cut_enable": "low_bass_cut_enable",
+}
+
+def _finite_float_or_default(value: Any, default: float = 0.0) -> float:
+    try:
+        parsed = float(value)
+        if math.isfinite(parsed):
+            return float(parsed)
+    except Exception:
+        logger.exception("float parse in pipeline config")
+    return float(default)
+
+def _advanced_manual_output_tilt_enabled(data: Dict[str, Any]) -> bool:
+    try:
+        mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
+    except Exception:
+        mode_u = "BASIC"
+
+    if mode_u != "ADVANCED":
+        return False
+
+    return normalize_lvl_mode_value(data.get("lvl_mode", LVL_MODE_AUTO)) == LVL_MODE_MANUAL
+
+def _effective_output_tilt_source(data: Dict[str, Any]) -> str:
+    if _advanced_manual_output_tilt_enabled(data):
+        return OUTPUT_TILT_SOURCE_MANUAL_TARGET_TILT
+    return normalize_output_tilt_source_value(
+        data.get("output_tilt_source", OUTPUT_TILT_SOURCE_OFF)
+    )
+
+def _resolve_output_tilt_db_per_oct(data: Dict[str, Any]) -> float:
+    try:
+        mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
+    except Exception:
+        mode_u = "BASIC"
+
+    lvl_mode = normalize_lvl_mode_value(data.get("lvl_mode", LVL_MODE_AUTO))
+    output_tilt_source = _effective_output_tilt_source(data)
+
+    if mode_u == "AUTO":
+        try:
+            auto_target_mode = str(data.get("auto_target_mode", "auto") or "auto").strip().lower()
+        except Exception:
+            auto_target_mode = "auto"
+        # AUTO-mode filter tilt is only allowed for the explicit adaptive-target path.
+        if auto_target_mode != "adaptive":
+            return 0.0
+        return max(0.0, _finite_float_or_default(data.get("output_tilt_db_per_oct", 0.0), 0.0))
+    if lvl_mode == LVL_MODE_MANUAL and output_tilt_source == OUTPUT_TILT_SOURCE_MANUAL_TARGET_TILT:
+        return _finite_float_or_default(data.get("manual_target_tilt_db_per_oct", 0.0), 0.0)
+    return 0.0
+
+def _apply_auto_mode_managed_settings(data: Dict[str, Any]) -> None:
+    """Force AUTO mode to use program-managed settings except allowed user choices."""
+    try:
+        filter_type = str(data.get("filter_type", "Asymmetric") or "Asymmetric")
+    except Exception:
+        filter_type = "Asymmetric"
+
+    merged_defaults = dict(MODE_DEFAULTS.get("AUTO", {}) or {})
+    merged_defaults.update(dict(get_auto_mode_filter_auto_defaults(filter_type) or {}))
+
+    forced = {
+        "mode": "AUTO",
+        "camillafir_automatic_mode": True,
+        "auto_mode_workers": 0,
+        "mag_correct": True,
+        "gain": 0.10,
+        "lvl_mode": LVL_MODE_AUTO,
+        "lvl_algo": LVL_ALGO_MEDIAN,
+        "lvl_manual_db": 0.0,
+        "manual_target_tilt_db_per_oct": 0.0,
+        "output_tilt_source": OUTPUT_TILT_SOURCE_OFF,
+        "normalize_opt": False,
+        "align_opt": True,
+        "unsafe_raw_dsp": False,
+        "stereo_link": True,
+        "stereo_link_strategy": "auto",
+        "exc_prot": True,
+        "low_bass_cut_enable": False,
+        "hpf_enable": True,
+        "comparison_mode": True,
+        "df_smoothing": False,
+        "auto_target_mode": str(data.get("auto_target_mode", "auto") or "auto"),
+    }
+
+    for cfg_key, ui_key in _AUTO_MODE_DEFAULT_CFG_TO_UI.items():
+        if cfg_key in merged_defaults:
+            forced[ui_key] = merged_defaults[cfg_key]
+    forced["gain"] = 0.10
+
+    forced["lvl_mode"] = normalize_lvl_mode_value(forced.get("lvl_mode", LVL_MODE_AUTO))
+    forced["lvl_algo"] = normalize_lvl_algo_value(forced.get("lvl_algo", LVL_ALGO_MEDIAN))
+
+    for key, value in forced.items():
+        data[key] = value
+    if _auto_goal_norm(str(data.get("auto_goal", "balanced") or "balanced")) == AUTO_MODE_GOAL_FLAT:
+        data["unsafe_raw_dsp"] = True
+
+
+__all__ = ['_finite_float_or_default', '_advanced_manual_output_tilt_enabled', '_effective_output_tilt_source', '_resolve_output_tilt_db_per_oct', '_apply_auto_mode_managed_settings']
+
+
+def _load_sibling_symbols() -> None:
+    import importlib
+    package = __package__
+    for module_name in ['managed_settings', 'ui_data', 'xo_hpf', 'filter_config']:
+        if module_name == __name__.rsplit('.', 1)[-1]:
+            continue
+        module = importlib.import_module(f"{package}.{module_name}")
+        for symbol in getattr(module, "__all__", ()):
+            globals().setdefault(symbol, getattr(module, symbol))
+
+
+_load_sibling_symbols()
