@@ -1,0 +1,6 @@
+numpy
+scipy
+nicegui>=1.4
+plotly
+optuna
+numba
