@@ -1,0 +1,26 @@
+DecayCore
+Copyright (c) 2026 Vilho Valittu.
+All rights reserved except as expressly granted in the LICENSE file.
+
+This repository contains source code, documentation, examples, configuration
+files, tests, and related project materials owned by Vilho Valittu, except where
+explicit third-party notices state otherwise.
+
+Files included in this public repository may be used only under the terms of the
+LICENSE file included with this repository.
+
+No rights are granted to components that are not included in this public
+repository, including but not limited to DecayCore measurement, calibration,
+sweep generation, chirp/reference-signal handling, response acquisition, timing
+extraction, multi-take aggregation, private development tools, internal release
+automation, unpublished source code, trademarks, logos, icons, or branding
+assets.
+
+Removal or alteration of copyright notices, attribution notices, authorship
+markers, license notices, or provenance information is prohibited.
+
+Third-party components remain subject to their own copyright notices and license
+terms.
+
+Contact:
+vilho.valittu@gmail.com

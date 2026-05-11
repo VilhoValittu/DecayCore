@@ -1,0 +1,31 @@
+DecayCore Notice
+
+DecayCore is developed and maintained by Vilho Valittu.
+
+This public repository is source-available under the terms of the LICENSE file
+included in this repository.
+
+DecayCore is not fully open-source software unless the LICENSE file explicitly
+states otherwise. Use, modification, redistribution, and commercial use are
+permitted only under the terms of the applicable license.
+
+The following components are not included in this public repository and remain
+proprietary unless explicitly licensed separately:
+
+- measurement workflow code;
+- sweep, chirp, reference-signal, and acquisition logic;
+- timing extraction and measurement alignment logic;
+- multi-take and multi-position measurement aggregation;
+- private development tools, internal build tools, and unpublished source code;
+- DecayCore names, logos, icons, branding assets, and project identity material.
+
+Certain parts of the measurement-development work may have been informed by
+external discussion, testing feedback, and privately shared material used with
+permission. Where relevant, third-party provenance must be preserved in project
+records, documentation, and file headers.
+
+Third-party libraries, dependencies, assets, and examples remain subject to their
+own licenses.
+
+All copyright notices, attribution notices, authorship markers, and provenance
+notices must be preserved.

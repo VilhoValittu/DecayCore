@@ -1,0 +1,54 @@
+Third-Party Notices for DecayCore
+
+This file records third-party notices, attribution requirements, provenance notes,
+and relevant external contributions for the DecayCore project.
+
+1. Purpose
+
+This file is provided for attribution and provenance tracking only.
+
+It does not modify, expand, or override the rights granted in the LICENSE file.
+It does not grant any additional right to use, copy, redistribute, sublicense,
+commercially reuse, or relicense DecayCore source code.
+
+2. Third-Party Dependencies
+
+Third-party libraries, packages, tools, assets, examples, and documentation used
+by DecayCore remain subject to their own licenses and copyright notices.
+
+Where required, those notices must be preserved according to the terms of the
+applicable third-party license.
+
+3. Measurement-Related Provenance
+
+Some DecayCore measurement-related development has benefited from external
+discussion, testing feedback, technical review, and privately shared material
+used with permission, including assistance and discussion from Serkan / OCA.
+
+Unless a specific file-level notice states otherwise, this provenance record does
+not mean that third-party source code is included in DecayCore, nor does it grant
+any ownership, license, or redistribution right in DecayCore source code.
+
+Measurement-related code, workflows, acquisition logic, sweep/chirp handling,
+timing extraction, aggregation logic, and related private implementation details
+remain proprietary unless explicitly licensed separately.
+
+4. File-Level Provenance Notices
+
+If a specific file contains third-party-derived material, adapted material, or
+material used under permission, that file should include a local provenance
+notice describing:
+
+- the origin of the material;
+- the nature of the adaptation or influence;
+- the permission basis, if applicable;
+- any attribution requirements;
+- any usage, redistribution, or confidentiality restrictions.
+
+5. Attribution Preservation
+
+All copyright notices, attribution notices, authorship markers, license notices,
+and provenance notices must be preserved.
+
+Removal or alteration of third-party notices is prohibited unless permitted by
+the applicable license or by written permission from the relevant rights holder.

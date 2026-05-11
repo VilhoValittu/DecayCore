@@ -1,0 +1,116 @@
+DecayCore Source-Available Non-Commercial License
+Version 1.0
+
+Copyright (c) 2026 Vilho Valittu.
+All rights reserved.
+
+1. Scope
+
+This license applies only to the source code, documentation, examples,
+configuration files, tests, and related materials included in this public
+DecayCore repository, unless a specific file clearly states otherwise.
+
+This license does not apply to:
+- DecayCore measurement, calibration, sweep generation, chirp/reference
+  signal handling, response acquisition, timing extraction, multi-take
+  aggregation, or related measurement workflow code;
+- private repositories, private builds, internal tools, release automation,
+  unpublished source code, or experimental branches not included in this
+  public repository;
+- DecayCore names, logos, icons, trademarks, branding assets, domain names,
+  or project identity materials;
+- third-party components, which remain subject to their own licenses.
+
+All excluded components remain proprietary and are not licensed under this
+license.
+
+2. Source-Available Status
+
+DecayCore is made available as source-available software.
+
+This is not an open-source license. Publication of the source code does not
+grant any rights other than those expressly stated in this license.
+
+3. Permitted Non-Commercial Use
+
+You may, for personal, educational, research, evaluation, and other
+non-commercial purposes:
+
+- view, fork, clone, and study the source code;
+- run the software privately;
+- modify the software for private or non-commercial use;
+- redistribute non-commercial copies or modified versions, provided that:
+  - this license and all copyright notices are preserved;
+  - modified versions are clearly marked as modified;
+  - DecayCore branding is not used in a way that suggests endorsement;
+  - the software is not sold, sublicensed, hosted as a paid service, or
+    included in a commercial product or service.
+
+4. Commercial Use
+
+Commercial use requires prior written permission from the copyright holder.
+
+Commercial use includes, but is not limited to:
+
+- selling the software or modified versions;
+- using the software in a paid product, service, appliance, DSP platform,
+  audio product, consulting deliverable, or hosted service;
+- integrating the software into commercial audio, measurement, correction,
+  calibration, or DSP workflows;
+- offering paid support, paid filtering services, paid measurement services,
+  or paid hosted processing based substantially on this software.
+
+Commercial licenses may be granted separately.
+
+5. Measurement Components
+
+No rights are granted to DecayCore measurement-related components unless they
+are explicitly included in this repository and explicitly licensed.
+
+The absence of measurement code from this repository does not grant permission
+to copy, reconstruct, relicense, or distribute any private measurement
+implementation owned by the copyright holder.
+
+6. Contributions
+
+By submitting a pull request, patch, issue contribution, documentation change,
+or other contribution to this repository, you grant the copyright holder a
+perpetual, worldwide, non-exclusive, royalty-free license to use, modify,
+relicense, sublicense, distribute, and incorporate your contribution into
+DecayCore.
+
+You represent that you have the right to submit the contribution.
+
+7. Third-Party Material
+
+Third-party libraries, dependencies, examples, or assets may be subject to
+separate license terms. Those terms remain in effect and are not replaced by
+this license.
+
+8. Attribution
+
+You may not remove, alter, hide, or misrepresent copyright notices, authorship
+notices, provenance notices, or license notices.
+
+You may not present DecayCore or a modified version as your own original work.
+
+9. Termination
+
+Any use outside the permissions granted by this license automatically
+terminates your rights under this license.
+
+10. No Warranty
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+11. Limitation of Liability
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR
+OTHER LIABILITY, WHETHER IN CONTRACT, TORT, OR OTHERWISE, ARISING FROM OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OF THE SOFTWARE.
+
+12. Written Exceptions
+
+Any exception to these terms must be granted in writing by the copyright holder.
