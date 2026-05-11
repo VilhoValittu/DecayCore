@@ -241,7 +241,6 @@ def build_config(
             setattr(cfg, "bass_boost_post_restore_enable", False)
             setattr(cfg, "bass_smooth_adaptive", False)
             setattr(cfg, "enable_ir_pre_energy_guard", False)
-            setattr(cfg, "enable_afdw", True)
             logger.info("UNSAFE Raw DSP: guard rails disabled (FOR TEST USE ONLY)")
         except Exception:
             logger.exception("unsafe raw DSP guard rail disable")
