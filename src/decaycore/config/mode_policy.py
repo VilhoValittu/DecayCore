@@ -189,7 +189,6 @@ MODE_CLAMPS: Dict[str, Dict[str, Tuple[Any, Any]]] = {
         "tdc_max_reduction_db": (0.0, 12.0),
         "tdc_slope_db_per_oct": (0.0, 12.0),
         "mixed_split_freq": (100.0, 200.0),
-        "enable_afdw": (True, True),
         "fdw_cycles": (10.0, 15.0),
         "mag_c_min": (18.0, 300.0),
         "mag_c_max": (18.0, 300.0),

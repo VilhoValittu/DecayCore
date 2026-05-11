@@ -178,6 +178,9 @@ def _apply_auto_mode_managed_settings(data: Dict[str, Any]) -> None:
 
     for cfg_key, ui_key in _AUTO_MODE_DEFAULT_CFG_TO_UI.items():
         if cfg_key in merged_defaults:
+            if ui_key == "enable_afdw" and data.get("enable_afdw", None) is not None:
+                forced[ui_key] = bool(data.get("enable_afdw", False))
+                continue
             forced[ui_key] = merged_defaults[cfg_key]
     forced["gain"] = 0.10
 
