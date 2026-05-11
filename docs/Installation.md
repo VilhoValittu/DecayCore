@@ -125,11 +125,11 @@ Then activate the virtual environment again.
 
 ### Ubuntu / Debian Linux
 
-1. Install Git, Python, venv support, pip, and the optional PortAudio system library used by built-in measurement audio:
+1. Install Git, Python, venv support & pip:
 
 ```bash
 sudo apt update
-sudo apt install git python3 python3-venv python3-pip libportaudio2
+sudo apt install git python3 python3-venv python3-pip 
 ```
 
 2. Open Terminal in the cloned DecayCore source folder.
