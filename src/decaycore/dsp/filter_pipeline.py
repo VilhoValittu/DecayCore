@@ -208,9 +208,9 @@ def _run_generate_filter_stereo_link_presolve(
             if hpf_f > 0 and hpf_order > 0:
                 hpf_db = apply_hpf_to_mags(freq_axis, np.zeros_like(freq_axis), hpf_f, hpf_order)
                 gain_db = gain_db + hpf_db
-                hpf_guard_mask = np.isfinite(freq_axis) & (freq_axis <= float(hpf_f)) & (gain_db > 0.0)
+                hpf_guard_mask = np.isfinite(freq_axis) & (freq_axis <= float(hpf_f)) & (gain_db > hpf_db)
                 if int(np.count_nonzero(hpf_guard_mask)) > 0:
-                    gain_db[hpf_guard_mask] = 0.0
+                    gain_db[hpf_guard_mask] = hpf_db[hpf_guard_mask]
 
         gain_db, _residual_telemetry = apply_residual_pass_if_enabled(
             cfg=cfg,

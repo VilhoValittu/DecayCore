@@ -180,10 +180,10 @@ def _run_phase_ir_stage(inputs: PhaseIRInputs) -> PhaseIROutputs:
                 freq_axis, np.zeros_like(freq_axis), hpf_f, hpf_order
             )
             gain_db = gain_db + hpf_db
-            hpf_guard_mask = np.isfinite(freq_axis) & (freq_axis <= float(hpf_f)) & (gain_db > 0.0)
+            hpf_guard_mask = np.isfinite(freq_axis) & (freq_axis <= float(hpf_f)) & (gain_db > hpf_db)
             hpf_guard_bins = int(np.count_nonzero(hpf_guard_mask))
             if hpf_guard_bins > 0:
-                gain_db[hpf_guard_mask] = 0.0
+                gain_db[hpf_guard_mask] = hpf_db[hpf_guard_mask]
             try:
                 logger.info(
                     "HPF magnitude applied to FIR: "
