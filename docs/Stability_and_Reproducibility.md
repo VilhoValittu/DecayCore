@@ -1,4 +1,4 @@
-# Stability and Reproducibility (v4.2.1)
+# Stability and Reproducibility (v1.0.0)
 
 DecayCore is designed to avoid the classic failure mode:
 
