@@ -304,7 +304,7 @@ _AUTO_LOCKED_FIELDS = [
     "stereo_link_strategy",
     "exc_prot", "exc_freq", "hpf_enable", "low_bass_cut_enable",
     "ir_export_window_mode", "ir_export_window_shape", "ir_export_tukey_alpha",
-    "enable_afdw", "fdw_cycles", "enable_tdc",
+    "fdw_cycles", "enable_tdc",
     "tdc_strength", "tdc_max_reduction_db", "tdc_slope_db_per_oct",
     "mixed_freq", "plot_smoothing_level",
 ]
