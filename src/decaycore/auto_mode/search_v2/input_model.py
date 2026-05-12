@@ -18,7 +18,7 @@ from types import MappingProxyType
 from typing import Any
 
 from ..cache_signature import _auto_measurement_signature
-from ..shared import _auto_hash_array
+from ..shared import _auto_filter_cache_key, _auto_filter_type_for_key, _auto_hash_array
 
 _WINNER_ONLY_KEYS = frozenset(
     {
@@ -31,6 +31,7 @@ _WINNER_ONLY_KEYS = frozenset(
         "_auto_target_curve_meta",
         "_auto_target_seed_metrics",
         "_auto_target_seed_preset",
+        "_auto_target_seed_source",
         "best_applied_preset",
         "best_metrics",
         "best_preset",
@@ -112,6 +113,8 @@ def canonicalize_auto_search_base_data(raw_data: dict | None) -> dict:
         if key_s in {"synthetic_target", "synthetic_target_f", "synthetic_target_m"}:
             continue
         out[key_s] = value
+    if "filter_type" in out:
+        out["filter_type"] = _auto_filter_type_for_key(_auto_filter_cache_key(out))
     return out
 
 

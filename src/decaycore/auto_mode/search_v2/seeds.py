@@ -100,7 +100,7 @@ def _apply_explicit_seed(
         prior_seed_preset = dict(seed_preset)
         logger.info(
             "Automatic mode: target/cache preset seed loaded for canonical "
-            "Phase 1 -> Phase 2 -> Micro refine search."
+            "Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 search."
         )
     return prior_seed_preset
 

@@ -17,10 +17,9 @@ import logging
 from .cache_signature import (
     _auto_apply_seed,
     _auto_compat_version,
-    _auto_seed_from_signature,
-    _auto_signature,
     get_or_build_synth_target,
 )
+from .cache_measurement_sig import _auto_get_measurement_signature, _auto_target_study_sig
 from .runtime_context import coerce_orchestrator_runtime
 from .rank_score import official_rank_score
 from .scoring_ranking import (
@@ -57,6 +56,7 @@ from .orchestrator_target_types import (
 from .orchestrator_target_cache import (
     _resolve_cached_target_state,
     _try_exact_cached_target_result,
+    _try_measurement_global_target_result,
 )
 from .orchestrator_target_shortlist import (
     _apply_target_shortlist_modifiers,
@@ -101,39 +101,14 @@ def _prepare_target_selection_setup(
         str(goal),
         str(rank_basis),
     )
-    target_sig_base = dict(base_data or {})
-    for key in (
-        "_auto_exc_freq_hz",
-        "_auto_exc_seed_freq_hz",
-        "_auto_mag_c_min_hz",
-        "_auto_low_bass_cut_hz",
-    ):
-        target_sig_base.pop(key, None)
-    seed_target = _auto_seed_from_signature(
-        base_data=target_sig_base,
-        measurements=measurements,
-        fs_v=int(fs_v),
-        taps_v=int(taps_v),
-        xos=xos,
-        hpf=hpf,
-        hc_mode=None,
-        include_hc_mode=False,
-    )
+    measurement_identity = _auto_get_measurement_signature(measurements)
+    target_study_sig = _auto_target_study_sig(measurement_identity, goal)
+    seed_target = int(str(target_study_sig)[:16], 16) % (2**31 - 1)
     _auto_apply_seed(seed_target)
     logger.info(
         "Automatic mode target select: seed=%d cache_schema=%d",
         int(seed_target),
         int(AUTO_MODE_CACHE_SCHEMA_VERSION),
-    )
-    target_study_sig = _auto_signature(
-        base_data=target_sig_base,
-        measurements=measurements,
-        fs_v=int(fs_v),
-        taps_v=int(taps_v),
-        xos=xos,
-        hpf=hpf,
-        hc_mode=None,
-        include_hc_mode=False,
     )
     return _TargetSelectionSetup(
         runtime=runtime_obj,
@@ -343,6 +318,16 @@ def _build_target_candidate_list(
         status_cb=params.get("status_cb"),
     )
     params["_target_cache_state"] = cache_state
+    cached_result = _try_measurement_global_target_result(
+        setup=setup,
+        cache_state=cache_state,
+        base_data=dict(params.get("base_data", {}) or {}),
+        measurements=dict(params.get("measurements", {}) or {}),
+        status_cb=params.get("status_cb"),
+    )
+    if isinstance(cached_result, dict):
+        params["_target_final_result"] = dict(cached_result)
+        return _TargetSelectionContext(params=params)
     cached_result = _try_exact_cached_target_result(
         setup=setup,
         cache_state=cache_state,

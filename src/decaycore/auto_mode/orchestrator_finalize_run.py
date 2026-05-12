@@ -305,6 +305,7 @@ def finalize_search_result(
     if search_state is None:
         return None
 
+    logger.info("Automatic mode Phase 4: Pareto finalize, winner polish, final validation")
     _run_phase2_pareto_finalize(
         search_state=search_state,
         cfg=cfg,
@@ -391,6 +392,7 @@ def finalize_search_result(
         materialized_best_preset=dict(materialized_best_preset or {}),
     )
 
+    logger.info("Automatic mode Phase 4 complete: final winner materialized and cached")
     return _build_final_search_result(
         search_state=search_state,
         cached_best_preset=dict(cached_best_preset or {}),

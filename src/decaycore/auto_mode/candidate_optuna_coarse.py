@@ -41,6 +41,7 @@ from .candidate_base import (
     _auto_optuna_nearest_choice,
     _bi_search_enabled,
     _derive_adaptive_freq_bounds,
+    _auto_filter_normalized_base_data,
     _mag_low_search_bounds,
     _seed_bi_optuna_params,
     _suggest_bi_optuna_params,
@@ -53,6 +54,7 @@ def _suggest_auto_mode_candidate_optuna(
     *,
     optimize_mag_low: bool = True,
 ) -> dict:
+    base_data = _auto_filter_normalized_base_data(base_data)
     keep_tdc = bool(base_data.get("enable_tdc", True))
     keep_afdw = bool(base_data.get("enable_afdw", True))
     keep_bass_first = bool(base_data.get("bass_first_ai", True))
@@ -237,6 +239,7 @@ def _seed_auto_mode_candidate_optuna_params(
     *,
     optimize_mag_low: bool = True,
 ) -> dict:
+    base_data = _auto_filter_normalized_base_data(base_data)
     ft = str(base_data.get("filter_type", "") or "").strip().lower()
     is_mixed = "mixed" in ft
     is_phase_search = _auto_is_phase_search_filter(ft)

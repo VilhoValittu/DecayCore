@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 import numpy as np
 
@@ -25,6 +26,7 @@ from .shared import (
     AUTO_MODE_OPTUNA_CONSTRAINTS_REFINE_ONLY,
     AUTO_MODE_OPTUNA_CONSTRAINTS_USE_EVENTS_IN_REFINE,
     AUTO_MODE_OPTUNA_USER_ATTR_OUT,
+    _auto_filter_cache_key,
     AutoModeConfig,
     _auto_safe_bool,
     _auto_safe_float,
@@ -87,13 +89,35 @@ def _auto_optuna_constraints_enabled_for_scope(
         return bool(_auto_optuna_is_refine_phase_kind(phase_kind))
     return bool(_auto_optuna_constraint_scope_kind(scope))
 
+
+def _auto_optuna_scope_for_filter(
+    base_data: dict | None,
+    scope: str | None,
+    *,
+    filter_key: str | None = None,
+) -> str:
+    scope_txt = str(scope or "study").strip() or "study"
+    fk = str(
+        _auto_filter_cache_key(
+            base_data if filter_key is None else None,
+            filter_type=filter_key,
+        )
+    )
+    suffix = f"filter-{fk}"
+    if re.search(r"(?:^|-)filter-(?:linear|mixed|minimum|asym)(?:-|$)", scope_txt.lower()):
+        return str(scope_txt)
+    if suffix in scope_txt.lower():
+        return str(scope_txt)
+    return f"{scope_txt}-{suffix}"
+
+
 def _auto_optuna_effective_scope(
     base_data: dict | None,
     scope: str | None,
     *,
     phase_kind: str | None = None,
 ) -> str:
-    scope_txt = str(scope or "study").strip() or "study"
+    scope_txt = _auto_optuna_scope_for_filter(base_data, scope)
     if _auto_optuna_is_refine_phase_kind(phase_kind) and str(phase_kind or "").strip().lower() == "local":
         if not str(scope_txt).lower().endswith("-locv2") and "-locv2-" not in str(scope_txt).lower():
             scope_txt = f"{scope_txt}-locv2"

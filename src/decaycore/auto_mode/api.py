@@ -33,6 +33,8 @@ from .cache_signature import (
     _auto_cache_get_entry,
     _auto_cache_get_last_used_best,
     _auto_cache_get_target_for_measurements,
+    _auto_cache_get_target_for_measurements_global,
+    _auto_cache_put_target_for_measurements_global,
     _auto_compat_version,
     _auto_signature,
     get_auto_mode_cache_path,
@@ -100,6 +102,7 @@ from .shared import (
     AUTO_MODE_PHASE_LIMIT_MAX_HZ as SHARED_AUTO_MODE_PHASE_LIMIT_MAX_HZ,
     AUTO_MODE_PHASE_LIMIT_MIN_HZ as SHARED_AUTO_MODE_PHASE_LIMIT_MIN_HZ,
     _auto_filter_cache_key,
+    _auto_filter_type_for_key,
     _auto_goal,
     _auto_goal_basis_text,
     _auto_goal_norm,
@@ -358,6 +361,7 @@ _auto_optuna_cross_study_best_params = _optuna_backend._auto_optuna_cross_study_
 _auto_optuna_jsonable = _optuna_backend._auto_optuna_jsonable
 _auto_optuna_scope_context_hash = _optuna_backend._auto_optuna_scope_context_hash
 _auto_optuna_scope_with_context = _optuna_backend._auto_optuna_scope_with_context
+_auto_optuna_scope_for_filter = _optuna_backend._auto_optuna_scope_for_filter
 _auto_optuna_param_signature = _optuna_backend._auto_optuna_param_signature
 _auto_optuna_trial_params = _optuna_backend._auto_optuna_trial_params
 _auto_optuna_trial_payload_preset = _optuna_backend._auto_optuna_trial_payload_preset

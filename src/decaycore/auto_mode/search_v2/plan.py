@@ -36,3 +36,4 @@ class AutoSearchPlanDecision:
     enabled_phases: tuple[str, ...]
     fallback_reasons: tuple[str, ...]
     cache_decision_report: dict | None = None
+    seed_source: str | None = None

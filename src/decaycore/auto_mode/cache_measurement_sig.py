@@ -128,3 +128,26 @@ def _auto_measurement_signature(measurements: dict) -> str:
         except Exception:
             logger.exception("bass integration signature hash update")
     return h.hexdigest()
+
+
+def _auto_optuna_stable_study_sig(measurement_identity: str, filter_key: str) -> str:
+    """Stable Optuna study signature keyed only on measurement + filter type.
+
+    Does NOT include taps/fs/xos — ensures the same Optuna study is reused
+    across runs even when filter length or sample rate changes.
+    """
+    h = hashlib.sha256()
+    h.update(str(filter_key or "mixed").strip().lower().encode("utf-8"))
+    h.update(b":")
+    h.update(str(measurement_identity or "").encode("utf-8"))
+    return h.hexdigest()
+
+
+def _auto_target_study_sig(measurement_identity: str, goal: str) -> str:
+    """Stable target-study signature keyed only on measurement + auto goal."""
+    h = hashlib.sha256()
+    h.update(b"target-v2:")
+    h.update(str(goal or "balanced").strip().lower().encode("utf-8", "ignore"))
+    h.update(b":")
+    h.update(str(measurement_identity or "").encode("utf-8", "ignore"))
+    return h.hexdigest()

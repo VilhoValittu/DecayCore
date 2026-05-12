@@ -52,6 +52,8 @@ from .shared import (
     AUTO_MODE_PHASE3_MICRO_TRIALS,
     _auto_is_phase_search_filter,
     _auto_goal,
+    _auto_filter_cache_key,
+    _auto_filter_type_for_key,
     _auto_output_tilt_bounds,
     _auto_optuna_sampler_kwargs,
     _auto_phase_limit_center,
@@ -65,6 +67,13 @@ from .shared import (
 # ---------------------------------------------------------------------------
 # Optuna snap / unit helpers
 # ---------------------------------------------------------------------------
+
+def _auto_filter_normalized_base_data(base_data: dict | None) -> dict:
+    out = dict(base_data or {})
+    fk = str(_auto_filter_cache_key(out))
+    out["filter_type"] = str(_auto_filter_type_for_key(fk))
+    out["_auto_filter_key"] = str(fk)
+    return out
 
 def _auto_optuna_snap_to_step(value: float, *, lo: float, hi: float, step: float) -> float:
     clipped = float(np.clip(_auto_safe_float(value, lo), float(lo), float(hi)))
@@ -499,6 +508,7 @@ def _build_auto_mode_candidates_optuna(
     startup_trials: int = AUTO_MODE_OPTUNA_PILOT_STARTUP_TRIALS,
     optimize_mag_low: bool = True,
 ) -> list[dict] | None:
+    base_data = _auto_filter_normalized_base_data(base_data)
     try:
         import optuna  # type: ignore
     except Exception:

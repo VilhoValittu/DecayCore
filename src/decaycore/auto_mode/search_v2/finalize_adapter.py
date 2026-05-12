@@ -26,6 +26,15 @@ from .context import _nullctx
 logger = logging.getLogger("DecayCore")
 
 
+def _emit_phase4_status(status_cb) -> None:
+    if not callable(status_cb):
+        return
+    try:
+        status_cb("DecayCore automatic mode: Phase 4 finalize / Pareto / winner polish")
+    except Exception:
+        logger.exception("Phase 4 status callback failed")
+
+
 def attach_auto_search_fallbacks(result: dict | None, *sources: dict | None) -> dict | None:
     if not isinstance(result, dict):
         return result
@@ -59,6 +68,7 @@ def finalize_from_refine_stats(
 ) -> dict | None:
     with active_profiler_scope(context.profiler):
         with (context.profiler.section("finalize") if context.profiler else _nullctx()):
+            _emit_phase4_status(context.status_cb)
             result = orchestrator_finalize.finalize_search_result(
                 search_base_data=context.search_base_data,
                 cache_base_data=context.cache_base_data,
@@ -108,6 +118,7 @@ def finalize_from_cache_refine(
 ) -> dict | None:
     with active_profiler_scope(context.profiler):
         with (context.profiler.section("finalize") if context.profiler else _nullctx()):
+            _emit_phase4_status(context.status_cb)
             result = orchestrator_finalize.finalize_search_result(
                 search_base_data=context.cache_base_data,
                 cache_base_data=context.cache_base_data,

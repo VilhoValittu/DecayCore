@@ -159,14 +159,34 @@ def _public_stereo_policy_refine_meta(stereo_refine_meta: dict | None) -> dict:
     return out
 
 def _cache_refine_winner_phase_label(seed_source: str | None) -> str:
+    seed_source_s = str(seed_source or "")
+    if seed_source_s in (
+        "cached_target_seed",
+        "cache_signature_target_seed",
+        "cache_measurement_target_seed",
+        "cache_optuna_target_seed",
+    ):
+        return "cached target seed + micro refine"
     return (
         "target preselect + micro refine"
-        if str(seed_source or "") == "target_preselect"
+        if seed_source_s == "target_preselect"
         else "exact cache hit + micro refine"
     )
 
 def _cache_refine_winner_summary(seed_source: str | None, *, improved_any: bool) -> str:
-    if str(seed_source or "") == "target_preselect":
+    seed_source_s = str(seed_source or "")
+    if seed_source_s in (
+        "cached_target_seed",
+        "cache_signature_target_seed",
+        "cache_measurement_target_seed",
+        "cache_optuna_target_seed",
+    ):
+        return (
+            "Loaded cached target seed and ran micro-refine trials."
+            if bool(improved_any)
+            else "Loaded cached target seed and verified it with micro-refine trials."
+        )
+    if seed_source_s == "target_preselect":
         return (
             "Loaded target preselect seed and ran micro-refine trials."
             if bool(improved_any)

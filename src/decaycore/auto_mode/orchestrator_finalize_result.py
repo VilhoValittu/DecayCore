@@ -315,6 +315,15 @@ def _build_final_search_result(
         "trials_phase1_ok": int(phase1_ok),
         "trials_phase2_total": int(phase2_tried),
         "trials_phase2_ok": int(phase2_ok),
+        "trials_phase3_total": int(dict(phase3_micro_optuna_tel or {}).get("n_total", 0) or 0),
+        "trials_phase3_ok": int(dict(phase3_micro_optuna_tel or {}).get("ok", 0) or 0),
+        "phase4_finalize": True,
+        "phase4_steps": {
+            "pareto_finalize": True,
+            "winner_polish": True,
+            "final_validation": True,
+            "cache_save": True,
+        },
         "optuna_phase1_telemetry": dict(phase1_optuna_tel or {}),
         "optuna_phase2_local_telemetry": list(phase2_local_optuna_tels or []),
         "optuna_phase3_micro_telemetry": dict(phase3_micro_optuna_tel or {}),
@@ -324,5 +333,4 @@ def _build_final_search_result(
         "search_fs": int(fs_v),
         "search_taps": int(taps_v),
     }
-
 

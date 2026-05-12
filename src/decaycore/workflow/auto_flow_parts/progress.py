@@ -100,7 +100,7 @@ def _estimate_auto_progress_from_status(msg: str) -> float | None:
     if "decaycore automatic mode" not in lower and "camillafir automatic mode" not in lower:
         return None
 
-    if "automatic mode: finalize " in lower:
+    if "automatic mode: finalize " in lower or "automatic mode: phase 4 finalize" in lower:
         return float(_AUTO_PROGRESS_FINALIZE)
     if (
         "phase2 summary" in lower
@@ -289,7 +289,10 @@ def _get_auto_status_callback(
         progress = _estimate_auto_progress_from_status(msg)
         if progress is not None:
             _set_auto_progress(ctx, support=support, value=float(progress))
-        callbacks.status(msg)
+        try:
+            callbacks.status(msg)
+        except Exception:
+            logger.exception("auto status callback failed")
 
     ctx["_auto_status_callback"] = _status
     return _status

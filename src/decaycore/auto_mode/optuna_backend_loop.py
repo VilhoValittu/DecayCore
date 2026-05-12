@@ -60,6 +60,7 @@ def _prepare_optuna_eval_context(
     study_scope: str | None = None,
     phase_label: str | None = None,
     phase_kind: str | None = None,
+    study_user_attrs: dict | None = None,
 ) -> _OptunaEvalContext:
     return _OptunaEvalContext(
         params={
@@ -80,6 +81,7 @@ def _prepare_optuna_eval_context(
             "study_scope": study_scope,
             "phase_label": phase_label,
             "phase_kind": phase_kind,
+            "study_user_attrs": dict(study_user_attrs or {}) if isinstance(study_user_attrs, dict) else None,
         },
         total=int(max(0, n_total)),
         workers=int(workers),
@@ -364,6 +366,7 @@ def _auto_run_optuna_eval_loop(
     study_scope: str | None = None,
     phase_label: str | None = None,
     phase_kind: str | None = None,
+    study_user_attrs: dict | None = None,
 ) -> dict:
     context = _prepare_optuna_eval_context(
         optuna_mod=optuna_mod,
@@ -383,6 +386,7 @@ def _auto_run_optuna_eval_loop(
         study_scope=study_scope,
         phase_label=phase_label,
         phase_kind=phase_kind,
+        study_user_attrs=study_user_attrs,
     )
     scheduled = _submit_or_schedule_trials(context=context)
     consumed = _consume_completed_trial(state=scheduled)

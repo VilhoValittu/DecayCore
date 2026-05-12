@@ -283,6 +283,17 @@ def _auto_filter_cache_key(
         return "linear"
     return "mixed"
 
+
+def _auto_filter_type_for_key(filter_key: str | None) -> str:
+    fk = str(_auto_filter_cache_key(filter_type=str(filter_key or "")))
+    if fk == "asym":
+        return "Asymmetric"
+    if fk == "linear":
+        return "Linear Phase"
+    if fk == "minimum":
+        return "Minimum Phase"
+    return "Mixed"
+
 def _auto_hash_array(a: np.ndarray, *, decimals: int = 4, max_len: int = 1200) -> str:
     try:
         x = np.asarray(a, dtype=float).reshape(-1)

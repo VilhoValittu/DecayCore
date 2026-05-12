@@ -1,4 +1,4 @@
-# DecayCore – Official Manual (v1.0.0)
+# DecayCore – Official Manual (v4.3.0)
 
 ## 1. Overview
 DecayCore generates **FIR room-correction filters** from REW exports, built-in sweep measurements, and WAV/IR captures.

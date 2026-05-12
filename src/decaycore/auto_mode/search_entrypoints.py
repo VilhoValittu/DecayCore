@@ -16,18 +16,31 @@ import logging
 
 from . import api as auto_api
 from . import orchestrator_finalize, orchestrator_refine
-from .search_v2.legacy_adapter import (
-    attach_auto_search_fallbacks,
-    build_auto_mode_orchestrator_runtime,
-    record_auto_search_fallback,
-)
-from .search_v2.runner import run_auto_search_v2 as _run_auto_search_v2
-
 logger = logging.getLogger("DecayCore")
 
-_build_auto_mode_orchestrator_runtime = build_auto_mode_orchestrator_runtime
-_record_auto_search_fallback = record_auto_search_fallback
-_attach_auto_search_fallbacks = attach_auto_search_fallbacks
+
+def _build_auto_mode_orchestrator_runtime():
+    from .search_v2.legacy_adapter import build_auto_mode_orchestrator_runtime
+
+    return build_auto_mode_orchestrator_runtime()
+
+
+def _record_auto_search_fallback(*args, **kwargs):
+    from .search_v2.legacy_adapter import record_auto_search_fallback
+
+    return record_auto_search_fallback(*args, **kwargs)
+
+
+def _attach_auto_search_fallbacks(*args, **kwargs):
+    from .search_v2.legacy_adapter import attach_auto_search_fallbacks
+
+    return attach_auto_search_fallbacks(*args, **kwargs)
+
+
+def _run_auto_search_v2(**kwargs):
+    from .search_v2.runner import run_auto_search_v2
+
+    return run_auto_search_v2(**kwargs)
 
 
 def _run_auto_mode_search(

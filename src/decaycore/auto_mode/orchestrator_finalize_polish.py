@@ -33,6 +33,7 @@ from .cache_signature import (
     _auto_cache_put_best,
     _auto_cache_put_last_used_best,
     _auto_cache_put_target_for_measurements,
+    _auto_cache_put_target_for_measurements_global,
     _auto_measurement_signature,
     _auto_signature,
 )
@@ -156,6 +157,19 @@ def _save_cached_best(
         goal=goal,
         filter_key=filter_key,
         compat_version=compat_version,
+    )
+    _auto_cache_put_target_for_measurements_global(
+        measurements=measurements,
+        best_hc_mode=best_hc_mode_builtin,
+        goal=goal,
+        compat_version=compat_version,
+        target_selection_meta={
+            "source": "auto_finalize",
+            "filter_key_that_updated_seed": str(filter_key),
+        },
+        filter_key=filter_key,
+        filter_seed_preset=dict(best_preset_for_target or {}),
+        filter_seed_metrics=dict(best_metrics or {}),
     )
     _auto_cache_put_last_used_best(
         best_preset=dict(best_preset_for_run or {}),
@@ -565,4 +579,3 @@ def _apply_search_winner_polish_pipeline(
         "_stereo_refine_meta": dict(stereo_refine_meta or {}),
     }
     return polish_meta, dict(residual_peak_safety_override_meta or {})
-

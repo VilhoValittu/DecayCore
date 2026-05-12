@@ -21,6 +21,7 @@ from .cache_signature import (
     _auto_apply_seed,
     _auto_seed_from_signature,
 )
+from .cache_measurement_sig import _auto_get_measurement_signature
 from .candidate_generation import _build_auto_mode_candidates
 from .search_v2.candidates import deduplicate_presets
 from .shared import (
@@ -188,9 +189,13 @@ def _run_target_trials(
 
     if bool(use_optuna_trials):
         out_by_idx: dict[int, dict] = {}
+        base_tc_optuna = dict(base_tc or {})
+        base_tc_optuna["_optuna_measurement_sig"] = _auto_get_measurement_signature(measurements)
+        base_tc_optuna["_optuna_journal_kind"] = "target"
+        base_tc_optuna["_optuna_filter_key"] = ""
         raw_scope = f"target-{str(target_name)}-{str(phase_tag)}"
         scope_eff = runtime.auto_optuna_effective_scope(
-            base_tc,
+            base_tc_optuna,
             raw_scope,
             phase_kind=phase_kind,
         )
@@ -231,7 +236,7 @@ def _run_target_trials(
                 + sum(ord(ch) for ch in str(target_name)) * 31
                 + sum(ord(ch) for ch in str(phase_tag)) * 17
             ),
-            base_data=dict(base_tc or {}),
+            base_data=base_tc_optuna,
             seed_presets=list(seed_presets or []),
             build_preset=optuna_builder,
             eval_one=_eval_one,
@@ -247,6 +252,12 @@ def _run_target_trials(
             study_scope=raw_scope,
             phase_label=f"target {str(target_name)} {str(phase_tag)}",
             phase_kind=phase_kind,
+            study_user_attrs={
+                "decaycore_kind": "target_search",
+                "decaycore_target_name": str(target_name),
+                "decaycore_target_study_sig": str(target_study_sig),
+                "decaycore_target_cache_version": 2,
+            },
         )
         return [
             dict(

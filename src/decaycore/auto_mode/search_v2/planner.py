@@ -70,22 +70,23 @@ def _decision(
     cache_record: dict | None = None,
     fallback_reasons: list[str] | tuple[str, ...] | None = None,
     cache_decision_report: dict | None = None,
+    seed_source: str | None = None,
 ) -> AutoSearchPlanDecision:
     if plan in (AutoSearchPlan.CACHE_MICRO_REFINE, AutoSearchPlan.LAST_BEST_MICRO_REFINE):
         skipped = ("phase1", "phase2")
-        enabled = ("micro_refine",)
+        enabled = ("phase3", "phase4")
     elif plan == AutoSearchPlan.PRESELECTED_TARGET_REFINE:
         skipped = ()
-        enabled = ("phase1","phase2", "micro_refine")
+        enabled = ("phase1", "phase2", "phase3", "phase4")
     elif plan == AutoSearchPlan.MANUAL_PRESET_REFINE:
         skipped = ()
-        enabled = ("phase1", "phase2", "micro_refine")
+        enabled = ("phase1", "phase2", "phase3", "phase4")
     elif plan == AutoSearchPlan.REUSE_VALID_RESULT:
-        skipped = ("phase1", "phase2", "micro_refine")
+        skipped = ("phase1", "phase2", "phase3", "phase4")
         enabled = ("reuse",)
     else:
         skipped = ()
-        enabled = ("phase1", "phase2", "micro_refine")
+        enabled = ("phase1", "phase2", "phase3", "phase4")
     return AutoSearchPlanDecision(
         plan=plan,
         reason=str(reason),
@@ -100,6 +101,7 @@ def _decision(
             if str(item or "").strip()
         ),
         cache_decision_report=dict(cache_decision_report or {}) if isinstance(cache_decision_report, dict) else None,
+        seed_source=str(seed_source or "").strip() or None,
     )
 
 
@@ -111,6 +113,61 @@ def _wants_target_preselect(raw_data: dict) -> bool:
 def _wants_manual_preset_refine(raw_data: dict) -> bool:
     mode = str(dict(raw_data or {}).get("auto_target_mode", "") or "").strip().lower()
     return bool(mode in ("selected", "manual", "fixed", "user"))
+
+
+def _has_target_preselect_seed(raw_data: dict) -> bool:
+    raw = dict(raw_data or {})
+    return bool(
+        isinstance(raw.get("_auto_target_seed_preset"), dict)
+        and dict(raw.get("_auto_target_seed_preset") or {})
+    )
+
+
+def _target_seed_source(raw_data: dict) -> str:
+    return str(dict(raw_data or {}).get("_auto_target_seed_source", "") or "").strip().lower()
+
+
+def _has_fresh_target_seed(raw_data: dict) -> bool:
+    if not _has_target_preselect_seed(raw_data):
+        return False
+    source = _target_seed_source(raw_data)
+    return bool(source in ("", "fresh_target_search", "target_preselect", "target_search"))
+
+
+def _has_cached_target_seed(raw_data: dict) -> bool:
+    if not _has_target_preselect_seed(raw_data):
+        return False
+    source = _target_seed_source(raw_data)
+    return bool(
+        source in (
+            "cached_target_seed",
+            "cache_signature",
+            "cache_signature_hit",
+            "cache_measurement",
+            "cache_measurement_hit",
+            "cache_measurement_global",
+            "cache_measurement_global_hit",
+            "cache_measurement_global_filter_seed",
+            "cache_measurement_global_filter_seed_hit",
+            "cache_optuna_target",
+            "cache_optuna_target_hit",
+        )
+    )
+
+
+def _cached_target_seed_label(raw_data: dict) -> str:
+    source = _target_seed_source(raw_data)
+    if source in ("cache_signature", "cache_signature_hit"):
+        return "cache_signature_target_seed"
+    if source in ("cache_measurement", "cache_measurement_hit"):
+        return "cache_measurement_target_seed"
+    if source in ("cache_measurement_global", "cache_measurement_global_hit"):
+        return "cache_measurement_global_target"
+    if source in ("cache_measurement_global_filter_seed", "cache_measurement_global_filter_seed_hit"):
+        return "cache_measurement_global_filter_seed"
+    if source in ("cache_optuna_target", "cache_optuna_target_hit"):
+        return "cache_optuna_target_seed"
+    return "cached_target_seed"
 
 
 def determine_auto_search_plan(
@@ -137,6 +194,9 @@ def determine_auto_search_plan(
     exact_reason = "disabled" if not cache_enabled else "not checked"
     last_best_status = "disabled" if not cache_enabled else "miss"
     last_best_reason = "disabled" if not cache_enabled else "not checked"
+    has_target_seed = _has_target_preselect_seed(raw)
+    has_fresh_target_seed = _has_fresh_target_seed(raw)
+    has_cached_target_seed = _has_cached_target_seed(raw)
 
     if cache_enabled:
         exact, exact_reason = read_exact_cache_with_reason(
@@ -165,6 +225,7 @@ def determine_auto_search_plan(
                 cache_record=exact,
                 fallback_reasons=fallback_reasons,
                 cache_decision_report=report,
+                seed_source="exact_cache",
             )
         exact_status = _cache_status(exact_reason)
         fallback_reasons.append(f"exact cache skipped: {str(exact_reason)}")
@@ -177,36 +238,65 @@ def determine_auto_search_plan(
         )
         if isinstance(last, dict) and last:
             last_best_status = _cache_status(last_reason, hit=True)
-            report = _build_cache_decision_report(
-                signature_obj=signature_obj,
-                signature=signature,
-                exact_status=exact_status,
-                exact_reason=exact_reason,
-                last_best_status=last_best_status,
-                last_best_reason=last_reason,
-                selected_plan=AutoSearchPlan.LAST_BEST_MICRO_REFINE,
-            )
             seed = dict(last.get("winner_preset", last.get("best_preset", {})) or {})
-            return _decision(
-                plan=AutoSearchPlan.LAST_BEST_MICRO_REFINE,
-                reason="compatible last-used best seed",
-                signature=signature,
-                seed_preset=seed,
-                cache_record=last,
-                fallback_reasons=fallback_reasons,
-                cache_decision_report=report,
+            fallback_reasons.append(
+                "last-best seed available; running full Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 search"
             )
+            if seed:
+                return _decision(
+                    plan=AutoSearchPlan.PRESELECTED_TARGET_REFINE,
+                    reason="compatible last-used best seed; running full Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 search",
+                    signature=signature,
+                    seed_preset=seed,
+                    cache_record=last,
+                    fallback_reasons=fallback_reasons,
+                    cache_decision_report=_build_cache_decision_report(
+                        signature_obj=signature_obj,
+                        signature=signature,
+                        exact_status=exact_status,
+                        exact_reason=exact_reason,
+                        last_best_status=last_best_status,
+                        last_best_reason=last_reason,
+                        selected_plan=AutoSearchPlan.PRESELECTED_TARGET_REFINE,
+                    ),
+                    seed_source="last_best",
+                )
         last_best_status = _cache_status(last_reason)
         last_best_reason = str(last_reason)
         fallback_reasons.append(f"last-best skipped: {str(last_reason)}")
     else:
         fallback_reasons.append("cache skipped: disabled")
 
-    if _wants_target_preselect(raw):
+    if bool(has_cached_target_seed):
+        plan = AutoSearchPlan.PRESELECTED_TARGET_REFINE
+        seed = dict(raw.get("_auto_target_seed_preset", {}) or {})
+        seed_metrics = dict(raw.get("_auto_target_seed_metrics", {}) or {})
+        return _decision(
+            plan=plan,
+            reason="cached target; running full Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 search",
+            signature=signature,
+            seed_preset=seed,
+            cache_record={"best_metrics": seed_metrics} if seed_metrics else None,
+            fallback_reasons=fallback_reasons,
+            cache_decision_report=_build_cache_decision_report(
+                signature_obj=signature_obj,
+                signature=signature,
+                exact_status=exact_status,
+                exact_reason=exact_reason,
+                last_best_status=last_best_status,
+                last_best_reason=last_best_reason,
+                selected_plan=plan,
+            ),
+            seed_source=_cached_target_seed_label(raw),
+        )
+
+    if bool(has_target_seed) or _wants_target_preselect(raw):
         plan = AutoSearchPlan.PRESELECTED_TARGET_REFINE
         return _decision(
             plan=plan,
-            reason="using preselected target; running refine stages",
+            reason="using target preselect seed; running refine stages"
+            if bool(has_target_seed)
+            else "using preselected target; running refine stages",
             signature=signature,
             fallback_reasons=fallback_reasons,
             cache_decision_report=_build_cache_decision_report(

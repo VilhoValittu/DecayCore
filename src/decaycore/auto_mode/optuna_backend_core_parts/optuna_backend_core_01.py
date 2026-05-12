@@ -97,6 +97,7 @@ def _auto_run_optuna_eval_loop_core(
     study_scope: str | None = None,
     phase_label: str | None = None,
     phase_kind: str | None = None,
+    study_user_attrs: dict | None = None,
 ) -> dict:
     if not _auto_optuna_module_ready(optuna_mod):
         return {}
@@ -199,6 +200,11 @@ def _auto_run_optuna_eval_loop_core(
         base_data=base_data,
         study_name=study_name,
     )
+    for attr_key, attr_value in dict(study_user_attrs or {}).items():
+        try:
+            study.set_user_attr(str(attr_key), attr_value)
+        except Exception:
+            logger.debug("Optuna study user_attr set failed", exc_info=True)
     if (
         _auto_safe_bool(
             (base_data or {}).get("auto_mode_optuna_cross_study_seeds", AUTO_MODE_OPTUNA_CROSS_STUDY_SEEDS),

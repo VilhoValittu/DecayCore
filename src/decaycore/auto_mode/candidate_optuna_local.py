@@ -50,6 +50,7 @@ from .candidate_base import (
     _auto_optuna_choice_from_unit,
     _auto_optuna_seed_choice_unit,
     _bi_search_enabled,
+    _auto_filter_normalized_base_data,
     _seed_bi_optuna_params,
     _suggest_bi_optuna_params,
 )
@@ -63,7 +64,7 @@ def _suggest_auto_mode_candidate_local_optuna(
     shrink: float = AUTO_MODE_LOCAL_REFINE_SHRINK,
     optimize_mag_low: bool = True,
 ) -> dict:
-    base = dict(base_data or {})
+    base = _auto_filter_normalized_base_data(base_data)
     c = dict(base)
     c.update(dict(center or {}))
     prefer_bass = bool(_auto_goal(base) == AUTO_MODE_GOAL_FLAT)
@@ -73,7 +74,7 @@ def _suggest_auto_mode_candidate_local_optuna(
     ft = str(c.get("filter_type", base.get("filter_type", "")) or "").strip().lower()
     is_mixed = "mixed" in ft
     is_phase_search = _auto_is_phase_search_filter(ft)
-    output_tilt_lo, output_tilt_hi = _auto_output_tilt_bounds(base_data)
+    output_tilt_lo, output_tilt_hi = _auto_output_tilt_bounds(base)
     output_tilt_center = float(
         np.clip(
             _auto_safe_float(c.get("output_tilt_db_per_oct", 0.0), 0.0),
@@ -316,6 +317,7 @@ def _seed_auto_mode_candidate_local_optuna_params(
     shrink: float = AUTO_MODE_LOCAL_REFINE_SHRINK,
     optimize_mag_low: bool = True,
 ) -> dict:
+    base_data = _auto_filter_normalized_base_data(base_data)
     base = dict(base_data or {})
     c = dict(base)
     c.update(dict(center or {}))
@@ -509,4 +511,3 @@ def _seed_auto_mode_candidate_local_optuna_params(
     if _bi_search_enabled(base):
         out.update(_seed_bi_optuna_params(base, p))
     return dict(out)
-

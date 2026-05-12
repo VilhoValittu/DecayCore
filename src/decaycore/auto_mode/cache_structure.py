@@ -49,6 +49,7 @@ def _auto_cache_empty(
         "schema_version": int(AUTO_MODE_CACHE_SCHEMA_VERSION),
         "items": {},
         "target_by_measurement": {},
+        "target_by_measurement_global": {},
         "by_filter": {},
     }
     ver = str(compat_version or AUTO_MODE_COMPAT_VERSION).strip()

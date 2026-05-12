@@ -13,12 +13,18 @@
 from __future__ import annotations
 
 import time
+from types import SimpleNamespace
 
-from .. import api as auto_api
+AUTO_SEARCH_CACHE_SCHEMA_VERSION = 2
+
+from ..cache_signature import _auto_cache_get_entry, _auto_cache_get_last_used_best
 from ..shared import logger
 from .input_model import AutoSearchInput
 
-AUTO_SEARCH_CACHE_SCHEMA_VERSION = 2
+auto_api = SimpleNamespace(
+    _auto_cache_get_entry=_auto_cache_get_entry,
+    _auto_cache_get_last_used_best=_auto_cache_get_last_used_best,
+)
 
 
 def _valid_record(record: dict | None, *, signature: str | None, measurement_identity: str | None) -> tuple[bool, str]:
@@ -136,5 +142,3 @@ def read_last_used_best(
         compat_version=compat_version,
     )
     return record
-
-

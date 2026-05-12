@@ -20,6 +20,7 @@ from .cache_signature import (
     _auto_apply_seed,
     _auto_signature,
 )
+from .cache_measurement_sig import _auto_get_measurement_signature
 from .shared import (
     AUTO_MODE_CACHE_ENABLED,
     AUTO_MODE_CACHE_SCHEMA_VERSION,
@@ -216,6 +217,7 @@ def _cached_target_state_from_optuna_study(
     *,
     setup: _TargetSelectionSetup,
     base_data: dict,
+    measurements: dict,
 ) -> _TargetCacheState | None:
     if not (
         str(setup.optimizer_backend) == "optuna"
@@ -225,9 +227,13 @@ def _cached_target_state_from_optuna_study(
     ):
         return None
     try:
+        storage_base_data = dict(base_data or {})
+        storage_base_data["_optuna_measurement_sig"] = _auto_get_measurement_signature(measurements or {})
+        storage_base_data["_optuna_journal_kind"] = "target"
+        storage_base_data["_optuna_filter_key"] = ""
         storage = setup.runtime.auto_optuna_create_storage(
             setup.optuna_mod,
-            base_data=dict(base_data or {}),
+            base_data=storage_base_data,
         )
     except Exception:
         storage = None
@@ -238,8 +244,8 @@ def _cached_target_state_from_optuna_study(
     if not callable(get_summaries) or not callable(load_study):
         return None
 
-    sig_token = str(setup.target_study_sig or "").strip().lower()[:32]
-    if not sig_token:
+    target_study_sig = str(setup.target_study_sig or "").strip()
+    if not target_study_sig:
         return None
 
     best_hc = None
@@ -250,21 +256,30 @@ def _cached_target_state_from_optuna_study(
     except Exception:
         summaries = []
     for summary in summaries:
+        study = None
+        study_name = ""
         try:
             study_name = str(getattr(summary, "study_name", "") or "").strip()
         except Exception:
             study_name = ""
-        if not study_name.startswith("camillafir-target-"):
+        attrs = dict(getattr(summary, "user_attrs", {}) or {})
+        if not attrs and study_name:
+            try:
+                study = load_study(study_name=str(study_name), storage=storage)
+                attrs = dict(getattr(study, "user_attrs", {}) or {})
+            except Exception:
+                attrs = {}
+        if attrs.get("decaycore_kind") != "target_search":
             continue
-        if not study_name.lower().endswith(sig_token):
+        if str(attrs.get("decaycore_target_study_sig", "") or "") != target_study_sig:
             continue
-        tail = study_name[len("camillafir-target-") :]
-        hc_token = str(tail.split("-", 1)[0] if tail else "").strip()
-        hc_name = _auto_builtin_target_name(hc_token)
+        hc_name = _auto_builtin_target_name(attrs.get("decaycore_target_name", ""))
         if not _cache_target_valid(setup.runtime, hc_name):
             continue
         try:
             trial_obj = getattr(summary, "best_trial", None)
+            if trial_obj is None and study is not None:
+                trial_obj = getattr(study, "best_trial", None)
             score_value = float(getattr(trial_obj, "value", float("nan")))
         except Exception:
             score_value = float("nan")
@@ -331,14 +346,43 @@ def _resolve_cached_target_state(
     state = _TargetCacheState()
     cached_target_entry = None
     try:
-        cached_target_entry = setup.runtime.auto_cache_get_target_for_measurements(
+        cached_target_entry = setup.runtime.auto_cache_get_target_for_measurements_global(
             measurements,
             goal=setup.goal,
-            filter_key=setup.filter_key,
             compat_version=setup.compat_version,
         )
     except Exception:
         cached_target_entry = None
+    cached_source = "cache_measurement_global"
+    cached_status = "measurement global"
+    cached_preset = {}
+    cached_metrics = {}
+    if isinstance(cached_target_entry, dict):
+        fk = str(setup.filter_key or "").strip()
+        seed_map = cached_target_entry.get("filter_seed_presets", {})
+        metric_map = cached_target_entry.get("filter_seed_metrics", {})
+        if isinstance(seed_map, dict):
+            cached_preset = dict(seed_map.get(fk, {}) or {})
+        if isinstance(metric_map, dict):
+            cached_metrics = dict(metric_map.get(fk, {}) or {})
+        if cached_preset or cached_metrics:
+            cached_source = "cache_measurement_global_filter_seed"
+            cached_status = "measurement global filter seed"
+    if not isinstance(cached_target_entry, dict):
+        try:
+            cached_target_entry = setup.runtime.auto_cache_get_target_for_measurements(
+                measurements,
+                goal=setup.goal,
+                filter_key=setup.filter_key,
+                compat_version=setup.compat_version,
+            )
+        except Exception:
+            cached_target_entry = None
+        cached_source = "cache_measurement"
+        cached_status = "measurement"
+        if isinstance(cached_target_entry, dict):
+            cached_preset = _cached_target_seed_preset(cached_target_entry)
+            cached_metrics = dict(cached_target_entry.get("best_metrics", {}) or {})
     if isinstance(cached_target_entry, dict):
         cached_hc_measurement = str(
             cached_target_entry.get(
@@ -352,10 +396,10 @@ def _resolve_cached_target_state(
                 state,
                 runtime=setup.runtime,
                 cached_hc=cached_hc_measurement,
-                cached_preset=_cached_target_seed_preset(cached_target_entry),
-                cached_metrics=dict(cached_target_entry.get("best_metrics", {}) or {}),
-                source="cache_measurement",
-                status_label="measurement",
+                cached_preset=dict(cached_preset or {}),
+                cached_metrics=dict(cached_metrics or {}),
+                source=str(cached_source),
+                status_label=str(cached_status),
                 status_cb=status_cb,
             )
         else:
@@ -396,10 +440,11 @@ def _resolve_cached_target_state(
                 _cache_target_valid(setup.runtime, cached_hc)
                 and _cached_target_matches_current_hc(base_data, cached_hc)
                 and (
-                bool(cached_preset) or not _cached_target_has_exact_preset(
-                    runtime=setup.runtime,
-                    cache_state=state,
-                )
+                    bool(cached_preset)
+                    or not _cached_target_has_exact_preset(
+                        runtime=setup.runtime,
+                        cache_state=state,
+                    )
                 )
             ):
                 _set_cached_target_state(
@@ -424,6 +469,7 @@ def _resolve_cached_target_state(
         optuna_state = _cached_target_state_from_optuna_study(
             setup=setup,
             base_data=base_data,
+            measurements=measurements,
         )
         if isinstance(optuna_state, _TargetCacheState) and str(
             optuna_state.cached_target_source or ""
@@ -507,5 +553,49 @@ def _try_exact_cached_target_result(
             "DecayCore automatic mode: target loaded directly from cache "
             f"(same measurements -> {str(cache_state.cached_target_hc)}, "
             "skipping target comparison trials)"
+        )
+    return dict(fallback)
+
+
+def _try_measurement_global_target_result(
+    *,
+    setup: _TargetSelectionSetup,
+    cache_state: _TargetCacheState,
+    base_data: dict,
+    measurements: dict,
+    status_cb,
+) -> dict | None:
+    source = str(cache_state.cached_target_source or "").strip()
+    if source not in (
+        "cache_measurement_global",
+        "cache_measurement_global_filter_seed",
+    ):
+        return None
+    hc = _auto_builtin_target_name(cache_state.cached_target_hc)
+    if not _cache_target_valid(setup.runtime, hc):
+        return None
+    if not _cached_target_matches_current_hc(base_data, hc):
+        return None
+    fallback = _cached_target_return(
+        runtime=setup.runtime,
+        cached_hc_mode=hc,
+        cached_preset=cache_state.cached_target_preset,
+        cached_metrics=cache_state.cached_target_metrics,
+        selection_method=f"{source}_hit",
+        base_data=base_data,
+        measurements=measurements,
+        goal=setup.goal,
+        rank_basis=setup.rank_basis,
+    )
+    if not isinstance(fallback, dict):
+        return None
+    logger.info(
+        "Automatic mode target select: measurement-global cache hit, using cached target=%s and skipping target comparison trials",
+        str(hc),
+    )
+    if callable(status_cb):
+        status_cb(
+            "DecayCore automatic mode: target cache hit for same measurements; "
+            f"using {str(hc)}"
         )
     return dict(fallback)

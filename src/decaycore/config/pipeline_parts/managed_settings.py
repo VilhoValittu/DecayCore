@@ -16,7 +16,12 @@ import math
 import numpy as np
 
 from ...auto_mode.filter_priors import get_auto_mode_filter_auto_defaults
-from ...auto_mode.shared import AUTO_MODE_GOAL_FLAT, _auto_bass_integration_profile_norm, _auto_goal_norm
+from ...auto_mode.shared import (
+    AUTO_MODE_GOAL_FLAT,
+    _auto_bass_integration_profile_norm,
+    _auto_filter_type_for_key,
+    _auto_goal_norm,
+)
 from ...config.mode_policy import MODE_DEFAULTS
 from ...config.models import StereoAutoPolicyConfig
 from ...dsp.bass_integration import normalize_sub_combine_mode
@@ -75,7 +80,6 @@ _AUTO_MODE_DEFAULT_CFG_TO_UI = {
     "conf_pull_gamma_cut": "conf_pull_gamma_cut",
     "conf_pull_gamma_boost": "conf_pull_gamma_boost",
     "low_bass_cut_strength": "low_bass_cut_strength",
-    "filter_type_str": "filter_type",
     "plot_smoothing_level": "plot_smoothing_level",
     "lvl_mode": "lvl_mode",
     "lvl_algo": "lvl_algo",
@@ -142,12 +146,26 @@ def _resolve_output_tilt_db_per_oct(data: Dict[str, Any]) -> float:
         return _finite_float_or_default(data.get("manual_target_tilt_db_per_oct", 0.0), 0.0)
     return 0.0
 
+def _auto_mode_filter_type_or_default(value: Any) -> str:
+    try:
+        raw = str(value or "").strip()
+    except Exception:
+        raw = ""
+    low = raw.lower()
+    if (
+        "asym" in low
+        or "mixed" in low
+        or "minimum" in low
+        or "minphase" in low
+        or ("min" in low and "phase" in low)
+        or "linear" in low
+    ):
+        return str(raw)
+    return str(_auto_filter_type_for_key("asym"))
+
 def _apply_auto_mode_managed_settings(data: Dict[str, Any]) -> None:
     """Force AUTO mode to use program-managed settings except allowed user choices."""
-    try:
-        filter_type = str(data.get("filter_type", "Asymmetric") or "Asymmetric")
-    except Exception:
-        filter_type = "Asymmetric"
+    filter_type = _auto_mode_filter_type_or_default(data.get("filter_type", "Asymmetric"))
 
     merged_defaults = dict(MODE_DEFAULTS.get("AUTO", {}) or {})
     merged_defaults.update(dict(get_auto_mode_filter_auto_defaults(filter_type) or {}))
@@ -174,6 +192,7 @@ def _apply_auto_mode_managed_settings(data: Dict[str, Any]) -> None:
         "comparison_mode": True,
         "df_smoothing": False,
         "auto_target_mode": str(data.get("auto_target_mode", "auto") or "auto"),
+        "filter_type": str(filter_type),
     }
 
     for cfg_key, ui_key in _AUTO_MODE_DEFAULT_CFG_TO_UI.items():

@@ -91,6 +91,149 @@ def _auto_cache_get_best_target(
     return _auto_builtin_target_name(hc)
 
 
+def _auto_target_measurement_cache_key(measurements: dict, goal: str) -> str:
+    msig = _auto_get_measurement_signature(measurements or {})
+    if not msig:
+        return ""
+    goal_norm = _auto_goal_norm(goal)
+    return f"{msig}|{goal_norm}|target-v2"
+
+
+@_auto_cache_guard
+def _auto_cache_get_target_for_measurements_global(
+    measurements: dict,
+    *,
+    goal: str = AUTO_MODE_GOAL_DEFAULT,
+    compat_version: str | None = None,
+) -> dict | None:
+    key = _auto_target_measurement_cache_key(measurements, goal)
+    if not key:
+        return None
+    cache = _auto_cache_load(compat_version=compat_version)
+
+    target_map = cache.get("target_by_measurement_global", {})
+    if isinstance(target_map, dict):
+        direct = target_map.get(key)
+        if isinstance(direct, dict):
+            return dict(direct)
+
+    msig = _auto_get_measurement_signature(measurements or {})
+    goal_norm = _auto_goal_norm(goal)
+    legacy_map = cache.get("target_by_measurement", {})
+    if isinstance(legacy_map, dict):
+        legacy = legacy_map.get(f"{msig}|{goal_norm}") or legacy_map.get(msig)
+        if isinstance(legacy, dict):
+            entry_goal = _auto_goal_norm(
+                str(legacy.get("auto_goal", AUTO_MODE_GOAL_DEFAULT) or AUTO_MODE_GOAL_DEFAULT)
+            )
+            if entry_goal == goal_norm:
+                return dict(legacy)
+
+    best = None
+    best_t = -1
+    by_filter = cache.get("by_filter", {})
+    if isinstance(by_filter, dict):
+        for bucket in by_filter.values():
+            if not isinstance(bucket, dict):
+                continue
+            tmap = bucket.get("target_by_measurement", {})
+            if not isinstance(tmap, dict):
+                continue
+            for entry in tmap.values():
+                if not isinstance(entry, dict):
+                    continue
+                if str(entry.get("measurement_sig", "") or "") != str(msig):
+                    continue
+                entry_goal = _auto_goal_norm(
+                    str(entry.get("auto_goal", AUTO_MODE_GOAL_DEFAULT) or AUTO_MODE_GOAL_DEFAULT)
+                )
+                if entry_goal != goal_norm:
+                    continue
+                try:
+                    t = int(entry.get("t", 0) or 0)
+                except Exception:
+                    t = 0
+                if t >= best_t:
+                    best_t = int(t)
+                    best = dict(entry)
+    return dict(best) if isinstance(best, dict) else None
+
+
+@_auto_cache_guard
+def _auto_cache_put_target_for_measurements_global(
+    *,
+    measurements: dict,
+    best_hc_mode: str | None,
+    goal: str = AUTO_MODE_GOAL_DEFAULT,
+    compat_version: str | None = None,
+    target_selection_meta: dict | None = None,
+    filter_seed_preset: dict | None = None,
+    filter_seed_metrics: dict | None = None,
+    filter_key: str | None = None,
+) -> None:
+    hc_val = str(best_hc_mode or "").strip()
+    if not hc_val:
+        return
+    key = _auto_target_measurement_cache_key(measurements, goal)
+    msig = _auto_get_measurement_signature(measurements or {})
+    if not key or not msig:
+        return
+    cache = _auto_cache_load(compat_version=compat_version)
+    target_map = cache.get("target_by_measurement_global", {})
+    if not isinstance(target_map, dict):
+        target_map = {}
+
+    old = target_map.get(key)
+    entry = dict(old or {}) if isinstance(old, dict) else {}
+    entry.update(
+        {
+            "t": int(time.time()),
+            "schema_version": int(AUTO_MODE_CACHE_SCHEMA_VERSION),
+            "target_cache_version": 2,
+            "measurement_sig": str(msig),
+            "measurement_identity": str(msig),
+            "auto_goal": str(_auto_goal_norm(goal)),
+            "best_target_curve": hc_val,
+            "best_hc_mode": hc_val,
+            "target_selection_meta": dict(target_selection_meta or {}),
+        }
+    )
+
+    seed_map = entry.get("filter_seed_presets", {})
+    if not isinstance(seed_map, dict):
+        seed_map = {}
+    metric_map = entry.get("filter_seed_metrics", {})
+    if not isinstance(metric_map, dict):
+        metric_map = {}
+
+    fk = _auto_filter_cache_key(filter_type=filter_key)
+    if fk and isinstance(filter_seed_preset, dict) and filter_seed_preset:
+        seed_map[str(fk)] = dict(filter_seed_preset)
+    if fk and isinstance(filter_seed_metrics, dict) and filter_seed_metrics:
+        metric_map[str(fk)] = dict(filter_seed_metrics)
+
+    if seed_map:
+        entry["filter_seed_presets"] = seed_map
+    if metric_map:
+        entry["filter_seed_metrics"] = metric_map
+
+    target_map[str(key)] = entry
+    try:
+        if len(target_map) > int(AUTO_MODE_CACHE_MAX_ITEMS):
+            sorted_items = sorted(
+                target_map.items(),
+                key=lambda kv: int((kv[1] or {}).get("t", 0) or 0),
+                reverse=True,
+            )
+            target_map = dict(sorted_items[: int(AUTO_MODE_CACHE_MAX_ITEMS)])
+    except Exception:
+        logger.exception("global target_map eviction")
+    cache["target_by_measurement_global"] = target_map
+    cache["v"] = int(AUTO_MODE_CACHE_SCHEMA_VERSION)
+    cache["schema_version"] = int(AUTO_MODE_CACHE_SCHEMA_VERSION)
+    _auto_cache_save(cache, compat_version=compat_version)
+
+
 @_auto_cache_guard
 def _auto_cache_get_target_for_measurements(
     measurements: dict,

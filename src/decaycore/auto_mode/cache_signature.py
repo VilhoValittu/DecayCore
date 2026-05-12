@@ -23,8 +23,10 @@ from .cache_get_put import (
     _auto_cache_get_best_target,
     _auto_cache_get_entry,
     _auto_cache_get_target_for_measurements,
+    _auto_cache_get_target_for_measurements_global,
     _auto_cache_put_best,
     _auto_cache_put_target_for_measurements,
+    _auto_cache_put_target_for_measurements_global,
 )
 from .cache_io import (
     _AUTO_CACHE_LOCK,

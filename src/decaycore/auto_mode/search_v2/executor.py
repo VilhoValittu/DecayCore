@@ -24,6 +24,30 @@ from .legacy_adapter import (
 from .plan import AutoSearchPlan
 
 
+def _base_data_with_plan_seed(base_data: dict, decision) -> dict:
+    data = dict(base_data or {})
+    plan = getattr(decision, "plan", AutoSearchPlan.FULL_SEARCH)
+    if plan in (
+        AutoSearchPlan.CACHE_MICRO_REFINE,
+        AutoSearchPlan.LAST_BEST_MICRO_REFINE,
+        AutoSearchPlan.REUSE_VALID_RESULT,
+    ):
+        return data
+    seed = dict(getattr(decision, "seed_preset", {}) or {})
+    if not seed:
+        return data
+    data["_auto_target_seed_preset"] = dict(seed)
+    data.update(seed)
+    cache_record = dict(getattr(decision, "cache_record", {}) or {})
+    seed_metrics = dict(cache_record.get("winner_metrics", cache_record.get("best_metrics", {})) or {})
+    if seed_metrics:
+        data["_auto_target_seed_metrics"] = dict(seed_metrics)
+    seed_source = str(getattr(decision, "seed_source", "") or "").strip()
+    if seed_source:
+        data["_auto_target_seed_source"] = str(seed_source)
+    return data
+
+
 def _fall_back_to_full_search(context, *, reason: str) -> dict | None:
     record_auto_search_fallback(context.search_base_data, str(reason))
     logger.info("Automatic mode search v2: %s", str(reason))
@@ -77,6 +101,7 @@ def execute_auto_search_plan(
     status_cb,
     n_trials: int,
 ) -> dict | None:
+    base_data = _base_data_with_plan_seed(base_data, decision)
     context = build_execution_context(
         base_data=base_data,
         measurements=measurements,

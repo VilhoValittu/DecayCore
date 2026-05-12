@@ -369,6 +369,15 @@ def _run_auto_mode_seed_phases(
                     target_seed_preset = dict(tc_pick.get("best_preset", {}) or {})
                     if target_seed_preset:
                         data["_auto_target_seed_preset"] = dict(target_seed_preset)
+                        selection_method_raw = str(tc_pick.get("selection_method", "") or "").strip().lower()
+                        if selection_method_raw in (
+                            "cache_signature_hit",
+                            "cache_measurement_hit",
+                            "cache_optuna_target_hit",
+                        ):
+                            data["_auto_target_seed_source"] = selection_method_raw
+                        else:
+                            data["_auto_target_seed_source"] = "fresh_target_search"
                         target_seed_metrics = dict(tc_pick.get("best_metrics", {}) or {})
                         if target_seed_metrics:
                             data["_auto_target_seed_metrics"] = dict(target_seed_metrics)
@@ -377,6 +386,7 @@ def _run_auto_mode_seed_phases(
                     else:
                         data.pop("_auto_target_seed_preset", None)
                         data.pop("_auto_target_seed_metrics", None)
+                        data.pop("_auto_target_seed_source", None)
                     if chosen_hc == "Adaptive" and "_synth_hc_f" in tc_pick:
                         data["_synth_hc_f"] = tc_pick["_synth_hc_f"]
                         data["_synth_hc_m"] = tc_pick["_synth_hc_m"]

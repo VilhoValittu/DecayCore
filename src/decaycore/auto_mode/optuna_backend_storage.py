@@ -21,6 +21,7 @@ from ..app_paths import decaycore_data_dir, program_version_token
 from .cache_signature import _auto_compat_version
 from .shared import (
     AUTO_MODE_OPTUNA_STORAGE_FILENAME,
+    _auto_filter_cache_key,
     _auto_safe_bool,
 )
 
@@ -122,15 +123,66 @@ def _auto_optuna_module_ready(optuna_mod) -> bool:
         and hasattr(trial_state, "FAIL")
     )
 
-def _auto_optuna_storage_filename(*, compat_version: str | None = None) -> str:
-    token = str(program_version_token(compat_version, default="") or "").strip()
-    if not token:
-        return str(AUTO_MODE_OPTUNA_STORAGE_FILENAME)
-    stem, ext = os.path.splitext(str(AUTO_MODE_OPTUNA_STORAGE_FILENAME))
-    return f"{stem}_{token}{ext or '.log'}"
+_OPTUNA_VALID_FILTER_KEYS = frozenset(("asym", "linear", "minimum", "mixed"))
+_OPTUNA_FILTER_FILENAME_LABELS = {
+    "asym": "asymmetric",
+    "linear": "linear",
+    "minimum": "minimum",
+    "mixed": "mixed",
+}
 
-def _auto_optuna_storage_path(*, compat_version: str | None = None) -> str:
-    filename = _auto_optuna_storage_filename(compat_version=compat_version)
+
+def _auto_optuna_measurement_token(measurement_identity: str | None) -> str:
+    txt = str(measurement_identity or "").strip().lower()
+    if not txt:
+        return "nomeasurement"
+    return re.sub(r"[^a-z0-9]+", "", txt)[:16] or "measurement"
+
+
+def _auto_optuna_storage_filename(
+    *,
+    compat_version: str | None = None,
+    filter_key: str | None = None,
+    measurement_identity: str | None = None,
+    journal_kind: str | None = None,
+) -> str:
+    token = str(program_version_token(compat_version, default="") or "").strip()
+    kind = str(journal_kind or "filter").strip().lower()
+    fk = str(filter_key or "").strip().lower()
+    _, ext = os.path.splitext(str(AUTO_MODE_OPTUNA_STORAGE_FILENAME))
+    if kind == "target":
+        parts = [
+            "decaycore",
+            "optuna",
+            "target",
+            _auto_optuna_measurement_token(measurement_identity),
+        ]
+    else:
+        fk_label = _OPTUNA_FILTER_FILENAME_LABELS.get(fk, fk if fk in _OPTUNA_VALID_FILTER_KEYS else "unknown")
+        parts = [
+            "decaycore",
+            "optuna",
+            fk_label,
+            _auto_optuna_measurement_token(measurement_identity),
+        ]
+    if token:
+        parts.append(token)
+    return "_".join(parts) + (ext or ".log")
+
+
+def _auto_optuna_storage_path(
+    *,
+    compat_version: str | None = None,
+    filter_key: str | None = None,
+    measurement_identity: str | None = None,
+    journal_kind: str | None = None,
+) -> str:
+    filename = _auto_optuna_storage_filename(
+        compat_version=compat_version,
+        filter_key=filter_key,
+        measurement_identity=measurement_identity,
+        journal_kind=journal_kind,
+    )
     preferred_base = os.fspath(decaycore_data_dir())
     preferred_path = os.path.join(preferred_base, filename)
     legacy_base = os.path.join(os.path.expanduser("~"), ".camillafir")
@@ -196,8 +248,15 @@ def _auto_optuna_create_storage(optuna_mod, *, base_data: dict | None):
     storages_mod = getattr(optuna_mod, "storages", None)
     if storages_mod is None:
         return None
+    explicit_fk = str((base_data or {}).get("_optuna_filter_key", "")).strip().lower()
+    fk = explicit_fk if explicit_fk in _OPTUNA_VALID_FILTER_KEYS else _auto_filter_cache_key(base_data)
+    measurement_identity = str((base_data or {}).get("_optuna_measurement_sig", "") or "")
+    journal_kind = str((base_data or {}).get("_optuna_journal_kind", "filter") or "filter")
     path = _auto_optuna_storage_path(
         compat_version=_auto_compat_version(base_data),
+        filter_key=str(fk),
+        measurement_identity=measurement_identity,
+        journal_kind=journal_kind,
     )
     candidates = [
         (

@@ -29,6 +29,7 @@ from .candidate_base import (
     _auto_optuna_suggest_centered_unit_float,
     _auto_optuna_seed_centered_unit_float,
     _bi_search_enabled,
+    _auto_filter_normalized_base_data,
     _seed_bi_optuna_params,
     _suggest_bi_optuna_params,
 )
@@ -41,6 +42,7 @@ def _suggest_auto_mode_candidate_micro_optuna(
     *,
     shrink: float = 1.0,
 ) -> dict:
+    base_data = _auto_filter_normalized_base_data(base_data)
     p = dict(base_data or {})
     p.update(dict(center or {}))
     ft = str(p.get("filter_type", "") or "").strip().lower()
@@ -137,6 +139,7 @@ def _seed_auto_mode_candidate_micro_optuna_params(
     *,
     shrink: float = 1.0,
 ) -> dict:
+    base_data = _auto_filter_normalized_base_data(base_data)
     p = dict(base_data or {})
     p.update(dict(center or {}))
     d = dict(p)

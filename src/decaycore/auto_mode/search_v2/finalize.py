@@ -47,4 +47,6 @@ def attach_search_v2_debug(result: dict | None, *, decision) -> dict | None:
     }
     debug["fallback_reasons"] = list(fallback_reasons)
     out["auto_mode_debug"] = debug
+    out["enabled_phases"] = list(decision.enabled_phases)
+    out["skipped_phases"] = list(decision.skipped_phases)
     return out

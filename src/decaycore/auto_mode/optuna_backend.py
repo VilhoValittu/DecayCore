@@ -59,6 +59,7 @@ from .optuna_backend_constraints import (
     _auto_optuna_constraints_func,
     _auto_optuna_effective_scope,
     _auto_optuna_is_refine_phase_kind,
+    _auto_optuna_scope_for_filter,
     _auto_optuna_startup_for_phase_kind,
     _auto_optuna_trial_out_payload,
     _auto_optuna_use_events_constraint,

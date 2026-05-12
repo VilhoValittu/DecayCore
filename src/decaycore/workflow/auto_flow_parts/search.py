@@ -239,6 +239,12 @@ def _run_auto_mode_search_if_needed(
                 "trials_phase2_total": int(auto_res.get("trials_phase2_total", AUTO_MODE_REFINE_TRIALS)),
                 "trials_phase2_ok": int(auto_res.get("trials_phase2_ok", 0)),
                 "phase2_plateau_hit": bool(auto_res.get("phase2_plateau_hit", False)),
+                "trials_phase3_total": int(auto_res.get("trials_phase3_total", 0)),
+                "trials_phase3_ok": int(auto_res.get("trials_phase3_ok", 0)),
+                "phase4_finalize": bool(auto_res.get("phase4_finalize", False)),
+                "phase4_steps": dict(auto_res.get("phase4_steps", {}) or {}),
+                "search_plan_enabled_phases": list(auto_res.get("enabled_phases", []) or []),
+                "search_plan_skipped_phases": list(auto_res.get("skipped_phases", []) or []),
                 "search_fs": int(auto_res.get("search_fs", auto_search_fs)),
                 "search_taps": int(auto_res.get("search_taps", auto_search_taps)),
                 "auto_exc_seed_freq_hz": (

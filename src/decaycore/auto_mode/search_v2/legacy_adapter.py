@@ -58,7 +58,9 @@ def run_micro_refine_from_seed(
         )
         or {}
     )
-    seed_source = "last_best" if str(getattr(getattr(decision, "plan", None), "value", "")) == "last_best_micro_refine" else "exact_cache"
+    seed_source = str(getattr(decision, "seed_source", "") or "").strip()
+    if not seed_source:
+        seed_source = "last_best" if str(getattr(getattr(decision, "plan", None), "value", "")) == "last_best_micro_refine" else "exact_cache"
     return orchestrator_refine.run_exact_cache_micro_refine(
         cache_base_data=context.cache_base_data,
         measurements=context.measurements,

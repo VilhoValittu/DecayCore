@@ -58,10 +58,10 @@ def run_auto_search_v2(
             "goal": _auto_goal(dict(base_data or {})),
         },
     )
-    seed_source = None
-    if decision.plan == AutoSearchPlan.CACHE_MICRO_REFINE:
+    seed_source = str(getattr(decision, "seed_source", "") or "").strip() or None
+    if seed_source is None and decision.plan == AutoSearchPlan.CACHE_MICRO_REFINE:
         seed_source = "exact_cache"
-    elif decision.plan == AutoSearchPlan.LAST_BEST_MICRO_REFINE:
+    elif seed_source is None and decision.plan == AutoSearchPlan.LAST_BEST_MICRO_REFINE:
         seed_source = "last_best"
     log_plan_decision(decision, seed_source=seed_source)
     result = execute_auto_search_plan(

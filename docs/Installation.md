@@ -21,7 +21,7 @@ All releases:
 
 ### Windows
 
-1. Download `DecayCore_<version>_windows.7z` from Releases.
+1. Download `DecayCore_<version>_windows.zip` from Releases.
 2. Extract the ZIP.
 3. Run `DecayCore.exe`.
 4. If SmartScreen appears, choose `More info` -> `Run anyway`.
@@ -30,7 +30,7 @@ All releases:
 
 ### Ubuntu / Debian Linux
 
-1. Download `DecayCore_<version>_linux.7z` from Releases.
+1. Download `DecayCore_<version>_linux.tar.gz` from Releases.
 2. Extract the archive.
 3. Open Terminal in the extracted folder and run:
 
@@ -48,7 +48,7 @@ sudo apt install libportaudio2
 
 ### macOS (Intel + Apple Silicon)
 
-1. Download `DecayCore_<version>_macos.7z` from Releases.
+1. Download `DecayCore_<version>_macos.tar.gz` from Releases.
 2. Extract the archive.
 3. Open Terminal in the extracted folder and run:
 
@@ -125,11 +125,11 @@ Then activate the virtual environment again.
 
 ### Ubuntu / Debian Linux
 
-1. Install Git, Python, venv support & pip:
+1. Install Git, Python, venv support, pip, and the optional PortAudio system library used by built-in measurement audio:
 
 ```bash
 sudo apt update
-sudo apt install git python3 python3-venv python3-pip 
+sudo apt install git python3 python3-venv python3-pip libportaudio2
 ```
 
 2. Open Terminal in the cloned DecayCore source folder.
