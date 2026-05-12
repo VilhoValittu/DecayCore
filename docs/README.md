@@ -35,6 +35,7 @@ DecayCore is also listed in the official CamillaDSP README under **Measurement a
 - Includes automatic target selection, room-safe optimization, and summary exports
 - Automatic mode can use harmonic curves and IACC-aware ranking when comparing candidate filters
 - Supports multi-rate export up to 192 kHz
+- Max samplerate : 384000 hz with 1048576 taps
 
 ## Why use DecayCore
 
