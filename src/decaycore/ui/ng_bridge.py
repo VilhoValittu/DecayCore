@@ -17,6 +17,7 @@ result rendering hooks.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 import typing
 
@@ -31,6 +32,8 @@ from ..workflow.bridge_types import ProcessRunCallbacks, ProcessRunUiBridge
 # ---------------------------------------------------------------------------
 
 _progress_getter: typing.Callable[[], typing.Any] | None = None
+_progress_lock = threading.Lock()
+_pending_progress_value: float | None = None
 
 
 def set_progress_element_getter(fn: typing.Callable[[], typing.Any]) -> None:
@@ -39,22 +42,28 @@ def set_progress_element_getter(fn: typing.Callable[[], typing.Any]) -> None:
     _progress_getter = fn if callable(fn) else None
 
 
+def queue_progress_value(value: float) -> None:
+    """Store the latest progress value for the NiceGUI UI timer to apply."""
+    global _pending_progress_value
+    with _progress_lock:
+        _pending_progress_value = float(value)
+
+
+def consume_pending_progress() -> float | None:
+    """Return and clear the latest queued progress value."""
+    global _pending_progress_value
+    with _progress_lock:
+        value = _pending_progress_value
+        _pending_progress_value = None
+    return value
+
+
 def _default_ensure_progress_bar() -> None:
-    el = _progress_getter() if callable(_progress_getter) else None
-    if el is not None:
-        try:
-            el.set_value(0.0)
-        except Exception:
-            logger.exception("progress bar reset")
+    queue_progress_value(0.0)
 
 
 def _default_set_progress(v: float) -> None:
-    el = _progress_getter() if callable(_progress_getter) else None
-    if el is not None:
-        try:
-            el.set_value(float(v))
-        except Exception:
-            logger.exception("progress bar update")
+    queue_progress_value(float(v))
 
 
 # ---------------------------------------------------------------------------

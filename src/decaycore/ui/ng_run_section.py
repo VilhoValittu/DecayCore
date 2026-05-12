@@ -163,6 +163,13 @@ def build_global_progress_bar() -> None:
     def _refresh_status() -> None:
         snap = ui_state.get_status_snapshot()
 
+        pending_progress = ng_bridge.consume_pending_progress()
+        if pending_progress is not None:
+            try:
+                progress.set_value(float(pending_progress))
+            except Exception:
+                logger.exception("progress bar queued update")
+
         phase_txt = snap.get("status_base_message", "") or ""
         progress_phase_label.set_text(phase_txt)
         if _run_clock["active"] and _run_clock["started_at"] is not None:
