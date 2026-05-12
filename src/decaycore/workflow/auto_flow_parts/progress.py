@@ -270,7 +270,10 @@ def _set_auto_progress(ctx: dict, *, support: ProcessRunSupport, value: float) -
     if next_value <= float(current) + 1e-9:
         return
     state["value"] = float(next_value)
-    support.ui_bridge.set_progress(float(next_value))
+    try:
+        support.ui_bridge.set_progress(float(next_value))
+    except Exception:
+        logger.exception("auto progress bridge update failed")
 
 def _get_auto_status_callback(
     ctx: dict,
