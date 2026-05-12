@@ -188,7 +188,7 @@ def _auto_optuna_study_name(*, study_sig: str | None, scope: str | None) -> str:
     scope_tok = re.sub(r"[^a-z0-9._-]+", "-", scope_txt).strip("-") or "study"
     scope_hash = hashlib.sha1(scope_txt.encode("utf-8", "ignore")).hexdigest()[:12]
     sig_tok = sig_txt[:32] if sig_txt else "nosig"
-    return f"camillafir-{scope_tok[:48]}-{scope_hash}-{sig_tok}"
+    return f"decaycore-{scope_tok[:48]}-{scope_hash}-{sig_tok}"
 
 def _auto_optuna_create_storage(optuna_mod, *, base_data: dict | None):
     if not _auto_safe_bool((base_data or {}).get("auto_mode_optuna_persistent_study", True), True):
