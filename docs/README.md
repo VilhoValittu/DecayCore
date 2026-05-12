@@ -11,6 +11,10 @@ It is designed for CamillaDSP and other FIR-capable playback systems.
 
 DecayCore is also listed in the official CamillaDSP README under **Measurement and filter generation tools (CamillaFIR)**.
 
+> Important note about the measurement function :
+> The integrated measurement function is available only in the packaged versions published under the GitHub Releases section. It is not included in the public source tree. The source repository contains the filter-generation side, while the measurement/acquisition workflow remains available through the released builds.
+
+
 ## Quick links
 
 - [Download latest release](https://github.com/VilhoValittu/DecayCore/releases/latest)
