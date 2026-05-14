@@ -64,6 +64,25 @@ def max_abs_gd_gradient_ms_per_oct(freq_axis: np.ndarray, phase_rad: np.ndarray,
     return float(m["max_ms_per_oct"]), m["at_hz"]
 
 
+def _gd_zone_limit_ms_per_oct(base_limit: float, peak_hz: float | None) -> float:
+    """Adjust GD gradient limit by frequency zone of worst gradient.
+
+    Bass modes (<120 Hz) need more room (looser limit); HF ripple (>500 Hz)
+    should be tighter. Returns base_limit when peak_hz is unknown.
+    """
+    if peak_hz is None or not (np.isfinite(peak_hz) and peak_hz > 0.0):
+        return float(base_limit)
+    if peak_hz < 120.0:
+        return float(base_limit * (50.0 / 30.0))
+    if peak_hz > 500.0:
+        return float(base_limit * (15.0 / 30.0))
+    if peak_hz <= 300.0:
+        t = (peak_hz - 120.0) / 180.0
+        return float(base_limit * ((50.0 + t * (30.0 - 50.0)) / 30.0))
+    t = (peak_hz - 300.0) / 200.0
+    return float(base_limit * ((30.0 + t * (15.0 - 30.0)) / 30.0))
+
+
 def gd_grad_limiter(ir, cfg, st, *, freq_axis=None, phase_mask=None, limiter_fn=None) -> tuple[np.ndarray, dict[str, Any]]:
     in_phase = np.asarray(ir, dtype=float).copy()
     out = in_phase.copy()
@@ -122,11 +141,13 @@ def gd_grad_limiter(ir, cfg, st, *, freq_axis=None, phase_mask=None, limiter_fn=
             except (AttributeError, TypeError, ValueError):
                 gd_sigma = 0.8
             gd_sigma = gd_sigma if np.isfinite(gd_sigma) else 0.8
+            lim_effective = _gd_zone_limit_ms_per_oct(lim_cfg, info.get("max_grad_before_hz"))
+            info["limit_ms_per_oct"] = float(lim_effective)
             out = limiter_fn(
                 f_arr,
                 in_phase,
                 mask=phase_mask,
-                max_grad_ms_per_oct=float(lim_cfg),
+                max_grad_ms_per_oct=float(lim_effective),
                 f_min=float(f_lo),
                 f_max=float(f_hi),
                 grad_smooth_sigma=float(max(0.0, gd_sigma)),

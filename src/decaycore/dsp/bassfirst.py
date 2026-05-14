@@ -43,7 +43,8 @@ def build_bassfirst_masks(freq_axis, m_raw_db, phase_rad_unwrapped, gd_ms, gd_di
                           mag_a0=1.5, mag_a1=8.0,
                           q0=2.0, q1=10.0,
                           rough_r0=0.6, rough_r1=2.5,
-                          pj_p0=0.0008, pj_p1=0.0040):
+                          pj_p0=0.0008, pj_p1=0.0040,
+                          rt60_lf_s: float | None = None):
 
     f = np.asarray(freq_axis, dtype=float)
     m = np.asarray(m_raw_db, dtype=float)
@@ -58,6 +59,19 @@ def build_bassfirst_masks(freq_axis, m_raw_db, phase_rad_unwrapped, gd_ms, gd_di
             gd_t0 = float(gd_t0) * 1.2
             gd_t1 = float(gd_t1) * 1.2
         except (TypeError, ValueError):
+            pass
+
+    if rt60_lf_s is not None:
+        try:
+            _rt60 = float(rt60_lf_s)
+            if np.isfinite(_rt60) and _rt60 > 0.05:
+                # Long LF decay → tighten GD detection thresholds → more room-mode flags → conservative.
+                # RT60 ≤ 0.4 s: no change; RT60 ≥ 1.2 s: 0.7× (maximum tightening).
+                _tighten = float(np.clip(1.0 - 0.375 * min(1.0, max(0.0, (_rt60 - 0.4) / 0.8)), 0.7, 1.0))
+                if _tighten < 0.999:
+                    gd_t0 = float(gd_t0) * _tighten
+                    gd_t1 = float(gd_t1) * _tighten
+        except (TypeError, ValueError, FloatingPointError):
             pass
 
     prior = _freq_prior(f, f1=mode_f1, f2=mode_f2)

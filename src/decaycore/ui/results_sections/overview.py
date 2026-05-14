@@ -354,6 +354,11 @@ def _render_run_overview(*, data: dict, l_st_f: dict, r_st_f: dict) -> None:
                 f"{l_st_f.get('rt60_val', 0):.2f} s",
                 f"{r_st_f.get('rt60_val', 0):.2f} s",
             ),
+            metric_row(
+                t("results_metric_schroeder_hz"),
+                f"{l_st_f.get('schroeder_hz_estimate', 0):.0f} Hz" if l_st_f.get('schroeder_hz_estimate') else "n/a",
+                f"{r_st_f.get('schroeder_hz_estimate', 0):.0f} Hz" if r_st_f.get('schroeder_hz_estimate') else "n/a",
+            ),
         ],
         summary_lines=acoustic_summary,
     )

@@ -51,6 +51,11 @@ def _build_measurement_side_ctx(measurements: dict, side: str) -> MeasurementSid
     """Build a MeasurementSideContext for one channel from the measurements dict."""
     rt60_val = normalize_rt60_value(measurements.get(f"measured_rt60_{side}"))
     rt60_bands = normalize_rt60_bands(measurements.get(f"measured_rt60_bands_{side}"))
+    try:
+        snr_raw = measurements.get(f"measured_snr_db_{side}")
+        snr_db: float | None = float(snr_raw) if snr_raw is not None and np.isfinite(float(snr_raw)) else None
+    except (TypeError, ValueError):
+        snr_db = None
     h_freq = measurements.get(f"harmonic_freq_hz_{side}")
     h_mags = measurements.get(f"harmonic_magnitudes_db_{side}")
     h_freq_arr = None if h_freq is None else np.asarray(h_freq, dtype=float)
@@ -77,6 +82,7 @@ def _build_measurement_side_ctx(measurements: dict, side: str) -> MeasurementSid
     return MeasurementSideContext(
         measured_rt60=rt60_val,
         measured_rt60_bands=rt60_bands,
+        measurement_snr_db=snr_db,
         harmonic_freq_hz=h_freq_arr,
         harmonic_magnitudes_db=h_mags_dict,
         harmonic_risk_freq_hz=risk_freq,

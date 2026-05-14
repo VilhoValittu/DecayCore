@@ -424,7 +424,7 @@ def _append_dsp_effective_params(summary_content, data, fs_v):
                     f"({_quality_band(_display_q)})\n"
                 )
                 summary_content += (
-                    f"Debug rank score: {best_rank:.3f}/100 "
+                    f"Score breakdown: {best_rank:.3f}/100 "
                     f"(avg={float(bm.get('avg_score', 0.0)):.3f}, "
                     f"dsp_pen={float(bm.get('dsp_penalty', 0.0)):.2f}"
                     f"{_exc_pen_txt}"

@@ -262,6 +262,7 @@ def _build_metrics(status: str, data: dict, ctx: dict | None, metadata: dict, rt
         "confidence_pull": _f(data.get("conf_pull_floor"), None),
         "filter_taps": int(getattr(result, "taps", data.get("taps", 0)) or 0) if (result is not None or data.get("taps")) else None,
         "optuna_trials": int(auto_meta.get("trials_ok", auto_meta.get("trials_total", 0)) or 0),
+        "schroeder_hz_estimate": _pick(stats, ["schroeder_hz_estimate"]),
     }
 
     bi_meta = dict(data.get("_bass_integration_meta", {}) or {})
@@ -345,6 +346,9 @@ def _write_summary(path: Path, metrics_doc: dict) -> None:
             f"delay={bi.get('delay_ms', 'n/a')} ms, gain={bi.get('gain_db', 'n/a')} dB, "
             f"polarity={bi.get('polarity', 'n/a')}"
         )
+    schroeder = m.get("schroeder_hz_estimate")
+    if schroeder is not None:
+        lines.append(f"Schroeder frequency estimate: {schroeder:.1f} Hz")
     if metrics_doc.get("rt60"):
         lines.append("RT60 summary: " + ", ".join(f"{k}={v}" for k, v in dict(metrics_doc["rt60"]).items()))
     if metrics_doc.get("harmonics"):

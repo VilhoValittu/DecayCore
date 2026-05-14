@@ -102,8 +102,8 @@ def score_acoustic_fit(result, l_st, r_st, *, base_data) -> dict:
 
 
 def score_safety_limits(l_st, r_st, *, auto_exc_freq_hz, base_data, net_boost_max, lr_delta, l_refs, r_refs) -> dict:
-    dsp_pen_l, dsp_dbg_l = _auto_dsp_quality_penalty(l_st)
-    dsp_pen_r, dsp_dbg_r = _auto_dsp_quality_penalty(r_st)
+    dsp_pen_l, bass_prering_raw_l, dsp_dbg_l = _auto_dsp_quality_penalty(l_st)
+    dsp_pen_r, bass_prering_raw_r, dsp_dbg_r = _auto_dsp_quality_penalty(r_st)
     dsp_penalty_raw = 0.5 * (float(dsp_pen_l) + float(dsp_pen_r))
     exc_pen_l, exc_dbg_l = _auto_excursion_penalty(l_st)
     exc_pen_r, exc_dbg_r = _auto_excursion_penalty(r_st)
@@ -147,7 +147,10 @@ def score_safety_limits(l_st, r_st, *, auto_exc_freq_hz, base_data, net_boost_ma
         boost_pen = min(8.0, 0.15 * max(0.0, float(net_boost_max) - 5.0))
     else:
         boost_pen = min(8.0, 0.40 * max(0.0, float(net_boost_max) - 6.0))
-    dsp_penalty = min(8.0, 0.35 * float(dsp_penalty_raw)) #0.20
+    bass_prering_avg_raw = 0.5 * (float(bass_prering_raw_l) + float(bass_prering_raw_r))
+    dsp_penalty_raw_excl = max(0.0, float(dsp_penalty_raw) - float(bass_prering_avg_raw))
+    dsp_penalty = min(8.0, 0.35 * float(dsp_penalty_raw_excl))
+    bass_prering_penalty = min(4.0, 0.35 * float(bass_prering_avg_raw))
     all_events = list(l_refs) + list(r_refs)
     event_pen_raw = _auto_event_penalty_weighted(
         all_events,
@@ -186,6 +189,7 @@ def score_safety_limits(l_st, r_st, *, auto_exc_freq_hz, base_data, net_boost_ma
         "dsp_dbg_r": dsp_dbg_r,
         "dsp_penalty_raw": dsp_penalty_raw,
         "dsp_penalty": dsp_penalty,
+        "bass_prering_penalty": bass_prering_penalty,
         "exc_pen_l": exc_pen_l,
         "exc_pen_r": exc_pen_r,
         "exc_dbg_l": exc_dbg_l,

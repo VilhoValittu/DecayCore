@@ -40,6 +40,7 @@ _RANK_COMPONENT_META = {
     "event_penalty": {"role": "penalty", "direction": "lower_is_better", "unit": "rank_points"},
     "lr_delta_penalty": {"role": "penalty", "direction": "lower_is_better", "unit": "rank_points"},
     "dsp_penalty": {"role": "penalty", "direction": "lower_is_better", "unit": "rank_points"},
+    "bass_prering_penalty": {"role": "penalty", "direction": "lower_is_better", "unit": "rank_points"},
     "exc_penalty": {"role": "penalty", "direction": "lower_is_better", "unit": "rank_points"},
     "bass_integration_penalty": {"role": "penalty", "direction": "lower_is_better", "unit": "rank_points"},
     "bass_feasibility_penalty": {"role": "penalty", "direction": "lower_is_better", "unit": "rank_points"},
@@ -173,6 +174,7 @@ def compute_rank_score_components(
     event_penalty: Any = 0.0,
     lr_delta_penalty: Any = 0.0,
     dsp_penalty: Any = 0.0,
+    bass_prering_penalty: Any = 0.0,
     exc_penalty: Any = 0.0,
     bass_integration_penalty: Any = 0.0,
     bass_feasibility_penalty: Any = 0.0,
@@ -213,6 +215,7 @@ def compute_rank_score_components(
             "event_penalty": float(_auto_safe_float(event_penalty, 0.0)),
             "lr_delta_penalty": float(_auto_safe_float(lr_delta_penalty, 0.0)),
             "dsp_penalty": float(_auto_safe_float(dsp_penalty, 0.0)),
+            "bass_prering_penalty": float(_auto_safe_float(bass_prering_penalty, 0.0)),
             "exc_penalty": float(_auto_safe_float(exc_penalty, 0.0)),
             "bass_integration_penalty": float(_auto_safe_float(bass_integration_penalty, 0.0)),
             "bass_feasibility_penalty": float(_auto_safe_float(bass_feasibility_penalty, 0.0)),
@@ -278,6 +281,7 @@ def compute_rank_score_components(
     event = float(max(0.0, _auto_safe_float(event_penalty, 0.0)))
     lr_pen = float(max(0.0, _auto_safe_float(lr_delta_penalty, 0.0)))
     dsp_pen = float(max(0.0, _auto_safe_float(dsp_penalty, 0.0)))
+    bass_prering_pen = float(max(0.0, _auto_safe_float(bass_prering_penalty, 0.0)))
     exc_pen = float(max(0.0, _auto_safe_float(exc_penalty, 0.0)))
     bass_pen = float(max(0.0, _auto_safe_float(bass_integration_penalty, 0.0)))
     bass_feas_pen = float(max(0.0, _auto_safe_float(bass_feasibility_penalty, 0.0)))
@@ -320,6 +324,7 @@ def compute_rank_score_components(
         - event
         - lr_pen
         - dsp_pen
+        - bass_prering_pen
         - exc_pen
         - bass_pen
         - bass_feas_pen
@@ -356,6 +361,7 @@ def compute_rank_score_components(
         "event_penalty": float(event),
         "lr_delta_penalty": float(lr_pen),
         "dsp_penalty": float(dsp_pen),
+        "bass_prering_penalty": float(bass_prering_pen),
         "exc_penalty": float(exc_pen),
         "bass_integration_penalty": float(bass_pen),
         "bass_feasibility_penalty": float(bass_feas_pen),

@@ -8,6 +8,12 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
+## [1.0.3] - 14-5-2026
+
+- GitHub Actions : sounddevice module fix for macOS builds
+
+---
+
 ## [1.0.2] 14-5-2026
 
 ### Export

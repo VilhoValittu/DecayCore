@@ -27,6 +27,7 @@ class MeasurementSideContext:
 
     measured_rt60: float | None = None
     measured_rt60_bands: dict[float, float] | None = None
+    measurement_snr_db: float | None = None
     harmonic_freq_hz: np.ndarray | None = None
     harmonic_magnitudes_db: dict[int, np.ndarray] | None = None
     harmonic_risk_freq_hz: np.ndarray | None = None

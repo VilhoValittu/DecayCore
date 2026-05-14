@@ -74,12 +74,15 @@ def _suggest_auto_mode_candidate_optuna(
     _mag_c_min_lo, _mag_c_min_hi, _low_bass_lo, _low_bass_hi = _mag_low_search_bounds(base_data)
     _bass_first_hi = float(adaptive.get("bass_first_hi", _BASS_FIRST_MODE_MAX_HZ))
     _conf_pull_hi = float(adaptive.get("conf_pull_hi", _CONF_PULL_MAX_MAX_HZ))
+    _mag_c_max_hi = float(adaptive.get("mag_c_max_hi", 400.0))
+    _schroeder_hz = adaptive.get("schroeder_hz_estimate")
     if adaptive and getattr(trial, "number", None) == 0:
         logger.info(
             "auto_mode adaptive bounds: mag_c_min=[%.1f,%.1f] low_bass=[%.1f,%.1f] "
-            "bass_first_hi=%.1f conf_pull_hi=%.1f",
+            "bass_first_hi=%.1f conf_pull_hi=%.1f mag_c_max_hi=%.1f%s",
             _mag_c_min_lo, _mag_c_min_hi, _low_bass_lo, _low_bass_hi,
-            _bass_first_hi, _conf_pull_hi,
+            _bass_first_hi, _conf_pull_hi, _mag_c_max_hi,
+            f" (schroeder={_schroeder_hz:.1f} Hz)" if _schroeder_hz is not None else "",
         )
 
     mag_c_min_seed = float(
@@ -169,9 +172,9 @@ def _suggest_auto_mode_candidate_optuna(
         ),
         "mag_c_min": float(mag_c_min),
         "mag_c_max": _auto_optuna_snap_to_step(
-            trial.suggest_float("mag_c_max", float(AUTO_MODE_MAG_C_MAX_MIN_HZ), 400.0, step=0.1),
+            trial.suggest_float("mag_c_max", float(AUTO_MODE_MAG_C_MAX_MIN_HZ), float(_mag_c_max_hi), step=0.1),
             lo=float(AUTO_MODE_MAG_C_MAX_MIN_HZ),
-            hi=400.0,
+            hi=float(_mag_c_max_hi),
             step=0.1,
         ),
         "trans_width": _auto_optuna_snap_to_step(

@@ -228,6 +228,25 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):
         typ = str(w.get("type", "Event") or "Event")
         return f"{typ} at {freq:.0f} Hz ({gd_ms:.2f} ms)"
 
+    def _fmt_schroeder(l_st: dict, r_st: dict, cfg: dict) -> str | None:
+        l_fs = l_st.get("schroeder_hz_estimate")
+        r_fs = r_st.get("schroeder_hz_estimate")
+        if l_fs is None and r_fs is None:
+            return None
+        try:
+            l_fs = float(l_fs) if l_fs is not None else None
+            r_fs = float(r_fs) if r_fs is not None else None
+            mag_c_max = _safe_float(cfg.get("mag_c_max", 0.0), 0.0)
+            fs_repr = l_fs if l_fs is not None else r_fs
+            ratio_str = ""
+            if mag_c_max > 0.0 and fs_repr is not None and fs_repr > 0.0:
+                ratio_str = f"  (mag_c_max {mag_c_max:.0f} Hz = {100.0 * mag_c_max / fs_repr:.0f}% of Schroeder)"
+            if l_fs is not None and r_fs is not None and abs(l_fs - r_fs) > 5.0:
+                return f"L {l_fs:.0f} Hz | R {r_fs:.0f} Hz{ratio_str}"
+            return f"{fs_repr:.0f} Hz{ratio_str}"
+        except Exception:
+            return None
+
     def _calc_acoustic_score(conf_pct, match_pct, rt60_s=None, rt60_reliability=None):
         try:
             return globals()["calc_acoustic_score"](
@@ -292,6 +311,7 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):
         f"Target Match:   L {_fmt_match(l_match, l_rms)} | R {_fmt_match(r_match, r_rms)}",
         f"Confidence:     L {l_conf:.1f}% | R {r_conf:.1f}%",
         f"RT60 Wideband:  L {l_rt:.2f}s | R {r_rt:.2f}s",
+        *([f"Schroeder:      {_fmt_schroeder(l_stats, r_stats, settings)}"] if _fmt_schroeder(l_stats, r_stats, settings) else []),
         f"Worst Event:    L {_worst_event(l_stats)} | R {_worst_event(r_stats)}",
         "",
         "--- Core Settings ---",
@@ -408,6 +428,9 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):
         lines.append(f"Band RT60 L: {_fmt_bands(l_bands)}")
         lines.append(f"Band RT60 R: {_fmt_bands(r_bands)}")
     lines.append(f"Confidence: L {l_conf:.1f}% | R {r_conf:.1f}%")
+    _schr = _fmt_schroeder(l_stats, r_stats, settings)
+    if _schr:
+        lines.append(f"Schroeder frequency estimate: {_schr}")
 
     l_om = l_stats.get("cmp_offset_method", l_stats.get("offset_method", "")) or "-"
     r_om = r_stats.get("cmp_offset_method", r_stats.get("offset_method", "")) or "-"
@@ -419,11 +442,6 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):
     lines.append("\n--- Target Curve Match ---")
     lines.append(f"Left:  {_fmt_match(l_match, l_rms)}")
     lines.append(f"Right: {_fmt_match(r_match, r_rms)}")
-    lines.append(
-        "Debug raw->pred: "
-        f"L {_fmt_match(l_match_raw, l_rms_raw)} -> {_fmt_match(l_match, l_rms)} | "
-        f"R {_fmt_match(r_match_raw, r_rms_raw)} -> {_fmt_match(r_match, r_rms)}"
-    )
 
     lines += format_dsp_quality_report_block(settings, l_stats, r_stats)
 

@@ -39,6 +39,8 @@ from .smoothing import (
     apply_adaptive_fdw,
     psycho_smooth_safe_gain,
 )
+from ._measurement_ctx_local import get_measurement_ctx
+from ..common.measurement_features import estimate_schroeder_hz
 
 
 def run_mag_raw_stage(
@@ -209,6 +211,15 @@ def run_mag_bassfirst_afdw_conf_stage(
                     logger.info(f"REW Asym low-latency: left_ms={left_ms:.1f} -> bass-first limited to {float(bf_mode_f2):.0f} Hz")
             except (AttributeError, TypeError, ValueError):
                 pass
+            _mctx = get_measurement_ctx()
+            _rt60_lf_for_mask: float | None = None
+            if _mctx is not None and isinstance(_mctx.measured_rt60_bands, dict):
+                _lf_vals_mask = [
+                    float(v) for k, v in _mctx.measured_rt60_bands.items()
+                    if 20.0 <= float(k) <= 150.0 and float(v) > 0.05
+                ]
+                if _lf_vals_mask:
+                    _rt60_lf_for_mask = float(np.median(_lf_vals_mask))
             bf_rel, bf_room_mode, _ = bf.build_bassfirst_masks(
                 freq_axis=freq_axis,
                 m_raw_db=m_interp,
@@ -219,6 +230,7 @@ def run_mag_bassfirst_afdw_conf_stage(
                 mode_f2=bf_mode_f2,
                 rew_asym=(win_mode == "rew_asym"),
                 left_ms=left_ms,
+                rt60_lf_s=_rt60_lf_for_mask,
             )
             bf_conf_for_smoothing = bf.fuse_conf_for_smoothing(
                 freq_axis=freq_axis,
@@ -226,6 +238,63 @@ def run_mag_bassfirst_afdw_conf_stage(
                 bass_floor_lo=float(getattr(cfg, "bass_first_smooth_floor_lo", 0.75) or 0.75),
                 bass_floor_hi=float(getattr(cfg, "bass_first_smooth_floor_hi", 0.35) or 0.35),
             )
+            # RT60-based post-hoc confidence modulation (A-FDW bandwidth control).
+            # _mctx and _rt60_lf_for_mask already extracted before build_bassfirst_masks.
+            if _rt60_lf_for_mask is not None:
+                _rt60_factor = float(np.clip(1.0 - 0.5 * min(1.0, (_rt60_lf_for_mask - 0.6) / 0.6), 0.7, 1.0))
+                if _rt60_factor < 0.999:
+                    _bass_mask = np.asarray(freq_axis, dtype=float) < 150.0
+                    bf_conf_for_smoothing = bf_conf_for_smoothing.copy()
+                    bf_conf_for_smoothing[_bass_mask] = np.clip(
+                        bf_conf_for_smoothing[_bass_mask] * _rt60_factor, 0.0, 1.0
+                    )
+                    logger.debug(
+                        "bassfirst RT60 modulation: lf_rt60=%.2fs factor=%.3f",
+                        _rt60_lf_for_mask, _rt60_factor,
+                    )
+            # SNR-based HF confidence reduction: low SNR → widen A-FDW above 2 kHz.
+            if (
+                _mctx is not None
+                and _mctx.measurement_snr_db is not None
+                and np.isfinite(_mctx.measurement_snr_db)
+                and bf_conf_for_smoothing is not None
+            ):
+                _snr = float(_mctx.measurement_snr_db)
+                # 30 dB+ → no reduction; below 20 dB → 0.70 factor
+                _snr_factor = float(np.clip(0.70 + 0.03 * max(0.0, _snr - 20.0), 0.70, 1.0))
+                if _snr_factor < 0.999:
+                    _hf_mask = np.asarray(freq_axis, dtype=float) >= 2000.0
+                    if np.any(_hf_mask):
+                        bf_conf_for_smoothing = bf_conf_for_smoothing.copy()
+                        bf_conf_for_smoothing[_hf_mask] = np.clip(
+                            bf_conf_for_smoothing[_hf_mask] * _snr_factor, 0.0, 1.0
+                        )
+                        logger.debug(
+                            "bassfirst SNR modulation: snr=%.1f dB factor=%.3f",
+                            _snr, _snr_factor,
+                        )
+            # Schroeder boost: below Schroeder frequency (modal region) FIR correction
+            # is well-defined and reliable → boost confidence to allow tighter A-FDW.
+            # Above Schroeder (diffuse field) we leave confidence unchanged.
+            if _mctx is not None and bf_conf_for_smoothing is not None:
+                _rt60_for_schroeder = _mctx.measured_rt60
+                if _rt60_for_schroeder is None and isinstance(_mctx.measured_rt60_bands, dict):
+                    _all_rt60 = [float(v) for v in _mctx.measured_rt60_bands.values() if float(v) > 0.05]
+                    _rt60_for_schroeder = float(np.median(_all_rt60)) if _all_rt60 else None
+                _fs_hz = estimate_schroeder_hz(_rt60_for_schroeder)
+                if _fs_hz is not None:
+                    if isinstance(st, dict):
+                        st["schroeder_hz_estimate"] = float(_fs_hz)
+                    _sub_schroeder = np.asarray(freq_axis, dtype=float) < _fs_hz
+                    if np.any(_sub_schroeder):
+                        bf_conf_for_smoothing = bf_conf_for_smoothing.copy()
+                        bf_conf_for_smoothing[_sub_schroeder] = np.clip(
+                            bf_conf_for_smoothing[_sub_schroeder] * 1.10, 0.0, 1.0
+                        )
+                        logger.debug(
+                            "bassfirst Schroeder boost: fs=%.1f Hz factor=1.10",
+                            _fs_hz,
+                        )
         except (TypeError, ValueError, FloatingPointError, IndexError):
             bf_rel = bf_room_mode = bf_conf_for_smoothing = None
 

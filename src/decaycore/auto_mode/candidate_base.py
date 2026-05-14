@@ -30,6 +30,7 @@ _CONF_PULL_MAX_MIN_HZ = 80.0
 _CONF_PULL_MAX_MAX_HZ = 220.0
 
 from decaycore.dsp.bass_integration import MIN_DIRECT_DAC_OVERLAP_RATIO
+from decaycore.common.measurement_features import estimate_schroeder_hz
 
 from .shared import (
     AUTO_MODE_GOAL_FLAT,
@@ -214,6 +215,25 @@ def _derive_adaptive_freq_bounds(base_data: dict) -> dict:
     conf_pull_hi = min(float(_CONF_PULL_MAX_MAX_HZ), modal_ceiling * 1.8)
     if conf_pull_hi - float(_CONF_PULL_MAX_MIN_HZ) >= _MIN_ADAPTIVE_WINDOW:
         bounds["conf_pull_hi"] = round(conf_pull_hi, 2)
+
+    # Schroeder-based mag_c_max upper bound: the Schroeder frequency separates
+    # the modal region (correctable with FIR) from the diffuse field (unreliable).
+    # Allow mag_c_max search up to 1.4× f_Schroeder so the optimizer explores
+    # the full modal band, but doesn't waste trials far above it.
+    rt60_vals = [
+        v for v in (
+            base_data.get("measured_rt60_l"),
+            base_data.get("measured_rt60_r"),
+        )
+        if v is not None
+    ]
+    if rt60_vals:
+        rt60_repr = float(np.median(np.asarray(rt60_vals, dtype=float)))
+        fs_hz = estimate_schroeder_hz(rt60_repr)
+        if fs_hz is not None:
+            mag_c_max_hi = float(np.clip(fs_hz * 1.4, float(AUTO_MODE_MAG_C_MAX_MIN_HZ) + 10.0, 400.0))
+            bounds["mag_c_max_hi"] = round(mag_c_max_hi, 1)
+            bounds["schroeder_hz_estimate"] = round(float(fs_hz), 1)
 
     return bounds
 

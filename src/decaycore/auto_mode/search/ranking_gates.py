@@ -112,6 +112,34 @@ def _auto_bass_boost_support_db(metrics: dict | None) -> float:
     return float(max(vals)) if vals else 0.0
 
 
+_ZONE_GATE_MODAL_DB = 7.5       # <100 Hz: modal region, loosened
+_ZONE_GATE_TRANSITION_DB = 6.0  # 100–250 Hz: baseline
+_ZONE_GATE_MID_DB = 5.0         # >250 Hz: correctable, tightened
+
+
+def _residual_peak_freq_zone_gate_db(gate: float, peak_hz: float) -> float:
+    """Return the absolute residual peak hard gate for the given frequency zone.
+
+    Modal region (<100 Hz): 7.5 dB — room modes are physically hard to
+    fully correct, so candidates with modest residual still compete (scoring
+    penalises them separately).
+
+    Transition (100–250 Hz): linearly blended 7.5 → 5.0 dB.
+
+    Mid-range (>250 Hz): 5.0 dB — these peaks are correctable, so
+    any candidate leaving >5 dB here is rejected outright.
+    """
+    if not (np.isfinite(peak_hz) and np.isfinite(gate) and peak_hz > 0.0):
+        return float(gate)
+    if peak_hz < 100.0:
+        return float(min(_ZONE_GATE_MODAL_DB, float(AUTO_MODE_PREFER_BASS_RESIDUAL_PEAK_HARD_GATE_MAX_DB)))
+    if peak_hz > 250.0:
+        return float(_ZONE_GATE_MID_DB)
+    # Linear blend in transition zone 100–250 Hz
+    t = (peak_hz - 100.0) / 150.0
+    return float(_ZONE_GATE_MODAL_DB + t * (_ZONE_GATE_MID_DB - _ZONE_GATE_MODAL_DB))
+
+
 def get_residual_peak_hard_gate_effective_db(
     candidate_or_metrics: dict | None,
     *,
@@ -121,6 +149,10 @@ def get_residual_peak_hard_gate_effective_db(
     gate = get_residual_peak_hard_gate_db(metrics)
     if not np.isfinite(gate):
         return float("nan")
+
+    peak_hz = _auto_safe_float(metrics.get("worst_residual_peak_hz", float("nan")), float("nan"))
+    gate = _residual_peak_freq_zone_gate_db(gate, peak_hz)
+
     if _auto_goal_norm(goal) != AUTO_MODE_GOAL_FLAT:
         return float(gate)
     bass_boost = _auto_bass_boost_support_db(metrics)
@@ -401,4 +433,4 @@ def maybe_override_hard_failed_winner(
 
 
 
-__all__ = ["_auto_pick_metric", "_auto_rank_value", "_auto_candidate_metrics", "get_residual_peak_db", "get_residual_peak_hard_gate_db", "get_residual_peak_hard_gate_effective_db", "_get_residual_peak_gate_value_and_source", "_auto_hard_gate_reasons", "is_hard_failed", "_auto_hard_gate_diagnostic", "filter_hard_failed_candidates", "select_best_safe_candidate", "maybe_override_hard_failed_winner"]
+__all__ = ["_auto_pick_metric", "_auto_rank_value", "_auto_candidate_metrics", "get_residual_peak_db", "get_residual_peak_hard_gate_db", "_residual_peak_freq_zone_gate_db", "get_residual_peak_hard_gate_effective_db", "_get_residual_peak_gate_value_and_source", "_auto_hard_gate_reasons", "is_hard_failed", "_auto_hard_gate_diagnostic", "filter_hard_failed_candidates", "select_best_safe_candidate", "maybe_override_hard_failed_winner"]

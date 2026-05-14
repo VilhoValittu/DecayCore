@@ -435,10 +435,15 @@ def _auto_harmonic_local_boost_penalty(
     risk_threshold: float = 0.5,
     scale: float = 0.04,
 ) -> float:
-    """Small secondary penalty from harmonic risk summary peak.
+    """Secondary penalty from harmonic risk summary.
 
     Distinct from _auto_harmonic_boost_penalty which does per-bin analysis.
     Uses the compact risk summary aggregated from repeat/multi-position analysis.
+
+    When bass boost (20-200 Hz) is ≥ 3 dB AND the bass-band harmonic risk
+    (mean_risk_20_120) is elevated, the scale is doubled (0.08) to more
+    aggressively penalise combinations that risk audible harmonic distortion in
+    the low-frequency boost region.
     """
     try:
         bd = dict(base_data or {})
@@ -457,13 +462,45 @@ def _auto_harmonic_local_boost_penalty(
         excess = max(0.0, risk_max - float(risk_threshold))
         if excess <= 0.0:
             return 0.0
+
+        # Check for bass-specific boost to scale penalty strength
+        def _bass_boost(st: dict | None) -> float:
+            s = dict(st or {})
+            for key in ("bass_boost_20_200_db", "lf_boost_max_db"):
+                v = shared._auto_safe_float(s.get(key, float("nan")), float("nan"))
+                if np.isfinite(v) and v > 0.0:
+                    return float(v)
+            return 0.0
+
+        bass_boost_l = _bass_boost(l_st)
+        bass_boost_r = _bass_boost(r_st)
+        bass_boost = max(bass_boost_l, bass_boost_r)
+
         net_boost_l = float(max(0.0, shared._auto_safe_float((l_st or {}).get("net_boost_peak_db", 0.0), 0.0)))
         net_boost_r = float(max(0.0, shared._auto_safe_float((r_st or {}).get("net_boost_peak_db", 0.0), 0.0)))
         net_boost = max(net_boost_l, net_boost_r)
         if net_boost <= 0.0:
             return 0.0
+
         severity = float(np.clip(excess / max(1.0 - float(risk_threshold), 0.1), 0.0, 1.0))
-        return float(max(0.0, float(net_boost) * float(severity) * float(scale)))
+        eff_scale = float(scale)
+
+        # Bass-specific strengthening: when bass boosting with elevated harmonic risk
+        # in the 20–120 Hz band, double the penalty scale (0.08 vs 0.04).
+        if bass_boost >= 3.0:
+            bass_risk_l = shared._auto_safe_float(
+                (bd.get("harmonic_risk_summary_l") or {}).get("mean_risk_20_120", float("nan")),
+                float("nan"),
+            )
+            bass_risk_r = shared._auto_safe_float(
+                (bd.get("harmonic_risk_summary_r") or {}).get("mean_risk_20_120", float("nan")),
+                float("nan"),
+            )
+            bass_risk_vals = [v for v in (bass_risk_l, bass_risk_r) if np.isfinite(v) and v > 0.0]
+            if bass_risk_vals and max(bass_risk_vals) > 0.35:
+                eff_scale = float(scale) * 2.0
+
+        return float(max(0.0, float(net_boost) * float(severity) * float(eff_scale)))
     except Exception:
         return 0.0
 

@@ -75,6 +75,7 @@ def _auto_score_result(
         event_pen=sl["event_pen"],
         lr_pen=sl["lr_pen"],
         dsp_penalty=sl["dsp_penalty"],
+        bass_prering_penalty=sl["bass_prering_penalty"],
         exc_penalty=sl["exc_penalty"],
         bass_integration_penalty=bi["bass_integration_penalty"],
         bass_feasibility_penalty=bi["bass_feasibility_penalty"],

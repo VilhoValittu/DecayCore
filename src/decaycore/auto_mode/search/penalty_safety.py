@@ -90,7 +90,7 @@ def _auto_tdc_overreach_penalty(st: dict | None) -> tuple[float, dict]:
     return float(max(0.0, penalty)), dbg
 
 
-def _auto_dsp_quality_penalty(st: dict | None) -> tuple[float, dict]:
+def _auto_dsp_quality_penalty(st: dict | None) -> tuple[float, float, dict]:
     st = st or {}
     penalty = 0.0
     dbg = {}
@@ -185,6 +185,18 @@ def _auto_dsp_quality_penalty(st: dict | None) -> tuple[float, dict]:
         penalty += 30.0 * max(0.0, float(pre_post_ratio) - 0.015)
     dbg["ir_pre_post_ratio"] = pre_post_ratio
 
+    # Bass pre-ringing guard: penalise when bass-band phase correction had to be
+    # heavily attenuated (scale_bass < 0.60) to prevent introducing pre-ringing.
+    # Threshold matches the warning level in phase_ir_phase_03 guard logic.
+    bass_prering_scale = None if bool(st.get("pre_energy_metric_suspect", False)) else _auto_pick_metric(
+        st, ("mixed_pre_ringing_scale_bass",), nonneg=True
+    )
+    bass_prering_raw = 0.0
+    if bass_prering_scale is not None and np.isfinite(float(bass_prering_scale)):
+        bass_prering_raw = 8.0 * max(0.0, 0.60 - float(bass_prering_scale))
+        penalty += bass_prering_raw
+    dbg["mixed_pre_ringing_scale_bass"] = bass_prering_scale
+
     phase_boundary_mdb = _auto_pick_metric(
         st,
         (
@@ -203,7 +215,7 @@ def _auto_dsp_quality_penalty(st: dict | None) -> tuple[float, dict]:
     dbg["tdc_overreach_penalty"] = float(tdc_penalty)
     dbg["tdc"] = dict(tdc_dbg)
 
-    return float(max(0.0, penalty)), dbg
+    return float(max(0.0, penalty)), float(bass_prering_raw), dbg
 
 
 def _auto_phase_quality(st: dict | None) -> tuple[float, float, dict]:

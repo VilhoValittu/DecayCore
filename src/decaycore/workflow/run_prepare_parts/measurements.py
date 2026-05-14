@@ -98,6 +98,16 @@ def _extract_generated_source_rt60(source: object) -> tuple[float | None, dict[f
 
     return rt60_val, rt60_bands
 
+def _extract_generated_source_snr(source: object) -> float | None:
+    if not isinstance(source, dict):
+        return None
+    try:
+        v = float(source.get("snr_db", None))
+    except (TypeError, ValueError):
+        return None
+    return float(v) if np.isfinite(v) else None
+
+
 def _load_generated_measurement_pair(data: dict) -> tuple | None:
     generated_l = data.get("generated_measurement_l", None)
     generated_r = data.get("generated_measurement_r", None)
@@ -244,6 +254,8 @@ def _prepare_ui_and_measurements(
     measured_rt60_r, measured_rt60_bands_r = _extract_generated_source_rt60(
         data.get("generated_measurement_r", None)
     )
+    measured_snr_db_l = _extract_generated_source_snr(data.get("generated_measurement_l", None))
+    measured_snr_db_r = _extract_generated_source_snr(data.get("generated_measurement_r", None))
 
     if bass_integration_enabled:
         _lp_l = str(data.get("local_path_l_main", "") or "").strip()
@@ -341,10 +353,12 @@ def _prepare_ui_and_measurements(
         "harmonic_magnitudes_db_l": _harmonic_mags_l,
         "harmonic_freq_hz_r": _harmonic_freq_hz_r,
         "harmonic_magnitudes_db_r": _harmonic_mags_r,
+        "measured_snr_db_l": measured_snr_db_l,
+        "measured_snr_db_r": measured_snr_db_r,
     }
 
 
-__all__ = ['_get_wav_window_params', '_extract_generated_source_rt60', '_load_generated_measurement_pair', '_prepare_ui_and_measurements']
+__all__ = ['_get_wav_window_params', '_extract_generated_source_rt60', '_extract_generated_source_snr', '_load_generated_measurement_pair', '_prepare_ui_and_measurements']
 
 
 def _load_sibling_symbols() -> None:

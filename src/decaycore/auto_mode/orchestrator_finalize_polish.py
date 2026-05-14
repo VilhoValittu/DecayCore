@@ -61,6 +61,7 @@ from .orchestrator_finalize_cache import (
     _resolve_target_seed_preset,
     _preset_with_target_hc_mode,
 )
+from .orchestrator_finalize_cross_polish import _apply_cross_residual_phase_polish
 
 logger = logging.getLogger("DecayCore")
 
@@ -530,6 +531,22 @@ def _apply_search_winner_polish_pipeline(
         target_name=winner_target_name,
     )
 
+    cross_polish_meta = _apply_cross_residual_phase_polish(
+        runtime=runtime,
+        search_state=search_state,
+        search_base_data=search_base_data,
+        cfg=cfg,
+        goal=goal,
+        filter_key=filter_key,
+        status_cb=status_cb,
+        winner_target_name=winner_target_name,
+        _cache_ready_preset=_cache_ready_preset,
+        _materialize_preset_result=_materialize_preset_result,
+        _set_search_winner_if_improved=_set_search_winner_if_improved,
+        _auto_is_better_refine=_auto_is_better_refine,
+        first_residual_meta=residual_peak_polish_meta,
+    )
+
     with profiled_section("finalize.tdc_strength_winner_polish"):
         tdc_strength_best_preset, tdc_strength_best_metrics, tdc_strength_polish_improved, tdc_strength_polish_meta = (
             apply_tdc_strength_winner_polish(
@@ -594,6 +611,7 @@ def _apply_search_winner_polish_pipeline(
         "hpf_winner_polish": dict(hpf_polish_meta or {}),
         "excess_phase_strength_winner_polish": dict(eps_polish_meta or {}),
         "residual_peak_winner_polish": dict(residual_peak_polish_meta or {}),
+        "cross_residual_phase_polish": dict(cross_polish_meta or {}),
         "tdc_strength_winner_polish": dict(tdc_strength_polish_meta or {}),
         "stereo_policy_refine": _public_stereo_policy_refine_meta(stereo_refine_meta),
         "_stereo_refine_meta": dict(stereo_refine_meta or {}),

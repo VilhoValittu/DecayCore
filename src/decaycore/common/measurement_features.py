@@ -507,6 +507,38 @@ def harmonic_distance_score(
         return None
 
 
+def estimate_schroeder_hz(
+    rt60_val: float | None,
+    *,
+    room_volume_m3: float = 40.0,
+    min_hz: float = 80.0,
+    max_hz: float = 500.0,
+) -> float | None:
+    """Estimate Schroeder frequency from RT60.
+
+    Uses f_S = 2000 * sqrt(RT60 / V).  Room volume defaults to 40 m³ which is a
+    reasonable middle estimate for a typical home listening room.  Returns None
+    when RT60 is unavailable or non-positive.
+    """
+    import math
+    if rt60_val is None:
+        return None
+    try:
+        rt60 = float(rt60_val)
+    except (TypeError, ValueError):
+        return None
+    if not (math.isfinite(rt60) and rt60 > 0.0):
+        return None
+    try:
+        v = float(room_volume_m3)
+    except (TypeError, ValueError):
+        v = 40.0
+    if not (math.isfinite(v) and v > 0.0):
+        v = 40.0
+    fs = 2000.0 * math.sqrt(rt60 / v)
+    return float(max(float(min_hz), min(float(max_hz), fs)))
+
+
 __all__ = [
     "normalize_rt60_value",
     "normalize_rt60_bands",
@@ -518,4 +550,5 @@ __all__ = [
     "aggregate_harmonic_curves",
     "rt60_distance_score",
     "harmonic_distance_score",
+    "estimate_schroeder_hz",
 ]
