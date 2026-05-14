@@ -4,7 +4,7 @@
 
 DecayCore generates high-precision FIR filters for CamillaDSP and other FIR-capable DSP engines. It focuses on physically sane, band-limited room correction, controlled low-frequency decay, phase-aware correction, and automated target optimization.
 
-## 1.0.0
+## 1.0.1
 
 DecayCore is an automatic FIR filter generator and room-correction tool for REW exports, built-in sweep measurements, and WAV/IR captures.
 It is designed for CamillaDSP and other FIR-capable playback systems.

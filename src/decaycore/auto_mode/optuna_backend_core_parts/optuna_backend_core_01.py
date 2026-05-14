@@ -78,6 +78,38 @@ from ..optuna_backend_loop import (
 
 logger = logging.getLogger("DecayCore")
 
+
+class _AutoOptunaPerRunStartupPruner:
+    """Keep a per-run startup window when a persistent study already has trials."""
+
+    def __init__(self, delegate, *, startup_trials: int):
+        self.delegate = delegate
+        self.startup_trials = int(max(1, startup_trials))
+        self.existing_trials = 0
+
+    def set_existing_trials(self, count: int) -> None:
+        self.existing_trials = int(max(0, count))
+
+    def prune(self, study, trial) -> bool:
+        try:
+            trial_number = int(getattr(trial, "number", -1))
+        except Exception:
+            trial_number = -1
+        if 0 <= int(trial_number) < int(self.existing_trials + self.startup_trials):
+            return False
+        return bool(self.delegate.prune(study, trial))
+
+
+def _auto_optuna_existing_trial_count(study) -> int:
+    try:
+        trials = study.get_trials(deepcopy=False)
+    except TypeError:
+        trials = study.get_trials()
+    except Exception:
+        trials = getattr(study, "trials", [])
+    return int(len(list(trials or [])))
+
+
 def _auto_run_optuna_eval_loop_core(
     *,
     optuna_mod,
@@ -164,6 +196,17 @@ def _auto_run_optuna_eval_loop_core(
                     n_warmup_steps=0,
                     interval_steps=1,
                 )
+                if (
+                    study_name
+                    and _auto_safe_bool(
+                        (base_data or {}).get("auto_mode_optuna_persistent_study", True),
+                        True,
+                    )
+                ):
+                    pruner = _AutoOptunaPerRunStartupPruner(
+                        pruner,
+                        startup_trials=int(startup_effective),
+                    )
             except Exception:
                 pruner = None
     logger.info(
@@ -200,6 +243,15 @@ def _auto_run_optuna_eval_loop_core(
         base_data=base_data,
         study_name=study_name,
     )
+    if isinstance(pruner, _AutoOptunaPerRunStartupPruner):
+        existing_trials = _auto_optuna_existing_trial_count(study)
+        pruner.set_existing_trials(int(existing_trials))
+        if int(existing_trials) > 0:
+            logger.info(
+                "Automatic mode Optuna pruning startup adjusted for persistent study: existing=%d current_startup=%d",
+                int(existing_trials),
+                int(startup_effective),
+            )
     for attr_key, attr_value in dict(study_user_attrs or {}).items():
         try:
             study.set_user_attr(str(attr_key), attr_value)

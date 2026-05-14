@@ -37,6 +37,10 @@ from .candidate_base import (
     _BASS_FIRST_MODE_MAX_HZ,
     _CONF_PULL_MAX_MIN_HZ,
     _CONF_PULL_MAX_MAX_HZ,
+    AUTO_MODE_MAG_C_MIN_MIN_HZ,
+    AUTO_MODE_MAG_C_MIN_MAX_HZ,
+    AUTO_MODE_LOW_BASS_MIN_HZ,
+    AUTO_MODE_LOW_BASS_MAX_HZ,
     _auto_optuna_snap_to_step,
     _auto_optuna_nearest_choice,
     _bi_search_enabled,
@@ -97,23 +101,23 @@ def _suggest_auto_mode_candidate_optuna(
         mag_c_min = _auto_optuna_snap_to_step(
             trial.suggest_float(
                 "mag_c_min",
-                _mag_c_min_lo,
-                _mag_c_min_hi,
+                float(AUTO_MODE_MAG_C_MIN_MIN_HZ),
+                float(AUTO_MODE_MAG_C_MIN_MAX_HZ),
                 log=True,
             ),
-            lo=_mag_c_min_lo,
-            hi=_mag_c_min_hi,
+            lo=float(AUTO_MODE_MAG_C_MIN_MIN_HZ),
+            hi=float(AUTO_MODE_MAG_C_MIN_MAX_HZ),
             step=0.1,
         )
         low_bass_cut_hz = _auto_optuna_snap_to_step(
             trial.suggest_float(
                 "low_bass_cut_hz",
-                _low_bass_lo,
-                _low_bass_hi,
+                float(AUTO_MODE_LOW_BASS_MIN_HZ),
+                float(AUTO_MODE_LOW_BASS_MAX_HZ),
                 log=True,
             ),
-            lo=_low_bass_lo,
-            hi=_low_bass_hi,
+            lo=float(AUTO_MODE_LOW_BASS_MIN_HZ),
+            hi=float(AUTO_MODE_LOW_BASS_MAX_HZ),
             step=0.1,
         )
     else:
@@ -158,8 +162,8 @@ def _suggest_auto_mode_candidate_optuna(
             trial.suggest_categorical("max_slope_cut_db_per_oct", [0.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 24.0, 36.0])
         ),
         "max_boost": _auto_optuna_snap_to_step(
-            trial.suggest_float("max_boost", 5.0 if prefer_bass else 0.1, 12.0, step=0.01),
-            lo=0.1 if prefer_bass else 0.1,
+            trial.suggest_float("max_boost", 0.1, 12.0, step=0.01),
+            lo=0.1,
             hi=12.0,
             step=0.03,
         ),
@@ -178,15 +182,15 @@ def _suggest_auto_mode_candidate_optuna(
         ),
         "filter_smooth": 96,
         "bass_first_mode_max_hz": _auto_optuna_snap_to_step(
-            trial.suggest_float("bass_first_mode_max_hz", _BASS_FIRST_MODE_MIN_HZ, _bass_first_hi, step=0.1),
+            trial.suggest_float("bass_first_mode_max_hz", _BASS_FIRST_MODE_MIN_HZ, _BASS_FIRST_MODE_MAX_HZ, step=0.1),
             lo=_BASS_FIRST_MODE_MIN_HZ,
-            hi=_bass_first_hi,
+            hi=_BASS_FIRST_MODE_MAX_HZ,
             step=0.1,
         ),
         "conf_pull_max_hz": _auto_optuna_snap_to_step(
-            trial.suggest_float("conf_pull_max_hz", _CONF_PULL_MAX_MIN_HZ, _conf_pull_hi, step=5.0),
+            trial.suggest_float("conf_pull_max_hz", _CONF_PULL_MAX_MIN_HZ, _CONF_PULL_MAX_MAX_HZ, step=5.0),
             lo=_CONF_PULL_MAX_MIN_HZ,
-            hi=_conf_pull_hi,
+            hi=_CONF_PULL_MAX_MAX_HZ,
             step=2.5,
         ),
         "low_bass_cut_hz": float(low_bass_cut_hz),
@@ -194,12 +198,12 @@ def _suggest_auto_mode_candidate_optuna(
     cand["output_tilt_db_per_oct"] = _auto_optuna_snap_to_step(
         trial.suggest_float(
             "output_tilt_db_per_oct",
-            float(output_tilt_lo),
-            float(output_tilt_hi),
+            -2.0,
+            2.0,
             step=0.05,
         ),
-        lo=float(output_tilt_lo),
-        hi=float(output_tilt_hi),
+        lo=-2.0,
+        hi=2.0,
         step=0.05,
     )
     if bool(is_synth_target):

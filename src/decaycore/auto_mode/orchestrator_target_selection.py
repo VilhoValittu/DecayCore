@@ -102,7 +102,7 @@ def _prepare_target_selection_setup(
         str(rank_basis),
     )
     measurement_identity = _auto_get_measurement_signature(measurements)
-    target_study_sig = _auto_target_study_sig(measurement_identity, goal)
+    target_study_sig = _auto_target_study_sig(measurement_identity, goal, filter_key,)
     seed_target = int(str(target_study_sig)[:16], 16) % (2**31 - 1)
     _auto_apply_seed(seed_target)
     logger.info(

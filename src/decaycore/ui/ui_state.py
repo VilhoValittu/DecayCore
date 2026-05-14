@@ -300,6 +300,45 @@ def _humanize_auto_status_detail(msg: str) -> str:
             if m:
                 return _f("auto_detail_cache_refine_round", n=m.group(1), total=m.group(2), trials=m.group(3))
 
+        if "auto-fit seed" in low:
+            m = re.match(
+                r"(?:Sub )?HPF auto-fit seed ([\d.]+) Hz/([\d.]+) dB/oct.*?confidence ([\d.]+)",
+                after, re.IGNORECASE,
+            )
+            if m:
+                is_sub = bool(re.match(r"Sub HPF", after, re.IGNORECASE))
+                key = "auto_detail_sub_hpf_autofit_seed" if is_sub else "auto_detail_hpf_autofit_seed"
+                return _f(key, hz=m.group(1), slope=int(float(m.group(2))), conf=int(round(float(m.group(3)) * 100)))
+
+        if "auto-fit fallback" in low:
+            m = re.match(
+                r"(?:Sub )?HPF auto-fit fallback ([\d.]+) Hz/([\d.]+) dB/oct.*?confidence ([\d.]+)",
+                after, re.IGNORECASE,
+            )
+            if m:
+                return _f("auto_detail_hpf_autofit_fallback", hz=m.group(1), slope=int(float(m.group(2))), conf=int(round(float(m.group(3)) * 100)))
+
+        if "auto-fit skipped" in low:
+            return _f("auto_detail_hpf_autofit_skipped")
+
+        if low.startswith("local refine target="):
+            m = re.match(r"Local refine target=(\S+) center #\d+ phase refine phase_limit=([\d.]+) Hz", after, re.IGNORECASE)
+            if m:
+                return _f("auto_detail_local_refine_target_start", name=m.group(1), hz=m.group(2))
+            m2 = re.match(r"Local refine target=(\S+) center #\d+ mixed_freq=([\d.]+) Hz", after, re.IGNORECASE)
+            if m2:
+                return _f("auto_detail_local_refine_target_start_mixed", name=m2.group(1), hz=m2.group(2))
+
+        if low.startswith("local refine center #"):
+            m = re.match(r"Local refine center #(\d+) phase refine phase_limit=([\d.]+) Hz", after, re.IGNORECASE)
+            if m:
+                return _f("auto_detail_local_refine_center_start", n=m.group(1), hz=m.group(2))
+
+        if low.startswith("local refine fallback"):
+            m = re.match(r"Local refine fallback center #(\d+)", after, re.IGNORECASE)
+            n = m.group(1) if m else "?"
+            return _f("auto_detail_local_refine_fallback", n=n)
+
         if low.startswith("local refine summary"):
             m = re.match(
                 r"Local refine summary center #(\d+),\s*current_best_rank=([\d.]+),\s*avg_score=([\d.]+)"
@@ -308,6 +347,19 @@ def _humanize_auto_status_detail(msg: str) -> str:
             )
             if m:
                 return _f("auto_detail_local_refine", n=m.group(1), rank=_r(m.group(2)), avg=_r(m.group(3)), run=m.group(4), ok=m.group(5))
+
+        if low.startswith("micro refine fallback"):
+            return _f("auto_detail_micro_refine_fallback")
+
+        if low.startswith("phase2 summary"):
+            m = re.search(r"optuna run=(\d+), ok=(\d+)", after, re.IGNORECASE)
+            if m:
+                return _f("auto_detail_phase2_summary", run=m.group(1), ok=m.group(2))
+
+        if low.startswith("hpf winner polish improved"):
+            m = re.match(r"hpf winner polish improved \(([^,]+), rank ([\d.]+)", after, re.IGNORECASE)
+            if m:
+                return _f("auto_detail_hpf_polish_improved", label=m.group(1).strip(), rank=_r(m.group(2)))
 
         if low.startswith("micro refine summary"):
             m = re.match(

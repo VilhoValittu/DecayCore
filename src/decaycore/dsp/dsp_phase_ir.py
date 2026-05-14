@@ -304,20 +304,13 @@ def _run_phase_ir_stage(inputs: PhaseIRInputs) -> PhaseIROutputs:
             pass
 
     gain_db_before_autogain = gain_db.copy()
-    gain_db_for_autogain = gain_db.copy()
     ag = compute_auto_gain_and_headroom(
         cfg=cfg,
-        gain_db=gain_db_for_autogain,
+        gain_db=gain_db,
         mask_c=mask_c,
         logger=logger,
     )
     require_allowed_keys("phase_ir_autogain", ag, _AUTOGAIN_ALLOWED_KEYS)
-    require_unchanged(
-        "phase_ir_autogain",
-        "gain_db input",
-        gain_db_before_autogain,
-        gain_db_for_autogain,
-    )
     require_unchanged(
         "phase_ir_autogain",
         "gain_db",
@@ -343,15 +336,12 @@ def _run_phase_ir_stage(inputs: PhaseIRInputs) -> PhaseIROutputs:
     final_gain_total_before_build = final_gain_total.copy()
     auto_global_gain_db_before_build = float(auto_global_gain_db)
     auto_headroom_db_before_build = float(auto_headroom_db)
-    gain_db_for_build = gain_db.copy()
-    p_rad_for_build = p_rad_interp.copy()
-    final_gain_total_for_build = final_gain_total.copy()
     built = build_phase_and_ir(
         cfg=cfg,
         freq_axis=freq_axis,
         n_fft=n_fft,
-        gain_db=gain_db_for_build,
-        p_rad_interp=p_rad_for_build,
+        gain_db=gain_db,
+        p_rad_interp=p_rad_interp,
         conf_mask=conf_mask,
         st=st,
         mask_c=mask_c,
@@ -361,33 +351,21 @@ def _run_phase_ir_stage(inputs: PhaseIRInputs) -> PhaseIROutputs:
         theo_xo=theo_xo,
         auto_global_gain_db=auto_global_gain_db,
         auto_headroom_db=auto_headroom_db,
-        final_gain_total=final_gain_total_for_build,
+        final_gain_total=final_gain_total,
         limit_gd_gradient_ms_per_oct_fn=_limit_gd_gradient_ms_per_oct,
     )
     require_allowed_keys("phase_ir_build", built, _BUILD_ALLOWED_KEYS)
     require_unchanged(
         "phase_ir_build",
-        "gain_db input",
-        gain_db_before_build,
-        gain_db_for_build,
-    )
-    require_unchanged(
-        "phase_ir_build",
-        "p_rad_interp input",
-        p_rad_before_build,
-        p_rad_for_build,
-    )
-    require_unchanged(
-        "phase_ir_build",
-        "final_gain_total input",
-        final_gain_total_before_build,
-        final_gain_total_for_build,
-    )
-    require_unchanged(
-        "phase_ir_build",
         "gain_db",
         gain_db_before_build,
         gain_db,
+    )
+    require_unchanged(
+        "phase_ir_build",
+        "p_rad_interp",
+        p_rad_before_build,
+        p_rad_interp,
     )
     require_unchanged(
         "phase_ir_build",

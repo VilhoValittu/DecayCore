@@ -428,7 +428,8 @@ def _consume_phase_result(
                     )
     else:
         err_txt = str(out.get("error", "unknown error") or "unknown error")
-        logger.warning(
+        log_fn = logger.info if bool(out.get("pruned", False)) else logger.warning
+        log_fn(
             "Automatic mode trial %d/%d failed (%s): %s",
             int(idx),
             int(n_total),

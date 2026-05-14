@@ -32,6 +32,7 @@ _WINNER_ONLY_KEYS = frozenset(
         "_auto_target_seed_metrics",
         "_auto_target_seed_preset",
         "_auto_target_seed_source",
+        "auto_applied_preset",
         "best_applied_preset",
         "best_metrics",
         "best_preset",
@@ -96,14 +97,50 @@ def _items(value: dict | None) -> tuple[tuple[str, Any], ...]:
     return tuple((str(k), _jsonable(v)) for k, v in sorted(dict(value or {}).items(), key=lambda kv: str(kv[0])))
 
 
+def _matching_auto_applied_keys(raw: dict) -> set[str]:
+    applied: dict[str, Any] = {}
+    explicit = raw.get("auto_applied_preset")
+    if isinstance(explicit, dict):
+        applied.update(explicit)
+    meta = raw.get("_auto_mode_meta")
+    if isinstance(meta, dict):
+        for key in ("best_preset", "best_applied_preset"):
+            value = meta.get(key)
+            if isinstance(value, dict):
+                applied.update(value)
+    out: set[str] = set()
+    for key, value in applied.items():
+        key_s = str(key)
+        if key_s not in raw:
+            continue
+        if _jsonable(raw.get(key_s)) == _jsonable(value):
+            out.add(key_s)
+    return out
+
+
+def _identity_base_data(raw: dict) -> dict:
+    explicit = raw.get("_auto_search_identity_base_data")
+    if isinstance(explicit, dict):
+        return dict(explicit)
+    meta = raw.get("_auto_mode_meta")
+    if isinstance(meta, dict):
+        search_v2 = meta.get("auto_search_v2")
+        if isinstance(search_v2, dict) and isinstance(search_v2.get("identity_base_data"), dict):
+            return dict(search_v2.get("identity_base_data") or {})
+    return {}
+
+
 def canonicalize_auto_search_base_data(raw_data: dict | None) -> dict:
     """Return raw user input stripped of winner/runtime fields."""
 
     raw = dict(raw_data or {})
-    out: dict[str, Any] = {}
+    auto_applied_keys = _matching_auto_applied_keys(raw)
+    out: dict[str, Any] = _identity_base_data(raw)
     for key, value in raw.items():
         key_s = str(key)
         if key_s in _WINNER_ONLY_KEYS:
+            continue
+        if key_s in auto_applied_keys:
             continue
         if key_s.startswith(_AUTO_PREFIX_DENY) and key_s not in {
             "_auto_user_phase_limit",

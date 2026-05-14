@@ -192,7 +192,7 @@ def _run_target_trials(
         base_tc_optuna = dict(base_tc or {})
         base_tc_optuna["_optuna_measurement_sig"] = _auto_get_measurement_signature(measurements)
         base_tc_optuna["_optuna_journal_kind"] = "target"
-        base_tc_optuna["_optuna_filter_key"] = ""
+        base_tc_optuna["_optuna_filter_key"] = str(filter_key or "")
         raw_scope = f"target-{str(target_name)}-{str(phase_tag)}"
         scope_eff = runtime.auto_optuna_effective_scope(
             base_tc_optuna,
@@ -256,7 +256,8 @@ def _run_target_trials(
                 "decaycore_kind": "target_search",
                 "decaycore_target_name": str(target_name),
                 "decaycore_target_study_sig": str(target_study_sig),
-                "decaycore_target_cache_version": 2,
+                "decaycore_target_cache_version": 3,
+                "decaycore_filter_key": str(filter_key),
             },
         )
         return [

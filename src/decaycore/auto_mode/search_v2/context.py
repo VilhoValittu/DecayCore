@@ -63,6 +63,7 @@ class AutoSearchExecutionContext:
     maybe_apply_residual_tiebreak: object
     seed: int
     optuna_search_sig: str
+    canonical_signature: str
     prior_seed_preset: dict
     use_optuna_trials: bool
     candidates: list
@@ -239,6 +240,7 @@ def build_execution_context(
     status_cb,
     n_trials: int,
     allow_legacy_cache_seeds: bool = False,
+    canonical_signature: str | None = None,
 ) -> AutoSearchExecutionContext:
     cache_base_data, search_base_data = _prepare_base_data(base_data, measurements)
     cfg = auto_api.AutoModeConfig.from_base_data(search_base_data)
@@ -259,6 +261,9 @@ def build_execution_context(
     search_base_data["_optuna_measurement_sig"] = str(measurement_sig)
     cache_base_data["_optuna_journal_kind"] = "filter"
     search_base_data["_optuna_journal_kind"] = "filter"
+    if str(canonical_signature or "").strip():
+        cache_base_data["_auto_search_v2_canonical_signature"] = str(canonical_signature).strip()
+        search_base_data["_auto_search_v2_canonical_signature"] = str(canonical_signature).strip()
     rank_basis = auto_api._auto_goal_basis_text(goal)
     optimizer_backend = auto_api._auto_optimizer_backend(
         search_base_data,
@@ -350,6 +355,7 @@ def build_execution_context(
         maybe_apply_residual_tiebreak=maybe_apply_residual_tiebreak,
         seed=int(seed),
         optuna_search_sig=str(optuna_search_sig),
+        canonical_signature=str(canonical_signature or "").strip(),
         prior_seed_preset=_apply_explicit_seed(
             search_base_data=search_base_data,
             cache_base_data=cache_base_data,

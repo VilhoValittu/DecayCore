@@ -34,10 +34,15 @@ from ...auto_mode.api import (
     AUTO_MODE_TARGET_TRIALS_PER_CURVE,
     AUTO_MODE_TRIALS,
     _auto_goal_norm,
+    _auto_cache_get_entry,
+    _auto_cache_get_target_for_measurements,
+    _auto_cache_get_target_for_measurements_global,
+    _auto_filter_cache_key,
     _auto_optimizer_backend,
     _auto_safe_float,
     _auto_select_builtin_target_curve,
     _auto_select_target_curve_with_trials,
+    _auto_signature,
     _estimate_auto_hpf_from_response,
     _estimate_auto_mag_c_min_hz,
     _resolve_auto_hpf_application,
@@ -73,6 +78,246 @@ _AUTO_PROGRESS_PHASE2_END = 0.82
 _AUTO_PROGRESS_PHASE3_START = 0.82
 _AUTO_PROGRESS_PHASE3_END = 0.85
 _AUTO_PROGRESS_FINALIZE = 0.88
+
+
+def _target_seed_from_cache_entry(entry: dict | None) -> dict:
+    payload = dict(entry or {}) if isinstance(entry, dict) else {}
+    target_seed = payload.get("target_seed_preset")
+    if isinstance(target_seed, dict) and target_seed:
+        return dict(target_seed)
+    best = payload.get("best_preset")
+    if isinstance(best, dict) and best:
+        return dict(best)
+    return {}
+
+
+def _target_cache_pick_from_entry(
+    entry: dict | None,
+    *,
+    selection_method: str,
+) -> dict | None:
+    payload = dict(entry or {}) if isinstance(entry, dict) else {}
+    hc = str(
+        payload.get(
+            "best_target_curve",
+            payload.get("best_hc_mode", ""),
+        )
+        or ""
+    ).strip()
+    seed = _target_seed_from_cache_entry(payload)
+    if not hc or not seed:
+        return None
+    return {
+        "selected_hc_mode": str(hc),
+        "fit_rms_db": float(
+            _auto_safe_float(
+                payload.get("fit_rms_db", payload.get("preselect_score", float("nan"))),
+                float("nan"),
+            )
+        ),
+        "offset_db": float(_auto_safe_float(payload.get("offset_db", 0.0), 0.0)),
+        "selection_method": str(selection_method),
+        "top_n": 0,
+        "trials_per_curve": 0,
+        "candidates": [],
+        "evaluated": [],
+        "best_preset": dict(seed),
+        "best_metrics": dict(payload.get("best_metrics", {}) or {}),
+    }
+
+
+def _try_cached_target_pick_before_search(
+    *,
+    data: dict,
+    measurements: dict,
+    fs_v: int,
+    taps_v: int,
+    xos: list,
+    hpf: dict | None,
+    goal: str,
+) -> dict | None:
+    filter_key = str(_auto_filter_cache_key(data) or "").strip()
+    compat_version = str(
+        data.get("auto_mode_compat_version", AUTO_MODE_COMPAT_VERSION)
+        or AUTO_MODE_COMPAT_VERSION
+    )
+
+    def _normalize_filter_key(value: object) -> str:
+        raw = str(value or "").strip()
+        if not raw:
+            return ""
+        try:
+            return str(_auto_filter_cache_key({"filter_type": raw}) or "").strip()
+        except Exception:
+            low = raw.lower()
+            if "asym" in low:
+                return "asym"
+            if "mixed" in low:
+                return "mixed"
+            if "minimum" in low or "minphase" in low or low == "min" or ("min" in low and "phase" in low):
+                return "minimum"
+            if "linear" in low:
+                return "linear"
+            return low
+
+    def _filter_map_get(mapping: object, filter_key: str) -> dict:
+            if not isinstance(mapping, dict):
+                return {}
+
+            wanted = _normalize_filter_key(filter_key)
+
+            direct = mapping.get(filter_key)
+            if isinstance(direct, dict):
+                return dict(direct)
+
+            direct_norm = mapping.get(wanted)
+            if isinstance(direct_norm, dict):
+                return dict(direct_norm)
+
+            for key, value in mapping.items():
+                if not isinstance(value, dict):
+                    continue
+                if _normalize_filter_key(key) == wanted:
+                    return dict(value)
+
+            return {}
+
+    def _dict_for_current_filter(mapping: object) -> dict:
+        if not isinstance(mapping, dict):
+            return {}
+
+        direct = mapping.get(filter_key)
+        if isinstance(direct, dict):
+            return dict(direct)
+
+        wanted = _normalize_filter_key(filter_key)
+        for key, value in mapping.items():
+            if not isinstance(value, dict):
+                continue
+            if _normalize_filter_key(key) == wanted:
+                return dict(value)
+
+        return {}
+
+    def _entry_matches_current_filter(entry: object) -> bool:
+        if not isinstance(entry, dict):
+            return False
+
+        # Newer target-cache entries may carry a filter-specific seed map.
+        # If so, accept only when the current filter has its own seed.
+        seed = _dict_for_current_filter(entry.get("filter_seed_presets", {}))
+        if seed:
+            return True
+
+        # Filter-specific entries may carry one of these fields.
+        for field in (
+            "filter_key",
+            "filter_type",
+            "_auto_filter_key",
+            "_optuna_filter_key",
+            "decaycore_filter_key",
+        ):
+            value = entry.get(field)
+            if value is None:
+                continue
+            if _normalize_filter_key(value) == _normalize_filter_key(filter_key):
+                return True
+
+        # If no filter metadata exists, do not trust the entry.
+        # This prevents old Linear/global target-cache entries from leaking
+        # into Minimum/Mixed/Asymmetric runs.
+        return False
+
+    # 1. Measurement-global cache:
+    # usable only if it contains a seed for the current filter.
+    try:
+        global_entry = _auto_cache_get_target_for_measurements_global(
+            measurements,
+            goal=goal,
+            compat_version=compat_version,
+        )
+    except Exception:
+        global_entry = None
+
+    if isinstance(global_entry, dict):
+        seed = _dict_for_current_filter(global_entry.get("filter_seed_presets", {}))
+        if seed:
+            entry = dict(global_entry)
+            entry["target_seed_preset"] = dict(seed)
+
+            metrics = _dict_for_current_filter(global_entry.get("filter_seed_metrics", {}))
+            if metrics:
+                entry["best_metrics"] = dict(metrics)
+
+            entry["filter_key"] = filter_key
+
+            pick = _target_cache_pick_from_entry(
+                entry,
+                selection_method="cache_measurement_global_filter_seed_hit",
+            )
+            if isinstance(pick, dict):
+                return pick
+
+    # 2. Filter-specific measurement target cache:
+    # reject legacy/global leakage unless it explicitly matches this filter.
+    try:
+        measurement_entry = _auto_cache_get_target_for_measurements(
+            measurements,
+            goal=goal,
+            filter_key=filter_key,
+            compat_version=compat_version,
+        )
+    except Exception:
+        measurement_entry = None
+
+    if _entry_matches_current_filter(measurement_entry):
+        entry = dict(measurement_entry)
+
+        seed = _dict_for_current_filter(entry.get("filter_seed_presets", {}))
+        if seed and not isinstance(entry.get("target_seed_preset"), dict):
+            entry["target_seed_preset"] = dict(seed)
+
+        metrics = _dict_for_current_filter(entry.get("filter_seed_metrics", {}))
+        if metrics and not isinstance(entry.get("best_metrics"), dict):
+            entry["best_metrics"] = dict(metrics)
+
+        entry["filter_key"] = filter_key
+
+        pick = _target_cache_pick_from_entry(
+            entry,
+            selection_method="cache_measurement_hit",
+        )
+        if isinstance(pick, dict):
+            return pick
+
+    # 3. Exact signature cache:
+    # this is already filter-specific because _auto_signature() uses base_data
+    # and _auto_cache_get_entry() is called with filter_key.
+    try:
+        sig_target = _auto_signature(
+            base_data=data,
+            measurements=measurements,
+            fs_v=int(fs_v),
+            taps_v=int(taps_v),
+            xos=xos,
+            hpf=hpf,
+            hc_mode=None,
+            include_hc_mode=False,
+        )
+        signature_entry = _auto_cache_get_entry(
+            sig_target,
+            filter_key=filter_key,
+            compat_version=compat_version,
+        )
+    except Exception:
+        signature_entry = None
+
+    pick = _target_cache_pick_from_entry(
+        signature_entry,
+        selection_method="cache_signature_hit",
+    )
+    return pick if isinstance(pick, dict) else None
+
 
 def _run_auto_mode_seed_phases(
     ctx: dict,
@@ -335,24 +580,34 @@ def _run_auto_mode_seed_phases(
                         "is_wav_source": bool(detect_is_wav_source(data)),
                     }
                 )
-                auto_status(
-                    "DecayCore automatic mode: target search init "
-                    f"(top-{AUTO_MODE_TARGET_TOP_N}, {AUTO_MODE_TARGET_TRIALS_PER_CURVE} trials/curve, "
-                    f"fs {int(pre_fs)} Hz, taps {int(pre_taps)}, "
-                    f"-6 dB point {float(est_mag_c_min):.1f} Hz, goal {auto_goal})"
-                )
-                tc_pick = _auto_select_target_curve_with_trials(
-                    base_data=data,
+                tc_pick = _try_cached_target_pick_before_search(
+                    data=data,
                     measurements=pre_measurements,
                     fs_v=int(pre_fs),
                     taps_v=int(pre_taps),
                     xos=pre_xos,
                     hpf=pre_hpf,
-                    status_cb=auto_status,
-                    top_n=int(AUTO_MODE_TARGET_TOP_N),
-                    trials_per_curve=int(AUTO_MODE_TARGET_TRIALS_PER_CURVE),
+                    goal=str(auto_goal),
                 )
                 if not isinstance(tc_pick, dict):
+                    tc_pick = _auto_select_target_curve_with_trials(
+                        base_data=data,
+                        measurements=pre_measurements,
+                        fs_v=int(pre_fs),
+                        taps_v=int(pre_taps),
+                        xos=pre_xos,
+                        hpf=pre_hpf,
+                        status_cb=auto_status,
+                        top_n=int(AUTO_MODE_TARGET_TOP_N),
+                        trials_per_curve=int(AUTO_MODE_TARGET_TRIALS_PER_CURVE),
+                    )
+                if not isinstance(tc_pick, dict):
+                    auto_status(
+                        "DecayCore automatic mode: target search init "
+                        f"(top-{AUTO_MODE_TARGET_TOP_N}, {AUTO_MODE_TARGET_TRIALS_PER_CURVE} trials/curve, "
+                        f"fs {int(pre_fs)} Hz, taps {int(pre_taps)}, "
+                        f"-6 dB point {float(est_mag_c_min):.1f} Hz, goal {auto_goal})"
+                    )
                     tc_pick = _auto_select_builtin_target_curve(
                         data,
                         f_l=pre_f_l,
@@ -367,14 +622,17 @@ def _run_auto_mode_seed_phases(
                     method_txt = support.auto_target_selection_method_text(method_raw)
                     data["hc_mode"] = chosen_hc
                     target_seed_preset = dict(tc_pick.get("best_preset", {}) or {})
+                    selection_method_raw = str(tc_pick.get("selection_method", "") or "").strip().lower()
+                    cached_target_methods = {
+                        "cache_signature_hit",
+                        "cache_measurement_hit",
+                        "cache_measurement_global_hit",
+                        "cache_measurement_global_filter_seed_hit",
+                        "cache_optuna_target_hit",
+                    }
                     if target_seed_preset:
                         data["_auto_target_seed_preset"] = dict(target_seed_preset)
-                        selection_method_raw = str(tc_pick.get("selection_method", "") or "").strip().lower()
-                        if selection_method_raw in (
-                            "cache_signature_hit",
-                            "cache_measurement_hit",
-                            "cache_optuna_target_hit",
-                        ):
+                        if selection_method_raw in cached_target_methods:
                             data["_auto_target_seed_source"] = selection_method_raw
                         else:
                             data["_auto_target_seed_source"] = "fresh_target_search"
@@ -399,6 +657,13 @@ def _run_auto_mode_seed_phases(
                         auto_status(
                             "DecayCore automatic mode: adaptive target selected "
                             "(synthesized from room measurements, bass buildup, tilt and HF roll-off)"
+                        )
+                    elif selection_method_raw in cached_target_methods:
+                        auto_status(
+                            "DecayCore automatic mode: target cache hit "
+                            f"{chosen_hc} (method {method_txt}, "
+                            f"fit_rms {float(tc_pick.get('fit_rms_db', 0.0)):.3f} dB, "
+                            "skipping target comparison trials)"
                         )
                     else:
                         auto_status(

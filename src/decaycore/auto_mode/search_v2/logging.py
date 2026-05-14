@@ -24,8 +24,13 @@ def log_plan_decision(decision: AutoSearchPlanDecision, *, seed_source: str | No
     logger.info(
         "=== AUTO SEARCH V2 DECISION ===\n"
         "Signature: %s\n"
+        "Signature source: %s\n"
+        "Filter: %s\n"
+        "Target mode: %s\n"
+        "Compat version: %s\n"
         "Plan: %s\n"
         "Reason: %s\n"
+        "Cache proof: %s\n"
         "Skipped phases: %s\n"
         "Running phases: %s\n"
         "Seed source: %s\n"
@@ -35,8 +40,13 @@ def log_plan_decision(decision: AutoSearchPlanDecision, *, seed_source: str | No
         "Signature inputs: %s\n"
         "Cache schema: %d",
         str(decision.signature),
+        str(report.get("signature_source", "") or "unknown"),
+        str(report.get("filter_key", "") or ""),
+        str(report.get("target_mode", "") or ""),
+        str(report.get("compat_version", "") or ""),
         str(decision.plan.name),
         str(decision.reason),
+        str(report.get("cache_proof_status", "") or "unknown"),
         ", ".join(decision.skipped_phases) if decision.skipped_phases else "none",
         ", ".join(decision.enabled_phases) if decision.enabled_phases else "none",
         str(seed_source or "none"),

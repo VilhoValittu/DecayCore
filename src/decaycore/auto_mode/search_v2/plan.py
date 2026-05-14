@@ -17,7 +17,9 @@ from enum import Enum
 
 
 class AutoSearchPlan(Enum):
-    FULL_SEARCH = "full_search"
+    FIRST_RUN_FULL_SEARCH = "first_run_full_search"
+    FULL_SEARCH = "first_run_full_search"
+    FALLBACK_FULL_SEARCH = "fallback_full_search"
     PRESELECTED_TARGET_REFINE = "preselected_target_refine"
     CACHE_MICRO_REFINE = "cache_micro_refine"
     LAST_BEST_MICRO_REFINE = "last_best_micro_refine"

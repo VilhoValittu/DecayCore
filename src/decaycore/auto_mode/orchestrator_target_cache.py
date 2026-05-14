@@ -112,11 +112,18 @@ def _cached_target_return(
 ) -> dict | None:
     if not _cache_target_valid(runtime, cached_hc_mode):
         return None
-    fit_rms_db, offset_db = _cached_target_fit(
-        runtime=runtime,
-        base_data=base_data,
-        measurements=measurements,
-        hc_name=str(cached_hc_mode),
+    metrics = dict(cached_metrics or {}) if isinstance(cached_metrics, dict) else {}
+    fit_rms_db = float(
+        _auto_safe_float(
+            metrics.get("fit_rms_db", metrics.get("preselect_score", float("nan"))),
+            float("nan"),
+        )
+    )
+    offset_db = float(
+        _auto_safe_float(
+            metrics.get("offset_db", 0.0),
+            0.0,
+        )
     )
     return {
         "selected_hc_mode": str(cached_hc_mode),
@@ -130,7 +137,7 @@ def _cached_target_return(
         "candidates": [],
         "evaluated": [],
         "best_preset": dict(cached_preset or {}),
-        "best_metrics": dict(cached_metrics or {}),
+        "best_metrics": dict(metrics or {}),
     }
 
 
@@ -230,7 +237,7 @@ def _cached_target_state_from_optuna_study(
         storage_base_data = dict(base_data or {})
         storage_base_data["_optuna_measurement_sig"] = _auto_get_measurement_signature(measurements or {})
         storage_base_data["_optuna_journal_kind"] = "target"
-        storage_base_data["_optuna_filter_key"] = ""
+        storage_base_data["_optuna_filter_key"] = str(setup.filter_key or "")
         storage = setup.runtime.auto_optuna_create_storage(
             setup.optuna_mod,
             base_data=storage_base_data,
@@ -272,6 +279,11 @@ def _cached_target_state_from_optuna_study(
         if attrs.get("decaycore_kind") != "target_search":
             continue
         if str(attrs.get("decaycore_target_study_sig", "") or "") != target_study_sig:
+            continue
+        if (
+            str(attrs.get("decaycore_filter_key", "") or "").strip().lower()
+            != str(setup.filter_key or "").strip().lower()
+        ):
             continue
         hc_name = _auto_builtin_target_name(attrs.get("decaycore_target_name", ""))
         if not _cache_target_valid(setup.runtime, hc_name):
@@ -365,9 +377,13 @@ def _resolve_cached_target_state(
             cached_preset = dict(seed_map.get(fk, {}) or {})
         if isinstance(metric_map, dict):
             cached_metrics = dict(metric_map.get(fk, {}) or {})
-        if cached_preset or cached_metrics:
+        if cached_preset:
             cached_source = "cache_measurement_global_filter_seed"
             cached_status = "measurement global filter seed"
+        else:
+            cached_target_entry = None
+            cached_preset = {}
+            cached_metrics = {}
     if not isinstance(cached_target_entry, dict):
         try:
             cached_target_entry = setup.runtime.auto_cache_get_target_for_measurements(
@@ -566,10 +582,9 @@ def _try_measurement_global_target_result(
     status_cb,
 ) -> dict | None:
     source = str(cache_state.cached_target_source or "").strip()
-    if source not in (
-        "cache_measurement_global",
-        "cache_measurement_global_filter_seed",
-    ):
+    if source != "cache_measurement_global_filter_seed":
+        return None
+    if not dict(cache_state.cached_target_preset or {}):
         return None
     hc = _auto_builtin_target_name(cache_state.cached_target_hc)
     if not _cache_target_valid(setup.runtime, hc):

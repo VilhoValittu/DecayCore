@@ -35,6 +35,9 @@ _progress_getter: typing.Callable[[], typing.Any] | None = None
 _progress_lock = threading.Lock()
 _pending_progress_value: float | None = None
 
+_render_results_lock = threading.Lock()
+_pending_render_results: tuple[tuple[typing.Any, ...], dict[str, typing.Any]] | None = None
+
 
 def set_progress_element_getter(fn: typing.Callable[[], typing.Any]) -> None:
     """Register a callable that returns the live NiceGUI LinearProgress element."""
@@ -55,6 +58,22 @@ def consume_pending_progress() -> float | None:
     with _progress_lock:
         value = _pending_progress_value
         _pending_progress_value = None
+    return value
+
+
+def queue_render_results(*args: typing.Any, **kwargs: typing.Any) -> None:
+    """Queue the latest results payload for rendering from the NiceGUI UI timer."""
+    global _pending_render_results
+    with _render_results_lock:
+        _pending_render_results = (tuple(args), dict(kwargs))
+
+
+def consume_pending_render_results() -> tuple[tuple[typing.Any, ...], dict[str, typing.Any]] | None:
+    """Return and clear the latest queued results payload."""
+    global _pending_render_results
+    with _render_results_lock:
+        value = _pending_render_results
+        _pending_render_results = None
     return value
 
 
@@ -97,9 +116,7 @@ def _default_make_callbacks(run_started_at: float) -> ProcessRunCallbacks:
 # ---------------------------------------------------------------------------
 
 def _lazy_render_results(*args: typing.Any, **kwargs: typing.Any) -> None:
-    from .ng_results_sections import render_results  # noqa: PLC0415
-
-    render_results(*args, **kwargs)
+    queue_render_results(*args, **kwargs)
 
 
 # ---------------------------------------------------------------------------

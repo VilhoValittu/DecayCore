@@ -275,6 +275,7 @@ def finalize_search_result(
     _maybe_apply_residual_tiebreak,
     cache_refine_result: dict | None = None,
     runtime=None,
+    canonical_signature: str | None = None,
 ) -> dict | None:
     runtime = coerce_orchestrator_runtime(runtime)
     if isinstance(cache_refine_result, dict):
@@ -301,6 +302,7 @@ def finalize_search_result(
             _materialize_preset_result=_materialize_preset_result,
             _maybe_apply_residual_tiebreak=_maybe_apply_residual_tiebreak,
             cache_refine_result=dict(cache_refine_result or {}),
+            canonical_signature=canonical_signature,
         )
     if search_state is None:
         return None
@@ -390,6 +392,7 @@ def finalize_search_result(
         cached_best_preset=dict(cached_best_preset or {}),
         best_metrics=dict(search_state.best_metrics or {}),
         materialized_best_preset=dict(materialized_best_preset or {}),
+        canonical_signature=canonical_signature,
     )
 
     logger.info("Automatic mode Phase 4 complete: final winner materialized and cached")

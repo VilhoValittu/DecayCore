@@ -39,6 +39,8 @@ _results_container_ref = None
 _progress_ref = None
 _progress_overlay_refs = []
 _run_clock: dict = {"started_at": None, "active": False, "elapsed_s": None}
+_start_button_lock = threading.Lock()
+_pending_start_button_enable = None
 
 
 def get_results_container():
@@ -47,6 +49,35 @@ def get_results_container():
 
 def get_progress_element():
     return _progress_ref
+
+
+def _queue_start_button_enable(start_btn) -> None:
+    global _pending_start_button_enable
+    with _start_button_lock:
+        _pending_start_button_enable = start_btn
+
+
+def _consume_pending_start_button_enable():
+    global _pending_start_button_enable
+    with _start_button_lock:
+        start_btn = _pending_start_button_enable
+        _pending_start_button_enable = None
+    return start_btn
+
+
+def _drain_pending_result_render() -> None:
+    from . import ng_bridge
+
+    pending = ng_bridge.consume_pending_render_results()
+    if pending is None:
+        return
+    args, kwargs = pending
+    try:
+        from .ng_results_sections import render_results  # noqa: PLC0415
+
+        render_results(*args, **kwargs)
+    except Exception:
+        logger.exception("queued results render failed")
 
 
 def _set_progress_overlay_text_dark(enabled: bool) -> None:
@@ -169,6 +200,15 @@ def build_global_progress_bar() -> None:
                 progress.set_value(float(pending_progress))
             except Exception:
                 logger.exception("progress bar queued update")
+
+        _drain_pending_result_render()
+
+        pending_start_btn = _consume_pending_start_button_enable()
+        if pending_start_btn is not None:
+            try:
+                pending_start_btn.enable()
+            except Exception:
+                logger.exception("start button queued re-enable")
 
         phase_txt = snap.get("status_base_message", "") or ""
         progress_phase_label.set_text(phase_txt)
@@ -301,6 +341,9 @@ def _clear_previous_run_output() -> None:
     container = get_results_container()
     if container is None:
         return
+    if bool(getattr(container, "is_deleted", False)):
+        logger.debug("Previous results container has been deleted; skipping clear")
+        return
     try:
         container.clear()
     except Exception:
@@ -309,8 +352,6 @@ def _clear_previous_run_output() -> None:
 
 def _handle_start(on_start_click, start_btn, run_clock) -> None:
     """Run the DSP pipeline in a background thread so the UI stays responsive."""
-    from nicegui import ui
-
     start_btn.disable()
     run_clock["started_at"] = time.perf_counter()
     run_clock["elapsed_s"] = 0.0
@@ -341,9 +382,6 @@ def _handle_start(on_start_click, start_btn, run_clock) -> None:
             except Exception:
                 logger.exception("run clock update")
             run_clock["active"] = False
-            try:
-                start_btn.enable()
-            except Exception:
-                logger.exception("start button re-enable")
+            _queue_start_button_enable(start_btn)
 
     threading.Thread(target=_run, daemon=True).start()

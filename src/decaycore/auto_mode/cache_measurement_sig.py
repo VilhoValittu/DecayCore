@@ -143,11 +143,17 @@ def _auto_optuna_stable_study_sig(measurement_identity: str, filter_key: str) ->
     return h.hexdigest()
 
 
-def _auto_target_study_sig(measurement_identity: str, goal: str) -> str:
-    """Stable target-study signature keyed only on measurement + auto goal."""
+def _auto_target_study_sig(
+    measurement_identity: str,
+    goal: str,
+    filter_key: str | None = None,
+) -> str:
+    """Stable target-study signature keyed on measurement + auto goal + filter type."""
     h = hashlib.sha256()
-    h.update(b"target-v2:")
+    h.update(b"target-v3:")
     h.update(str(goal or "balanced").strip().lower().encode("utf-8", "ignore"))
+    h.update(b":")
+    h.update(str(filter_key or "mixed").strip().lower().encode("utf-8", "ignore"))
     h.update(b":")
     h.update(str(measurement_identity or "").encode("utf-8", "ignore"))
     return h.hexdigest()

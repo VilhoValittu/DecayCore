@@ -28,7 +28,6 @@ from .shared import (
     AUTO_MODE_OPTUNA_USER_ATTR_OUT,
     AUTO_MODE_PHASE_LIMIT_MAX_HZ,
     AUTO_MODE_PHASE_LIMIT_MIN_HZ,
-    _auto_output_tilt_bounds,
     _auto_safe_float,
 )
 from .optuna_backend_storage import (
@@ -273,10 +272,9 @@ def _auto_optuna_sanitize_enqueued_params(params: dict | None, *, base_data: dic
     out = dict(params or {})
     if not out:
         return out
-    mag_lo, mag_hi, low_lo, low_hi = _auto_optuna_adaptive_freq_bounds(base_data)
     for key, lo, hi in (
-        ("mag_c_min", mag_lo, mag_hi),
-        ("low_bass_cut_hz", low_lo, low_hi),
+        ("mag_c_min", float(AUTO_MODE_MAG_C_MIN_MIN_HZ), float(AUTO_MODE_MAG_C_MIN_MAX_HZ)),
+        ("low_bass_cut_hz", float(AUTO_MODE_LOW_BASS_MIN_HZ), float(AUTO_MODE_LOW_BASS_MAX_HZ)),
     ):
         if key not in out:
             continue
@@ -295,7 +293,6 @@ def _auto_optuna_trial_distributions(optuna_mod, *, params: dict | None, base_da
     if not callable(float_dist) or not callable(cat_dist):
         return None
 
-    tdc_min = float(_auto_optuna_tdc_min(base_data))
     categorical_choices = {
         "enable_afdw": [False, True],
         "bass_first_ai": [False, True],
@@ -304,25 +301,22 @@ def _auto_optuna_trial_distributions(optuna_mod, *, params: dict | None, base_da
         "max_slope_boost_db_per_oct": [0.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 24.0, 36.0],
         "max_slope_cut_db_per_oct": [0.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 24.0, 36.0],
         "filter_smooth": [96],
-
     }
-    output_tilt_lo, output_tilt_hi = _auto_output_tilt_bounds(base_data)
-    mag_lo, mag_hi, low_lo, low_hi = _auto_optuna_adaptive_freq_bounds(base_data)
     float_ranges = {
         "fdw_cycles": (5.0, 16.0, 0.01),
-        "tdc_strength": (tdc_min, 75.0, 0.1),
+        "tdc_strength": (5.0, 75.0, 0.1),
         "tdc_max_reduction_db": (0.0, 18.0, 0.1),
         "reg_strength": (15.0, 45.0, 0.1),
-        "max_boost": (3.0, 12.0, 0.01),
-        "mag_c_min": (float(mag_lo), float(mag_hi), 0.1),
+        "max_boost": (0.1, 12.0, 0.01),
+        "mag_c_min": (float(AUTO_MODE_MAG_C_MIN_MIN_HZ), float(AUTO_MODE_MAG_C_MIN_MAX_HZ), 0.1),
         "mag_c_max": (float(AUTO_MODE_MAG_C_MAX_MIN_HZ), 400.0, 0.1),
         "trans_width": (70.0, 150.0, 0.1),
         "bass_first_mode_max_hz": (120.0, 220.0, 0.1),
         "conf_pull_max_hz": (80.0, 220.0, 5.0),
-        "low_bass_cut_hz": (float(low_lo), float(low_hi), 0.1),
+        "low_bass_cut_hz": (float(AUTO_MODE_LOW_BASS_MIN_HZ), float(AUTO_MODE_LOW_BASS_MAX_HZ), 0.1),
         "mixed_freq": (80.0, 320.0, 0.1),
         "phase_limit": (float(AUTO_MODE_PHASE_LIMIT_MIN_HZ), float(AUTO_MODE_PHASE_LIMIT_MAX_HZ), 0.1),
-        "output_tilt_db_per_oct": (float(output_tilt_lo), float(output_tilt_hi), 0.05),
+        "output_tilt_db_per_oct": (-2.0, 2.0, 0.05),
         "synth_tilt_frac": (0.05, 0.55, 0.01),
     }
     # Parameters sampled on a log scale in _suggest_auto_mode_candidate_optuna;

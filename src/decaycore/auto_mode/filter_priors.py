@@ -442,11 +442,6 @@ def update_auto_mode_filter_priors_from_winner(
         filters = _normalize_filters(measurement_entry.get("filters", {}) or {})
         prior_snapshot = load_auto_mode_filter_priors()
         global_filters = _normalize_filters(prior_snapshot.get("filters", {}) or {})
-        if not global_filters:
-            global_filters = {
-                key: _entry_from_known_keys(label, best_preset, data)
-                for key, label in _KNOWN_FILTER_TYPES.items()
-            }
         for known_filter_key, known_entry in global_filters.items():
             filters[str(known_filter_key)] = _merge_filter_entry(
                 dict(known_entry or {}),

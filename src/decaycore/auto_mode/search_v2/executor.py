@@ -26,7 +26,7 @@ from .plan import AutoSearchPlan
 
 def _base_data_with_plan_seed(base_data: dict, decision) -> dict:
     data = dict(base_data or {})
-    plan = getattr(decision, "plan", AutoSearchPlan.FULL_SEARCH)
+    plan = getattr(decision, "plan", AutoSearchPlan.FIRST_RUN_FULL_SEARCH)
     if plan in (
         AutoSearchPlan.CACHE_MICRO_REFINE,
         AutoSearchPlan.LAST_BEST_MICRO_REFINE,
@@ -42,6 +42,24 @@ def _base_data_with_plan_seed(base_data: dict, decision) -> dict:
     seed_metrics = dict(cache_record.get("winner_metrics", cache_record.get("best_metrics", {})) or {})
     if seed_metrics:
         data["_auto_target_seed_metrics"] = dict(seed_metrics)
+    seed_source = str(getattr(decision, "seed_source", "") or "").strip()
+    if seed_source:
+        data["_auto_target_seed_source"] = str(seed_source)
+    return data
+
+
+def run_target_search_stage(base_data: dict, decision, *, status_cb=None) -> dict:
+    """Attach target-search stage metadata without trusting it as completion proof.
+
+    The workflow still performs the expensive target comparison before this
+    search entry point. This adapter centralizes the stage boundary for
+    search_v2 and preserves cached/fresh target seeds as refine seeds.
+    """
+
+    data = dict(base_data or {})
+    seed = dict(getattr(decision, "seed_preset", {}) or {})
+    if seed and not isinstance(data.get("_auto_target_seed_preset"), dict):
+        data["_auto_target_seed_preset"] = dict(seed)
     seed_source = str(getattr(decision, "seed_source", "") or "").strip()
     if seed_source:
         data["_auto_target_seed_source"] = str(seed_source)
@@ -102,6 +120,8 @@ def execute_auto_search_plan(
     n_trials: int,
 ) -> dict | None:
     base_data = _base_data_with_plan_seed(base_data, decision)
+    if "target_search" in tuple(getattr(decision, "enabled_phases", ()) or ()):
+        base_data = run_target_search_stage(base_data, decision, status_cb=status_cb)
     context = build_execution_context(
         base_data=base_data,
         measurements=measurements,
@@ -115,8 +135,9 @@ def execute_auto_search_plan(
         status_cb=status_cb,
         n_trials=int(n_trials),
         allow_legacy_cache_seeds=False,
+        canonical_signature=str(getattr(decision, "signature", "") or "").strip(),
     )
-    plan = getattr(decision, "plan", AutoSearchPlan.FULL_SEARCH)
+    plan = getattr(decision, "plan", AutoSearchPlan.FIRST_RUN_FULL_SEARCH)
     if plan in (AutoSearchPlan.CACHE_MICRO_REFINE, AutoSearchPlan.LAST_BEST_MICRO_REFINE):
         cache_refine_result = run_micro_refine_from_seed(context, decision)
         if isinstance(cache_refine_result, dict):

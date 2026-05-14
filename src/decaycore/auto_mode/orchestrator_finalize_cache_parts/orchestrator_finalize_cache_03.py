@@ -72,6 +72,7 @@ def _materialize_cached_result(
     stereo_cache_meta: dict | None,
     _cache_ready_preset,
     _materialize_preset_result,
+    canonical_signature: str | None = None,
 ) -> dict:
     cache_materialize_base_data = _stereo_refine_materialize_base_data(
         cache_base_data,
@@ -142,6 +143,7 @@ def _materialize_cached_result(
         best_preset=dict(best_cache_preset or {}),
         best_metrics=dict(best_metrics or {}),
         best_hc_mode=str(cache_base_data.get("hc_mode", "") or "").strip() or None,
+        canonical_signature=canonical_signature,
     )
     return {
         "best_result": best_result,

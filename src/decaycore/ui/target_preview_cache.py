@@ -20,8 +20,15 @@ import numpy as np
 from ..io import measurements_txt, measurements_wav
 from ..io.measurement_bundle import TransferData
 
+_CURVE_CACHE_MAX = 64
+_TRANSFER_CACHE_MAX = 32
 _CURVE_CACHE: dict[tuple[Any, ...], tuple[np.ndarray | None, np.ndarray | None]] = {}
 _TRANSFER_CACHE: dict[tuple[Any, ...], TransferData | None] = {}
+
+
+def clear_target_preview_caches() -> None:
+    _CURVE_CACHE.clear()
+    _TRANSFER_CACHE.clear()
 
 
 def _coerce_content_bytes(content: Any) -> bytes:
@@ -197,17 +204,29 @@ def _parse_path_transfer(
         return None
 
 
+def _curve_cache_put(key: tuple[Any, ...], value: tuple[np.ndarray | None, np.ndarray | None]) -> None:
+    if len(_CURVE_CACHE) >= _CURVE_CACHE_MAX:
+        _CURVE_CACHE.pop(next(iter(_CURVE_CACHE)))
+    _CURVE_CACHE[key] = value
+
+
+def _transfer_cache_put(key: tuple[Any, ...], value: TransferData | None) -> None:
+    if len(_TRANSFER_CACHE) >= _TRANSFER_CACHE_MAX:
+        _TRANSFER_CACHE.pop(next(iter(_TRANSFER_CACHE)))
+    _TRANSFER_CACHE[key] = value
+
+
 def load_upload_measurement_curve(upload: dict[str, Any] | None, *, pre_ms: float, post_ms: float, smoothing_level: int):
     key = _upload_cache_key(upload, pre_ms=pre_ms, post_ms=post_ms, smoothing_level=smoothing_level)
     if key is None or not isinstance(upload, dict):
         return None, None
     if key not in _CURVE_CACHE:
-        _CURVE_CACHE[key] = _parse_upload_curve(
+        _curve_cache_put(key, _parse_upload_curve(
             upload,
             pre_ms=pre_ms,
             post_ms=post_ms,
             smoothing_level=smoothing_level,
-        )
+        ))
     return _CURVE_CACHE[key]
 
 
@@ -224,13 +243,13 @@ def load_upload_measurement_transfer(
         return None
     transfer_key = ("transfer",) + tuple(key) + (str(label or ""),)
     if transfer_key not in _TRANSFER_CACHE:
-        _TRANSFER_CACHE[transfer_key] = _parse_upload_transfer(
+        _transfer_cache_put(transfer_key, _parse_upload_transfer(
             upload,
             pre_ms=pre_ms,
             post_ms=post_ms,
             smoothing_level=smoothing_level,
             label=label,
-        )
+        ))
     return _TRANSFER_CACHE[transfer_key]
 
 
@@ -246,12 +265,12 @@ def load_path_measurement_curve(path_raw: Any, *, pre_ms: float, post_ms: float,
             smoothing_level=smoothing_level,
         )
     if key not in _CURVE_CACHE:
-        _CURVE_CACHE[key] = _parse_path_curve(
+        _curve_cache_put(key, _parse_path_curve(
             path,
             pre_ms=pre_ms,
             post_ms=post_ms,
             smoothing_level=smoothing_level,
-        )
+        ))
     return _CURVE_CACHE[key]
 
 
@@ -278,11 +297,11 @@ def load_path_measurement_transfer(
             label=label,
         )
     if transfer_key not in _TRANSFER_CACHE:
-        _TRANSFER_CACHE[transfer_key] = _parse_path_transfer(
+        _transfer_cache_put(transfer_key, _parse_path_transfer(
             path,
             pre_ms=pre_ms,
             post_ms=post_ms,
             smoothing_level=smoothing_level,
             label=label,
-        )
+        ))
     return _TRANSFER_CACHE[transfer_key]

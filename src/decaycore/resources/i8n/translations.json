@@ -571,7 +571,18 @@
     "auto_detail_cache_refine_improved": "Improved in round {n} — score {rank}/100",
     "auto_detail_cache_refine_round_summary": "Round {n} — {ok}/{run} trials OK, {improvements} improvement(s)",
     "auto_detail_cache_refine_summary": "Refinement done — {done}/{total} rounds, {executed} trials, {improvements} improvement(s)",
-    "auto_detail_mag_c_min_improved": "Bass limit tuning improved — {from_hz} → {to_hz} Hz, score {old_r} → {new_r}"
+    "auto_detail_mag_c_min_improved": "Bass limit tuning improved — {from_hz} → {to_hz} Hz, score {old_r} → {new_r}",
+    "auto_detail_hpf_autofit_seed": "HPF auto-fit: {hz} Hz/{slope} dB/oct (confidence {conf}%)",
+    "auto_detail_sub_hpf_autofit_seed": "Sub HPF auto-fit: {hz} Hz/{slope} dB/oct (confidence {conf}%)",
+    "auto_detail_hpf_autofit_fallback": "HPF auto-fit fallback: {hz} Hz/{slope} dB/oct (confidence {conf}%)",
+    "auto_detail_hpf_autofit_skipped": "HPF auto-fit: skipped (user setting preserved)",
+    "auto_detail_local_refine_target_start": "Refining {name} — phase limit {hz} Hz",
+    "auto_detail_local_refine_target_start_mixed": "Refining {name} — mixed freq {hz} Hz",
+    "auto_detail_local_refine_center_start": "Local refine — center #{n}, phase limit {hz} Hz",
+    "auto_detail_local_refine_fallback": "Optimizer fallback used — center #{n} (constraints relaxed)",
+    "auto_detail_micro_refine_fallback": "Optimizer fallback used — micro refine (constraints relaxed)",
+    "auto_detail_phase2_summary": "Phase 2 summary — {ok}/{run} trials OK",
+    "auto_detail_hpf_polish_improved": "HPF winner polish — {label} (score {rank}/100)"
   },
   "fi": {
     "about_body": "**DecayCore** on huonekorjauksen FIR-generaattori DSP-järjestelmille, jotka tukevat FIR-suodattimia.\n\n- **Tekijä:** Vilho Valittu 📧 [vilho.valittu@gmail.com](mailto:vilho.valittu@gmail.com)\n\n- **Yhteisötestaus ja palaute:** Patu\n- **Erityiskiitokset:** OCA <a href='https://www.youtube.com/@ocaudiophile' target='_blank'>youtube.com/@ocaudiophile</a>",
@@ -1139,6 +1150,17 @@
     "auto_detail_cache_refine_improved": "Parannettu kierroksella {n} — pisteet {rank}/100",
     "auto_detail_cache_refine_round_summary": "Kierros {n} — {ok}/{run} kokeilua OK, {improvements} parannusta",
     "auto_detail_cache_refine_summary": "Tarkennusajo valmis — {done}/{total} kierrosta, {executed} kokeilua, {improvements} parannusta",
-    "auto_detail_mag_c_min_improved": "Basson rajaviritys parani — {from_hz} → {to_hz} Hz, pisteet {old_r} → {new_r}"
+    "auto_detail_mag_c_min_improved": "Basson rajaviritys parani — {from_hz} → {to_hz} Hz, pisteet {old_r} → {new_r}",
+    "auto_detail_hpf_autofit_seed": "HPF automaattinen säätö: {hz} Hz/{slope} dB/okt (luottamus {conf}%)",
+    "auto_detail_sub_hpf_autofit_seed": "Sub HPF automaattinen säätö: {hz} Hz/{slope} dB/okt (luottamus {conf}%)",
+    "auto_detail_hpf_autofit_fallback": "HPF varasäätö: {hz} Hz/{slope} dB/okt (luottamus {conf}%)",
+    "auto_detail_hpf_autofit_skipped": "HPF automaattinen säätö: ohitettu (käyttäjän asetus säilytetty)",
+    "auto_detail_local_refine_target_start": "Tarkennetaan {name} — vaiheraja {hz} Hz",
+    "auto_detail_local_refine_target_start_mixed": "Tarkennetaan {name} — sekoitustaajuus {hz} Hz",
+    "auto_detail_local_refine_center_start": "Paikallinen tarkennushaku — keskipiste #{n}, vaiheraja {hz} Hz",
+    "auto_detail_local_refine_fallback": "Optimoija käytti varaehtoja — keskipiste #{n} (rajoituksia löysätty)",
+    "auto_detail_micro_refine_fallback": "Optimoija käytti varaehtoja — mikrotarkennus (rajoituksia löysätty)",
+    "auto_detail_phase2_summary": "Vaihe 2 yhteenveto — {ok}/{run} kokeilua OK",
+    "auto_detail_hpf_polish_improved": "HPF-viimeistely — {label} (pisteet {rank}/100)"
   }
 }

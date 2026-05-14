@@ -13,6 +13,7 @@ import scipy.signal
 import scipy.ndimage
 
 _SOS_CACHE: dict[tuple, np.ndarray] = {}
+_SOS_CACHE_MAX = 256
 
 
 def clear_analysis_cache() -> None:
@@ -26,6 +27,8 @@ def _get_bandpass_sos(nyq: float, order: int, fl: float, fh: float) -> np.ndarra
         return _SOS_CACHE[key]
     except KeyError:
         sos = scipy.signal.butter(order, [fl / nyq, fh / nyq], btype="bandpass", output="sos")
+        if len(_SOS_CACHE) >= _SOS_CACHE_MAX:
+            _SOS_CACHE.pop(next(iter(_SOS_CACHE)))
         _SOS_CACHE[key] = sos
         return sos
 

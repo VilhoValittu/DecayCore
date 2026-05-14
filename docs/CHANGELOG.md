@@ -6,6 +6,14 @@ All notable changes to **DecayCore** are documented in this file.
 
 # DecayCore
 
+---
+
+## [1.0.1] 14.5.2026
+
+- Optuna memory-leak fix
+
+---
+
 ## [1.0.0] 11.5.2026
 
 - Release DecayCore 1.0.0

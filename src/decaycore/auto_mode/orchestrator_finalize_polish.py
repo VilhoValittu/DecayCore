@@ -87,6 +87,7 @@ def _save_cached_best(
     best_preset: dict,
     best_metrics: dict | None,
     best_hc_mode: str | None,
+    canonical_signature: str | None = None,
 ) -> None:
     if not bool(cfg.cache_enabled):
         return
@@ -126,8 +127,10 @@ def _save_cached_best(
         hc_mode=None,
         include_hc_mode=False,
     )
+    canonical_sig = str(canonical_signature or "").strip()
+    primary_sig = canonical_sig or sig
     _auto_cache_put_best(
-        sig,
+        primary_sig,
         best_preset=dict(best_preset_for_run or {}),
         target_seed_preset=dict(target_seed_preset_for_run or {}),
         best_metrics=dict(best_metrics or {}),
@@ -136,7 +139,21 @@ def _save_cached_best(
         goal=goal,
         filter_key=filter_key,
         compat_version=compat_version,
+        first_run_complete=True,
     )
+    if canonical_sig and canonical_sig != sig:
+        _auto_cache_put_best(
+            sig,
+            best_preset=dict(best_preset_for_run or {}),
+            target_seed_preset=dict(target_seed_preset_for_run or {}),
+            best_metrics=dict(best_metrics or {}),
+            best_hc_mode=best_hc_mode_raw or None,
+            measurement_sig=measurement_sig,
+            goal=goal,
+            filter_key=filter_key,
+            compat_version=compat_version,
+            first_run_complete=False,
+        )
     _auto_cache_put_best(
         sig_target,
         best_preset=dict(best_preset_for_target or {}),
@@ -147,6 +164,7 @@ def _save_cached_best(
         goal=goal,
         filter_key=filter_key,
         compat_version=compat_version,
+        first_run_complete=False,
     )
     _auto_cache_put_target_for_measurements(
         measurements=measurements,
@@ -197,6 +215,7 @@ def _save_final_search_cache(
     cached_best_preset: dict,
     best_metrics: dict,
     materialized_best_preset: dict,
+    canonical_signature: str | None = None,
 ) -> None:
     if not bool(cfg.cache_enabled):
         return
@@ -215,6 +234,7 @@ def _save_final_search_cache(
             best_preset=dict(cached_best_preset or {}),
             best_metrics=dict(best_metrics or {}),
             best_hc_mode=str(cache_base_data.get("hc_mode", "") or "").strip() or None,
+            canonical_signature=canonical_signature,
         )
         logger.info("Automatic mode: saved best preset to cache.")
     except Exception:

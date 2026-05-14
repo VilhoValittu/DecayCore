@@ -224,13 +224,18 @@ def build_xos_hpf(data: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], Optional[
     return xos, hpf
 
 def filter_type_short(filter_type: str) -> str:
-    s = str(filter_type or "")
-    if "Asymmetric" in s:
+    raw = str(filter_type or "").strip()
+    s = raw.lower()
+
+    if "asym" in s:
         return "Asymmetric"
-    if "Min" in s:
-        return "Minimum"
-    if "Mixed" in s:
+    if "mixed" in s:
         return "Mixed"
+    if "minimum" in s or "minphase" in s or s == "min" or ("min" in s and "phase" in s):
+        return "Minimum"
+    if "linear" in s or s == "lin":
+        return "Linear"
+
     return "Linear"
 
 def filter_type_supports_xo_phase_model(filter_type: Any) -> bool:

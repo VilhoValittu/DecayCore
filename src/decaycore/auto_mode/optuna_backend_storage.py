@@ -150,15 +150,20 @@ def _auto_optuna_storage_filename(
     kind = str(journal_kind or "filter").strip().lower()
     fk = str(filter_key or "").strip().lower()
     _, ext = os.path.splitext(str(AUTO_MODE_OPTUNA_STORAGE_FILENAME))
+    fk_label = _OPTUNA_FILTER_FILENAME_LABELS.get(
+        fk,
+        fk if fk in _OPTUNA_VALID_FILTER_KEYS else "unknown",
+    )
+
     if kind == "target":
         parts = [
             "decaycore",
             "optuna",
             "target",
+            fk_label,
             _auto_optuna_measurement_token(measurement_identity),
         ]
     else:
-        fk_label = _OPTUNA_FILTER_FILENAME_LABELS.get(fk, fk if fk in _OPTUNA_VALID_FILTER_KEYS else "unknown")
         parts = [
             "decaycore",
             "optuna",

@@ -106,6 +106,7 @@ def finalize_from_refine_stats(
                 _materialize_preset_result=context.materialize_preset_result,
                 _maybe_apply_residual_tiebreak=context.maybe_apply_residual_tiebreak,
                 runtime=context.runtime,
+                canonical_signature=context.canonical_signature,
             )
     if context.profiler:
         context.profiler.log_summary(logger, label="auto-mode search")
@@ -157,6 +158,7 @@ def finalize_from_cache_refine(
                 _maybe_apply_residual_tiebreak=context.maybe_apply_residual_tiebreak,
                 cache_refine_result=dict(cache_refine_result or {}),
                 runtime=context.runtime,
+                canonical_signature=context.canonical_signature,
             )
     if context.profiler:
         context.profiler.log_summary(logger, label="auto-mode search")

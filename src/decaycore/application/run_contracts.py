@@ -106,6 +106,12 @@ def apply_auto_mode_result(
         next_data.update(best_applied_preset)
         next_data["program_version"] = str(version)
         next_data["auto_mode_compat_version"] = str(auto_mode_compat_version)
+        search_v2_debug = dict(
+            dict(auto_res.get("auto_mode_debug", {}) or {}).get("auto_search_v2", {}) or {}
+        )
+        identity_base_data = search_v2_debug.get("identity_base_data")
+        if isinstance(identity_base_data, dict) and identity_base_data:
+            next_data["_auto_search_identity_base_data"] = dict(identity_base_data)
     next_measurements = build_dsp_measurements(next_data, resolved.measurements)
     return ResolvedRunConfig(
         source_ui_data=copy_source_ui_data(resolved.source_ui_data),

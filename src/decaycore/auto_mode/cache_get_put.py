@@ -106,57 +106,38 @@ def _auto_cache_get_target_for_measurements_global(
     goal: str = AUTO_MODE_GOAL_DEFAULT,
     compat_version: str | None = None,
 ) -> dict | None:
+    """Return measurement-global target cache entry only.
+
+    Important:
+    This function must not fall back to filter-specific or legacy target caches.
+    It has no filter_key argument, so it cannot safely decide whether a cached
+    target/seed belongs to the currently selected filter type.
+
+    Caller must validate that the returned global entry contains a usable
+    filter_seed_presets[filter_key] before using it to skip target search.
+    """
     key = _auto_target_measurement_cache_key(measurements, goal)
     if not key:
         return None
+
     cache = _auto_cache_load(compat_version=compat_version)
-
     target_map = cache.get("target_by_measurement_global", {})
-    if isinstance(target_map, dict):
-        direct = target_map.get(key)
-        if isinstance(direct, dict):
-            return dict(direct)
+    if not isinstance(target_map, dict):
+        return None
 
-    msig = _auto_get_measurement_signature(measurements or {})
+    direct = target_map.get(key)
+    if not isinstance(direct, dict):
+        return None
+
     goal_norm = _auto_goal_norm(goal)
-    legacy_map = cache.get("target_by_measurement", {})
-    if isinstance(legacy_map, dict):
-        legacy = legacy_map.get(f"{msig}|{goal_norm}") or legacy_map.get(msig)
-        if isinstance(legacy, dict):
-            entry_goal = _auto_goal_norm(
-                str(legacy.get("auto_goal", AUTO_MODE_GOAL_DEFAULT) or AUTO_MODE_GOAL_DEFAULT)
-            )
-            if entry_goal == goal_norm:
-                return dict(legacy)
+    entry_goal = _auto_goal_norm(
+        str(direct.get("auto_goal", AUTO_MODE_GOAL_DEFAULT) or AUTO_MODE_GOAL_DEFAULT)
+    )
 
-    best = None
-    best_t = -1
-    by_filter = cache.get("by_filter", {})
-    if isinstance(by_filter, dict):
-        for bucket in by_filter.values():
-            if not isinstance(bucket, dict):
-                continue
-            tmap = bucket.get("target_by_measurement", {})
-            if not isinstance(tmap, dict):
-                continue
-            for entry in tmap.values():
-                if not isinstance(entry, dict):
-                    continue
-                if str(entry.get("measurement_sig", "") or "") != str(msig):
-                    continue
-                entry_goal = _auto_goal_norm(
-                    str(entry.get("auto_goal", AUTO_MODE_GOAL_DEFAULT) or AUTO_MODE_GOAL_DEFAULT)
-                )
-                if entry_goal != goal_norm:
-                    continue
-                try:
-                    t = int(entry.get("t", 0) or 0)
-                except Exception:
-                    t = 0
-                if t >= best_t:
-                    best_t = int(t)
-                    best = dict(entry)
-    return dict(best) if isinstance(best, dict) else None
+    if entry_goal != goal_norm:
+        return None
+
+    return dict(direct)
 
 
 @_auto_cache_guard
@@ -377,6 +358,8 @@ def _auto_cache_put_best(
     goal: str = AUTO_MODE_GOAL_DEFAULT,
     filter_key: str | None = None,
     compat_version: str | None = None,
+    first_run_complete: bool = True,
+    completed_stages: list[str] | tuple[str, ...] | None = None,
 ) -> None:
     if not isinstance(best_preset, dict) or not best_preset:
         return
@@ -395,8 +378,11 @@ def _auto_cache_put_best(
         "t": int(time.time()),
         "schema_version": int(AUTO_MODE_CACHE_SCHEMA_VERSION),
         "signature": str(sig),
+        "compat_version": str(compat_version or ""),
         "auto_goal": str(goal_norm),
         "filter_key": str(_auto_filter_cache_key(filter_type=filter_key)),
+        "first_run_complete": bool(first_run_complete),
+        "completed_stages": list(completed_stages or (["target_search", "phase1", "phase2", "phase3"] if bool(first_run_complete) else [])),
         "best_preset": dict(best_preset or {}),
         "best_metrics": dict(best_metrics or {}),
         "best_rank": float(_auto_safe_float((best_metrics or {}).get("rank_score", float("nan")), float("nan"))),

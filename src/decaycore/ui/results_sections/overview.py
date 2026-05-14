@@ -120,6 +120,9 @@ def render_results(
     if container is None:
         logger.warning("render_results: results container not available")
         return
+    if bool(getattr(container, "is_deleted", False)):
+        logger.warning("render_results: results container has been deleted")
+        return
 
     container.clear()
 

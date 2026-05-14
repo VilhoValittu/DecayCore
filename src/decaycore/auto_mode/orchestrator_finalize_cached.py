@@ -70,6 +70,7 @@ def _finalize_cached_result(
     _materialize_preset_result,
     _maybe_apply_residual_tiebreak,
     cache_refine_result: dict,
+    canonical_signature: str | None = None,
 ) -> dict | None:
     cached_state = _validate_cached_result(cache_refine_result)
     seed_source = str(cached_state.get("seed_source", "exact_cache") or "exact_cache")
@@ -110,6 +111,7 @@ def _finalize_cached_result(
                 stereo_cache_meta={},
                 _cache_ready_preset=_cache_ready_preset,
                 _materialize_preset_result=_materialize_preset_result,
+                canonical_signature=canonical_signature,
             )
             score = _score_cached_result(
                 best_metrics=dict(materialized.get("best_metrics", {}) or {}),
@@ -353,6 +355,7 @@ def _finalize_cached_result(
             stereo_cache_meta=stereo_cache_meta,
             _cache_ready_preset=_cache_ready_preset,
             _materialize_preset_result=_materialize_preset_result,
+            canonical_signature=canonical_signature,
         )
         score = _score_cached_result(
             best_metrics=dict(materialized.get("best_metrics", {}) or {}),

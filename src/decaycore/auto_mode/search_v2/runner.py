@@ -58,6 +58,10 @@ def run_auto_search_v2(
             "goal": _auto_goal(dict(base_data or {})),
         },
     )
+    if isinstance(decision.cache_decision_report, dict):
+        report = dict(decision.cache_decision_report or {})
+        report["identity_base_data"] = search_input.base_data()
+        object.__setattr__(decision, "cache_decision_report", report)
     seed_source = str(getattr(decision, "seed_source", "") or "").strip() or None
     if seed_source is None and decision.plan == AutoSearchPlan.CACHE_MICRO_REFINE:
         seed_source = "exact_cache"
