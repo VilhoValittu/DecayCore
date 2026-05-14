@@ -8,6 +8,7 @@ theme: minima
 
 header_pages:
   - getting-started.md
+  - Installation.md
   - measurement-workflow.md
   - faq.md
   - User_Manual.md

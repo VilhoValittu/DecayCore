@@ -1,6 +1,9 @@
-# DecayCore Installation Guide
-
-This guide contains the detailed installation and update instructions that were previously embedded in the main `README.md`.
+---
+title: DecayCore Installation Guide
+nav_title: Installation
+description: Install DecayCore from a packaged release or run it from Python source on Windows, Linux, and macOS.
+permalink: /installation/
+---
 
 ## Recommended path
 

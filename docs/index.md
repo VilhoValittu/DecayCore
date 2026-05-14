@@ -14,6 +14,7 @@ hide_title: true
     <div class="action-row">
       <a class="button button--primary" href="https://github.com/VilhoValittu/DecayCore/releases">Download releases</a>
       <a class="button" href="{{ '/getting-started/' | relative_url }}">Getting started</a>
+      <a class="button" href="{{ '/installation/' | relative_url }}">Installation</a>
       <a class="button" href="{{ '/User_Manual.html' | relative_url }}">User manual</a>
     </div>
   </div>
@@ -62,6 +63,10 @@ hide_title: true
   <section class="doc-card">
     <h3><a href="{{ '/getting-started/' | relative_url }}">Getting started</a></h3>
     <p>The shortest path from release download to generated FIR filters.</p>
+  </section>
+  <section class="doc-card">
+    <h3><a href="{{ '/installation/' | relative_url }}">Installation</a></h3>
+    <p>Install DecayCore from a release package or run it from Python source.</p>
   </section>
   <section class="doc-card">
     <h3><a href="{{ '/measurement-workflow/' | relative_url }}">Measurement workflow</a></h3>
