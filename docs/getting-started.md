@@ -10,7 +10,7 @@ DecayCore is designed to measure your system, generate FIR room correction filte
 ## Recommended workflow
 
 1. Download the latest release build.
-2. Measure your speakers with DecayCore's built-in measurement workflow.
+2. Measure your speakers with DecayCore's built-in measurement workflow or use existing files of yours.
 3. Review the measured response.
 4. Choose a filter mode and target behavior.
 5. Generate FIR correction filters.
