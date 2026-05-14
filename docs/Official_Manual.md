@@ -120,11 +120,11 @@ at a more technical level than the simplified pipeline overview.
 
 ## Download
 
-- Windows: https://github.com/VilhoValittu/DecayCore/releases/latest
-- macOS (Intel + Apple Silicon): https://github.com/VilhoValittu/DecayCore/releases/latest
+- Windows: [latest DecayCore release](https://github.com/VilhoValittu/DecayCore/releases/latest)
+- macOS (Intel + Apple Silicon): [latest DecayCore release](https://github.com/VilhoValittu/DecayCore/releases/latest)
     -macOS builds are community-supported. Limited direct testing.
-- Linux: https://github.com/VilhoValittu/DecayCore/releases/latest
-- All releases: https://github.com/VilhoValittu/DecayCore/releases
+- Linux: [latest DecayCore release](https://github.com/VilhoValittu/DecayCore/releases/latest)
+- All releases: [DecayCore releases](https://github.com/VilhoValittu/DecayCore/releases)
 
 ---
 
@@ -450,7 +450,7 @@ This distinction is important for understanding why FIR files may differ
 in time-domain appearance without changing the audible correction.
 
 See:
-- [IR Export Windowing vs DSP Correction](IR_Export_Windowing.md)
+- [IR Export Windowing vs DSP Correction](IR_Export_Windowing.html)
 
 ---
 

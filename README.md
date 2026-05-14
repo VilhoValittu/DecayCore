@@ -13,8 +13,8 @@ It focuses on physically sane, band-limited room correction instead of simply fo
 ## Links
 
 - Documentation: https://vilhovalittu.github.io/DecayCore/
-- Releases: https://github.com/VilhoValittu/DecayCore/releases
-- Source code: https://github.com/VilhoValittu/DecayCore
+- Releases: [DecayCore releases](https://github.com/VilhoValittu/DecayCore/releases)
+- Source code: [DecayCore repository](https://github.com/VilhoValittu/DecayCore)
 
 > Important note about the measurement function :
 > The integrated measurement function is available only in the packaged versions published under the GitHub Releases section. It is not included in the public source tree. The source repository contains the filter-generation side, while the measurement/acquisition workflow remains available through the released builds.
@@ -47,7 +47,7 @@ REW-style measurement data may also be used in compatible workflows, but DecayCo
 
 Download DecayCore from the official GitHub releases page:
 
-https://github.com/VilhoValittu/DecayCore/releases
+[DecayCore releases](https://github.com/VilhoValittu/DecayCore/releases)
 
 ## Contact
 

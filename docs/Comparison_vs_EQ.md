@@ -48,4 +48,4 @@ AI was used to translate this document from Finnish to English.
 DecayCore intentionally avoids aggressive inversion and prioritizes corrections that remain stable and physically plausible.
 
 - **[Get Started with DecayCore]({{ site.baseurl }}/)** – Download the FIR filter maker.
-- **[Read the FAQ]({{ site.baseurl }}/faq)** – Common questions about convolution and REW.
+- **[Read the FAQ]({{ site.baseurl }}/faq/)** – Common questions about convolution and REW.

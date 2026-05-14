@@ -12,10 +12,10 @@ For most users, the recommended option is:
 4. Open `http://127.0.0.1:8080` if the browser does not open automatically
 
 Latest release:
-- https://github.com/VilhoValittu/DecayCore/releases/latest
+- [Latest DecayCore release](https://github.com/VilhoValittu/DecayCore/releases/latest)
 
 All releases:
-- https://github.com/VilhoValittu/DecayCore/releases
+- [DecayCore releases](https://github.com/VilhoValittu/DecayCore/releases)
 
 ## Run from release package
 
@@ -65,7 +65,7 @@ chmod +x DecayCore
 Use this path if you want to run DecayCore from a cloned source tree instead of a packaged release. Python 3.11 or newer is recommended.
 
 Repository:
-- https://github.com/VilhoValittu/DecayCore
+- [DecayCore source repository](https://github.com/VilhoValittu/DecayCore)
 
 ### Get the source with Git
 

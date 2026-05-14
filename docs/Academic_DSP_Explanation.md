@@ -205,5 +205,5 @@ AI was used to translate this document from Finnish to English.
 ## Implementation Details
 The stability of DecayCore is based on layered constraints and confidence-aware smoothing.
 
-- **[Learn about FIR vs IIR]({{ site.baseurl }}/Comparison_vs_EQ)** – How these academic principles apply in practice.
+- **[Learn about FIR vs IIR]({{ site.baseurl }}/Comparison_vs_EQ.html)** – How these academic principles apply in practice.
 - **[DecayCore Home]({{ site.baseurl }}/)** – Back to the main FIR filter generator page.

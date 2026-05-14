@@ -66,4 +66,4 @@ Load the resulting **WAV FIR filter** into your preferred engine:
 ## Why use DecayCore?
 Unlike basic EQ, this **FIR filter maker** handles **excess phase** and **temporal decay (TDC)**, providing tighter bass and more repeatable tuning.
 
-[← Back to Home]({{ site.baseurl }}/) | [Read the FAQ]({{ site.baseurl }}/faq)
+[← Back to Home]({{ site.baseurl }}/) | [Read the FAQ]({{ site.baseurl }}/faq/)

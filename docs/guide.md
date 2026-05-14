@@ -186,7 +186,7 @@ Always re-measure with the filter active:
 
 ## Download
 
-https://github.com/VilhoValittu/DecayCore/releases
+[DecayCore releases](https://github.com/VilhoValittu/DecayCore/releases)
 
 ### Disclaimer
 AI was used to translate this document from Finnish to English.

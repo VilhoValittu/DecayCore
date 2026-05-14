@@ -31,7 +31,7 @@ Existing REW-style measurement data may be used where compatible, but REW should
 
 Download DecayCore from the official GitHub releases page:
 
-https://github.com/VilhoValittu/DecayCore/releases
+[DecayCore releases](https://github.com/VilhoValittu/DecayCore/releases)
 
 The built-in measurement feature is available in release builds published in the Releases section.
 
