@@ -7,7 +7,7 @@ permalink: /guide/
 
 # DecayCore Guide (Recommended AUTO Workflow)
 
-This guide reflects the current DecayCore workflow in v4.2.1: measure with the built-in measurement tool or import existing compatible measurements, keep `AUTO` mode, let DecayCore search for a good preset, export FIR filters, and verify with a new measurement.
+This guide reflects the current DecayCore workflow in v1.0.1: measure with the built-in measurement tool or import existing compatible measurements, keep `AUTO` mode, let DecayCore search for a good preset, export FIR filters, and verify with a new measurement.
 
 ## Quick workflow
 
@@ -52,7 +52,7 @@ Why `AUTO` is the recommended starting point:
 
 - It can auto-select a suitable built-in target curve if you do not lock in your own target.
 - It searches multiple candidate presets and applies the best-ranked winner before export.
-- In the current v4.2.1 workflow it can also use harmonic curves and IACC-aware ranking to avoid overly aggressive or overly symmetric winners.
+- In the current v1.0.1 workflow it can also use harmonic curves and IACC-aware ranking to avoid overly aggressive or overly symmetric winners.
 - It reuses cache hits when the same measurements and relevant settings are seen again.
 - It exports summary metadata about the winning preset, target choice, and run details.
 
