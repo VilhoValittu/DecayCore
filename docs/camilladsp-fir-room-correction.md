@@ -6,6 +6,8 @@ permalink: /camilladsp-fir-room-correction/
 
 DecayCore can generate FIR room correction filters for CamillaDSP and other convolution-capable DSP engines.
 
+DecayCore is a CamillaDSP FIR room correction tool that measures your system and exports convolution-ready WAV impulse response filters.
+
 The recommended workflow is:
 
 1. Measure the left and right speakers with DecayCore.

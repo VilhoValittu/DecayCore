@@ -8,8 +8,8 @@ hide_title: true
 <section class="hero">
   <div>
     <p class="hero__eyebrow">FIR room correction and measurement</p>
-    <h1>DecayCore</h1>
-    <p class="hero__copy">A free acoustic measurement and FIR filter generation tool for CamillaDSP, convolution WAV filters, Roon convolution workflows, Equalizer APO, and other FIR-capable DSP engines.</p>
+    <h1>DecayCore — FIR Room Correction and Measurement Tool</h1>
+    <p class="hero__copy">A free acoustic measurement tool, FIR room correction tool, and FIR filter generator for CamillaDSP, convolution WAV filters, Roon convolution workflows, Equalizer APO, and other FIR-capable DSP engines. DecayCore was formerly known as CamillaFIR.</p>
     <p class="hero__copy">DecayCore focuses on physically sane, band-limited room correction, phase-aware correction, automatic target optimization, and Temporal Decay Control for low-frequency room behavior.</p>
     <div class="action-row">
       <a class="button button--primary" href="https://github.com/VilhoValittu/DecayCore/releases">Download releases</a>
@@ -74,6 +74,14 @@ hide_title: true
   <section class="doc-card">
     <h3><a href="{{ '/fir-room-correction/' | relative_url }}">FIR room correction</a></h3>
     <p>The practical role of FIR filters in room correction workflows.</p>
+  </section>
+  <section class="doc-card">
+    <h3><a href="{{ '/minimum-phase-fir-generator/' | relative_url }}">Minimum Phase FIR Generator</a></h3>
+    <p>Minimum phase FIR correction for low-latency convolution workflows.</p>
+  </section>
+  <section class="doc-card">
+    <h3><a href="{{ '/mixed-phase-room-correction/' | relative_url }}">Mixed Phase Room Correction</a></h3>
+    <p>Phase-aware FIR correction with practical safety limits.</p>
   </section>
   <section class="doc-card">
     <h3><a href="{{ '/temporal-decay-control/' | relative_url }}">Temporal Decay Control</a></h3>

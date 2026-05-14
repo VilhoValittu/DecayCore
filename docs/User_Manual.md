@@ -36,7 +36,7 @@ DecayCore can work in several styles:
 
 Before you start, you need:
 
-- the built-in DecayCore measurement tool, or existing compatible measurements from REW (Room EQ Wizard)
+- the built-in DecayCore measurement tool, recommended for new measurements, or existing compatible external measurements, including REW-style exports
 - a calibrated measurement microphone
 - separate left and right channel measurements or equivalent generated IR sources
 - a playback system that supports FIR convolution
