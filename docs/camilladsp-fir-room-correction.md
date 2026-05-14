@@ -11,7 +11,7 @@ The recommended workflow is:
 1. Measure the left and right speakers with DecayCore.
 2. Generate correction filters from the measurements.
 3. Export WAV FIR filters.
-4. Load the generated filters into CamillaDSP convolution.
+4. Load the generated filters and config file from filter package into CamillaDSP convolution.
 
 DecayCore supports Linear Phase, Minimum Phase, Mixed Phase and Asymmetric FIR filters. It is designed for physically sane, band-limited correction instead of forcing the measured response to a perfectly flat line.
 
