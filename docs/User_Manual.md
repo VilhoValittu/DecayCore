@@ -1,4 +1,8 @@
-# DecayCore User Manual
+---
+title: DecayCore User Manual
+nav_title: Manual
+description: Practical guide for DecayCore measurement, FIR correction, export, and deployment workflows.
+---
 
 This manual is the practical end-user guide for DecayCore. It explains what the program does, which files it expects, how to choose the main settings, what gets exported, and how to deploy the result to a convolution-capable playback system.
 

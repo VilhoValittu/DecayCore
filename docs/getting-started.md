@@ -1,10 +1,9 @@
 ---
 title: Getting Started with DecayCore
+nav_title: Getting Started
 description: Start using DecayCore for acoustic measurement, FIR room correction and CamillaDSP-compatible convolution filters.
 permalink: /getting-started/
 ---
-
-# Getting Started with DecayCore
 
 DecayCore is designed to measure your system, generate FIR room correction filters, and export convolution-ready WAV filters for CamillaDSP and other FIR-capable DSP engines.
 
@@ -32,7 +31,3 @@ Each mode has different tradeoffs in latency, phase behavior, pre-ringing risk, 
 ## External measurement compatibility
 
 External measurement data, including REW-style data, may be used in compatible workflows. For new users, DecayCore's own measurement workflow is preferred because it is designed for the program's correction pipeline.
-
----
-
-[Home](../) | [GitHub](https://github.com/VilhoValittu/DecayCore) | [Releases](https://github.com/VilhoValittu/DecayCore/releases)

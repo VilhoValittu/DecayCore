@@ -4,8 +4,6 @@ description: Learn how DecayCore uses FIR filters for measurement-based room cor
 permalink: /fir-room-correction/
 ---
 
-# FIR Room Correction
-
 FIR room correction uses finite impulse response filters to correct measured loudspeaker and room behavior. FIR filters can control magnitude response and, depending on the design, phase behavior and timing behavior.
 
 DecayCore measures the system, generates FIR filters, and exports convolution-ready WAV filters for CamillaDSP and other FIR-capable engines.

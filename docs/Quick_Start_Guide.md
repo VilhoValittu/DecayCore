@@ -5,8 +5,6 @@ description: "Step-by-step guide to generating convolution filters using DecayCo
 permalink: /quick-start/
 ---
 
-# Quick Start Guide: Generating FIR Filters
-
 This guide shows you how to use **DecayCore**, an automated **FIR filter maker**, to create high-quality room correction filters for your audio system.
 
 ---

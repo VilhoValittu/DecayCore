@@ -4,8 +4,6 @@ description: Use DecayCore to measure your system and generate CamillaDSP-compat
 permalink: /camilladsp-fir-room-correction/
 ---
 
-# CamillaDSP FIR Room Correction with DecayCore
-
 DecayCore can generate FIR room correction filters for CamillaDSP and other convolution-capable DSP engines.
 
 The recommended workflow is:

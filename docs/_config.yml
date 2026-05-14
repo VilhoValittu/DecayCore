@@ -6,6 +6,18 @@ baseurl: "/DecayCore"
 # GitHub Pages supported theme
 theme: minima
 
+header_pages:
+  - getting-started.md
+  - measurement-workflow.md
+  - faq.md
+  - User_Manual.md
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+
 # Optional but helpful for SEO
 lang: en
 timezone: Europe/Helsinki

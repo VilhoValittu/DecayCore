@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="{{ site.lang | default: 'en' }}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="{{ page.description | default: site.description | escape }}">
+    <title>{% if page.title %}{{ page.title | escape }} | {% endif %}{{ site.title | escape }}</title>
+    <link rel="stylesheet" href="{{ '/assets/main.css' | relative_url }}">
+  </head>
+  <body{% if page.hide_title %} class="is-home"{% endif %}>
+    <header class="site-header">
+      <div class="site-header__inner">
+        <a class="brand" href="{{ '/' | relative_url }}" aria-label="{{ site.title }} home">
+          <img class="brand__mark" src="{{ '/pics/DecayCore_logo_light.png' | relative_url }}" alt="" width="48" height="48">
+          <span class="brand__name">{{ site.title }}</span>
+        </a>
+
+        <nav class="site-nav" aria-label="Primary navigation">
+          {% for nav_path in site.header_pages %}
+            {% assign nav_page = site.pages | where: "path", nav_path | first %}
+            {% if nav_page.title %}
+              <a href="{{ nav_page.url | relative_url }}">{{ nav_page.nav_title | default: nav_page.title }}</a>
+            {% endif %}
+          {% endfor %}
+          <a href="https://github.com/VilhoValittu/DecayCore/releases">Releases</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="page-shell">
+      {% unless page.hide_title %}
+        {% if page.title %}
+          <header class="page-heading">
+            <h1>{{ page.title }}</h1>
+            {% if page.description %}
+              <p>{{ page.description }}</p>
+            {% endif %}
+          </header>
+        {% endif %}
+      {% endunless %}
+
+      <article class="content">
+        {{ content }}
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <span>DecayCore FIR room correction and measurement tool.</span>
+        <span>
+          <a href="{{ '/' | relative_url }}">Home</a>
+          <a href="{{ '/User_Manual.html' | relative_url }}">Manual</a>
+          <a href="https://github.com/VilhoValittu/DecayCore">GitHub</a>
+        </span>
+      </div>
+    </footer>
+  </body>
+</html>

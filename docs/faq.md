@@ -1,10 +1,9 @@
 ---
 title: DecayCore FAQ
+nav_title: FAQ
 description: Frequently asked questions about DecayCore, acoustic measurement, CamillaDSP, FIR filters and room correction.
 permalink: /faq/
 ---
-
-# DecayCore FAQ
 
 ## What is DecayCore?
 
@@ -39,7 +38,3 @@ The built-in measurement feature is available in release builds published in the
 ## Is DecayCore open source?
 
 DecayCore source availability depends on the repository contents. Some components, such as measurement internals, may be excluded from the public source repository.
-
----
-
-[Home](../) | [GitHub](https://github.com/VilhoValittu/DecayCore) | [Releases](https://github.com/VilhoValittu/DecayCore/releases)

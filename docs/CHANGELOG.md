@@ -4,7 +4,7 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
-# DecayCore
+## DecayCore
 
 ---
 
@@ -21,7 +21,7 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
-# CamillaFIR
+## CamillaFIR
 
 ## [4.3.3]
 

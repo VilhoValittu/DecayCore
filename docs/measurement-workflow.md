@@ -1,10 +1,9 @@
 ---
 title: DecayCore Measurement Workflow
+nav_title: Measurement
 description: Use DecayCore's built-in acoustic measurement workflow to generate FIR room correction filters.
 permalink: /measurement-workflow/
 ---
-
-# DecayCore Measurement Workflow
 
 DecayCore includes its own acoustic measurement workflow in release builds.
 
@@ -30,7 +29,3 @@ This is especially important for FIR room correction because the correction proc
 DecayCore may also work with compatible external measurement data, including REW-style measurement exports. This is useful for users who already have existing measurements.
 
 For new measurements, DecayCore's built-in measurement workflow is the preferred path.
-
----
-
-[Home](../) | [GitHub](https://github.com/VilhoValittu/DecayCore) | [Releases](https://github.com/VilhoValittu/DecayCore/releases)
