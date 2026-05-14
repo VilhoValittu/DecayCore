@@ -1,7 +1,7 @@
 # DecayCore – Official Manual (v4.3.0)
 
 ## 1. Overview
-DecayCore generates **FIR room-correction filters** from REW exports, built-in sweep measurements, and WAV/IR captures.
+DecayCore generates **FIR room-correction filters** from built-in sweep measurements, compatible external measurement imports, and WAV/IR captures.
 It prioritizes **time-domain correctness** before frequency-domain equalization.
 
 DecayCore explicitly separates:
@@ -15,7 +15,7 @@ at a more technical level than the simplified pipeline overview.
 
 ```
                 ┌──────────────────────────────┐
-                │   REW Measurement Input      │
+                │ DecayCore / external input   │
                 │   (Magnitude + Phase)        │
                 └──────────────┬───────────────┘
                                │
@@ -130,9 +130,18 @@ at a more technical level than the simplified pipeline overview.
 
 ## 4. Input data and measurement workflows
 
-DecayCore supports two common REW export workflows and an optional internal measurement path.
+The recommended path is the built-in measurement tool. REW exports and WAV/IR files are also supported as import sources.
 
-### 4.1 REW text export (`.txt`)
+### 4.1 Built-in measurement tool
+
+Measure directly inside DecayCore from the Measurement tab. The tool saves IR WAV files that can be loaded immediately from the Files tab.
+
+Tips:
+- Use a calibrated measurement microphone.
+- Measure Left and Right channels separately with the same microphone position and procedure.
+- Keep all session files at the same gain — do not normalize between channels.
+
+### 4.2 REW text export (`.txt`)
 
 DecayCore expects text exports with columns:
 
@@ -147,39 +156,21 @@ Tips:
 - Use a consistent time reference in REW (same measurement procedure per channel).
 - Phase data is required for full phase-aware correction behavior.
 
-### 4.2 REW impulse export (`.wav`)
+### 4.3 WAV impulse export (`.wav`)
 
 DecayCore can import impulse-response WAV files and convert them internally for processing.
 
 Use this when:
 
+- you saved IR files from the built-in measurement tool
 - you prefer an IR-based workflow from REW
 - you want DecayCore to derive the response using its own windowing path
 
 Practical guidance:
 
-- export mono impulse files for each channel
+- use mono impulse files for each channel
 - keep the export settings consistent between left and right
 - match the sample rate to the playback rate when practical
-
-### 4.3 AUTO Bass Integration WAV workflow
-
-Use this workflow when subwoofer integration should be part of an automatic run instead of a separate manual crossover step.
-
-Measurement requirements:
-
-- Bass Integration is available only in `DecayCore automatic mode`
-- use coherent REW IR WAV exports with the same measurement gain and the same acoustic timing reference for every main/sub capture
-- do not normalize each file separately
-- do not move each file to its own `t=0`
-
-Topology-specific inputs:
-
-- `AVR / Receiver (LFE+Main)` requires four WAV measurements: `L main`, `R main`, `L sub`, `R sub`
-- `Direct DAC / CamillaDSP sub output` requires `L main`, `R main`, and `Sub 1`
-- `Sub 2` is optional in `Direct DAC` mode and is summed automatically with `Sub 1`
-
-Playback must match the same topology and crossover arrangement that was used during measurement.
 
 ---
 
@@ -760,8 +751,7 @@ If many takes are rejected, check the signal level, cable connections, and micro
 
 ### 11.6 Using the results
 
-- Load the saved IR WAV files via the **REW impulse export (.wav)** path (section 4.2)
-- For Bass Integration, use the sub IR files as Sub 1 and Sub 2 inputs (section 4.3)
+- Load the saved IR WAV files via the **WAV impulse export (.wav)** path (section 4.3)
 - Do not normalize individual IR files and do not move them to separate `t=0` references — keep all files from the same session at the same gain so that relative timing and level are preserved
 
 ### Disclaimer

@@ -2,9 +2,9 @@
 
 This manual is the practical end-user guide for DecayCore. It explains what the program does, which files it expects, how to choose the main settings, what gets exported, and how to deploy the result to a convolution-capable playback system.
 
-DecayCore generates room-correction FIR filters from REW exports, built-in sweep measurements, and WAV/IR captures. The typical workflow is:
+DecayCore generates room-correction FIR filters from built-in sweep measurements, compatible external measurement imports, and WAV/IR captures. The typical workflow is:
 
-1. Measure the left and right channels in REW, or use the built-in measurement workflow.
+1. Measure the left and right channels with the built-in measurement tool, or import existing compatible external measurements.
 2. Load the measurement files into DecayCore.
 3. Choose a target curve and operating mode.
 4. Generate filters.
@@ -16,7 +16,7 @@ DecayCore is a room-correction FIR filter generator for loudspeaker and listenin
 
 It is designed to:
 
-- read REW exports, built-in measurement results, and WAV/IR sources
+- read built-in measurement results, compatible REW-style imports, and WAV/IR sources
 - compare the measured response against a target curve
 - create left and right FIR filters
 - export ready-to-use files for convolution playback systems
@@ -32,7 +32,7 @@ DecayCore can work in several styles:
 
 Before you start, you need:
 
-- REW (Room EQ Wizard) or the built-in DecayCore measurement tool
+- the built-in DecayCore measurement tool, or existing compatible measurements from REW (Room EQ Wizard)
 - a calibrated measurement microphone
 - separate left and right channel measurements or equivalent generated IR sources
 - a playback system that supports FIR convolution
@@ -48,7 +48,7 @@ Recommended preparation:
 
 - use the same microphone position and measurement method for both channels
 - keep the sample rate consistent through your measurement and playback chain
-- verify that REW exports include phase when using text files
+- if importing REW text files, verify that the export includes phase data
 
 ## 3. Workflow Overview
 
@@ -75,11 +75,15 @@ For most systems, start simple:
 
 ## 4. Input Files
 
-DecayCore supports the two common REW export workflows.
+DecayCore accepts measurements from the built-in tool and common import formats.
 
-### 4.1 REW text export (`.txt`)
+### 4.1 Built-in measurement tool
 
-This is the most direct input format for frequency-response processing.
+The recommended path. Measure directly inside DecayCore and save the resulting IR WAV files. Load those files from the Files tab when the session is complete.
+
+### 4.2 REW text export (`.txt`)
+
+Import frequency-response data exported from REW.
 
 Expected content:
 
@@ -93,18 +97,19 @@ Important notes:
 - phase data is required if you want full phase-aware correction behavior
 - headers are acceptable as long as the export is a normal REW text export
 
-### 4.2 REW impulse export (`.wav`)
+### 4.3 WAV impulse export (`.wav`)
 
 DecayCore can also import impulse-response WAV files and convert them internally for processing.
 
 Use this when:
 
+- you saved IR files from the built-in measurement tool
 - you prefer an IR-based workflow from REW
 - you want DecayCore to derive the response using its own windowing path
 
 Practical guidance:
 
-- export mono impulse files for each channel
+- use mono impulse files for each channel
 - keep the export settings consistent between left and right
 - match the sample rate to the rate you expect to use in playback when practical
 
@@ -394,8 +399,6 @@ After a successful run, DecayCore produces a result bundle. Common output files 
 
 - `L_...wav` and `R_...wav`
   Left and right FIR impulse-response files
-- `Sub_...wav`
-  Optional mono subwoofer FIR file for `Direct DAC / CamillaDSP sub output` Bass Integration runs
 - `Summary_...txt`
   Human-readable report with scoring, settings, and diagnostics
 - `camilladsp_...yml`
@@ -414,7 +417,6 @@ Useful sections include:
 - acoustic score and target match
 - confidence metrics
 - core settings used for the run
-- Bass Integration mode, recommended crossover, and bass-overlap diagnostics when Bass Integration is enabled
 - gain, headroom, and clamp behavior
 - TDC, A-FDW, bass-first, and protection status
 - alignment and stereo-related diagnostics
@@ -488,15 +490,9 @@ If a health check fails, fix the root cause instead of trying to bypass the warn
 Check:
 
 - both channels are loaded
-- the files are valid REW exports
+- the files are valid and readable
 - the sample-rate and mode settings are sensible
 - any `CRIT` health checks have been resolved
-
-If `Bass Integration` is enabled, also check:
-
-- all required main/sub WAV inputs are loaded for the chosen topology
-- every main/sub WAV uses the same timing reference
-- the AVR crossover or `Main/Sub XO` matches the measurement setup closely enough to be meaningful
 
 ### 16.2 The correction sounds too thin
 
@@ -629,6 +625,5 @@ If many takes are rejected, check the signal level, cable connections, and micro
 
 ### 19.6 Using the results
 
-- Load the saved IR WAV files via the **REW impulse export (.wav)** path (section 4.2)
-- For Bass Integration, use the sub IR files as Sub 1 and Sub 2 inputs (section 4.3)
+- Load the saved IR WAV files via the **WAV impulse export (.wav)** path (section 4.3)
 - Do not normalize individual IR files and do not move them to separate `t=0` references — keep all files from the same session at the same gain so that relative timing and level are preserved
