@@ -691,18 +691,6 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
         apply_left_btn = ui.button(t("measurement_apply_left"), on_click=lambda: _apply_bundle("left")).props('outline color="secondary"')
         apply_right_btn = ui.button(t("measurement_apply_right"), on_click=lambda: _apply_bundle("right")).props('outline color="secondary"')
         clear_ref_btn = ui.button(t("measurement_left_ref_clear"), on_click=measurement_state.clear_timing_reference).props('outline color="secondary"')
-    with ui.row().classes("w-full gap-3"):
-        apply_sub1_btn = ui.button(
-            t("measurement_apply_sub1"),
-            on_click=lambda: _apply_bundle_as_sub(1),
-        ).props('outline color="secondary"')
-        apply_sub2_btn = ui.button(
-            t("measurement_apply_sub2"),
-            on_click=lambda: _apply_bundle_as_sub(2),
-        ).props('outline color="secondary"')
-    ui.label(
-        t("measurement_sub_bass_integration_notice")
-    ).classes("text-xs text-gray-400")
     session_preview_selector_row = ui.row().classes("w-full gap-3 items-center")
     with session_preview_selector_row:
         session_preview_channel = ui.select(
@@ -748,8 +736,6 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
             save_btn.disable()
             apply_left_btn.disable()
             apply_right_btn.disable()
-            apply_sub1_btn.disable()
-            apply_sub2_btn.disable()
             clear_ref_btn.disable()
             return
 
@@ -759,8 +745,6 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
         save_btn.enable()
         apply_left_btn.enable()
         apply_right_btn.enable()
-        apply_sub1_btn.enable()
-        apply_sub2_btn.enable()
         if timing_ref_latency_ms is not None:
             clear_ref_btn.enable()
 

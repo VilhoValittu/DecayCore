@@ -159,8 +159,10 @@ def _build_headless_export_zip(
 ) -> tuple[io.BytesIO, dict, dict]:
     import scipy.io.wavfile
 
+    from ...io.bypass_fir_export import bypass_zip_path, write_bypass_fir_wavs
     from ...config.decaycore_convolver_configs import (
         filter_wav_export_spec,
+        generate_bypass_hlc_config,
         generate_hlc_config,
         generate_raspberry_yaml,
         sub_filter_wav_export_spec,
@@ -203,6 +205,28 @@ def _build_headless_export_zip(
                 sub_name = str(sub_filter_wav_export_spec(fs_v, ft_short, file_ts, irw_tag=irw_tag)["bundle_name"])
                 zf.writestr(sub_name, wav_sub.getvalue())
 
+            write_bypass_fir_wavs(
+                zf,
+                result=result,
+                fs=fs_v,
+                ft_short=ft_short,
+                file_ts=file_ts,
+                irw_tag=irw_tag,
+                target_curve_tag=target_curve_tag,
+                layout=data.get("layout", "Mono"),
+            )
+
+            zf.writestr(
+                bypass_zip_path(f"Bypass_Config_{ft_short}_{fs_v}Hz_{irw_tag}.cfg"),
+                generate_bypass_hlc_config(
+                    fs_v,
+                    ft_short,
+                    file_ts,
+                    irw_tag=irw_tag,
+                    target_curve_tag=target_curve_tag,
+                    layout=data.get("layout", "Mono"),
+                ),
+            )
             zf.writestr(f"Summary_{ft_short}_{fs_v}Hz_{file_ts}.txt", _headless_summary_content(data, result))
             zf.writestr(
                 f"Config_{ft_short}_{fs_v}Hz_{irw_tag}.cfg",

@@ -76,6 +76,44 @@ def filter_wav_export_spec(
     }
 
 
+def bypass_filter_wav_export_spec(
+    fs_token,
+    ft_short,
+    file_ts,
+    *,
+    irw_tag: str = "auto",
+    target_curve_tag: str = "",
+    layout: str | None = "Mono",
+    prefix: str = "",
+):
+    spec = filter_wav_export_spec(
+        fs_token,
+        ft_short,
+        file_ts,
+        irw_tag=irw_tag,
+        target_curve_tag=target_curve_tag,
+        layout=layout,
+        prefix=prefix,
+    )
+    names = [f"Bypass_{name}" for name in list(spec.get("bundle_names", []) or [])]
+    if str(spec.get("layout")) == "Stereo":
+        stereo_name = names[0] if names else ""
+        return {
+            **spec,
+            "bundle_names": names,
+            "left_filename": f"{prefix}{stereo_name}",
+            "right_filename": f"{prefix}{stereo_name}",
+        }
+    left_name = names[0] if len(names) > 0 else ""
+    right_name = names[1] if len(names) > 1 else ""
+    return {
+        **spec,
+        "bundle_names": names,
+        "left_filename": f"{prefix}{left_name}",
+        "right_filename": f"{prefix}{right_name}",
+    }
+
+
 def sub_filter_wav_export_spec(
     fs_token,
     ft_short,
@@ -90,6 +128,29 @@ def sub_filter_wav_export_spec(
         "bundle_name": sub_name,
         "filename": f"{prefix}{sub_name}",
         "channel": 0,
+    }
+
+
+def bypass_sub_filter_wav_export_spec(
+    fs_token,
+    ft_short,
+    file_ts,
+    *,
+    irw_tag: str = "auto",
+    prefix: str = "",
+):
+    spec = sub_filter_wav_export_spec(
+        fs_token,
+        ft_short,
+        file_ts,
+        irw_tag=irw_tag,
+        prefix=prefix,
+    )
+    sub_name = f"Bypass_{spec['bundle_name']}"
+    return {
+        **spec,
+        "bundle_name": sub_name,
+        "filename": f"{prefix}{sub_name}",
     }
 
 
@@ -365,6 +426,43 @@ def generate_hlc_config(
 ):
     """Rakentaa tai generoi: generate hlc config."""
     spec = filter_wav_export_spec(
+        fs,
+        ft_short,
+        file_ts,
+        irw_tag=irw_tag,
+        target_curve_tag=target_curve_tag,
+        layout=layout,
+    )
+    l_name = str(spec["left_filename"])
+    r_name = str(spec["right_filename"])
+    l_ch = int(spec["left_channel"])
+    r_ch = int(spec["right_channel"])
+
+    config = [
+        f"{int(fs)} 2 2 0",
+        "0 0",
+        "0 0",
+        f"{l_name}",
+        f"{l_ch}",
+        "0.0",
+        "0.0",
+        f"{r_name}",
+        f"{r_ch}",
+        "1.0",
+        "1.0"
+    ]
+    return "\n".join(config)
+
+
+def generate_bypass_hlc_config(
+    fs,
+    ft_short,
+    file_ts,
+    irw_tag: str = "auto",
+    target_curve_tag: str = "",
+    layout: str | None = "Mono",
+):
+    spec = bypass_filter_wav_export_spec(
         fs,
         ft_short,
         file_ts,

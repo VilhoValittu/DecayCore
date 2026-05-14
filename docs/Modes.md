@@ -1,4 +1,4 @@
-# DecayCore Modes: AUTO vs BASIC vs ADVANCED (v1.0.1)
+# DecayCore Modes: AUTO vs BASIC vs ADVANCED (v1.0.2)
 
 DecayCore has three operating modes:
 

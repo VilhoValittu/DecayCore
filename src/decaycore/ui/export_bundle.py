@@ -21,10 +21,12 @@ import scipy.io.wavfile
 from ..app_paths import safe_filters_dir
 from ..config.decaycore_convolver_configs import (
     filter_wav_export_spec,
+    generate_bypass_hlc_config,
     generate_raspberry_yaml,
     sub_filter_wav_export_spec,
 )
 from ..config.results import FilterResult
+from ..io.bypass_fir_export import bypass_zip_path, write_bypass_fir_wavs
 from .export_outputs import (
     _camilladsp_yaml_name,
     _direct_dac_yaml_export_settings,
@@ -106,6 +108,28 @@ def build_export_zip(
                     )["bundle_name"]
                 )
                 zf.writestr(sub_name, wav_sub.getvalue())
+
+            write_bypass_fir_wavs(
+                zf,
+                result=result,
+                fs=fs_v,
+                ft_short=ft_short,
+                file_ts=file_ts,
+                irw_tag=irw_tag,
+                target_curve_tag=target_curve_tag,
+                layout=data.get("layout", "Mono"),
+            )
+            zf.writestr(
+                bypass_zip_path(f"Bypass_Config_{ft_short}_{fs_v}Hz_{irw_tag}.cfg"),
+                generate_bypass_hlc_config(
+                    fs_v,
+                    ft_short,
+                    file_ts,
+                    irw_tag=irw_tag,
+                    target_curve_tag=target_curve_tag,
+                    layout=data.get("layout", "Mono"),
+                ),
+            )
 
             write_dash = bool(
                 write_dashboards

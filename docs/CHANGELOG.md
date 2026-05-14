@@ -8,13 +8,21 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
-## [1.0.1] 14.5.2026
+## [1.0.2] 14-5-2026
+
+### Export
+- Export ZIP now includes bypass FIR WAV files (identity impulse at the same peak position as the correction filter) alongside the correction filters. Thanks for the idea : ShadowBoxer @ audiosciencereview.com
+- Export ZIP now includes a bypass HLC config file, making it easy to A/B between corrected and bypassed signal without reloading a different config.
+
+---
+
+## [1.0.1] 14-5-2026
 
 - Optuna memory-leak fix
 
 ---
 
-## [1.0.0] 11.5.2026
+## [1.0.0] 11-5-2026
 
 - Release DecayCore 1.0.0
 - Name change : CamillaFIR --> DecayCore
