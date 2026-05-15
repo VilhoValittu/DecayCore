@@ -22,18 +22,23 @@ All releases:
 
 ## Run from release package
 
+---
+
+
 ### Windows
 
-1. Download `DecayCore_<version>_windows.zip` from Releases.
+1. Download `DecayCore_<version>_windows.7z` from Releases.
 2. Extract the ZIP.
 3. Run `DecayCore.exe`.
 4. If SmartScreen appears, choose `More info` -> `Run anyway`.
 5. Allow private firewall access if prompted. DecayCore runs on internal server on your computer.
 6. Open `http://127.0.0.1:8080` if the browser does not open automatically.
 
+---
+
 ### Ubuntu / Debian Linux
 
-1. Download `DecayCore_<version>_linux.tar.gz` from Releases.
+1. Download `DecayCore_<version>_linux.7z` from Releases.
 2. Extract the archive.
 3. Open Terminal in the extracted folder and run:
 
@@ -51,7 +56,7 @@ sudo apt install libportaudio2
 
 ### macOS (Intel + Apple Silicon)
 
-1. Download `DecayCore_<version>_macos.tar.gz` from Releases.
+1. Download `DecayCore_<version>_macos.7z` from Releases.
 2. Extract the archive.
 3. Open Terminal in the extracted folder and run:
 
@@ -62,6 +67,8 @@ chmod +x DecayCore
 
 4. If macOS blocks first launch, open `System Settings -> Privacy & Security -> Open Anyway`.
 5. Open `http://127.0.0.1:8080` if the browser does not open automatically.
+
+---
 
 ## Run directly from Python source
 
@@ -74,7 +81,9 @@ Repository:
 
 Install Git first:
 - Windows: https://git-scm.com/download/win
+
 - Linux: use your distribution package manager, for example `sudo apt install git`
+
 - macOS: install Xcode Command Line Tools with `xcode-select --install`, or install Git with Homebrew
 
 Clone the repository:
@@ -94,7 +103,9 @@ git pull
 ### Windows
 
 1. Install Python from https://www.python.org/downloads/windows/ and enable `Add python.exe to PATH`.
+
 2. Open PowerShell in the cloned DecayCore source folder.
+
 3. Create and activate a virtual environment:
 
 ```powershell
@@ -136,6 +147,7 @@ sudo apt install git python3 python3-venv python3-pip
 ```
 
 2. Open Terminal in the cloned DecayCore source folder.
+
 3. Create and activate a virtual environment:
 
 ```bash
