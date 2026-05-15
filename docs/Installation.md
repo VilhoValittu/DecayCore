@@ -54,6 +54,8 @@ sudo apt install libportaudio2
 
 5. Open `http://127.0.0.1:8080` if the browser does not open automatically.
 
+---
+
 ### macOS (Intel + Apple Silicon)
 
 1. Download `DecayCore_<version>_macos.7z` from Releases.
