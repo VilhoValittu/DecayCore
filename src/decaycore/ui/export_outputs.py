@@ -195,6 +195,12 @@ def _direct_dac_yaml_export_settings(data: dict | None, *, include_sub: bool) ->
         "sub_delay_ms": 0.0,
         "sub_polarity_invert": False,
         "sub_gain_trim_db": 0.0,
+        "main_hpf_hz": None,
+        "sub_hpf_hz": None,
+        "sub_lpf_hz": None,
+        "main_hpf_order": 2,
+        "sub_hpf_order": 2,
+        "sub_lpf_order": 2,
     }
     if not bool(include_sub):
         return settings
@@ -218,6 +224,38 @@ def _direct_dac_yaml_export_settings(data: dict | None, *, include_sub: bool) ->
     settings["sub_delay_ms"] = float(sub_delay_ms if math.isfinite(sub_delay_ms) else 0.0)
     settings["sub_polarity_invert"] = bool((data or {}).get("bass_integration_sub_polarity_invert", False))
     settings["sub_gain_trim_db"] = float(sub_gain_trim_db if math.isfinite(sub_gain_trim_db) else 0.0)
+    try:
+        main_hpf_hz = float((data or {}).get("sub_crossover_hz", (data or {}).get("avr_crossover_hz", 80.0)) or 80.0)
+    except Exception:
+        main_hpf_hz = 80.0
+    try:
+        sub_hpf_hz = float((data or {}).get("sub_hpf_freq", 20.0) or 20.0)
+    except Exception:
+        sub_hpf_hz = 20.0
+    try:
+        sub_lpf_hz = float((data or {}).get("direct_dac_sub_lpf_hz", main_hpf_hz + 20.0) or main_hpf_hz + 20.0)
+    except Exception:
+        sub_lpf_hz = main_hpf_hz + 20.0
+    if not math.isfinite(main_hpf_hz) or main_hpf_hz <= 0.0:
+        main_hpf_hz = 80.0
+    if not math.isfinite(sub_hpf_hz) or sub_hpf_hz <= 0.0:
+        sub_hpf_hz = 20.0
+    if not math.isfinite(sub_lpf_hz) or sub_lpf_hz <= 0.0:
+        sub_lpf_hz = main_hpf_hz + 20.0
+    settings["main_hpf_hz"] = float(main_hpf_hz)
+    settings["sub_hpf_hz"] = float(sub_hpf_hz)
+    settings["sub_lpf_hz"] = float(max(main_hpf_hz + 20.0, sub_lpf_hz))
+    try:
+        xo_order = int(round(float((data or {}).get("sub_crossover_slope", 12) or 12) / 6.0))
+    except Exception:
+        xo_order = 2
+    try:
+        sub_hpf_order = int(round(float((data or {}).get("sub_hpf_slope", 12) or 12) / 6.0))
+    except Exception:
+        sub_hpf_order = 2
+    settings["main_hpf_order"] = int(xo_order)
+    settings["sub_lpf_order"] = int(xo_order)
+    settings["sub_hpf_order"] = int(sub_hpf_order)
     if not bool((data or {}).get("bass_integration_allpass_auto_applied", False)):
         return settings
 
@@ -418,6 +456,12 @@ def _write_fs_outputs(
             sub_delay_ms=yaml_settings.get("sub_delay_ms"),
             sub_polarity_invert=bool(yaml_settings.get("sub_polarity_invert", False)),
             sub_gain_trim_db=yaml_settings.get("sub_gain_trim_db"),
+            main_hpf_hz=yaml_settings.get("main_hpf_hz"),
+            sub_hpf_hz=yaml_settings.get("sub_hpf_hz"),
+            sub_lpf_hz=yaml_settings.get("sub_lpf_hz"),
+            main_hpf_order=yaml_settings.get("main_hpf_order"),
+            sub_hpf_order=yaml_settings.get("sub_hpf_order"),
+            sub_lpf_order=yaml_settings.get("sub_lpf_order"),
         )
         zf.writestr(
             _camilladsp_yaml_name(data=data, ft_short=ft_short, irw_tag=irw_tag, fs_v=int(fs_v)),

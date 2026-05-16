@@ -136,6 +136,14 @@ def build_basic_tab(*, t: Callable, get_val: Callable, max_safe_boost: float) ->
                 label=t("auto_target_mode_label"),
             ).props("dense outlined").classes("w-full"),
         )
+        ctrl.register(
+            "bass_integration_enable",
+            ui.checkbox(
+                t("bass_integration_enable"),
+                value=bool(get_val("bass_integration_enable", False)),
+            ),
+        )
+        ui.label(t("bass_integration_auto_help")).classes("text-xs text-gray-400")
         with ui.card().classes("w-full gap-2"):
             ctrl.register(
                 "enable_channel_specific_auto_policy",

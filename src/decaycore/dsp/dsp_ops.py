@@ -10,9 +10,11 @@
 
 from __future__ import annotations
 
+import math
+
+import numba
 import numpy as np
 import scipy.integrate
-import scipy.ndimage
 
 
 def apply_confidence_weighted_target_pull(
@@ -64,6 +66,71 @@ def apply_confidence_weighted_target_pull(
         return out, {"w_eff": w_eff, "pull_mask": None, "pull_strength": None}
 
 
+@numba.njit(cache=True)
+def _gradient1d(arr: np.ndarray, spacing: np.ndarray) -> np.ndarray:
+    n = arr.size
+    out = np.empty(n)
+    if n <= 1:
+        for i in range(n):
+            out[i] = 0.0
+        return out
+    out[0] = (arr[1] - arr[0]) / (spacing[1] - spacing[0])
+    out[n - 1] = (arr[n - 1] - arr[n - 2]) / (spacing[n - 1] - spacing[n - 2])
+    for i in range(1, n - 1):
+        out[i] = (arr[i + 1] - arr[i - 1]) / (spacing[i + 1] - spacing[i - 1])
+    return out
+
+
+@numba.njit(cache=True)
+def _gaussian1d_nearest(arr: np.ndarray, sigma: float) -> np.ndarray:
+    radius = max(1, int(4.0 * sigma + 0.5))
+    n = arr.size
+    s2 = 2.0 * sigma * sigma
+    ksize = 2 * radius + 1
+    k = np.empty(ksize)
+    for i in range(ksize):
+        x = float(i - radius)
+        k[i] = math.exp(-(x * x) / s2)
+    k_sum = 0.0
+    for i in range(ksize):
+        k_sum += k[i]
+    for i in range(ksize):
+        k[i] /= k_sum
+    out = np.empty(n)
+    for i in range(n):
+        acc = 0.0
+        for j in range(-radius, radius + 1):
+            idx = i + j
+            if idx < 0:
+                idx = 0
+            elif idx >= n:
+                idx = n - 1
+            acc += arr[idx] * k[j + radius]
+        out[i] = acc
+    return out
+
+
+@numba.njit(cache=True)
+def _gd_smooth_loop(
+    gd_l: np.ndarray, log2f: np.ndarray, lim_arr: np.ndarray, sigma: float
+) -> np.ndarray:
+    for _ in range(14):
+        gd_grad = _gradient1d(gd_l, log2f)
+        for i in range(gd_grad.size):
+            if not math.isfinite(gd_grad[i]):
+                gd_grad[i] = 0.0
+        max_ratio = 0.0
+        for i in range(gd_grad.size):
+            r = abs(gd_grad[i] / lim_arr[i])
+            if r > max_ratio:
+                max_ratio = r
+        if max_ratio <= 1.001:
+            break
+        gd_l = _gaussian1d_nearest(gd_l, sigma)
+        sigma *= 1.25
+    return gd_l
+
+
 def _limit_gd_gradient_ms_per_oct(
     freq_axis,
     phase_rad,
@@ -106,12 +173,7 @@ def _limit_gd_gradient_ms_per_oct(
     except (TypeError, ValueError, OverflowError):
         sigma = 0.6
     sigma = float(max(0.25, sigma))
-    for _ in range(14):
-        gd_grad_now = np.nan_to_num(np.gradient(gd_l, log2f), nan=0.0, posinf=0.0, neginf=0.0)
-        if gd_grad_now.size == 0 or float(np.max(np.abs(gd_grad_now / lim_arr))) <= 1.001:
-            break
-        gd_l = scipy.ndimage.gaussian_filter1d(gd_l, sigma=sigma, mode="nearest")
-        sigma *= 1.25
+    gd_l = _gd_smooth_loop(gd_l, log2f, lim_arr, sigma)
     gd_grad = np.nan_to_num(np.gradient(gd_l, log2f), nan=0.0, posinf=0.0, neginf=0.0)
     gd_grad_l = lim_arr * np.tanh(gd_grad / lim_arr) if soft_limit else np.clip(gd_grad, -lim_arr, lim_arr)
     dlog2f = np.diff(log2f)

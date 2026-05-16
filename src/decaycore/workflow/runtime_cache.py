@@ -18,7 +18,7 @@ def reset_runtime_caches() -> None:
     except Exception:
         logger.exception("Python import cache invalidation failed")
 
-    from ..auto_mode import cache_signature, filter_priors
+    from ..auto_mode import cache_signature, filter_priors, optuna_backend_storage
     from ..dsp import (
         bass_integration,
         decaycore_analysis,
@@ -31,6 +31,7 @@ def reset_runtime_caches() -> None:
     clearers: list[tuple[str, Callable[[], None]]] = [
         ("auto_mode_filter_priors", filter_priors.clear_auto_mode_filter_priors_cache),
         ("auto_mode_synth_target", cache_signature.clear_auto_mode_runtime_caches),
+        ("optuna_backend", optuna_backend_storage.clear_optuna_runtime_caches),
         ("analysis", decaycore_analysis.clear_analysis_cache),
         ("bass_integration", bass_integration.clear_bass_integration_caches),
         ("leveling", decaycore_leveling._clear_leveling_cache),

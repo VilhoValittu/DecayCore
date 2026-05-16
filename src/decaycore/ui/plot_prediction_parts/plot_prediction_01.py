@@ -108,6 +108,8 @@ def generate_prediction_plot(
     create_full_html=True,
     return_fig: bool = False,
     plot_smoothing_level="Psychoacoustic",
+    x_max_hz: float = 20000.0,
+    y_mag_range_db: float | None = None,
 ):
     try:
         fft_ctx = _prediction_plot_fft_context(filt_ir=filt_ir, fs=fs, target_stats=target_stats)
@@ -675,13 +677,17 @@ def generate_prediction_plot(
                     borderwidth=1,
                 )
 
-        t_vals = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
+        _t_vals_full = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
+        t_vals = [v for v in _t_vals_full if v <= x_max_hz]
         _n_rows = 5 if show_afdw else 4
         for r in range(1, _n_rows + 1):
             fig.update_xaxes(matches="x", row=r, col=1)
-            fig.update_xaxes(type="log", range=[np.log10(10), np.log10(20000)], tickvals=t_vals, row=r, col=1)
+            fig.update_xaxes(type="log", range=[np.log10(10), np.log10(x_max_hz)], tickvals=t_vals, row=r, col=1)
 
-        fig.update_yaxes(autorange=True, row=1, col=1)
+        if y_mag_range_db is not None:
+            fig.update_yaxes(range=[-y_mag_range_db, y_mag_range_db], row=1, col=1)
+        else:
+            fig.update_yaxes(autorange=True, row=1, col=1)
         fig.update_yaxes(autorange=True, row=2, col=1)
         fig.update_yaxes(autorange=True, row=3, col=1)
         fig.update_yaxes(range=[-30, 12], row=4, col=1)

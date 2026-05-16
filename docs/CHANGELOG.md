@@ -8,6 +8,24 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
+## [1.0.4] - 16-5-2026
+
+### Bass Integration (BETA)
+- Implemented Direct DAC Bass Integration and Subwoofer Targeting for improved low-frequency channel routing.
+
+### Crossover
+- Enhanced crossover filter functionality with updated YAML export settings.
+
+### Plots
+- Added combined channel results to prediction plots and enhanced plot parameters.
+
+### Performance / Auto mode
+- Added Optuna runtime cache clearing function integrated with `reset_runtime_caches`.
+- Optimized Optuna memory usage by disabling persistent journal in cache refinement.
+
+
+---
+
 ## [1.0.3] - 14-5-2026
 
 - GitHub Actions : sounddevice module fix for macOS builds

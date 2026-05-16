@@ -1,4 +1,4 @@
-# DecayCore - Official Manual (v1.0.2)
+# DecayCore - Official Manual (v1.0.4)
 
 ## 1. Overview
 DecayCore generates **FIR room-correction filters** from built-in sweep measurements, compatible external measurement imports, and WAV/IR captures.
@@ -425,6 +425,8 @@ When to reduce or disable:
 ## 7. Outputs
 Typical output package contains:
 - FIR filters (`.wav` 32-bit float)
+- Bypass FIR WAV files (identity impulse at the same peak position as the correction filter, for A/B comparison without reloading a different config)
+- Bypass config file (`.yml`) for easy A/B switching between corrected and bypassed signal
 - Summary report (`Summary.txt`)
 - Config snippet (`.cfg`)
 - CamillaDSP YAML (`.yml`)
@@ -753,6 +755,53 @@ If many takes are rejected, check the signal level, cable connections, and micro
 
 - Load the saved IR WAV files via the **WAV impulse export (.wav)** path (section 4.3)
 - Do not normalize individual IR files and do not move them to separate `t=0` references — keep all files from the same session at the same gain so that relative timing and level are preserved
+
+---
+
+## 12. Bass Integration (Beta)
+
+> **This feature is currently in Beta.** Behaviour, parameter names, and output formats may change in future releases. Feedback is welcome — please report issues or observations via the GitHub issue tracker or the support channel.
+
+Bass Integration is an optional workflow for systems that include one or two dedicated subwoofers. It produces a phase-aligned mono Sub FIR filter alongside the normal L/R correction filters and recommends crossover, delay, gain, and polarity settings.
+
+### 12.1 Integration path
+
+Bass Integration uses the **Direct DAC / CamillaDSP sub output** path: the subwoofer is driven directly by a separate amplifier channel or a CamillaDSP pipeline output. Main speakers and subwoofer are measured independently and then aligned in phase, delay, gain, and polarity.
+
+### 12.2 Single combined filter for multiple subwoofers
+
+**When two subwoofers (Sub1 + Sub2) are measured, DecayCore generates one shared mono sub filter, not two separate filters.**
+
+The two sub measurements are combined into a single transfer function before alignment and FIR generation. The combination method is either:
+
+- **Average** — arithmetic mean of the two sub responses.
+- **Aligned sum** — cross-correlation time-alignment followed by summation.
+
+The resulting mono sub filter is intended to drive both subwoofers simultaneously from a single output channel (or a summed/bridged output). It does not replace per-unit DSP correction if the subwoofers are in very different positions with very different response shapes.
+
+### 12.3 What the feature produces
+
+- Recommended crossover frequency (Main HPF / Sub LPF)
+- Recommended delay, gain, and polarity for the sub output
+- Dedicated mono Sub FIR WAV file included in the export ZIP
+- Diagnostics: overlap ripple, cancellation risk, sub dominance, XO group delay mismatch, phase error
+
+### 12.4 Interpretation of diagnostics
+
+| Metric | Good | Marginal |
+|--------|------|----------|
+| Overlap ripple | < 8 dB | < 12 dB |
+| Sub dominance | < 8 dB | < 12 dB |
+| XO group-delay RMS mismatch | < 12 ms | < 20 ms |
+
+If metrics are in the marginal range, the integration may still be usable but the crossover region should be verified with a post-filter measurement before finalizing the setup.
+
+### 12.5 Limitations (Beta)
+
+- Sub FIR generation requires separate sub measurement WAV files from the built-in measurement tool or compatible external captures.
+- Subwoofer measurement via the built-in tool requires Windows (see section 11.4).
+- The combined mono filter approach is appropriate for symmetrically placed dual-sub setups. Asymmetric placements may benefit from per-unit correction outside of DecayCore first.
+- Cancellation risk and overlap ripple are model-based estimates, not measured verification. Always re-measure after applying the exported settings.
 
 ### Disclaimer
 AI was used to translate this document from Finnish to English.

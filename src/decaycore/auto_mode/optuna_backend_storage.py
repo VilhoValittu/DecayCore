@@ -39,6 +39,16 @@ _OPTUNA_STUDY_SCAN_STATS = {
 }
 
 
+def clear_optuna_runtime_caches() -> None:
+    """Clear per-run Optuna in-memory caches. Called by reset_runtime_caches()."""
+    _OPTUNA_KNOWN_SIGNATURES.clear()
+    _OPTUNA_KNOWN_SIGNATURES_PRIMED.clear()
+    _OPTUNA_KNOWN_RECORDS.clear()
+    _OPTUNA_CROSS_STUDY_BEST_PARAMS.clear()
+    _OPTUNA_STUDY_SCAN_STATS["study_scans"] = 0
+    _OPTUNA_STUDY_SCAN_STATS["study_trials_scanned"] = 0
+
+
 def _auto_optuna_get_known_signatures(study_name: str) -> set[str]:
     if study_name not in _OPTUNA_KNOWN_SIGNATURES:
         _OPTUNA_KNOWN_SIGNATURES[study_name] = set()

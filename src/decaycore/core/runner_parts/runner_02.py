@@ -172,6 +172,14 @@ def _build_headless_export_zip(
     perf = {"zip_png_s": 0.0, "per_fs_stats": {}}
     target_curve_tag = str(data.get("target_curve_tag", "") or "").strip()
     multi_rate_on = bool(data.get("multi_rate_opt", False))
+    try:
+        yaml_xo_order = int(round(float(data.get("sub_crossover_slope", 12) or 12) / 6.0))
+    except Exception:
+        yaml_xo_order = 2
+    try:
+        yaml_sub_hpf_order = int(round(float(data.get("sub_hpf_slope", 12) or 12) / 6.0))
+    except Exception:
+        yaml_sub_hpf_order = 2
 
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         for result in list(results or []):
@@ -258,6 +266,12 @@ def _build_headless_export_zip(
                         sub_delay_ms=data.get("bass_integration_sub_delay_ms"),
                         sub_polarity_invert=bool(data.get("bass_integration_sub_polarity_invert", False)),
                         sub_gain_trim_db=data.get("bass_integration_sub_gain_trim_db"),
+                        main_hpf_hz=data.get("sub_crossover_hz", data.get("avr_crossover_hz")),
+                        sub_hpf_hz=data.get("sub_hpf_freq"),
+                        sub_lpf_hz=data.get("direct_dac_sub_lpf_hz"),
+                        main_hpf_order=yaml_xo_order,
+                        sub_hpf_order=yaml_sub_hpf_order,
+                        sub_lpf_order=yaml_xo_order,
                     ),
                 )
 
@@ -280,6 +294,15 @@ def _build_headless_export_zip(
                     include_sub=include_sub_multi,
                     sub_allpass_freq_hz=data.get("bass_integration_allpass_freq_hz"),
                     sub_allpass_q=data.get("bass_integration_allpass_q"),
+                    sub_delay_ms=data.get("bass_integration_sub_delay_ms"),
+                    sub_polarity_invert=bool(data.get("bass_integration_sub_polarity_invert", False)),
+                    sub_gain_trim_db=data.get("bass_integration_sub_gain_trim_db"),
+                    main_hpf_hz=data.get("sub_crossover_hz", data.get("avr_crossover_hz")),
+                    sub_hpf_hz=data.get("sub_hpf_freq"),
+                    sub_lpf_hz=data.get("direct_dac_sub_lpf_hz"),
+                    main_hpf_order=yaml_xo_order,
+                    sub_hpf_order=yaml_sub_hpf_order,
+                    sub_lpf_order=yaml_xo_order,
                 ),
             )
 

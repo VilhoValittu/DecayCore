@@ -85,6 +85,39 @@ def _append_bass_integration_summary(summary_content: str, data: dict | None) ->
         summary_content += f"{xo_label}: {float(xo_value):.1f} Hz\n"
         if raw_bi_mode == "direct_dac":
             summary_content += f"Sub LPF: {float(sub_lpf_value):.1f} Hz\n"
+            sub_target_lpf = _safe_float(
+                bi_meta.get("sub_target_lpf_hz", ui_data.get("sub_target_lpf_hz", float("nan"))),
+                float("nan"),
+            )
+            sub_target_slope = _safe_float(
+                bi_meta.get(
+                    "sub_target_lpf_slope_db_per_oct",
+                    ui_data.get("sub_target_lpf_slope_db_per_oct", float("nan")),
+                ),
+                float("nan"),
+            )
+            if (
+                sub_target_lpf == sub_target_lpf
+                and abs(sub_target_lpf) != float("inf")
+                and sub_target_slope == sub_target_slope
+                and abs(sub_target_slope) != float("inf")
+            ):
+                summary_content += (
+                    f"Sub target LPF: {float(sub_target_lpf):.0f} Hz, "
+                    f"{float(sub_target_slope):.0f} dB/oct\n"
+                )
+            diag_direct = dict(bi_meta.get("diagnostics", {}) or {})
+            sub_hpf_value = _safe_float(
+                diag_direct.get("direct_dac_sub_hpf_hz", ui_data.get("sub_hpf_freq", 20.0)),
+                20.0,
+            )
+            overlap_value = _safe_float(
+                diag_direct.get("direct_dac_sub_overlap_hz", max(0.0, float(sub_lpf_value) - float(xo_value))),
+                max(0.0, float(sub_lpf_value) - float(xo_value)),
+            )
+            summary_content += "Optimization: automatic\n"
+            summary_content += f"Sub HPF: {float(sub_hpf_value):.1f} Hz\n"
+            summary_content += f"Sub overlap above main XO: +{float(overlap_value):.1f} Hz\n"
         rec_hz = bi_meta.get("recommended_crossover_hz", None)
         rec_sub_lpf_hz = bi_meta.get("recommended_sub_lpf_hz", None)
         rec_hz_l = bi_meta.get("recommended_crossover_hz_l", None)
@@ -151,6 +184,15 @@ def _append_bass_integration_summary(summary_content: str, data: dict | None) ->
                 f"Sub polarity: {'INVERTED' if bool(alignment.get('polarity_invert', ui_data.get('bass_integration_sub_polarity_invert', False))) else 'NORMAL'}\n"
             )
             summary_content += f"Sub gain trim: {float(alignment.get('gain_trim_db', ui_data.get('bass_integration_sub_gain_trim_db', 0.0)) or 0.0):+.2f} dB\n"
+            phase_err = _safe_float(diag.get("direct_dac_phase_error_deg", float("nan")), float("nan"))
+            direct_gd = _safe_float(diag.get("direct_dac_gd_mismatch_ms", float("nan")), float("nan"))
+            direct_cancel = str(diag.get("direct_dac_cancellation_risk", "") or "").strip().lower()
+            if phase_err == phase_err and abs(phase_err) != float("inf"):
+                summary_content += f"XO phase error: {float(phase_err):.1f} deg\n"
+            if direct_gd == direct_gd and abs(direct_gd) != float("inf"):
+                summary_content += f"XO GD mismatch: {float(direct_gd):.3f} ms\n"
+            if direct_cancel:
+                summary_content += f"Cancellation risk: {direct_cancel}\n"
         cancel = _safe_float(bm.get("bass_cancellation_risk", float("nan")), float("nan"))
         ripple = _safe_float(bm.get("bass_overlap_ripple", float("nan")), float("nan"))
         dominance = _safe_float(bm.get("bass_sub_dominance", float("nan")), float("nan"))
@@ -234,6 +276,12 @@ def _append_bass_integration_allpass_auto_summary(summary_content: str, data: di
             return summary_content
         bi_meta = dict(ui_data.get("_bass_integration_meta", {}) or {})
         allpass_meta = dict(bi_meta.get("recommended_allpass", {}) or {})
+        if (
+            not bool(ui_data.get("bass_integration_allpass_auto_enable", False))
+            and not bool(ui_data.get("bass_integration_allpass_auto_applied", False))
+            and not bool(allpass_meta.get("enabled", False))
+        ):
+            return summary_content
         baseline = dict(bi_meta.get("allpass_baseline_metrics", {}) or {})
         optimized = dict(bi_meta.get("allpass_optimized_metrics", {}) or {})
 

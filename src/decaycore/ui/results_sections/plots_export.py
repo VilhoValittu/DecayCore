@@ -61,6 +61,62 @@ from ...dsp.lr_difference_metrics import compute_lr_difference_metrics
 
 logger = logging.getLogger("DecayCore")
 
+_DIRECT_DAC_COMBINED_KEYS = frozenset({
+    "direct_dac_sum_measured_mags",
+    "direct_dac_sum_predicted_mags",
+    "direct_dac_sum_predicted_mags_comp",
+})
+
+
+def _build_combined_fig(freq_hz, measured_db, predicted_db, title: str,
+                        target_db=None):
+    import numpy as np
+    import plotly.graph_objects as go
+
+    f = np.asarray(freq_hz, dtype=float)
+    mask = (f >= 10.0) & (f <= 500.0)
+    f_plot = f[mask]
+
+    fig = go.Figure()
+    if measured_db is not None:
+        m = np.asarray(measured_db, dtype=float)
+        if m.size == f.size:
+            fig.add_trace(go.Scatter(
+                x=f_plot, y=m[mask],
+                name="Measured (combined)",
+                line=dict(color="#888888", width=1.2, dash="dot"),
+            ))
+    if predicted_db is not None:
+        p = np.asarray(predicted_db, dtype=float)
+        if p.size == f.size:
+            fig.add_trace(go.Scatter(
+                x=f_plot, y=p[mask],
+                name="Predicted (combined)",
+                line=dict(color="#4488ff", width=2.0),
+            ))
+    if target_db is not None:
+        tgt = np.asarray(target_db, dtype=float)
+        if tgt.size == f.size:
+            fig.add_trace(go.Scatter(
+                x=f_plot, y=tgt[mask],
+                name="Target",
+                line=dict(color="green", width=1.5, dash="dash"),
+            ))
+    fig.update_xaxes(
+        type="log",
+        range=[np.log10(10), np.log10(500)],
+        tickvals=[10, 20, 50, 100, 200, 500],
+    )
+    fig.update_yaxes(autorange=True)
+    fig.update_layout(
+        title_text=f"{title} Analysis",
+        height=350,
+        template="plotly_white",
+        uirevision="keep",
+    )
+    return fig
+
+
 def _render_plots_and_export(
     *,
     data,
@@ -91,40 +147,13 @@ def _render_plots_and_export(
     mixed_freq = data.get("mixed_freq", 200.0)
     fs_v = int(data.get("fs", 48000) or 48000)
 
-    _bi_mode = str(
-        data.get("bass_integration_mode", "avr_lfe_main_decomposed") or "avr_lfe_main_decomposed"
-    ).strip().lower()
-
-    _sub_target_override: dict | None = None
-    if _bi_mode == "direct_dac" and isinstance(sub_st_f, dict) and "target_mags" in sub_st_f:
-        _sf = sub_st_f.get("freq_axis") or []
-        _st = sub_st_f["target_mags"] or []
-        if len(_sf) > 1 and len(_st) == len(_sf):
-            _sub_target_override = {
-                "freq_axis": list(_sf),
-                "target_mags": list(_st),
-                "eff_target_db": sub_st_f.get("eff_target_db"),
-                "target_level_db_window": sub_st_f.get("target_level_db_window"),
-            }
-
-    def _patch_st_for_main(st_f: dict | None) -> dict | None:
-        if _sub_target_override is None or not isinstance(st_f, dict):
-            return st_f
-        patched = dict(st_f)
-        patched["target_mags"] = _sub_target_override["target_mags"]
-        patched["freq_axis"] = _sub_target_override["freq_axis"]
-        for k in ("eff_target_db", "target_level_db_window"):
-            v = _sub_target_override[k]
-            if v is not None:
-                patched[k] = v
-        return patched
-
     def _render_channel_plot(*, channel_key: str, title: str, f_ch, m_ch, p_ch, imp_f, st_f) -> None:
         """Render channel plot, using the per-run figure cache."""
         cache_key = (channel_key, psl)
         fig = _PLOT_RENDER_CACHE.get(cache_key)
         if fig is None:
             try:
+                is_sub = channel_key == "sub"
                 result = plots.generate_prediction_plot(
                     f_ch,
                     m_ch,
@@ -139,6 +168,8 @@ def _render_plots_and_export(
                     False,
                     True,
                     psl,
+                    x_max_hz=500.0 if is_sub else 20000.0,
+                    y_mag_range_db=20.0 if is_sub else None,
                 )
                 fig = result[1] if isinstance(result, tuple) else None
             except Exception:
@@ -157,12 +188,19 @@ def _render_plots_and_export(
         and sub_meas.get("f_sub") is not None
         and len(sub_meas.get("f_sub", [])) > 0
     )
+    has_combined = has_sub and bool(
+        l_st_f and l_st_f.get("direct_dac_sum_predicted_mags")
+    )
+
+    l_st_speaker = {k: v for k, v in (l_st_f or {}).items() if k not in _DIRECT_DAC_COMBINED_KEYS}
+    r_st_speaker = {k: v for k, v in (r_st_f or {}).items() if k not in _DIRECT_DAC_COMBINED_KEYS}
 
     with ui.card().classes("w-full"):
         with ui.tabs().classes("w-full") as plot_tabs:
             tab_left = ui.tab(t("results_left_channel"))
             tab_right = ui.tab(t("results_right_channel"))
             tab_sub = ui.tab(t("results_sub_channel")) if has_sub else None
+            tab_combined = ui.tab(t("results_combined_channel")) if has_combined else None
 
         with ui.tab_panels(plot_tabs, value=tab_left).classes("w-full"):
             with ui.tab_panel(tab_left).classes("w-full"):
@@ -170,7 +208,7 @@ def _render_plots_and_export(
                     channel_key="left",
                     title=t("results_left_channel"),
                     f_ch=f_l, m_ch=m_l, p_ch=p_l,
-                    imp_f=l_imp_f, st_f=_patch_st_for_main(l_st_f),
+                    imp_f=l_imp_f, st_f=l_st_speaker,
                 )
 
             with ui.tab_panel(tab_right).classes("w-full"):
@@ -178,7 +216,7 @@ def _render_plots_and_export(
                     channel_key="right",
                     title=t("results_right_channel"),
                     f_ch=f_r, m_ch=m_r, p_ch=p_r,
-                    imp_f=r_imp_f, st_f=_patch_st_for_main(r_st_f),
+                    imp_f=r_imp_f, st_f=r_st_speaker,
                 )
 
             if has_sub and tab_sub is not None:
@@ -189,6 +227,29 @@ def _render_plots_and_export(
                         f_ch=sub_meas["f_sub"], m_ch=sub_meas["m_sub"], p_ch=sub_meas["p_sub"],
                         imp_f=sub_imp_f, st_f=sub_st_f,
                     )
+
+            if has_combined and tab_combined is not None:
+                with ui.tab_panel(tab_combined).classes("w-full"):
+                    cache_key = ("combined", psl)
+                    fig = _PLOT_RENDER_CACHE.get(cache_key)
+                    if fig is None:
+                        try:
+                            fig = _build_combined_fig(
+                                freq_hz=l_st_f["freq_axis"],
+                                measured_db=l_st_f.get("direct_dac_sum_measured_mags"),
+                                predicted_db=l_st_f.get("direct_dac_sum_predicted_mags"),
+                                title=t("results_combined_channel"),
+                                target_db=l_st_f.get("target_mags"),
+                            )
+                        except Exception:
+                            logger.debug("Combined plot generation failed", exc_info=True)
+                            fig = None
+                        if fig is not None:
+                            _PLOT_RENDER_CACHE[cache_key] = fig
+                    if fig is not None:
+                        ui.plotly(fig).classes("w-full")
+                    else:
+                        ui.label(t("results_plot_unavailable")).classes("text-gray-400")
 
     with ui.row().classes("w-full items-center gap-4 mt-2"):
         if zip_buffer is not None and fname:

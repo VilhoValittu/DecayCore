@@ -154,6 +154,54 @@ def bypass_sub_filter_wav_export_spec(
     }
 
 
+def _camilladsp_crossover_order(value: int | float | str | None, default: int = 2) -> int:
+    try:
+        order = int(round(float(value))) if value is not None else int(default)
+    except Exception:
+        order = int(default)
+    if order <= 2:
+        return 2
+    if order % 2:
+        order -= 1
+    return max(2, order)
+
+
+def _extend_camilladsp_crossover_filter(
+    lines: list[str],
+    *,
+    name: str,
+    kind: str,
+    freq_hz: float,
+    order: int,
+) -> None:
+    if int(order) <= 2:
+        lines.extend(
+            [
+                "",
+                f"  {name}:",
+                "    type: Biquad",
+                "    parameters:",
+                f"      type: {kind}",
+                f"      freq: {freq_hz:.3f}",
+                "      q: 0.707107",
+            ]
+        )
+        return
+
+    combo_type = "LinkwitzRileyHighpass" if str(kind).lower() == "highpass" else "LinkwitzRileyLowpass"
+    lines.extend(
+        [
+            "",
+            f"  {name}:",
+            "    type: BiquadCombo",
+            "    parameters:",
+            f"      type: {combo_type}",
+            f"      freq: {freq_hz:.3f}",
+            f"      order: {int(order)}",
+        ]
+    )
+
+
 def generate_raspberry_yaml(
     fs,
     ft_short,
@@ -170,6 +218,12 @@ def generate_raspberry_yaml(
     sub_delay_ms: float | None = None,
     sub_polarity_invert: bool = False,
     sub_gain_trim_db: float | None = None,
+    main_hpf_hz: float | None = None,
+    sub_hpf_hz: float | None = None,
+    sub_lpf_hz: float | None = None,
+    main_hpf_order: int | float | str | None = None,
+    sub_hpf_order: int | float | str | None = None,
+    sub_lpf_order: int | float | str | None = None,
 ):
     tc = _tc_segment(target_curve_tag)
     title_meta = _title_suffix(program_version=program_version, winner_rank_score=winner_rank_score)
@@ -217,7 +271,22 @@ def generate_raspberry_yaml(
         sub_gain_db = 0.0
     if not (sub_gain_db == sub_gain_db) or abs(sub_gain_db) == float("inf"):
         sub_gain_db = 0.0
+    try:
+        main_hpf = float(main_hpf_hz) if main_hpf_hz is not None else float("nan")
+    except Exception:
+        main_hpf = float("nan")
+    try:
+        sub_hpf = float(sub_hpf_hz) if sub_hpf_hz is not None else float("nan")
+    except Exception:
+        sub_hpf = float("nan")
+    try:
+        sub_lpf = float(sub_lpf_hz) if sub_lpf_hz is not None else float("nan")
+    except Exception:
+        sub_lpf = float("nan")
     sub_polarity_invert = bool(sub_polarity_invert)
+    use_main_hpf = bool(include_sub and main_hpf == main_hpf and abs(main_hpf) != float("inf") and main_hpf > 0.0)
+    use_sub_hpf = bool(include_sub and sub_hpf == sub_hpf and abs(sub_hpf) != float("inf") and sub_hpf > 0.0)
+    use_sub_lpf = bool(include_sub and sub_lpf == sub_lpf and abs(sub_lpf) != float("inf") and sub_lpf > 0.0)
     use_sub_allpass = bool(
         include_sub
         and ap_freq_hz == ap_freq_hz
@@ -235,6 +304,9 @@ def generate_raspberry_yaml(
     use_main_delay = bool(include_sub and main_delay_ms > 1e-9)
     use_sub_delay = bool(include_sub and sub_delay_pos_ms > 1e-9)
     use_sub_gain = bool(include_sub and (abs(sub_gain_db) > 1e-9 or sub_polarity_invert))
+    main_hpf_order_i = _camilladsp_crossover_order(main_hpf_order, 2)
+    sub_hpf_order_i = _camilladsp_crossover_order(sub_hpf_order, 2)
+    sub_lpf_order_i = _camilladsp_crossover_order(sub_lpf_order, 2)
 
     playback_channels = 3 if include_sub else 2
     left_filter_names = ["mastergain"]
@@ -242,6 +314,9 @@ def generate_raspberry_yaml(
     if use_main_delay:
         left_filter_names.append("main_delay")
         right_filter_names.append("main_delay")
+    if use_main_hpf:
+        left_filter_names.append("main_hpf")
+        right_filter_names.append("main_hpf")
     left_filter_names.append("ir_left")
     right_filter_names.append("ir_right")
 
@@ -250,6 +325,10 @@ def generate_raspberry_yaml(
         sub_filter_names.append("sub_gain")
     if use_sub_delay:
         sub_filter_names.append("sub_delay")
+    if use_sub_hpf:
+        sub_filter_names.append("sub_hpf")
+    if use_sub_lpf:
+        sub_filter_names.append("sub_lpf")
     if use_sub_allpass:
         sub_filter_names.append("sub_allpass")
     sub_filter_names.append("ir_sub")
@@ -311,6 +390,30 @@ def generate_raspberry_yaml(
                     f"      q: {ap_q:.6f}",
                 ]
             )
+        if use_sub_hpf:
+            _extend_camilladsp_crossover_filter(
+                lines,
+                name="sub_hpf",
+                kind="Highpass",
+                freq_hz=sub_hpf,
+                order=sub_hpf_order_i,
+            )
+        if use_sub_lpf:
+            _extend_camilladsp_crossover_filter(
+                lines,
+                name="sub_lpf",
+                kind="Lowpass",
+                freq_hz=sub_lpf,
+                order=sub_lpf_order_i,
+            )
+    if use_main_hpf:
+        _extend_camilladsp_crossover_filter(
+            lines,
+            name="main_hpf",
+            kind="Highpass",
+            freq_hz=main_hpf,
+            order=main_hpf_order_i,
+        )
     if use_main_delay:
         lines.extend(
             [

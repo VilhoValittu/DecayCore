@@ -344,6 +344,8 @@ def collect_ui_data(pin) -> Dict[str, Any]:
         bi_mode = "avr_lfe_main_decomposed"
     if bi_mode not in ("avr_lfe_main_decomposed", "direct_dac"):
         bi_mode = "avr_lfe_main_decomposed"
+    if bool(data.get("bass_integration_enable", False)) and is_auto_mode:
+        bi_mode = "direct_dac"
     data["bass_integration_mode"] = bi_mode
     try:
         bi_profile = str(data.get("bass_integration_profile", "safe") or "safe").strip().lower()
@@ -367,6 +369,8 @@ def collect_ui_data(pin) -> Dict[str, Any]:
     data["bass_integration_alignment_auto_applied"] = bool(data.get("bass_integration_alignment_auto_applied", False))
     data["bass_integration_alignment_reason"] = str(data.get("bass_integration_alignment_reason", "") or "")
     data["bass_integration_allpass_auto_enable"] = bool(data.get("bass_integration_allpass_auto_enable", False))
+    if bool(data.get("bass_integration_enable", False)) and is_auto_mode:
+        data["bass_integration_allpass_auto_enable"] = False
     try:
         v = float(data.get("bass_integration_allpass_freq_hz", 0.0) or 0.0)
         data["bass_integration_allpass_freq_hz"] = v if math.isfinite(v) and v > 0.0 else 0.0
@@ -404,7 +408,7 @@ def collect_ui_data(pin) -> Dict[str, Any]:
     if not math.isfinite(direct_sub_lpf_hz) or direct_sub_lpf_hz <= 0.0:
         direct_sub_lpf_hz = main_xo_hz
     if data["bass_integration_mode"] == "direct_dac":
-        direct_sub_lpf_hz = max(float(main_xo_hz), float(direct_sub_lpf_hz))
+        direct_sub_lpf_hz = max(float(main_xo_hz) + 20.0, float(direct_sub_lpf_hz))
     data["direct_dac_sub_lpf_hz"] = float(direct_sub_lpf_hz)
 
     v_raw = data.get("ir_export_window_mode", None)

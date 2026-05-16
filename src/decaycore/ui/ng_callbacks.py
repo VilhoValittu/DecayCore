@@ -141,6 +141,8 @@ def _register_bass_integration_callbacks(*, t: Callable) -> None:
         if bool(v):
             ctrl.set_value("mode", "AUTO")
             ctrl.set_value("camillafir_automatic_mode", True, emit=False)
+            ctrl.set_value("bass_integration_mode", "direct_dac", emit=False)
+            ctrl.set_value("bass_integration_allpass_auto_enable", False, emit=False)
         _sync_bass_integration_visibility()
         _update_target_preview()
 
@@ -332,9 +334,10 @@ def _sync_bass_integration_visibility() -> None:
     enabled = bool(ctrl.value("bass_integration_enable", False))
     mode_u = str(ctrl.value("mode", "BASIC") or "BASIC").strip().upper()
     bi_visible = bool(enabled and mode_u == "AUTO")
-    mode = str(ctrl.value("bass_integration_mode", "avr_lfe_main_decomposed") or "avr_lfe_main_decomposed").strip()
-    is_avr = mode == "avr_lfe_main_decomposed"
-    is_direct = mode == "direct_dac"
+    if bi_visible:
+        ctrl.set_value("bass_integration_mode", "direct_dac", emit=False)
+    is_avr = False
+    is_direct = bool(bi_visible)
     for scope_name, visible in (
         ("files_legacy_topology_scope", not bi_visible),
         ("files_bass_integration_topology_scope", bi_visible and is_avr),
@@ -350,7 +353,6 @@ def _sync_bass_integration_visibility() -> None:
             scope.set_visibility(bool(visible))
         except Exception:
             logger.debug("bass integration visibility update failed: %s", scope_name, exc_info=True)
-    direct_xo_override = bool(ctrl.value("sub_crossover_manual_override", False))
-    ctrl.set_enabled("sub_crossover_hz", bool(bi_visible and is_direct and direct_xo_override))
-    ctrl.set_enabled("sub_crossover_slope", bool(bi_visible and is_direct and direct_xo_override))
-    ctrl.set_enabled("bass_integration_allpass_auto_enable", bool(bi_visible and is_direct))
+    ctrl.set_enabled("sub_crossover_hz", False)
+    ctrl.set_enabled("sub_crossover_slope", False)
+    ctrl.set_enabled("bass_integration_allpass_auto_enable", False)

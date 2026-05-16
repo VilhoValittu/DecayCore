@@ -51,6 +51,10 @@ def _run_optuna_cache_refine_round(
 ) -> _CacheRefineRound:
     params = dict(context.params or {})
     cache_base_data = dict(params.get("cache_base_data", {}) or {})
+    # Micro/refine phase is a local search with seed presets — no journal needed.
+    # Using in-memory study avoids loading the (potentially large) persistent journal
+    # file on every round, which is the main cause of the ~4-6 GB memory spike.
+    cache_base_data = {**cache_base_data, "auto_mode_optuna_persistent_study": False}
     status_cb = params.get("status_cb")
     cfg = params.get("cfg")
     goal = str(params.get("goal", "") or "")

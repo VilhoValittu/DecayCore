@@ -5,7 +5,7 @@ description: "Up-to-date step-by-step DecayCore guide for creating FIR convoluti
 permalink: /guide/
 ---
 
-This guide reflects the current DecayCore workflow in v1.0.2: measure with the built-in measurement tool or import existing compatible measurements, keep `AUTO` mode, let DecayCore search for a good preset, export FIR filters, and verify with a new measurement.
+This guide reflects the current DecayCore workflow in v1.0.4: measure with the built-in measurement tool or import existing compatible measurements, keep `AUTO` mode, let DecayCore search for a good preset, export FIR filters, and verify with a new measurement.
 
 ## Quick workflow
 
@@ -50,7 +50,7 @@ Why `AUTO` is the recommended starting point:
 
 - It can auto-select a suitable built-in target curve if you do not lock in your own target.
 - It searches multiple candidate presets and applies the best-ranked winner before export.
-- In the current v1.0.2 workflow it can also use harmonic curves and IACC-aware ranking to avoid overly aggressive or overly symmetric winners.
+- In the current v1.0.4 workflow it can also use harmonic curves and IACC-aware ranking to avoid overly aggressive or overly symmetric winners.
 - It reuses cache hits when the same measurements and relevant settings are seen again.
 - It exports summary metadata about the winning preset, target choice, and run details.
 
@@ -138,6 +138,8 @@ If that location is not writable, DecayCore uses a safe fallback path and shows 
 Typical package contents:
 
 - L/R FIR WAV files (`32-bit float`)
+- Bypass FIR WAV files (identity impulse at the same peak position as the correction filter, for A/B comparison without reloading a different config)
+- Bypass config file (`.yml`) for easy A/B switching between corrected and bypassed signal
 - `Summary_...txt` report with AUTO-mode metadata
 - CamillaDSP config snippet (`.cfg`)
 - CamillaDSP `.yml` (single-rate export, or multi-rate variant)
@@ -165,6 +167,25 @@ Always re-measure with the filter active:
 - Check headroom and clipping risk.
 - Review `Summary.txt` for winner details, confidence, decay, and clamp diagnostics.
 - Adjust goal, correction range, or boost limit if the result sounds or measures over-corrected.
+
+---
+
+## Bass Integration (Beta)
+
+If your system includes one or two subwoofers, you can use the Bass Integration workflow to generate a phase-aligned mono Sub FIR filter alongside the normal L/R filters.
+
+> **Bass Integration is currently in Beta.** Feedback on results and issues is welcome.
+
+Key facts:
+
+- Requires separate subwoofer measurement WAV files (from the built-in measurement tool or compatible external captures).
+- Built-in subwoofer measurement requires Windows — see the Official Manual section 11.4.
+- Uses the **Direct DAC / CamillaDSP sub output** path: the subwoofer is driven directly from a separate amplifier channel or CamillaDSP pipeline output.
+- **When two subwoofers are measured, DecayCore generates one shared mono sub filter** for both. The two sub responses are combined before FIR generation; separate per-unit filters are not produced.
+- The export ZIP will contain a dedicated Sub FIR WAV file and updated crossover settings alongside the L/R filters.
+- Always re-measure after applying the exported crossover and sub delay settings to verify the integration in your actual room.
+
+Full details: `docs/Official_Manual.md` section 12.
 
 ---
 

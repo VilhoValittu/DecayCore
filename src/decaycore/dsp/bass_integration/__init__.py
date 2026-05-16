@@ -69,6 +69,11 @@ from ._sub_combine import (
     _xcorr_lag_from_spectra,
 )
 from ._utils import normalize_sub_combine_mode
+from .direct_dac import (
+    DirectDacBassIntegrationResult,
+    run_direct_dac_bass_integration,
+    score_direct_dac_bass_integration,
+)
 from ..bass_cache import _BUTTER_RESPONSE_CACHE, clear_bass_integration_caches
 
 # Private helpers re-exported for callers that import them from this package
@@ -128,4 +133,7 @@ __all__ = [
     "recommend_direct_dac_allpass",
     "recommend_avr_lfe_main_prepare",
     "recommend_direct_dac_prepare_optuna",
+    "DirectDacBassIntegrationResult",
+    "run_direct_dac_bass_integration",
+    "score_direct_dac_bass_integration",
 ]

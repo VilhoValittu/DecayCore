@@ -44,6 +44,8 @@ from ..dsp._measurement_ctx_local import clear_measurement_ctx, set_measurement_
 from ..dsp.correction_types import MeasurementSideContext
 from ..engine_build import _as_float
 from ..engine_summary import summarize_run
+from .direct_dac_bass_integration import apply_direct_dac_bass_integration_result
+from .subwoofer_target import build_subwoofer_target_with_lpf, subwoofer_target_metadata
 
 logger = logging.getLogger("DecayCore")
 
@@ -184,6 +186,7 @@ def _inject_direct_dac_summed_prediction_for_plot(
         st["direct_dac_sum_predicted_mags_comp"] = (
             20.0 * np.log10(np.maximum(np.abs(total_comp), 1e-12))
         ).astype(float).tolist()
+
     except Exception:
         logger.debug("Direct-DAC summed plot prediction injection failed", exc_info=True)
 
@@ -214,6 +217,7 @@ def run_pipeline(
 
     warnings: list[str] = []
     sub_st: dict | None = None
+    sub_target_meta: dict[str, Any] = {}
 
     _mctx_l = _build_measurement_side_ctx(measurements, "l")
     _mctx_r = _build_measurement_side_ctx(measurements, "r")
@@ -291,20 +295,51 @@ def run_pipeline(
             sub_hpf_freq = float(getattr(cfg, "sub_hpf_freq", 20.0))
             sub_hpf_order = int(getattr(cfg, "sub_hpf_order", 2))
 
-            sub_cfg = dataclasses.replace(
-                cfg,
-                lpf_settings={"enabled": True, "freq": sub_lpf_hz, "order": sub_xo_order},
-                hpf_settings={"enabled": True, "freq": sub_hpf_freq, "order": sub_hpf_order},
-                crossovers=[{"freq": sub_lpf_hz, "order": sub_xo_order,
-                             "slope": sub_xo_order * 6, "idx": 0}],
-                mag_c_min=max(5.0, float(sub_hpf_freq)),
-                mag_c_max=sub_lpf_hz,
-                lvl_min=20.0,
-                lvl_max=200.0,
-                stereo_link=False,
-                sub_integration_enable=False,
-                sub_generate_ir=False,
+            is_direct_dac_bi = bool(
+                getattr(cfg, "bass_integration_enable", False)
+                and str(getattr(cfg, "bass_integration_mode", "") or "").strip().lower() == "direct_dac"
             )
+            if is_direct_dac_bi:
+                sub_target = build_subwoofer_target_with_lpf(
+                    getattr(cfg, "house_freqs", None),
+                    getattr(cfg, "house_mags", None),
+                )
+                sub_target_meta = subwoofer_target_metadata(sub_target)
+                sub_cfg = dataclasses.replace(
+                    cfg,
+                    lpf_settings=None,
+                    hpf_settings=None,
+                    crossovers=[],
+                    house_freqs=sub_target.house_freqs,
+                    house_mags=sub_target.house_mags,
+                    mag_c_min=20.0,
+                    mag_c_max=200.0,
+                    lvl_min=20.0,
+                    lvl_max=200.0,
+                    stereo_link=False,
+                    sub_integration_enable=False,
+                    sub_generate_ir=False,
+                )
+                if isinstance(data, dict):
+                    data.update(sub_target_meta)
+                    bi_meta = data.setdefault("_bass_integration_meta", {})
+                    if isinstance(bi_meta, dict):
+                        bi_meta.update(sub_target_meta)
+            else:
+                sub_cfg = dataclasses.replace(
+                    cfg,
+                    lpf_settings={"enabled": True, "freq": sub_lpf_hz, "order": sub_xo_order},
+                    hpf_settings={"enabled": True, "freq": sub_hpf_freq, "order": sub_hpf_order},
+                    crossovers=[{"freq": sub_lpf_hz, "order": sub_xo_order,
+                                 "slope": sub_xo_order * 6, "idx": 0}],
+                    mag_c_min=max(5.0, float(sub_hpf_freq)),
+                    mag_c_max=sub_lpf_hz,
+                    lvl_min=20.0,
+                    lvl_max=200.0,
+                    stereo_link=False,
+                    sub_integration_enable=False,
+                    sub_generate_ir=False,
+                )
             sub_imp, sub_st = _call_generate_filter(
                 f_sub,
                 m_sub,
@@ -316,7 +351,19 @@ def run_pipeline(
             sub_f = np.asarray(f_sub, dtype=float)
             sub_m = np.asarray(m_sub, dtype=float)
             sub_p = np.asarray(p_sub, dtype=float)
-            if abs(float(sub_lpf_hz) - float(sub_xo_hz)) >= 0.5:
+            if is_direct_dac_bi and isinstance(sub_st, dict):
+                sub_st.update(sub_target_meta)
+            if is_direct_dac_bi:
+                logger.info(
+                    "Sub pass: Direct-DAC full-band FIR, sub target LPF %.0f Hz / %.0f dB/oct, "
+                    "correction scan 20-200 Hz; "
+                    "XO/HPF/LPF applied in CamillaDSP YAML"
+                    % (
+                        float(sub_target_meta.get("sub_target_lpf_hz", 200.0) or 200.0),
+                        float(sub_target_meta.get("sub_target_lpf_slope_db_per_oct", 96.0) or 96.0),
+                    )
+                )
+            elif abs(float(sub_lpf_hz) - float(sub_xo_hz)) >= 0.5:
                 logger.info(
                     f"Sub pass: main HPF={sub_xo_hz:.0f} Hz, "
                     f"sub LPF={sub_lpf_hz:.0f} Hz (order {sub_xo_order}), "
@@ -607,6 +654,25 @@ def run_pipeline(
         l_phase = np.asarray([], dtype=float)
         r_phase = np.asarray([], dtype=float)
 
+    direct_dac_result_dict = apply_direct_dac_bass_integration_result(
+        cfg=cfg,
+        measurements=measurements,
+        data=data,
+        l_imp=np.asarray(l_imp, dtype=float),
+        r_imp=np.asarray(r_imp, dtype=float),
+        sub_ir=np.asarray(sub_ir, dtype=float) if sub_ir is not None else None,
+        l_st=l_st,
+        r_st=r_st,
+        sub_st=sub_st if isinstance(sub_st, dict) else None,
+    )
+    if sub_target_meta and isinstance(data, dict):
+        data.update(sub_target_meta)
+        bi_meta = data.setdefault("_bass_integration_meta", {})
+        if isinstance(bi_meta, dict):
+            bi_meta.update(sub_target_meta)
+    if sub_target_meta and isinstance(sub_st, dict):
+        sub_st.update(sub_target_meta)
+
     metrics = {
         "alignment_samples": int(d_s),
         "alignment_method": str(align_method),
@@ -620,6 +686,13 @@ def run_pipeline(
         "r_max_boost_db_effective": _as_float((r_st or {}).get("max_boost_db_effective", (r_st or {}).get("max_boost_db", 0.0)), 0.0),
         "l_max_cut_db": _as_float((l_st or {}).get("max_cut_db", 0.0), 0.0),
         "r_max_cut_db": _as_float((r_st or {}).get("max_cut_db", 0.0), 0.0),
+        "direct_dac_bass_integration": dict(direct_dac_result_dict),
+        "bass_integration_crossover_hz": _as_float(direct_dac_result_dict.get("main_hpf_hz"), 0.0),
+        "bass_integration_delay_ms": _as_float(direct_dac_result_dict.get("sub_delay_ms"), 0.0),
+        "bass_integration_gain_db": _as_float(direct_dac_result_dict.get("sub_gain_db"), 0.0),
+        "bass_integration_polarity": "invert" if bool(direct_dac_result_dict.get("sub_polarity_invert", False)) else "normal",
+        "bass_integration_cancellation_risk": str(direct_dac_result_dict.get("cancellation_risk", "") or ""),
+        **({f"bass_integration_{k}": v for k, v in sub_target_meta.items()} if sub_target_meta else {}),
     }
 
     result = FilterResult(

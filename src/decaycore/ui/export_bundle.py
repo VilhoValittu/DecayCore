@@ -182,6 +182,15 @@ def build_export_zip(
                 include_sub=bool(yaml_settings.get("include_sub", False)),
                 sub_allpass_freq_hz=yaml_settings.get("sub_allpass_freq_hz"),
                 sub_allpass_q=yaml_settings.get("sub_allpass_q"),
+                sub_delay_ms=yaml_settings.get("sub_delay_ms"),
+                sub_polarity_invert=bool(yaml_settings.get("sub_polarity_invert", False)),
+                sub_gain_trim_db=yaml_settings.get("sub_gain_trim_db"),
+                main_hpf_hz=yaml_settings.get("main_hpf_hz"),
+                sub_hpf_hz=yaml_settings.get("sub_hpf_hz"),
+                sub_lpf_hz=yaml_settings.get("sub_lpf_hz"),
+                main_hpf_order=yaml_settings.get("main_hpf_order"),
+                sub_hpf_order=yaml_settings.get("sub_hpf_order"),
+                sub_lpf_order=yaml_settings.get("sub_lpf_order"),
             )
             zf.writestr(
                 _camilladsp_yaml_name(data=data, ft_short=ft_short, irw_tag=irw_tag),

@@ -167,6 +167,10 @@ def build_xos_hpf(data: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], Optional[
     except Exception:
         mode_u = "BASIC"
     auto_mode_active = bool(mode_u == "AUTO" or data.get("camillafir_automatic_mode", False))
+    is_direct_dac_bi = bool(
+        data.get("bass_integration_enable", False)
+        and str(data.get("bass_integration_mode", "") or "").strip().lower() == "direct_dac"
+    )
     if filter_type_supports_xo_phase_model(data.get("filter_type", "")):
         for i in range(1, 6):
             f_raw = data.get(f"xo{i}_f", None)
@@ -189,7 +193,7 @@ def build_xos_hpf(data: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], Optional[
             xos.append({"freq": f_hz, "order": order, "slope": slope_db_oct, "idx": i})
     xos.sort(key=lambda d: float(d.get("freq", 0.0)))
 
-    hpf_enabled = bool(data.get("hpf_enable")) or bool(auto_mode_active)
+    hpf_enabled = bool(data.get("hpf_enable")) or bool(auto_mode_active and not is_direct_dac_bi)
     try:
         hpf_slope_db_oct = int(round(float(data.get("hpf_slope", 12) or 12.0)))
     except Exception:
@@ -203,23 +207,6 @@ def build_xos_hpf(data: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], Optional[
         if bool(hpf_enabled)
         else None
     )
-    if (
-        bool(data.get("bass_integration_enable", False))
-        and str(data.get("bass_integration_mode", "") or "").strip().lower() == "direct_dac"
-    ):
-        try:
-            direct_xo_hz = float(data.get("sub_crossover_hz", data.get("avr_crossover_hz", 80.0)) or 80.0)
-        except Exception:
-            direct_xo_hz = 80.0
-        try:
-            direct_xo_order = int(round(float(data.get("sub_crossover_slope", 24) or 24.0))) // 6
-        except Exception:
-            direct_xo_order = 4
-        hpf = {
-            "enabled": True,
-            "freq": float(direct_xo_hz if math.isfinite(direct_xo_hz) and direct_xo_hz > 0.0 else 80.0),
-            "order": max(1, int(direct_xo_order)),
-        }
     hpf = _apply_auto_hpf_runtime_override(data, hpf)
     return xos, hpf
 

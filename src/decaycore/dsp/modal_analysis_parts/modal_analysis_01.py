@@ -10,9 +10,11 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Sequence
 
+import numba
 import numpy as np
 
 
@@ -101,6 +103,45 @@ def _as_float_array(value) -> np.ndarray:
     except Exception:
         return np.asarray([], dtype=float)
 
+@numba.njit(cache=True)
+def _smooth_log_box_kernel(x: np.ndarray, y_raw: np.ndarray, half: float) -> np.ndarray:
+    n = x.size
+    sum_y = np.empty(n + 1)
+    sum_w = np.empty(n + 1)
+    sum_y[0] = 0.0
+    sum_w[0] = 0.0
+    for i in range(n):
+        if math.isfinite(y_raw[i]):
+            sum_y[i + 1] = sum_y[i] + y_raw[i]
+            sum_w[i + 1] = sum_w[i] + 1.0
+        else:
+            sum_y[i + 1] = sum_y[i]
+            sum_w[i + 1] = sum_w[i]
+    out = np.empty(n)
+    for i in range(n):
+        lo = x[i] - half
+        hi = x[i] + half
+        left = 0
+        right = n
+        while left < right:
+            mid = (left + right) >> 1
+            if x[mid] < lo:
+                left = mid + 1
+            else:
+                right = mid
+        rl = 0
+        rr = n
+        while rl < rr:
+            mid = (rl + rr) >> 1
+            if x[mid] <= hi:
+                rl = mid + 1
+            else:
+                rr = mid
+        count = sum_w[rl] - sum_w[left]
+        out[i] = (sum_y[rl] - sum_y[left]) / count if count > 0.0 else 0.0
+    return out
+
+
 def _smooth_log_box(freq_hz: np.ndarray, values: np.ndarray, width_oct: float) -> np.ndarray:
     f = np.asarray(freq_hz, dtype=float).reshape(-1)
     v = np.asarray(values, dtype=float).reshape(-1)
@@ -110,18 +151,10 @@ def _smooth_log_box(freq_hz: np.ndarray, values: np.ndarray, width_oct: float) -
     half = 0.5 * width
     log_f = np.log2(np.maximum(f, 1e-9))
     order = np.argsort(log_f)
-    x = np.asarray(log_f[order], dtype=float)
-    y = np.nan_to_num(np.asarray(v[order], dtype=float), nan=0.0, posinf=0.0, neginf=0.0)
-    finite = np.isfinite(v[order]).astype(float)
-    sum_y = np.r_[0.0, np.cumsum(y * finite)]
-    sum_w = np.r_[0.0, np.cumsum(finite)]
+    x = np.ascontiguousarray(log_f[order], dtype=float)
+    y_raw = np.ascontiguousarray(v[order], dtype=float)
     out = np.empty_like(v, dtype=float)
-    lefts = np.searchsorted(x, x - half, side="left")
-    rights = np.searchsorted(x, x + half, side="right")
-    counts = sum_w[rights] - sum_w[lefts]
-    valid = counts > 0.0
-    out_sorted = np.where(valid, (sum_y[rights] - sum_y[lefts]) / np.where(counts > 0.0, counts, 1.0), y)
-    out[order] = out_sorted
+    out[order] = _smooth_log_box_kernel(x, y_raw, half)
     return out
 
 def _safe_confidence(confidence_mask: np.ndarray, n: int) -> np.ndarray:

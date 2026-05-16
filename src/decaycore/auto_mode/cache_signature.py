@@ -80,6 +80,7 @@ def _auto_cache_resolve_path(*, compat_version: str | None = None) -> str:
 
 _BASS_ALLPASS_ALGO_V = 1
 _BASS_INTEGRATION_COMBINE_ALGO_V = 1
+_DIRECT_DAC_SUB_TARGET_POLICY_V = 1
 _AUTO_TDC_DECAY_SCORING_ALGO_V = 2
 _AUTO_BROAD_RESIDUAL_PEAK_SCORING_ALGO_V = 1
 _AUTO_CORRECTION_SHARPNESS_SCORING_ALGO_V = 1
@@ -255,6 +256,7 @@ def _auto_signature_payload(
         "_auto_exc_freq_hz": float(_auto_safe_float(base_data.get("_auto_exc_freq_hz", float("nan")), float("nan"))),
         "_bass_allpass_algo_v": int(_BASS_ALLPASS_ALGO_V),
         "_bass_integration_combine_algo_v": int(_BASS_INTEGRATION_COMBINE_ALGO_V),
+        "_direct_dac_sub_target_policy_v": int(_DIRECT_DAC_SUB_TARGET_POLICY_V),
         "_auto_tdc_decay_scoring_algo_v": int(_AUTO_TDC_DECAY_SCORING_ALGO_V),
         "auto_mode_scoring_policy": {
             "broad_residual_peak_scoring_algo_v": int(_AUTO_BROAD_RESIDUAL_PEAK_SCORING_ALGO_V),

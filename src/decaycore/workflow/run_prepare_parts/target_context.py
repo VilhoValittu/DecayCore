@@ -124,7 +124,27 @@ def _prepare_target_curve_and_run_context(
         data["bass_integration_allpass_q"] = float(data.get("bass_integration_allpass_q", 0.707) or 0.707)
         data["bass_integration_allpass_reason"] = ""
         if bi_mode == "direct_dac":
-            _bi_unified = _compute_direct_dac_prepare_recommendation(bundle, data, callbacks=callbacks)
+            data["bass_integration_allpass_auto_enable"] = False
+            data["bass_integration_allpass_auto_applied"] = False
+            data["bass_integration_allpass_freq_hz"] = 0.0
+            data["bass_integration_allpass_q"] = 0.707
+            data["bass_integration_allpass_reason"] = "Direct DAC rewrite uses polarity/delay/gain only."
+            _bi_unified = {
+                "applied": False,
+                "sub_delay_ms": 0.0,
+                "sub_polarity_invert": False,
+                "sub_gain_trim_db": 0.0,
+                "recommended_hz": float(data.get("avr_crossover_hz", 80.0) or 80.0),
+                "recommended_sub_lpf_hz": float(data.get("direct_dac_sub_lpf_hz", data.get("avr_crossover_hz", 80.0)) or data.get("avr_crossover_hz", 80.0) or 80.0),
+                "baseline": {},
+                "optimized": {},
+                "improvement_score": 0.0,
+                "reason": "Direct DAC optimization runs after FIR prediction.",
+                "allpass_enabled": False,
+                "allpass_freq_hz": 0.0,
+                "allpass_q": 0.707,
+                "allpass_reason": "Direct DAC rewrite uses polarity/delay/gain only.",
+            }
             bi_alignment_recommendation = {
                 "applied": bool(_bi_unified.get("applied", False)),
                 "sub_delay_ms": float(_bi_unified.get("sub_delay_ms", 0.0) or 0.0),
@@ -151,25 +171,11 @@ def _prepare_target_curve_and_run_context(
             bi_recommended_sub_lpf_hz = _bi_unified.get("recommended_sub_lpf_hz", None)
             bi_rec_xo_l = None
             bi_rec_xo_r = None
-            manual_xo_override = bool(data.get("sub_crossover_manual_override", False))
-            if manual_xo_override:
-                try:
-                    manual_xo_hz = float(data.get("sub_crossover_hz", 80.0) or 80.0)
-                except Exception:
-                    manual_xo_hz = 80.0
-                if not math.isfinite(manual_xo_hz) or manual_xo_hz <= 0.0:
-                    manual_xo_hz = 80.0
-                data["sub_crossover_hz"] = float(manual_xo_hz)
-                data["avr_crossover_hz"] = float(manual_xo_hz)
-                data["direct_dac_sub_lpf_hz"] = float(manual_xo_hz)
-                logger.info(
-                    "Bass Integration Direct-DAC manual XO override: "
-                    f"{float(manual_xo_hz):.1f} Hz"
-                )
-            elif bi_recommended_xo_hz is not None:
+            if bi_recommended_xo_hz is not None:
                 data["sub_crossover_hz"] = float(bi_recommended_xo_hz)
                 data["avr_crossover_hz"] = float(bi_recommended_xo_hz)
-                _sub_lpf_store = float(bi_recommended_sub_lpf_hz) if bi_recommended_sub_lpf_hz is not None else float(bi_recommended_xo_hz)
+                _sub_lpf_store = float(bi_recommended_sub_lpf_hz) if bi_recommended_sub_lpf_hz is not None else float(bi_recommended_xo_hz) + 20.0
+                _sub_lpf_store = max(float(bi_recommended_xo_hz) + 20.0, _sub_lpf_store)
                 data["direct_dac_sub_lpf_hz"] = _sub_lpf_store
                 if _sub_lpf_store > float(bi_recommended_xo_hz) + 0.5:
                     logger.info(
@@ -194,7 +200,7 @@ def _prepare_target_curve_and_run_context(
                 _current_sub_lpf = _current_main_hpf
             if not math.isfinite(_current_sub_lpf) or _current_sub_lpf <= 0.0:
                 _current_sub_lpf = _current_main_hpf
-            data["direct_dac_sub_lpf_hz"] = float(max(_current_main_hpf, _current_sub_lpf))
+            data["direct_dac_sub_lpf_hz"] = float(max(_current_main_hpf + 20.0, _current_sub_lpf))
             bi_allpass_recommendation = {
                 "enabled": bool(_bi_unified.get("allpass_enabled", False)),
                 "freq_hz": float(_bi_unified.get("allpass_freq_hz", 0.0) or 0.0),

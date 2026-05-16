@@ -534,16 +534,16 @@ def build_filter_config(
         if not math.isfinite(direct_sub_lpf_hz) or direct_sub_lpf_hz <= 0.0:
             direct_sub_lpf_hz = sub_xo_hz
         if _is_direct_dac:
-            direct_sub_lpf_hz = max(float(sub_xo_hz), float(direct_sub_lpf_hz))
+            direct_sub_lpf_hz = max(float(sub_xo_hz) + 20.0, float(direct_sub_lpf_hz))
 
         if _is_direct_dac:
-            main_hpf_f = float(sub_xo_hz)
+            main_hpf_f = 0.0
             main_hpf_order = int(sub_xo_order)
         else:
             existing_hpf_f = float((hpf or {}).get("freq", 0.0) or 0.0)
             main_hpf_f = max(existing_hpf_f, sub_xo_hz)
             main_hpf_order = sub_xo_order if main_hpf_f >= sub_xo_hz else int((hpf or {}).get("order", 2) or 2)
-        cfg.hpf_settings = {"enabled": True, "freq": float(main_hpf_f), "order": int(main_hpf_order)}
+        cfg.hpf_settings = None if _is_direct_dac else {"enabled": True, "freq": float(main_hpf_f), "order": int(main_hpf_order)}
         cfg.sub_integration_enable = True
         cfg.sub_generate_ir = _is_direct_dac or bool(data.get("sub_generate_ir", False))
         cfg.sub_crossover_hz = float(sub_xo_hz)
