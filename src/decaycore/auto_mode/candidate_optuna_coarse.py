@@ -21,7 +21,6 @@ from .shared import (
     AUTO_MODE_MAG_C_MAX_MIN_HZ,
     AUTO_MODE_PHASE_LIMIT_MAX_HZ,
     AUTO_MODE_PHASE_LIMIT_MIN_HZ,
-    AUTO_MODE_LOCAL_REFINE_SHRINK,
     _auto_is_phase_search_filter,
     _auto_goal,
     _auto_output_tilt_bounds,
@@ -41,12 +40,16 @@ from .candidate_base import (
     AUTO_MODE_MAG_C_MIN_MAX_HZ,
     AUTO_MODE_LOW_BASS_MIN_HZ,
     AUTO_MODE_LOW_BASS_MAX_HZ,
+    _auto_optuna_project_to_unit,
     _auto_optuna_snap_to_step,
     _auto_optuna_nearest_choice,
     _bi_search_enabled,
     _derive_adaptive_freq_bounds,
     _auto_filter_normalized_base_data,
     _mag_low_search_bounds,
+    _auto_phase1_bool_search_enabled,
+    _auto_phase1_max_boost_hi,
+    _auto_phase1_phase_limit_primary_bounds,
     _seed_bi_optuna_params,
     _suggest_bi_optuna_params,
 )
@@ -63,6 +66,8 @@ def _suggest_auto_mode_candidate_optuna(
     keep_afdw = bool(base_data.get("enable_afdw", True))
     keep_bass_first = bool(base_data.get("bass_first_ai", True))
     prefer_bass = bool(_auto_goal(base_data) == AUTO_MODE_GOAL_FLAT)
+    bool_search = bool(_auto_phase1_bool_search_enabled(base_data))
+    max_boost_hi = float(_auto_phase1_max_boost_hi(base_data))
     ft = str(base_data.get("filter_type", "") or "").strip().lower()
     is_mixed = "mixed" in ft
     is_phase_search = _auto_is_phase_search_filter(ft)
@@ -130,8 +135,16 @@ def _suggest_auto_mode_candidate_optuna(
     cand = {
         "comparison_mode": True,
         "enable_tdc": bool(keep_tdc),
-        "enable_afdw": bool(trial.suggest_categorical("enable_afdw", [False, True])),
-        "bass_first_ai": bool(trial.suggest_categorical("bass_first_ai", [False, True])),
+        "enable_afdw": (
+            bool(trial.suggest_categorical("enable_afdw", [False, True]))
+            if bool(bool_search)
+            else bool(keep_afdw)
+        ),
+        "bass_first_ai": (
+            bool(trial.suggest_categorical("bass_first_ai", [False, True]))
+            if bool(bool_search)
+            else bool(keep_bass_first)
+        ),
         "fdw_cycles": _auto_optuna_snap_to_step(
             trial.suggest_float("fdw_cycles", 5.0, 16.0, step=0.01),
             lo=5.0,
@@ -165,9 +178,9 @@ def _suggest_auto_mode_candidate_optuna(
             trial.suggest_categorical("max_slope_cut_db_per_oct", [0.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 24.0, 36.0])
         ),
         "max_boost": _auto_optuna_snap_to_step(
-            trial.suggest_float("max_boost", 0.1, 12.0, step=0.01),
+            trial.suggest_float("max_boost", 0.1, float(max_boost_hi), step=0.01),
             lo=0.1,
-            hi=12.0,
+            hi=float(max_boost_hi),
             step=0.03,
         ),
         "mag_c_min": float(mag_c_min),
@@ -224,15 +237,25 @@ def _suggest_auto_mode_candidate_optuna(
             step=0.1,
         )
     if bool(is_phase_search):
-        cand["phase_limit"] = _auto_optuna_snap_to_step(
+        phase_lo, phase_hi = _auto_phase1_phase_limit_primary_bounds(base_data)
+        phase_range_u = float(trial.suggest_float("phase_limit_range_u", 0.0, 1.0))
+        phase_unit = _auto_optuna_snap_to_step(
             trial.suggest_float(
-                "phase_limit",
-                float(AUTO_MODE_PHASE_LIMIT_MIN_HZ),
-                float(AUTO_MODE_PHASE_LIMIT_MAX_HZ),
-                log=True,
+                "phase_limit_u",
+                0.0,
+                1.0,
             ),
-            lo=float(AUTO_MODE_PHASE_LIMIT_MIN_HZ),
-            hi=float(AUTO_MODE_PHASE_LIMIT_MAX_HZ),
+            lo=0.0,
+            hi=1.0,
+            step=0.1,
+        )
+        if float(phase_range_u) < 0.10:
+            phase_lo = float(AUTO_MODE_PHASE_LIMIT_MIN_HZ)
+            phase_hi = float(AUTO_MODE_PHASE_LIMIT_MAX_HZ)
+        cand["phase_limit"] = _auto_optuna_snap_to_step(
+            float(phase_lo) + float(phase_unit) * (float(phase_hi) - float(phase_lo)),
+            lo=float(phase_lo),
+            hi=float(phase_hi),
             step=0.1,
         )
     if _bi_search_enabled(base_data):
@@ -296,7 +319,12 @@ def _seed_auto_mode_candidate_optuna_params(
             [0.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 24.0, 36.0],
             default=0.0,
         ),
-        "max_boost": _auto_optuna_snap_to_step(_auto_safe_float(p.get("max_boost", 4.0), 4.0), lo=3.0, hi=12.0, step=0.01),
+        "max_boost": _auto_optuna_snap_to_step(
+            _auto_safe_float(p.get("max_boost", 4.0), 4.0),
+            lo=0.1,
+            hi=float(_auto_phase1_max_boost_hi(base_data)),
+            step=0.01,
+        ),
         "mag_c_max": _auto_optuna_snap_to_step(_auto_safe_float(p.get("mag_c_max", 220.0), 220.0), lo=170.0, hi=300.0, step=0.1),
         "trans_width": _auto_optuna_snap_to_step(_auto_safe_float(p.get("trans_width", 100.0), 100.0), lo=70.0, hi=150.0, step=0.1),
         "filter_smooth": 96,
@@ -347,11 +375,12 @@ def _seed_auto_mode_candidate_optuna_params(
             step=0.1,
         )
     if bool(is_phase_search):
-        out["phase_limit"] = _auto_optuna_snap_to_step(
+        phase_lo, phase_hi = _auto_phase1_phase_limit_primary_bounds(base_data)
+        out["phase_limit_range_u"] = 1.0
+        out["phase_limit_u"] = _auto_optuna_project_to_unit(
             _auto_safe_float(p.get("phase_limit", _auto_phase_limit_center(base_data.get("phase_limit", None))), 320.0),
-            lo=float(AUTO_MODE_PHASE_LIMIT_MIN_HZ),
-            hi=float(AUTO_MODE_PHASE_LIMIT_MAX_HZ),
-            step=0.1,
+            lo_eff=float(phase_lo),
+            hi_eff=float(phase_hi),
         )
     if _bi_search_enabled(base_data):
         out.update(_seed_bi_optuna_params(base_data, p))

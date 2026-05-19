@@ -155,11 +155,15 @@ def _auto_optuna_telemetry_text_ex(tel: dict | None, *, include_phase_kind: bool
 
     if bool(t.get("constraints_active", False)):
         cflags = dict(t.get("constraint_flags", {}) or {})
+        thr = dict(t.get("constraint_thresholds", {}) or {})
         feas_n = int(t.get("feasible_trials", 0) or 0)
         infeas_n = int(t.get("infeasible_trials", 0) or 0)
         parts.append(f"feas={feas_n}/{feas_n + infeas_n}")
         if not bool(cflags.get("use_events", True)):
             parts.append("events=off")
+        ripple_thr = thr.get("max_mode_ripple_db", None)
+        if ripple_thr is not None:
+            parts.append(f"ripple<={_auto_optuna_fmt_value(ripple_thr, 3)}")
         best_raw = t.get("best_raw_value", None)
         best_feas = t.get("best_feasible_value", None)
         if best_raw is not None:

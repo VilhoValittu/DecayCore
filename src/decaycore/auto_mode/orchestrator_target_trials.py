@@ -13,7 +13,17 @@
 from __future__ import annotations
 
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+
+from .worker_init import _auto_worker_init
+
+import sys as _sys
+_USE_PROCESS_POOL = _sys.platform != "win32"
+
+# Fork-inherited runtime — set in _run_target_trials before pool creation.
+# Workers read this global directly, bypassing pickle.
+_PROC_RUNTIME = None
 
 import numpy as np
 
@@ -138,6 +148,36 @@ def _target_eval_one(
         "metrics": dict(metrics or {}),
         "preset": dict(trial_preset),
     }
+
+
+def _target_eval_one_proc(
+    *,
+    preset: dict,
+    base_tc: dict,
+    measurements: dict,
+    fs_v: int,
+    taps_v: int,
+    xos: list,
+    hpf,
+    hc_f_arr,
+    hc_m_arr,
+    filter_key: str,
+) -> dict:
+    """ProcessPool wrapper: uses fork-inherited _PROC_RUNTIME instead of pickled runtime."""
+    return _target_eval_one(
+        runtime=_PROC_RUNTIME,
+        preset=preset,
+        base_tc=base_tc,
+        measurements=measurements,
+        fs_v=int(fs_v),
+        taps_v=int(taps_v),
+        xos=xos,
+        hpf=hpf,
+        hc_f_arr=hc_f_arr,
+        hc_m_arr=hc_m_arr,
+        pin_obj=None,
+        filter_key=filter_key,
+    )
 
 
 def _run_target_trials(
@@ -295,27 +335,54 @@ def _run_target_trials(
             out_by_idx[int(idx)] = dict(out or {})
     else:
         chunk_size = int(_auto_trial_chunk_size(workers))
-        with ThreadPoolExecutor(max_workers=int(workers)) as executor:
+        _ExecutorCls = ProcessPoolExecutor if _USE_PROCESS_POOL else ThreadPoolExecutor
+        if _USE_PROCESS_POOL:
+            _ctx = multiprocessing.get_context("fork")
+            _executor_kwargs = {"mp_context": _ctx, "initializer": _auto_worker_init}
+        else:
+            _executor_kwargs = {}
+        if _USE_PROCESS_POOL:
+            global _PROC_RUNTIME
+            _PROC_RUNTIME = runtime
+        with _ExecutorCls(max_workers=int(workers), **_executor_kwargs) as executor:
             for c0 in range(0, int(len(idx_presets)), int(chunk_size)):
                 chunk = idx_presets[c0 : c0 + int(chunk_size)]
-                future_map = {
-                    executor.submit(
-                        _target_eval_one,
-                        runtime=runtime,
-                        preset=dict(preset or {}),
-                        base_tc=base_tc,
-                        measurements=measurements,
-                        fs_v=int(fs_v),
-                        taps_v=int(taps_v),
-                        xos=xos,
-                        hpf=hpf,
-                        hc_f_arr=hc_f_arr,
-                        hc_m_arr=hc_m_arr,
-                        pin_obj=pin_obj,
-                        filter_key=filter_key,
-                    ): int(idx)
-                    for idx, preset in chunk
-                }
+                if _USE_PROCESS_POOL:
+                    future_map = {
+                        executor.submit(
+                            _target_eval_one_proc,
+                            preset=dict(preset or {}),
+                            base_tc=base_tc,
+                            measurements=measurements,
+                            fs_v=int(fs_v),
+                            taps_v=int(taps_v),
+                            xos=xos,
+                            hpf=hpf,
+                            hc_f_arr=hc_f_arr,
+                            hc_m_arr=hc_m_arr,
+                            filter_key=filter_key,
+                        ): int(idx)
+                        for idx, preset in chunk
+                    }
+                else:
+                    future_map = {
+                        executor.submit(
+                            _target_eval_one,
+                            runtime=runtime,
+                            preset=dict(preset or {}),
+                            base_tc=base_tc,
+                            measurements=measurements,
+                            fs_v=int(fs_v),
+                            taps_v=int(taps_v),
+                            xos=xos,
+                            hpf=hpf,
+                            hc_f_arr=hc_f_arr,
+                            hc_m_arr=hc_m_arr,
+                            pin_obj=pin_obj,
+                            filter_key=filter_key,
+                        ): int(idx)
+                        for idx, preset in chunk
+                    }
                 for future in as_completed(list(future_map.keys())):
                     idx = int(future_map.get(future, 0))
                     try:
@@ -581,3 +648,35 @@ def _evaluate_target_curve(
     )
     summary = _summarize_target_eval(trial_result=trial_result)
     return _build_target_eval_result(summary=summary)
+
+
+def _evaluate_target_curve_proc(*, tc: dict, t_idx: int) -> dict | None:
+    """ProcessPool wrapper: reads shared state from fork-inherited _PROC_CURVE_ARGS."""
+    from .orchestrator_target_shortlist import _PROC_CURVE_ARGS
+
+    a = _PROC_CURVE_ARGS
+    return _evaluate_target_curve(
+        runtime=a["runtime"],
+        cfg=a["cfg"],
+        base_data=a["base_data"],
+        measurements=a["measurements"],
+        fs_v=a["fs_v"],
+        taps_v=a["taps_v"],
+        xos=a["xos"],
+        hpf=a["hpf"],
+        pin_obj=None,
+        goal=a["goal"],
+        filter_key=a["filter_key"],
+        optimizer_backend=a["optimizer_backend"],
+        optuna_mod=a["optuna_mod"],
+        seed_target=a["seed_target"],
+        target_study_sig=a["target_study_sig"],
+        trials_eff=a["trials_eff"],
+        shortlisted=a["shortlisted"],
+        status_cb=None,
+        f6_txt=a["f6_txt"],
+        tc=dict(tc or {}),
+        t_idx=int(t_idx),
+        emit_status=False,
+        curve_inner_workers=a["curve_inner_workers"],
+    )

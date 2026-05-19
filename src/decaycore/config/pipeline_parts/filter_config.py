@@ -179,6 +179,8 @@ def build_filter_config(
     mixed_excess_phase_strength = _as_float_allow_zero(data.get("excess_phase_strength", None), 0.9)
     mixed_low_full_hz = _as_float_allow_zero(data.get("low_freq_full_correction_hz", None), 140.0)
     mixed_high_none_hz = _as_float_allow_zero(data.get("high_freq_no_correction_hz", None), 900.0)
+    mixed_phase_budget_lf_deg = _as_float_allow_zero(data.get("mixed_phase_budget_lf_deg", None), 40.0)
+    mixed_phase_budget_hf_deg = _as_float_allow_zero(data.get("mixed_phase_budget_hf_deg", None), 22.5)
     enable_ir_pre_energy_guard = bool(data.get("enable_ir_pre_energy_guard", True))
     pre_energy_ratio_max = _as_float_allow_zero(data.get("pre_energy_ratio_max", None), 0.25)
     pre_energy_guard_strength = _as_float_allow_zero(data.get("pre_energy_guard_strength", None), 0.8)
@@ -198,6 +200,10 @@ def build_filter_config(
         mixed_kwargs["low_freq_full_correction_hz"] = float(max(20.0, mixed_low_full_hz))
     if hasattr(FilterConfig_cls, "high_freq_no_correction_hz"):
         mixed_kwargs["high_freq_no_correction_hz"] = float(max(20.0, mixed_high_none_hz))
+    if hasattr(FilterConfig_cls, "mixed_phase_budget_lf_deg"):
+        mixed_kwargs["mixed_phase_budget_lf_deg"] = float(max(0.0, mixed_phase_budget_lf_deg))
+    if hasattr(FilterConfig_cls, "mixed_phase_budget_hf_deg"):
+        mixed_kwargs["mixed_phase_budget_hf_deg"] = float(max(0.0, mixed_phase_budget_hf_deg))
     if hasattr(FilterConfig_cls, "enable_ir_pre_energy_guard"):
         mixed_kwargs["enable_ir_pre_energy_guard"] = bool(enable_ir_pre_energy_guard)
     if hasattr(FilterConfig_cls, "pre_energy_ratio_max"):

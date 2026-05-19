@@ -49,6 +49,11 @@ def main():
     os.environ.setdefault("DECAYCORE_AUTO_PROFILE", os.environ.get("CAMILLAFIR_AUTO_PROFILE", "0"))
     configure_main_app()
     _register_single_client_guard()
+
+    @app.on_startup
+    async def _print_shutdown_hint() -> None:
+        print("To shut down the DecayCore, press Ctrl+C or close the terminal.", flush=True)
+
     ui.run(
         port=8080,
         show=True,

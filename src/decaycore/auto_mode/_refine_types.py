@@ -93,6 +93,7 @@ class _SearchPhase2State:
     phase2_ok: int = 0
     phase2_tried: int = 0
     phase2_plateau_hit: bool = False
+    phase2_improved_any: bool = False
     phase2_focus_lo: float = float("nan")
     phase2_focus_hi: float = float("nan")
     phase2_local_optuna_tels: list[dict] = field(default_factory=list)

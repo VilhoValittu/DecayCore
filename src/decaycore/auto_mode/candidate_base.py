@@ -18,12 +18,17 @@ logger = logging.getLogger(__name__)
 
 # Static choice arrays for rng.choice calls in _build_auto_mode_candidates.
 # Defined once at module level to avoid recreating them on every loop iteration.
-_TDC_SLOPE_CHOICES = np.array([3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 12.0, 24.0, 36.0, 48.0, 60.0, 80.0])
-_MAX_SLOPE_CHOICES = np.array([8.0, 10.0, 12.0, 14.0, 16.0, 20.0, 24.0, 36.0, 48.0, 60.0, 80.0])
+_TDC_SLOPE_CHOICES = np.array([3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 12.0, 18.0, 24.0])
+_MAX_SLOPE_CHOICES = np.array([8.0, 10.0, 12.0, 14.0, 16.0,])
 _TDC_STRENGTH_MIN = 5.0
 _TDC_STRENGTH_MAX = 75.0
 _TDC_MAX_REDUCTION_MIN_DB = 1.0
-_TDC_MAX_REDUCTION_MAX_DB = 36.0
+_TDC_MAX_REDUCTION_MAX_DB = 18.0
+_PHASE1_SAFE_MAX_BOOST_DB = 8.0
+_PHASE1_FULL_MAX_BOOST_DB = 12.0
+_PHASE1_PHASE_LIMIT_PRIMARY_LO_HZ = 180.0
+_PHASE1_PHASE_LIMIT_PRIMARY_HI_HZ = 420.0
+_PHASE1_PHASE_LIMIT_FULL_RANGE_FRAC = 0.10
 _BASS_FIRST_MODE_MIN_HZ = 120.0
 _BASS_FIRST_MODE_MAX_HZ = 220.0
 _CONF_PULL_MAX_MIN_HZ = 80.0
@@ -34,22 +39,16 @@ from decaycore.common.measurement_features import estimate_schroeder_hz
 
 from .shared import (
     AUTO_MODE_GOAL_FLAT,
-    AUTO_MODE_LOCAL_REFINE_SHRINK,
     AUTO_MODE_LOW_BASS_MAX_HZ,
     AUTO_MODE_LOW_BASS_MIN_HZ,
     AUTO_MODE_MAG_C_MAX_MIN_HZ,
     AUTO_MODE_MAG_C_MIN_MAX_HZ,
     AUTO_MODE_MAG_C_MIN_MIN_HZ,
     AUTO_MODE_OPTUNA_PILOT_STARTUP_TRIALS,
-    AUTO_MODE_PHASE_LIMIT_DEFAULT_HZ,
-    AUTO_MODE_PHASE_LIMIT_EXPLORE_GLOBAL_FRAC,
     AUTO_MODE_PHASE_LIMIT_EXPLORE_GLOBAL_SIGMA_HZ,
-    AUTO_MODE_PHASE_LIMIT_EXPLORE_UNIFORM_FRAC,
-    AUTO_MODE_PHASE_LIMIT_LOCAL_SIGMA_HZ,
     AUTO_MODE_PHASE_LIMIT_MAX_HZ,
     AUTO_MODE_PHASE_LIMIT_MIN_HZ,
     AUTO_MODE_PHASE_LIMIT_PRIOR_CENTER_HZ,
-    AUTO_MODE_PHASE_LIMIT_SIGMA_HZ,
     AUTO_MODE_PHASE3_MICRO_TRIALS,
     _auto_is_phase_search_filter,
     _auto_goal,
@@ -61,7 +60,6 @@ from .shared import (
     _auto_safe_float,
     _auto_sample_mag_low_pair,
     _clip,
-    _jitter,
 )
 
 
@@ -88,6 +86,58 @@ def _auto_optuna_snap_to_step(value: float, *, lo: float, hi: float, step: float
 def _auto_candidate_bool_choice(rng, preferred: bool) -> bool:
     pref = bool(preferred)
     return pref if float(rng.random()) < 0.65 else (not pref)
+
+
+def _auto_phase1_conservative_goal(base_data: dict | None) -> bool:
+    raw = str(dict(base_data or {}).get("auto_goal", "") or "").strip().lower()
+    if not raw:
+        raw = "balanced"
+    return raw in {"balanced", "room-safe", "room safe", "acoustic", "hybrid"}
+
+
+def _auto_phase1_bool_search_enabled(base_data: dict | None) -> bool:
+    raw = str(dict(base_data or {}).get("auto_goal", "") or "").strip().lower()
+    return raw not in {"balanced", "room-safe", "room safe"}
+
+
+def _auto_phase1_max_boost_hi(base_data: dict | None) -> float:
+    return (
+        float(_PHASE1_SAFE_MAX_BOOST_DB)
+        if _auto_phase1_conservative_goal(base_data)
+        else float(_PHASE1_FULL_MAX_BOOST_DB)
+    )
+
+
+def _auto_phase1_phase_limit_center(base_data: dict | None) -> float:
+    data = dict(base_data or {})
+    raw = data.get("phase_limit", None)
+    center = _auto_safe_float(raw, float("nan"))
+    if not np.isfinite(center):
+        center = float(AUTO_MODE_PHASE_LIMIT_PRIOR_CENTER_HZ)
+    return float(np.clip(center, float(AUTO_MODE_PHASE_LIMIT_MIN_HZ), float(AUTO_MODE_PHASE_LIMIT_MAX_HZ)))
+
+
+def _auto_phase1_phase_limit_primary_bounds(base_data: dict | None) -> tuple[float, float]:
+    center = _auto_phase1_phase_limit_center(base_data)
+    lo = min(float(_PHASE1_PHASE_LIMIT_PRIMARY_LO_HZ), float(center))
+    hi = max(float(_PHASE1_PHASE_LIMIT_PRIMARY_HI_HZ), float(center))
+    return (
+        float(np.clip(lo, float(AUTO_MODE_PHASE_LIMIT_MIN_HZ), float(AUTO_MODE_PHASE_LIMIT_MAX_HZ))),
+        float(np.clip(hi, float(AUTO_MODE_PHASE_LIMIT_MIN_HZ), float(AUTO_MODE_PHASE_LIMIT_MAX_HZ))),
+    )
+
+
+def _auto_phase1_sample_phase_limit(base_data: dict | None, rng) -> float:
+    center = _auto_phase1_phase_limit_center(base_data)
+    full_frac = float(np.clip(_PHASE1_PHASE_LIMIT_FULL_RANGE_FRAC, 0.0, 1.0))
+    if float(rng.random()) < full_frac:
+        return float(rng.uniform(float(AUTO_MODE_PHASE_LIMIT_MIN_HZ), float(AUTO_MODE_PHASE_LIMIT_MAX_HZ)))
+    lo, hi = _auto_phase1_phase_limit_primary_bounds(base_data)
+    if float(rng.random()) < 0.65:
+        draw = float(rng.normal(loc=float(center), scale=float(AUTO_MODE_PHASE_LIMIT_EXPLORE_GLOBAL_SIGMA_HZ)))
+    else:
+        draw = float(rng.uniform(float(lo), float(hi)))
+    return float(_clip(draw, float(lo), float(hi)))
 
 
 def _auto_optuna_window(center: float, span: float, lo: float, hi: float) -> tuple[float, float]:
@@ -394,6 +444,8 @@ def _build_auto_mode_candidates(
     keep_afdw = bool(base_data.get("enable_afdw", True))
     keep_bass_first = bool(base_data.get("bass_first_ai", True))
     prefer_bass = bool(_auto_goal(base_data) == AUTO_MODE_GOAL_FLAT)
+    bool_search = bool(_auto_phase1_bool_search_enabled(base_data))
+    max_boost_hi = float(_auto_phase1_max_boost_hi(base_data))
     ft = str(base_data.get("filter_type", "") or "").strip().lower()
     is_mixed = "mixed" in ft
     is_phase_search = _auto_is_phase_search_filter(ft)
@@ -442,7 +494,7 @@ def _build_auto_mode_candidates(
     out_seed["bass_first_ai"] = bool(keep_bass_first)
     if bool(prefer_bass):
         out_seed["max_boost"] = round(
-            float(max(6.0, _auto_safe_float(base_data.get("max_boost", 5.0), 5.0))),
+            float(np.clip(max(6.0, _auto_safe_float(base_data.get("max_boost", 5.0), 5.0)), 0.1, max_boost_hi)),
             2,
         )
     if bool(is_phase_search):
@@ -463,15 +515,15 @@ def _build_auto_mode_candidates(
         cand = {
             "comparison_mode": True,
             "enable_tdc": bool(keep_tdc),
-            "enable_afdw": _auto_candidate_bool_choice(rng, keep_afdw),
-            "bass_first_ai": _auto_candidate_bool_choice(rng, keep_bass_first),
+            "enable_afdw": _auto_candidate_bool_choice(rng, keep_afdw) if bool(bool_search) else bool(keep_afdw),
+            "bass_first_ai": _auto_candidate_bool_choice(rng, keep_bass_first) if bool(bool_search) else bool(keep_bass_first),
             "fdw_cycles": round(float(rng.uniform(5.0, 16.0)), 2),
             "tdc_strength": round(float(rng.uniform(_TDC_STRENGTH_MIN, _TDC_STRENGTH_MAX)), 1),
             "tdc_max_reduction_db": round(float(rng.uniform(_TDC_MAX_REDUCTION_MIN_DB, _TDC_MAX_REDUCTION_MAX_DB)), 1),
             "tdc_slope_db_per_oct": float(rng.choice(_TDC_SLOPE_CHOICES)),
             "reg_strength": round(float(rng.uniform(15.0, 45.0)), 1),
             "max_slope_db_per_oct": float(rng.choice(_MAX_SLOPE_CHOICES)),
-            "max_boost": round(float(rng.uniform(5.0 if prefer_bass else 3.0, 12.0)), 2),
+            "max_boost": round(float(rng.uniform(5.0 if prefer_bass else 3.0, max_boost_hi)), 2),
             "mag_c_min": float(mag_c_min_cand),
             "mag_c_max": round(float(rng.uniform(170.0, 300.0)), 1),
             "trans_width": round(float(rng.uniform(70.0, 150.0)), 1),
@@ -483,31 +535,8 @@ def _build_auto_mode_candidates(
         if is_mixed:
             cand["mixed_freq"] = round(float(np.clip(rng.normal(loc=mixed_center, scale=35.0), 80.0, 320.0)), 1)
         if is_phase_search:
-            phase_lo = float(AUTO_MODE_PHASE_LIMIT_MIN_HZ)
-            phase_hi = float(AUTO_MODE_PHASE_LIMIT_MAX_HZ)
-            phase_global_frac = float(np.clip(_auto_safe_float(AUTO_MODE_PHASE_LIMIT_EXPLORE_GLOBAL_FRAC, 0.35), 0.0, 1.0))
-            phase_uniform_frac = float(np.clip(_auto_safe_float(AUTO_MODE_PHASE_LIMIT_EXPLORE_UNIFORM_FRAC, 0.20), 0.0, 1.0))
-            phase_uniform_frac = min(phase_uniform_frac, 1.0 - 1e-6)
-            phase_global_frac = min(phase_global_frac, max(0.0, 1.0 - phase_uniform_frac - 1e-6))
-            phase_u = float(rng.random())
-            if phase_u < phase_uniform_frac:
-                phase_draw = float(rng.uniform(phase_lo, phase_hi))
-            elif phase_u < (phase_uniform_frac + phase_global_frac):
-                phase_draw = float(
-                    rng.normal(
-                        loc=float(AUTO_MODE_PHASE_LIMIT_PRIOR_CENTER_HZ),
-                        scale=float(AUTO_MODE_PHASE_LIMIT_EXPLORE_GLOBAL_SIGMA_HZ),
-                    )
-                )
-            else:
-                phase_draw = float(
-                    rng.normal(
-                        loc=float(phase_center),
-                        scale=float(AUTO_MODE_PHASE_LIMIT_SIGMA_HZ),
-                    )
-                )
             cand["phase_limit"] = round(
-                float(_clip(phase_draw, phase_lo, phase_hi)),
+                float(_auto_phase1_sample_phase_limit(base_data, rng)),
                 1,
             )
         if _bi_search_enabled(base_data):

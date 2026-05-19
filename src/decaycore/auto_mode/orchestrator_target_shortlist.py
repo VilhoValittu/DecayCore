@@ -13,7 +13,17 @@
 from __future__ import annotations
 
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+
+from .worker_init import _auto_worker_init
+
+import sys as _sys
+_USE_PROCESS_POOL = _sys.platform != "win32"
+
+# Fork-inherited shared state for curve-parallel ProcessPool.
+# Set in _run_shortlist_curve_parallel before pool creation.
+_PROC_CURVE_ARGS: dict | None = None
 
 import numpy as np
 
@@ -421,37 +431,74 @@ def _evaluate_target_shortlist_core(
             int(curve_workers),
             int(curve_inner_workers),
         )
-        with ThreadPoolExecutor(max_workers=int(curve_workers)) as executor:
+        _ExecutorCls = ProcessPoolExecutor if _USE_PROCESS_POOL else ThreadPoolExecutor
+        if _USE_PROCESS_POOL:
+            _ctx = multiprocessing.get_context("fork")
+            _executor_kwargs = {"mp_context": _ctx, "initializer": _auto_worker_init}
+        else:
+            _executor_kwargs = {}
+        if _USE_PROCESS_POOL:
+            global _PROC_CURVE_ARGS
+            _PROC_CURVE_ARGS = {
+                "runtime": setup.runtime,
+                "cfg": setup.cfg,
+                "base_data": base_data,
+                "measurements": measurements,
+                "fs_v": int(fs_v),
+                "taps_v": int(taps_v),
+                "xos": xos,
+                "hpf": hpf,
+                "goal": setup.goal,
+                "filter_key": setup.filter_key,
+                "optimizer_backend": setup.optimizer_backend,
+                "optuna_mod": setup.optuna_mod,
+                "seed_target": int(setup.seed_target),
+                "target_study_sig": setup.target_study_sig,
+                "trials_eff": int(shortlist_state.trials_eff),
+                "shortlisted": shortlist_state.shortlisted,
+                "f6_txt": shortlist_state.f6_txt,
+                "curve_inner_workers": int(curve_inner_workers),
+            }
+        with _ExecutorCls(max_workers=int(curve_workers), **_executor_kwargs) as executor:
+            from .orchestrator_target_trials import _evaluate_target_curve_proc
+
             future_map = {}
             best_done_item = None
             done_n = 0
             for t_idx, tc in enumerate(shortlist_state.shortlisted, start=1):
-                future = executor.submit(
-                    _evaluate_target_curve,
-                    runtime=setup.runtime,
-                    cfg=setup.cfg,
-                    base_data=base_data,
-                    measurements=measurements,
-                    fs_v=int(fs_v),
-                    taps_v=int(taps_v),
-                    xos=xos,
-                    hpf=hpf,
-                    pin_obj=pin_obj,
-                    goal=setup.goal,
-                    filter_key=setup.filter_key,
-                    optimizer_backend=setup.optimizer_backend,
-                    optuna_mod=setup.optuna_mod,
-                    seed_target=int(setup.seed_target),
-                    target_study_sig=setup.target_study_sig,
-                    trials_eff=int(shortlist_state.trials_eff),
-                    shortlisted=shortlist_state.shortlisted,
-                    status_cb=status_cb,
-                    f6_txt=shortlist_state.f6_txt,
-                    tc=dict(tc or {}),
-                    t_idx=int(t_idx),
-                    emit_status=False,
-                    curve_inner_workers=int(curve_inner_workers),
-                )
+                if _USE_PROCESS_POOL:
+                    future = executor.submit(
+                        _evaluate_target_curve_proc,
+                        tc=dict(tc or {}),
+                        t_idx=int(t_idx),
+                    )
+                else:
+                    future = executor.submit(
+                        _evaluate_target_curve,
+                        runtime=setup.runtime,
+                        cfg=setup.cfg,
+                        base_data=base_data,
+                        measurements=measurements,
+                        fs_v=int(fs_v),
+                        taps_v=int(taps_v),
+                        xos=xos,
+                        hpf=hpf,
+                        pin_obj=pin_obj,
+                        goal=setup.goal,
+                        filter_key=setup.filter_key,
+                        optimizer_backend=setup.optimizer_backend,
+                        optuna_mod=setup.optuna_mod,
+                        seed_target=int(setup.seed_target),
+                        target_study_sig=setup.target_study_sig,
+                        trials_eff=int(shortlist_state.trials_eff),
+                        shortlisted=shortlist_state.shortlisted,
+                        status_cb=status_cb,
+                        f6_txt=shortlist_state.f6_txt,
+                        tc=dict(tc or {}),
+                        t_idx=int(t_idx),
+                        emit_status=False,
+                        curve_inner_workers=int(curve_inner_workers),
+                    )
                 future_map[future] = (
                     int(t_idx),
                     str((tc or {}).get("hc_mode", "") or "").strip(),

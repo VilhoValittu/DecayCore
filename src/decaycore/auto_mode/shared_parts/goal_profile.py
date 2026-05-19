@@ -31,8 +31,8 @@ AUTO_MODE_SUBWOOFERS_LEVEL_MAX_HZ = 200.0
 AUTO_MODE_CACHE_ENABLED = True
 AUTO_MODE_CACHE_MAX_ITEMS = 64
 # Bump only when AUTO mode cache/Optuna persistence compatibility changes.
-AUTO_MODE_CACHE_SCHEMA_VERSION = 12
-AUTO_MODE_COMPAT_VERSION = "am23"
+AUTO_MODE_CACHE_SCHEMA_VERSION = 13
+AUTO_MODE_COMPAT_VERSION = "am24"
 AUTO_MODE_CACHE_FILENAME = "decaycore_auto_mode_cache.json"
 AUTO_MODE_CACHE_FILTER_KEYS = ("linear", "mixed", "minimum", "asym")
 AUTO_MODE_PHASE1_PLATEAU_ROUNDS = 5
@@ -73,7 +73,7 @@ AUTO_MODE_SYNTH_TARGET_HF_COMP_FRAC = 0.50
 AUTO_MODE_SYNTH_TARGET_SMOOTH_OCT = 1.0 / 3.0
 AUTO_MODE_LOCAL_REFINE_ENABLED = True
 AUTO_MODE_LOCAL_REFINE_TOP_K = 1
-AUTO_MODE_LOCAL_REFINE_TRIALS_PER_TOP = 2
+AUTO_MODE_LOCAL_REFINE_TRIALS_PER_TOP = 8
 AUTO_MODE_LOCAL_REFINE_SHRINK = 0.35
 AUTO_MODE_LOCAL_REFINE_KEEP_BEST_PHASE1 = True
 AUTO_MODE_LOCAL_REFINEMENT_TOP_N = 3
@@ -324,7 +324,10 @@ def _auto_goal_basis_text(goal: str) -> str:
 
 def _auto_metric_text(metrics: dict | None, goal: str) -> str:
     m = dict(metrics or {})
-    return f"rank={_auto_safe_float(m.get('rank_score'), 0.0):.3f}"
+    rank = _auto_safe_float(m.get("rank_score_official", float("nan")), float("nan"))
+    if not np.isfinite(rank):
+        rank = _auto_safe_float(m.get("rank_score"), 0.0)
+    return f"rank={float(rank):.3f}"
 
 def _m(metrics: dict | None, key: str, default=float("nan")) -> float:
     try:

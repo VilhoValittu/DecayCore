@@ -139,13 +139,11 @@ def build_config(
             setattr(stereo_policy, "enable_channel_specific_auto_policy", False)
     except Exception:
         logger.exception("stereo_auto_policy basic clamp")
-    try:
-        unsafe_raw_req = bool(data.get("unsafe_raw_dsp", False))
-    except Exception:
-        unsafe_raw_req = False
+    unsafe_raw_req = bool(data.get("unsafe_raw_dsp", False))
     try:
         auto_goal = _auto_goal_norm(str(data.get("auto_goal", "balanced") or "balanced"))
     except Exception:
+        logger.debug("auto_goal normalisation failed, using balanced", exc_info=True)
         auto_goal = "balanced"
     unsafe_raw_auto = bool(mode_u == "AUTO" and auto_goal == AUTO_MODE_GOAL_FLAT)
     unsafe_raw = bool(unsafe_raw_req and (mode_u == "ADVANCED" or unsafe_raw_auto))
@@ -158,18 +156,12 @@ def build_config(
     irw_mode = str(irw_raw or "auto").strip().lower()
     if irw_mode not in ("auto", "off", "rew_sym", "rew_asym"):
         irw_mode = "auto"
-    try:
-        sh = str(data.get("ir_export_window_shape", "hann") or "hann").strip().lower()
-    except Exception:
-        sh = "hann"
+    sh = str(data.get("ir_export_window_shape", "hann") or "hann").strip().lower()
     if sh not in ("hann", "tukey"):
         sh = "hann"
     tukey_alpha = float(np.clip(_as_float(data.get("ir_export_tukey_alpha", 0.25), 0.25), 0.0, 1.0))
 
-    try:
-        filter_type_s = str(getattr(cfg, "filter_type_str", data.get("filter_type", "")) or "").strip().lower()
-    except Exception:
-        filter_type_s = ""
+    filter_type_s = str(getattr(cfg, "filter_type_str", data.get("filter_type", "")) or "").strip().lower()
     if "asym" in filter_type_s:
         irw_mode = "rew_asym"
         sh = "tukey"

@@ -350,13 +350,19 @@ def _consume_phase_result(
     out: dict,
     phase_label: str,
     plateau_after_no_improve: int,
-    use_refine_tiebreak: bool,
+    plateau_min_trials: int = 0,
+    use_refine_tiebreak: bool = False,
 ) -> bool:
     phase_state.tried_n += 1
     improved = False
+    candidate_rank = float("nan")
+    candidate_refine_rank = float("nan")
+    refine_reason = "rank"
 
     if bool(out.get("ok", False)):
         metrics = dict(out.get("metrics", {}) or {})
+        candidate_rank = _auto_safe_float(official_rank_score(metrics), float("nan"))
+        candidate_refine_rank = _auto_safe_float(metrics.get("rank_score_refine"), float("nan"))
         metrics["trial"] = int(len(ctx.search_state.scored) + 1)
         metrics["phase"] = str(phase_label)
         trial_preset = dict(out.get("trial_preset", {}) or {})
@@ -373,7 +379,6 @@ def _consume_phase_result(
         phase_state.ok_n += 1
 
         better = False
-        refine_reason = "rank"
         if ctx.search_state.best_metrics is None:
             better = True
         elif bool(use_refine_tiebreak):
@@ -443,17 +448,36 @@ def _consume_phase_result(
             avg_now = _auto_safe_float((ctx.search_state.best_metrics or {}).get("avg_score"), 0.0)
             mode_now = _auto_safe_float((ctx.search_state.best_metrics or {}).get("mode_ripple_db"), float("nan"))
             boost_now = _auto_safe_float((ctx.search_state.best_metrics or {}).get("max_net_boost_db"), float("nan"))
+            baseline_note = (
+                ", baseline initialized"
+                if int(phase_state.ok_n) == 1 and int(phase_state.tried_n) == 1
+                else ""
+            )
             ctx.status_cb(
                 f"{ctx.status_prefix}: {phase_label} best improved trial {idx}/{n_total} "
                 f"(goal {ctx.goal}, rank {rank_now:.3f}, avg {avg_now:.3f}, "
                 f"mode {'n/a' if not np.isfinite(mode_now) else f'{mode_now:.3f} dB'}, "
                 f"boost {'n/a' if not np.isfinite(boost_now) else f'{boost_now:.2f} dB'}, "
-                f"ok {int(phase_state.ok_n)}/{int(phase_state.tried_n)})"
+                f"ok {int(phase_state.ok_n)}/{int(phase_state.tried_n)}{baseline_note})"
             )
         elif ctx.search_state.best_metrics is not None:
+            cand_txt = (
+                "n/a"
+                if not np.isfinite(candidate_rank)
+                else f"{float(candidate_rank):.3f}"
+            )
+            refine_txt = ""
+            if bool(use_refine_tiebreak):
+                refine_rank_txt = (
+                    "n/a"
+                    if not np.isfinite(candidate_refine_rank)
+                    else f"{float(candidate_refine_rank):.3f}"
+                )
+                refine_txt = f", decision {refine_reason}, refine rank {refine_rank_txt}"
             ctx.status_cb(
                 f"{ctx.status_prefix}: {phase_label} {idx}/{n_total} "
-                f"(rank {rank_now:.3f}, ok {int(phase_state.ok_n)}/{int(phase_state.tried_n)})"
+                f"(best rank {rank_now:.3f}, candidate rank {cand_txt}, "
+                f"ok {int(phase_state.ok_n)}/{int(phase_state.tried_n)}{refine_txt})"
             )
 
     if int(plateau_after_no_improve) > 0:
@@ -461,7 +485,8 @@ def _consume_phase_result(
             phase_state.no_improve_streak = 0
         else:
             phase_state.no_improve_streak += 1
-        if phase_state.no_improve_streak >= int(plateau_after_no_improve):
+        plateau_ready = int(phase_state.tried_n) >= int(max(0, plateau_min_trials))
+        if bool(plateau_ready) and phase_state.no_improve_streak >= int(plateau_after_no_improve):
             phase_state.plateau_hit = True
             best_now = (
                 "n/a"
@@ -490,6 +515,7 @@ def run_candidate_phase(
     phase_label: str,
     phase_kind: str | None = None,
     plateau_after_no_improve: int = 0,
+    plateau_min_trials: int = 0,
     use_refine_tiebreak: bool = False,
     focus_lo_hz: float | None = None,
     focus_hi_hz: float | None = None,
@@ -498,6 +524,7 @@ def run_candidate_phase(
     optuna_builder=None,
     seed_to_params=None,
     study_scope: str | None = None,
+    optuna_base_data_override: dict | None = None,
 ) -> dict:
     phase_state = _AutoModePhaseState()
     use_optuna_phase = bool(
@@ -551,13 +578,15 @@ def run_candidate_phase(
             out=dict(out or {}),
             phase_label=phase_label,
             plateau_after_no_improve=int(plateau_after_no_improve),
+            plateau_min_trials=int(plateau_min_trials),
             use_refine_tiebreak=bool(use_refine_tiebreak),
         )
 
     if bool(use_optuna_phase):
         raw_scope = str(study_scope or phase_label)
+        optuna_base_data = dict(optuna_base_data_override or ctx.search_base_data or {})
         scope_eff = ctx.runtime.auto_optuna_effective_scope(
-            ctx.search_base_data,
+            optuna_base_data,
             raw_scope,
             phase_kind=phase_kind,
         )
@@ -565,13 +594,14 @@ def run_candidate_phase(
             study_sig=ctx.optuna_search_sig,
             scope=scope_eff,
         )
+        phase_seed = int(ctx.seed + sum(ord(ch) for ch in str(phase_label)) * 31)
         phase_tel = dict(
             ctx.runtime.auto_run_optuna_eval_loop(
                 optuna_mod=ctx.optuna_mod,
                 cfg=ctx.cfg,
                 n_total=int(n_total),
-                seed=int(ctx.seed + sum(ord(ch) for ch in str(phase_label)) * 31),
-                base_data=dict(ctx.search_base_data or {}),
+                seed=int(phase_seed),
+                base_data=dict(optuna_base_data),
                 seed_presets=list(seed_presets or []),
                 build_preset=optuna_builder,
                 eval_one=_eval_one,
@@ -591,7 +621,7 @@ def run_candidate_phase(
             or {}
         )
         if ctx.runtime.auto_optuna_needs_zero_feasible_rescue(
-            base_data=ctx.search_base_data,
+            base_data=optuna_base_data,
             phase_kind=phase_kind,
             telemetry=phase_tel,
         ):
@@ -601,7 +631,7 @@ def run_candidate_phase(
                 str(raw_scope),
             )
             rescue_base_data = ctx.runtime.auto_optuna_base_data_without_constraints(
-                ctx.search_base_data
+                optuna_base_data
             )
             rescue_scope = f"{str(raw_scope)}-zf0"
             rescue_scope_eff = ctx.runtime.auto_optuna_effective_scope(
@@ -614,7 +644,7 @@ def run_candidate_phase(
                     optuna_mod=ctx.optuna_mod,
                     cfg=ctx.cfg,
                     n_total=int(n_total),
-                    seed=int(ctx.seed + sum(ord(ch) for ch in str(phase_label)) * 31),
+                    seed=int(phase_seed + 999983),
                     base_data=dict(rescue_base_data or {}),
                     seed_presets=list(seed_presets or []),
                     build_preset=optuna_builder,

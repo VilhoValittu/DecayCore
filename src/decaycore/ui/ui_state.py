@@ -23,7 +23,6 @@ _STATUS_SUMMARY_TEXT = ""
 _STATUS_INFO_TEXT = ""
 _AUTO_SELECTED_BAR_MSG = ""
 _AUTO_STATUS_DETAILS: list[str] = []
-_AUTO_STATUS_DETAIL_MAX = 80
 _AUTO_STATUS_LAST_DETAIL = ""
 _RUN_WALL_CLOCK_TEXT = ""
 _LAST_RUN_INFO: dict = {}
@@ -65,59 +64,186 @@ def _compact_auto_status_core(core: str) -> str:
         s = str(core or "").strip()
     except Exception:
         s = ""
+
+    # --- Bracket format: "DecayCore automatic mode [target] (...): <phase_text>" ---
+    bracket_m = re.match(
+        r"^DecayCore automatic mode \[([^\]]+)\][^:]*:\s*(.+)$",
+        s,
+        flags=re.IGNORECASE,
+    )
+    if bracket_m:
+        target = bracket_m.group(1).strip()
+        after_colon = bracket_m.group(2).strip()
+        low_ac = after_colon.lower()
+
+        # Main search: "phase 1/2 best improved trial N/M (...)"
+        best_m = re.match(
+            r"(phase\s+\d+/\d+)\s+best improved trial\s+(\d+/\d+)",
+            after_colon, re.IGNORECASE,
+        )
+        if best_m:
+            return f"Optimizing · {target} · {best_m.group(1)} · trial {best_m.group(2)} ↑"
+
+        # Main search: "phase 1/2 N/M (...)"
+        phase_m = re.match(r"(phase\s+\d+/\d+)\s+(\d+/\d+)", after_colon, re.IGNORECASE)
+        if phase_m:
+            return f"Optimizing · {target} · {phase_m.group(1)} · trial {phase_m.group(2)}"
+
+        # Winner polish with trial counts: "<param> winner polish best improved trial N/M"
+        polish_best_m = re.match(
+            r"(\S+)\s+winner polish\s+best improved trial\s+(\d+/\d+)",
+            after_colon, re.IGNORECASE,
+        )
+        if polish_best_m:
+            label = _polish_param_label(polish_best_m.group(1))
+            return f"Polishing · {target} · {label} · {polish_best_m.group(2)} ↑"
+
+        # Winner polish with trial counts: "<param> winner polish N/M"
+        polish_m = re.match(r"(\S+)\s+winner polish\s+(\d+/\d+)", after_colon, re.IGNORECASE)
+        if polish_m:
+            label = _polish_param_label(polish_m.group(1))
+            return f"Polishing · {target} · {label} · {polish_m.group(2)}"
+
+        # Residual tie-break / safety
+        if low_ac.startswith("residual tie-break"):
+            return f"Polishing · {target} · peaks"
+        if low_ac.startswith("residual_peak safety override"):
+            return f"Safety check · {target}"
+
+        # Fallback: strip parenthetical suffix
+        clean = re.sub(r"\s*\(.*\)\s*$", "", after_colon).strip()
+        clean = re.sub(r"\s+\d+/\d+\s*$", "", clean).strip()
+        return f"Optimizing · {target} · {clean}" if clean else f"Optimizing · {target}"
+
+    # --- Old format: "DecayCore automatic mode: <phase_text>" ---
     prefix = "DecayCore automatic mode:"
     if not s.startswith(prefix):
         return s
-    after = str(s[len(prefix):] or "").strip()
+    after = s[len(prefix):].strip()
     low = after.lower()
+
+    # Target curve selection
+    if low.startswith("adaptive target"):
+        return "Synthesizing · target"
     if low.startswith("target shortlist"):
-        phase = "target shortlist"
-    elif low.startswith("target preselect"):
-        phase = "target preselect"
-    elif low.startswith("target search"):
-        phase = "target search"
-    elif low.startswith("selecting target curve"):
-        phase = "selecting target curve"
-    elif low.startswith("target trials"):
-        phase = "target trials"
-    elif low.startswith("phase1 done"):
-        phase = "phase1 done"
-    elif low.startswith("local refine"):
-        phase = "local refine"
-    elif low.startswith("phase2 summary"):
-        phase = "phase2 summary"
-    elif low.startswith("micro refine summary"):
-        phase = "micro refine summary"
-    elif low.startswith("micro refine"):
-        phase = "micro refine"
-    elif low.startswith("target finalize"):
-        phase = "target finalize"
-    elif low.startswith("preset search"):
-        phase = "preset search"
-    elif low.startswith("phase search"):
-        phase = "phase search"
-    elif low.startswith("protection model"):
-        phase = "protection model"
-    elif low.startswith("hpf auto-fit"):
-        phase = "hpf auto-fit"
-    elif low.startswith("finalize"):
-        phase = "finalize"
-    elif low.startswith("target curve mode="):
-        phase = "target curve mode"
-    elif low.startswith("target preselect winner"):
-        phase = "target preselect winner"
-    elif low.startswith("adaptive target"):
-        phase = "adaptive target"
-    elif low.startswith("init"):
-        phase = "init"
-    else:
-        try:
-            phase = re.sub(r"\s*\(.*\)\s*$", "", after).strip()
-        except Exception:
-            phase = after
-        if not phase:
-            phase = "running"
-    return f"{prefix} {phase}".strip()
+        return "Selecting · target"
+    if low.startswith("target preselect winner"):
+        return "Selecting · target"
+    if low.startswith("target preselect cache seed") or low.startswith("target preselect seed loaded"):
+        return "Loading · target"
+    if low.startswith("target preselect"):
+        return "Selecting · target"
+    if low.startswith("target search"):
+        return "Selecting · target"
+    if low.startswith("selecting target curve"):
+        return "Selecting · target"
+    if low.startswith("target trials"):
+        return "Searching · target"
+    if low.startswith("target finalize"):
+        return "Selecting · target"
+    if low.startswith("target curve mode"):
+        return "Selecting · target"
+    if low.startswith("target loaded directly from cache") or low.startswith("target cache hit"):
+        return "Loaded from cache"
+
+    # Phase 1 search
+    if low.startswith("phase1 done") or low.startswith("phase 1 done"):
+        return "Searching · done"
+
+    # Phase 2 local refine
+    if low.startswith("local refine summary"):
+        return "Refining · done"
+    if low.startswith("local refine fallback"):
+        return "Refining"
+    if low.startswith("local refine"):
+        return "Refining"
+    if low.startswith("phase2 summary"):
+        return "Refining · done"
+
+    # Phase 3 micro refine
+    if low.startswith("micro refine summary"):
+        return "Micro-refining · done"
+    if low.startswith("micro refine fallback"):
+        return "Micro-refining"
+    if low.startswith("micro refine"):
+        return "Micro-refining"
+
+    # Cache
+    if low.startswith("cache refine best improved"):
+        return "Refining · cache ↑"
+    if low.startswith("cache refine round summary") or low.startswith("cache refine summary"):
+        return "Refining · cache done"
+    if low.startswith("cache refine init"):
+        return "Refining · cache"
+    if low.startswith("cache refine"):
+        return "Refining · cache"
+    if low.startswith("preset loaded from cache"):
+        return "Loaded from cache"
+
+    # Winner polish (old format "improved" messages)
+    if low.startswith("tdc_strength winner polish"):
+        return "Polishing · decay ↑"
+    if low.startswith("mag_c_min winner polish"):
+        return "Polishing · extension ↑"
+    if low.startswith("low_bass_cut winner polish"):
+        return "Polishing · bass ↑"
+    if low.startswith("phase_limit winner polish"):
+        return "Polishing · phase ↑"
+    if low.startswith("hpf winner polish"):
+        return "Polishing · HPF ↑"
+    if low.startswith("excess_phase_strength winner polish"):
+        return "Polishing · phase ↑"
+    if low.startswith("residual-peak polish") or low.startswith("residual_peak winner polish"):
+        return "Polishing · peaks ↑"
+    if low.startswith("residual tie-break"):
+        return "Polishing · peaks"
+    if low.startswith("residual_peak safety override"):
+        return "Safety check"
+
+    # Finalize
+    if low.startswith("phase 4 finalize") or low.startswith("finalize"):
+        return "Finalizing"
+
+    # Other search phases
+    if low.startswith("preset search"):
+        return "Searching · preset"
+    if low.startswith("phase search"):
+        return "Searching · phase"
+    if low.startswith("protection model"):
+        return "Safety check"
+    if low.startswith("hpf auto-fit"):
+        return "Fitting · HPF"
+    if low.startswith("stereo lf policy"):
+        return "Refining · stereo"
+    if low.startswith("init"):
+        return "Initializing"
+
+    # Generic fallback
+    try:
+        clean = re.sub(r"\s*\(.*\)\s*$", "", after).strip()
+    except Exception:
+        clean = after
+    return f"Auto · {clean}" if clean else "Auto · running"
+
+
+def _polish_param_label(param: str) -> str:
+    """Map internal parameter name to a readable polish label."""
+    p = str(param or "").lower()
+    if p.startswith("tdc"):
+        return "decay"
+    if p.startswith("mag_c"):
+        return "extension"
+    if p.startswith("low_bass"):
+        return "bass"
+    if p.startswith("phase_limit"):
+        return "phase"
+    if p.startswith("hpf"):
+        return "HPF"
+    if p.startswith("excess_phase"):
+        return "phase"
+    if p.startswith("residual"):
+        return "peaks"
+    return p
 
 
 def _humanize_auto_status_detail(msg: str) -> str:
@@ -226,7 +352,7 @@ def _humanize_auto_status_detail(msg: str) -> str:
                 after, re.IGNORECASE,
             )
             if m:
-                return _f("auto_detail_target_finalize", winner=m.group(1), rank=_r(m.group(2)), fit=_r(m.group(4)))
+                return _f("auto_detail_target_finalize", winner=m.group(1), fit=_r(m.group(4)))
 
         if low.startswith("preset loaded from cache"):
             target_m = re.search(r"target (\S+?),", after, re.IGNORECASE)
@@ -416,11 +542,11 @@ def _status_compact_with_detail(msg) -> tuple[str, str | None]:
     if elapsed:
         out = f"{compact_core} {elapsed}"
     detail = None
-    if (
-        isinstance(core, str)
-        and core.startswith("DecayCore automatic mode:")
-        and str(core).strip() != str(compact_core).strip()
-    ):
+    _is_auto_mode_text = isinstance(core, str) and (
+        core.startswith("DecayCore automatic mode:")
+        or bool(re.match(r"^DecayCore automatic mode \[", core))
+    )
+    if _is_auto_mode_text and str(core).strip() != str(compact_core).strip():
         detail = str(core).strip()
     return out, detail
 
@@ -507,9 +633,6 @@ def update_status(msg) -> None:
         if detail_txt != str(_AUTO_STATUS_LAST_DETAIL or ""):
             _AUTO_STATUS_LAST_DETAIL = detail_txt
             _AUTO_STATUS_DETAILS = list(_AUTO_STATUS_DETAILS or []) + [detail_txt]
-            max_n = int(max(10, _AUTO_STATUS_DETAIL_MAX))
-            if len(_AUTO_STATUS_DETAILS) > max_n:
-                _AUTO_STATUS_DETAILS = list(_AUTO_STATUS_DETAILS[-max_n:])
     _notify_renderer("status")
 
 

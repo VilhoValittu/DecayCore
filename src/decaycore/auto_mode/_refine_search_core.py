@@ -33,9 +33,11 @@ from .scoring_ranking import (
     _auto_goal_uses_local_refine,
     _auto_rank_key,
     _auto_rank_value,
+    _auto_ripple_metric_for_gate,
     _auto_select_best_scored,
+    filter_hard_failed_candidates,
 )
-from .shared import AUTO_MODE_ADAPTIVE_SHRINK_MIN, _auto_safe_float
+from .shared import AUTO_MODE_ADAPTIVE_SHRINK_MIN, AUTO_MODE_OPTUNA_CONSTRAINTS_MAX_MODE_RIPPLE_DB, _auto_safe_float
 from ._refine_types import _SearchPhase1State, _SearchPhase2State
 
 logger = logging.getLogger("DecayCore")
@@ -118,12 +120,35 @@ def _run_search_refine_phase1_core(
             seed=int(seed),
         )
     )
+    # Clear target-search seed baseline so phase 1 evaluates the seed preset in its own
+    # scoring context. The target-search score (from a different evaluation context) is
+    # unreachable by phase 1 trials, causing no-improve plateau after every startup trial.
+    # refine_eval_01.py:377 handles best_metrics=None: first trial always wins and sets
+    # the baseline. _maybe_revalidate_seed_winner becomes a no-op (gap≈0), which is correct.
+    ctx.search_state.best_metrics = None
+    ctx.search_state.best_preset = None
+    phase1_plateau_min_trials = 0
+    if bool(use_optuna_trials):
+        startup_floor = int(max(1, getattr(cfg, "optuna_startup_phase1", 32)))
+        seed_floor = int(len(phase1_seed_presets or []) + startup_floor)
+        exploration_floor = int(np.ceil(float(max(1, n_trials_eff)) * 0.50))
+        phase1_plateau_min_trials = int(
+            min(
+                int(max(1, n_trials_eff)),
+                max(
+                    int(cfg.phase1_plateau_rounds),
+                    int(seed_floor),
+                    int(exploration_floor),
+                ),
+            )
+        )
     phase1_stats = run_candidate_phase(
         ctx,
         candidates,
         phase_label="phase 1/2",
         phase_kind="phase1",
         plateau_after_no_improve=int(cfg.phase1_plateau_rounds),
+        plateau_min_trials=int(phase1_plateau_min_trials),
         use_refine_tiebreak=False,
         n_total_override=int(n_trials_eff),
         seed_presets=list(phase1_seed_presets or []),
@@ -144,10 +169,41 @@ def _run_search_refine_phase1_core(
         for it in list(ctx.search_state.scored)
         if str(dict(it.get("metrics", {}) or {}).get("phase", "")) == "phase 1/2"
     ]
+    finite_phase1_entries = [
+        dict(it)
+        for it in list(phase1_entries or [])
+        if np.isfinite(_auto_rank_value(dict(it.get("metrics", {}) or {}), default=float("nan")))
+    ]
+    phase1_safe_entries, phase1_hard_gate_diag = filter_hard_failed_candidates(
+        finite_phase1_entries or phase1_entries,
+        goal=ctx.goal,
+    )
+    if phase1_safe_entries:
+        phase1_anchor_pool = list(phase1_safe_entries)
+    else:
+        phase1_anchor_pool = list(finite_phase1_entries or phase1_entries)
+        if phase1_anchor_pool:
+            logger.warning(
+                "Automatic mode Phase1 top anchor fallback: no non-hard-gated candidates "
+                "(pool=%d, diagnostics=%d); using ranked fallback pool.",
+                int(len(finite_phase1_entries or phase1_entries)),
+                int(len(phase1_hard_gate_diag or [])),
+            )
     phase1_top = sorted(
-        phase1_entries,
+        phase1_anchor_pool,
         key=lambda x: _auto_rank_key(x.get("metrics", {})),
     )[: int(max(1, cfg.local_refine_top_k))]
+    if bool(phase1_stats.get("plateau_hit", False)):
+        logger.info(
+            "Automatic mode Phase1 plateau detail: tried=%d ok=%d no_improve_streak=%d "
+            "plateau_min_trials=%d safe_top_candidates=%d top_k=%d",
+            int(phase1_stats.get("tried", 0) or 0),
+            int(phase1_stats.get("ok", 0) or 0),
+            int(cfg.phase1_plateau_rounds),
+            int(phase1_plateau_min_trials),
+            int(len(phase1_safe_entries or [])),
+            int(max(1, cfg.local_refine_top_k)),
+        )
     if phase1_top:
         phase1_top_best = dict(_auto_select_best_scored(phase1_top, goal=ctx.goal) or phase1_top[0])
         p1m = dict(phase1_top_best.get("metrics", {}) or {})
@@ -178,6 +234,42 @@ def _run_search_refine_phase1_core(
             str(p1_detail),
             str(p1_status_suffix),
         )
+        for top_idx, top_item in enumerate(list(phase1_top or []), start=1):
+            top_m = dict(top_item.get("metrics", {}) or {})
+            top_p = dict(top_item.get("preset", {}) or {})
+            top_rank = _auto_safe_float(official_rank_score(top_m), float("nan"))
+            top_avg = _auto_safe_float(top_m.get("avg_score"), float("nan"))
+            top_mode = _auto_safe_float(top_m.get("mode_ripple_db"), float("nan"))
+            top_boost = _auto_safe_float(top_m.get("max_net_boost_db"), float("nan"))
+            top_residual = _auto_safe_float(top_m.get("worst_residual_peak_db"), float("nan"))
+            top_gate = _auto_safe_float(top_m.get("residual_peak_hard_gate_db"), float("nan"))
+            top_phase = _auto_safe_float(top_p.get("phase_limit"), float("nan"))
+            top_tdc = _auto_safe_float(top_p.get("tdc_strength"), float("nan"))
+            top_tdc_red = _auto_safe_float(top_p.get("tdc_max_reduction_db"), float("nan"))
+            top_mag_min = _auto_safe_float(top_p.get("mag_c_min"), float("nan"))
+            top_mag_max = _auto_safe_float(top_p.get("mag_c_max"), float("nan"))
+            top_low = _auto_safe_float(top_p.get("low_bass_cut_hz"), float("nan"))
+            hard_reasons = list(top_m.get("hard_gate_failures", top_m.get("hard_gate_reasons", [])) or [])
+            hard_txt = ",".join(str(x) for x in hard_reasons) if hard_reasons else "none"
+            logger.info(
+                "Automatic mode Phase1 top #%d: rank=%s avg=%s mode=%s boost=%s "
+                "residual=%s gate=%s phase_limit=%s tdc=%s tdc_reduction=%s "
+                "mag_c_min=%s mag_c_max=%s low_bass_cut=%s hard_gate=%s",
+                int(top_idx),
+                "n/a" if not np.isfinite(top_rank) else f"{top_rank:.3f}",
+                "n/a" if not np.isfinite(top_avg) else f"{top_avg:.3f}",
+                "n/a" if not np.isfinite(top_mode) else f"{top_mode:.3f}",
+                "n/a" if not np.isfinite(top_boost) else f"{top_boost:.2f}",
+                "n/a" if not np.isfinite(top_residual) else f"{top_residual:.2f}",
+                "n/a" if not np.isfinite(top_gate) else f"{top_gate:.2f}",
+                "n/a" if not np.isfinite(top_phase) else f"{top_phase:.1f}",
+                "n/a" if not np.isfinite(top_tdc) else f"{top_tdc:.1f}",
+                "n/a" if not np.isfinite(top_tdc_red) else f"{top_tdc_red:.1f}",
+                "n/a" if not np.isfinite(top_mag_min) else f"{top_mag_min:.1f}",
+                "n/a" if not np.isfinite(top_mag_max) else f"{top_mag_max:.1f}",
+                "n/a" if not np.isfinite(top_low) else f"{top_low:.1f}",
+                str(hard_txt),
+            )
         if callable(status_cb):
             status_cb(
                 "DecayCore automatic mode: Phase1 done "
@@ -239,6 +331,40 @@ def _maybe_revalidate_seed_winner(
             float(seed_rank - phase1_rank),
             float(revalidate_threshold),
         )
+
+
+def _build_refine_optuna_base_data(
+    search_base_data: dict,
+    search_state,
+) -> dict | None:
+    """Return base_data with dynamic ripple constraint when winner ripple exceeds fixed threshold.
+
+    The fixed threshold (0.20 dB) is impossible in rooms where the best achievable post-correction
+    ripple is higher, causing 100% infeasibility in refine phases and constant fallback. When the
+    winner's ripple exceeds the threshold, use winner_ripple * 1.10 so Optuna can distinguish
+    candidates that improve vs. worsen the current best.
+    """
+    best = dict((search_state.best_metrics if search_state is not None else None) or {})
+    if not best:
+        return None
+    winner_ripple = _auto_safe_float(best.get("mode_ripple_db", float("nan")), float("nan"))
+    gate_ripple = _auto_safe_float(_auto_ripple_metric_for_gate(best), float("nan"))
+    fixed_threshold = float(AUTO_MODE_OPTUNA_CONSTRAINTS_MAX_MODE_RIPPLE_DB)
+    if not np.isfinite(gate_ripple) or gate_ripple <= fixed_threshold:
+        return None
+    dynamic_threshold = float(max(fixed_threshold, gate_ripple * 1.10))
+    override = dict(search_base_data)
+    override["auto_mode_optuna_constraints_max_mode_ripple_db"] = float(dynamic_threshold)
+    override["_auto_mode_refine_constraint_gate_metric_db"] = float(gate_ripple)
+    logger.info(
+        "Automatic mode refine: dynamic ripple constraint %.3f dB "
+        "(gate %.3f dB, mode %.3f dB, fixed %.3f dB)",
+        float(dynamic_threshold),
+        float(gate_ripple),
+        float(winner_ripple),
+        float(fixed_threshold),
+    )
+    return override
 
 
 def _run_search_refine_phase2_local_core(
@@ -315,6 +441,17 @@ def _run_search_refine_phase2_local_core(
                 shrink=float(local_shrink),
             )
         before = dict(search_state.best_metrics or {})
+        local_optuna_base_data = _build_refine_optuna_base_data(search_base_data, search_state)
+        local_total = int(cfg.local_refine_trials_per_top)
+        if bool(use_optuna_trials):
+            local_total = int(
+                max(
+                    int(local_total),
+                    int(len(local_seed_presets or []))
+                    + int(max(1, getattr(cfg, "optuna_startup_local", 4)))
+                    + 3,
+                )
+            )
         stats = run_candidate_phase(
             phase1.ctx,
             local_candidates,
@@ -324,7 +461,7 @@ def _run_search_refine_phase2_local_core(
             use_refine_tiebreak=True,
             focus_lo_hz=float(phase2.phase2_focus_lo) if np.isfinite(phase2.phase2_focus_lo) else None,
             focus_hi_hz=float(phase2.phase2_focus_hi) if np.isfinite(phase2.phase2_focus_hi) else None,
-            n_total_override=int(cfg.local_refine_trials_per_top),
+            n_total_override=int(local_total),
             seed_presets=list(local_seed_presets or []),
             optuna_builder=(
                 (
@@ -365,6 +502,7 @@ def _run_search_refine_phase2_local_core(
                     "target": str(winner_target_name or ""),
                 },
             ),
+            optuna_base_data_override=local_optuna_base_data,
         )
         phase2.phase2_ok += int(stats.get("ok", 0) or 0)
         phase2.phase2_tried += int(stats.get("tried", 0) or 0)
@@ -409,7 +547,9 @@ def _run_search_refine_phase2_local_core(
                     "DecayCore automatic mode: Local refine fallback "
                     f"center #{int(ci)}, {local_fallback_txt}"
                 )
-        if bool(stats.get("improved_any", False)):
+        center_improved = bool(stats.get("improved_any", False))
+        phase2.phase2_improved_any |= center_improved
+        if center_improved:
             logger.info(
                 "Automatic mode Local refine winner improved: avg_score %.3f -> %.3f, rank_score %.3f -> %.3f",
                 _auto_safe_float(before.get("avg_score"), 0.0),
@@ -417,6 +557,12 @@ def _run_search_refine_phase2_local_core(
                 _auto_safe_float(before.get("rank_score"), 0.0),
                 _auto_safe_float((search_state.best_metrics or {}).get("rank_score"), 0.0),
             )
+        elif ci == 1 and len(phase1.phase1_top) > 1:
+            logger.info(
+                "Automatic mode: skipping remaining %d local refine center(s) — center #1 made no improvement",
+                int(len(phase1.phase1_top)) - 1,
+            )
+            break
     return phase2
 
 
@@ -465,6 +611,9 @@ def _run_search_refine_micro_core(
         and bool(search_state.best_preset)
     ):
         return phase2
+    if not phase2.phase2_improved_any:
+        logger.info("Automatic mode: skipping micro refine — phase 2 made no improvement over phase 1")
+        return phase2
     micro_shrink = float(
         _auto_adaptive_shrink_factor(
             phase1.phase1_top,
@@ -498,6 +647,7 @@ def _run_search_refine_micro_core(
             f"DecayCore automatic mode: micro refine {int(cfg.phase3_micro_trials)} trials around current best"
         )
     before_micro = dict(search_state.best_metrics or {})
+    micro_optuna_base_data = _build_refine_optuna_base_data(search_base_data, search_state)
     micro_stats = run_candidate_phase(
         phase1.ctx,
         micro_candidates,
@@ -548,6 +698,7 @@ def _run_search_refine_micro_core(
                 "target": str(winner_target_name or ""),
             },
         ),
+        optuna_base_data_override=micro_optuna_base_data,
     )
     phase2.phase2_ok += int(micro_stats.get("ok", 0) or 0)
     phase2.phase2_tried += int(micro_stats.get("tried", 0) or 0)
@@ -588,5 +739,3 @@ def _run_search_refine_micro_core(
                 f"{micro_fallback_txt}"
             )
     return phase2
-
-

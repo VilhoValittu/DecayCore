@@ -96,6 +96,13 @@ body { background: var(--cf-bg) !important; color: var(--cf-text) !important; }
 .cf-status-text    { color: var(--cf-muted); font-size: 0.85rem; }
 .cf-auto-bar       { background: rgba(40,120,60,0.22); border-left: 3px solid #3a9a5c;
                      padding: 6px 12px; border-radius: var(--cf-radius-sm); font-size: 0.85rem; }
+.cf-auto-details-scroll {
+    width: 100%;
+    max-height: min(40vh, 24rem);
+    overflow-y: auto;
+    overflow-x: auto;
+    padding: 8px 10px 8px 8px;
+}
 
 /* Dialogs */
 .q-dialog__backdrop {

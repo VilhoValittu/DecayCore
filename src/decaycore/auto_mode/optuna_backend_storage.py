@@ -115,6 +115,13 @@ def _auto_import_optuna():
         # Optional dependency: fall back to builtin search if Optuna is absent or unusable.
         logger.debug("Optuna not available; automatic mode will use builtin backend", exc_info=True)
         return None
+    optuna.logging.set_verbosity(optuna.logging.ERROR)
+    try:
+        import warnings as _warnings
+        from optuna.exceptions import ExperimentalWarning as _EW
+        _warnings.filterwarnings("ignore", category=_EW)
+    except Exception:
+        pass
     return optuna
 
 def _auto_optuna_module_ready(optuna_mod) -> bool:
@@ -323,8 +330,8 @@ def _auto_optuna_create_study(
                 study_name=str(study_name),
                 load_if_exists=True,
             )
-        except TypeError:
-            pass
+        except TypeError as exc:
+            logger.debug("Optuna create_study kwarg mismatch (API version?), retrying without storage: %s", exc)
         except Exception as exc:
             logger.warning(
                 "Automatic mode Optuna storage unavailable for study %s (%s: %s). "

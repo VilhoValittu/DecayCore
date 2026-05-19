@@ -163,11 +163,11 @@ def validate_final_fir_against_ir(
     warn_gd = cr.float("final_ir_validation_warn_gd_peak_ms", 45.0)
     reject_gd = cr.float("final_ir_validation_reject_gd_peak_ms", 80.0)
     warn_voice = cr.float("final_ir_validation_warn_voice_peak_db", 3.0)
-    reject_voice = cr.float("final_ir_validation_reject_voice_peak_db", 5.0)
+    reject_voice = cr.float("final_ir_validation_reject_voice_peak_db", 8.0)
     warn_stereo = cr.float("final_ir_validation_warn_stereo_delta_db", 3.0)
     reject_stereo = cr.float("final_ir_validation_reject_stereo_delta_db", 5.0)
     warn_bass = cr.float("final_ir_validation_warn_bass_residual_peak_db", 4.0)
-    reject_bass = cr.float("final_ir_validation_reject_bass_residual_peak_db", 7.0)
+    reject_bass = cr.float("final_ir_validation_reject_bass_residual_peak_db", 10.0)
     pre_window_ms = cr.float("final_ir_validation_pre_window_ms", 25.0)
     post_window_ms = cr.float("final_ir_validation_post_window_ms", 250.0)
     early_window_ms = cr.float("final_ir_validation_early_window_ms", 20.0)
@@ -175,6 +175,8 @@ def validate_final_fir_against_ir(
     mag_hi = cr.float("final_ir_validation_mag_hi_hz", 300.0)
     voice_lo = cr.float("final_ir_validation_voice_lo_hz", 70.0)
     voice_hi = cr.float("final_ir_validation_voice_hi_hz", 180.0)
+    stereo_lo = cr.float("final_ir_validation_stereo_lo_hz", 80.0)
+    stereo_hi = cr.float("final_ir_validation_stereo_hi_hz", 250.0)
 
     # Determine analysis IRs
     if measured_ir_l is not None:
@@ -259,14 +261,22 @@ def validate_final_fir_against_ir(
             authority_null_risk=null_arr,
         )
 
-        # Stereo magnitude metrics
+        # Stereo magnitude metrics — compare corrected responses, not raw filter gains.
+        # Filter gains differ because rooms differ; the corrected output balance matters.
         if has_stereo:
             pred_r = _safe_arr(predicted_mag_db_r, n_ref=freq_arr.size)
             if pred_r is not None:
                 mag_db_r = pred_r
             else:
                 mag_db_r = _fir_to_mag_db(fir_r_arr, fs, freq_arr)
-            stereo = _stereo_metrics(mag_db_l, mag_db_r, freq_arr, lo_hz=mag_lo, hi_hz=mag_hi)
+            meas_r = _safe_arr(measured_mag_db_r, n_ref=freq_arr.size)
+            if meas_l is not None and meas_r is not None:
+                stereo_l = meas_l + mag_db_l
+                stereo_r = meas_r + mag_db_r
+            else:
+                stereo_l = mag_db_l
+                stereo_r = mag_db_r
+            stereo = _stereo_metrics(stereo_l, stereo_r, freq_arr, lo_hz=stereo_lo, hi_hz=stereo_hi)
         else:
             stereo = {"stereo_delta_rms_db": 0.0, "stereo_delta_peak_db": 0.0}
     else:

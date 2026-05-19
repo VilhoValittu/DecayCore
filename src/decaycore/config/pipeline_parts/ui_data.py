@@ -105,6 +105,7 @@ def collect_ui_data(pin) -> Dict[str, Any]:
         "mag_c_min", "mag_c_max", "max_boost", "max_cut_db", "max_slope_db_per_oct",
         "max_slope_boost_db_per_oct", "max_slope_cut_db_per_oct", "phase_limit", "mag_correct",
         "excess_phase_strength", "low_freq_full_correction_hz", "high_freq_no_correction_hz",
+        "mixed_phase_budget_lf_deg", "mixed_phase_budget_hf_deg",
         "enable_ir_pre_energy_guard", "pre_energy_ratio_max", "pre_energy_guard_strength",
         "max_pre_ringing_db", "max_excess_delay_ms", "gd_grad_limit_ms_per_oct",
         "ir_anchor_mode", "min_causal_ms", "auto_asym_left_ratio", "auto_asym_left_max_ms",

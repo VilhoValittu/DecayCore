@@ -207,6 +207,7 @@ def _run_p6_final_validation(
                 )
 
         vr_stats = final_ir_validation_to_stats(winner_vr)
+        vr_stats["final_ir_validation_mode"] = str(mode)
         if isinstance(search_state.best_metrics, dict):
             search_state.best_metrics.update(vr_stats)
             if winner_vr.score_penalty > 0.0:

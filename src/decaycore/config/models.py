@@ -433,7 +433,7 @@ class FilterConfig:
     mixed_transition_mode: str = "width_based"
     mixed_confidence_blend_enable: bool = False
     mixed_confidence_power: float = 1.5
-    mixed_phase_budget_lf_deg: float = 60.0
+    mixed_phase_budget_lf_deg: float = 40.0
     mixed_phase_budget_hf_deg: float = 22.5
     mixed_min_tilt_comp_enable: bool = True
     excess_phase_strength: float = 0.9

@@ -30,6 +30,7 @@ from .shared import (
     AUTO_MODE_PHASE_LIMIT_MIN_HZ,
     _auto_safe_float,
 )
+from .candidate_base import _TDC_MAX_REDUCTION_MAX_DB, _auto_phase1_max_boost_hi
 from .optuna_backend_storage import (
     _OPTUNA_CROSS_STUDY_BEST_PARAMS,
     _auto_optuna_create_storage,
@@ -305,9 +306,9 @@ def _auto_optuna_trial_distributions(optuna_mod, *, params: dict | None, base_da
     float_ranges = {
         "fdw_cycles": (5.0, 16.0, 0.01),
         "tdc_strength": (5.0, 75.0, 0.1),
-        "tdc_max_reduction_db": (0.0, 18.0, 0.1),
+        "tdc_max_reduction_db": (0.0, float(_TDC_MAX_REDUCTION_MAX_DB), 0.1),
         "reg_strength": (15.0, 45.0, 0.1),
-        "max_boost": (0.1, 12.0, 0.01),
+        "max_boost": (0.1, float(_auto_phase1_max_boost_hi(base_data)), 0.01),
         "mag_c_min": (float(AUTO_MODE_MAG_C_MIN_MIN_HZ), float(AUTO_MODE_MAG_C_MIN_MAX_HZ), 0.1),
         "mag_c_max": (float(AUTO_MODE_MAG_C_MAX_MIN_HZ), 400.0, 0.1),
         "trans_width": (70.0, 150.0, 0.1),

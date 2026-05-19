@@ -189,7 +189,8 @@ def build_global_progress_bar() -> None:
         auto_bar.visible = False
         with ui.expansion(t("run_auto_details_title")).classes("w-full text-xs") as auto_details_exp:
             auto_details_exp.visible = False
-            auto_details_label = ui.label("").classes("whitespace-pre text-xs")
+            with ui.element("div").classes("cf-auto-details-scroll"):
+                auto_details_label = ui.label("").classes("whitespace-pre text-xs")
 
     def _refresh_status() -> None:
         snap = ui_state.get_status_snapshot()

@@ -171,10 +171,7 @@ def update_stereo_auto_policy_ui() -> None:
 
 def update_mixed_freq_ui(*, t: Callable) -> None:
     """Show mixed split only for BASIC/ADVANCED when mixed-phase is selected."""
-    try:
-        mode_u = str(ctrl.value("mode", "BASIC") or "BASIC").strip().upper()
-    except Exception:
-        mode_u = "BASIC"
+    mode_u = str(ctrl.value("mode", "BASIC") or "BASIC").strip().upper()
     ftype = str(ctrl.value("filter_type", "") or "").strip().lower()
     is_mixed = "mixed" in ftype
     show = mode_u in ("BASIC", "ADVANCED") and is_mixed
@@ -237,14 +234,12 @@ def update_engine_metrics_ui(*, t: Callable) -> None:
 
 def update_taps_auto_info(*, t: Callable) -> None:
     """Render multi-rate taps info into both NiceGUI scope containers."""
-    try:
-        multi_rate = bool(ctrl.value("multi_rate_opt", False))
-    except Exception:
-        multi_rate = False
+    multi_rate = bool(ctrl.value("multi_rate_opt", False))
 
     try:
         base_taps = int(float(ctrl.value("taps", 65536) or 65536))
     except Exception:
+        logger.debug("taps value parse failed, using default", exc_info=True)
         base_taps = 65536
 
     markdown = _build_taps_auto_info_markdown(

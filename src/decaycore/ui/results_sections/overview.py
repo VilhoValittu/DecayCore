@@ -526,8 +526,12 @@ def _build_p6_validation_block(best_metrics: dict) -> str | None:
     penalty = safe_float(best_metrics.get("final_ir_validation_score_penalty", float("nan")), float("nan"))
     reasons = list(best_metrics.get("final_ir_validation_reasons", []) or [])
 
+    p6_mode = str(best_metrics.get("final_ir_validation_mode", "warn") or "warn").strip().lower()
     icon = "✓" if severity == "ok" else ("✗" if severity == "reject" else "⚠")
-    lines = [f"{icon} P6: {severity}"]
+    severity_label = severity
+    if severity == "reject" and p6_mode != "reject":
+        severity_label = f"{severity} (warn mode — result used)"
+    lines = [f"{icon} P6: {severity_label}"]
     if math.isfinite(pre):
         lines.append(f"- Pre-ringing: {pre:.1f} dB")
     if math.isfinite(gd):

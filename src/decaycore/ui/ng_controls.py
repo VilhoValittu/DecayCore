@@ -61,6 +61,7 @@ def value(name: str, default: Any = None) -> Any:
         v = el.value
         return v if v is not None else default
     except Exception:
+        logger.debug("value(%r) read failed", name, exc_info=True)
         return default
 
 

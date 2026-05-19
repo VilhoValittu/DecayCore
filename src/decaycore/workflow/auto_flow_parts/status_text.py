@@ -123,17 +123,16 @@ def _build_auto_selected_text(run_data: dict) -> str:
 
     best_metrics = attach_official_rank_score(run_data.get("best_metrics", {}))
     rank_score = official_rank_score(best_metrics)
-    rank_txt = f", winner rank {rank_score:.3f}/100" if np.isfinite(rank_score) else ""
+    rank_txt = f" · Score {rank_score:.3f}" if np.isfinite(rank_score) else ""
 
     detail_txt = ""
     if ft_short in ("Linear", "Asymmetric"):
-        detail_txt = f", phase limit {phase_txt}"
+        detail_txt = f" · phase limit {phase_txt}"
     elif ft_short == "Mixed":
-        detail_txt = f", mixed freq {mixed_txt}"
+        detail_txt = f" · mixed freq {mixed_txt}"
 
     return (
-        "Chosen (Automatic mode): "
-        f"target {target_name}, {hpf_label} {hpf_txt}, -6 dB {f6_txt}{detail_txt}{rank_txt}"
+        f"Selected · {target_name} · {hpf_label} {hpf_txt} · -6 dB {f6_txt}{detail_txt}{rank_txt}"
     )
 
 def _resolve_auto_hpf_seed_source(

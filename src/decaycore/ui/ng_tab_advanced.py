@@ -104,6 +104,24 @@ def build_advanced_tab(*, t: Callable, get_val: Callable, max_safe_boost: float)
 
                 with ui.row().classes("w-full gap-4"):
                     ctrl.register(
+                        "mixed_phase_budget_lf_deg",
+                        ui.number(
+                            label=t("mixed_phase_budget_lf_deg"),
+                            value=float(get_val("mixed_phase_budget_lf_deg", 40.0) or 40.0),
+                            format="%.1f",
+                        ).props("dense outlined").classes("flex-1"),
+                    )
+                    ctrl.register(
+                        "mixed_phase_budget_hf_deg",
+                        ui.number(
+                            label=t("mixed_phase_budget_hf_deg"),
+                            value=float(get_val("mixed_phase_budget_hf_deg", 22.5) or 22.5),
+                            format="%.1f",
+                        ).props("dense outlined").classes("flex-1"),
+                    )
+
+                with ui.row().classes("w-full gap-4"):
+                    ctrl.register(
                         "trans_width",
                         ui.number(
                             label=t("trans_width_label"),
