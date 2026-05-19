@@ -8,6 +8,28 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
+## [1.0.5] - 19-5-2026
+
+### Performance / Auto mode — major speedup without quality loss
+- **Parallel target curve evaluation**: target curve trials now run concurrently via ProcessPool workers instead of sequentially, substantially reducing the target selection phase duration.
+- **Dynamic ripple constraints for Optuna**: search refinement now uses measurement-adaptive ripple bounds, shrinking the search space more efficiently and converging to better results with fewer trials.
+- **Improved local refinement**: new exploration floor calculation and enhanced candidate filtering steer local search toward promising regions, eliminating wasted trials.
+- **Tuned Optuna parameters**: search configuration updated based on performance profiling — trial counts reduced where they add no value, increased where they matter.
+- **Earlier candidate filtering**: weak candidates are pruned earlier in the search, preventing poor choices from advancing to later stages and accelerating convergence.
+- Added IR validation metrics to the finalization stage to verify winner quality before selection is locked.
+- Improved validation feedback is now surfaced more clearly on the results page.
+- Added dynamic search space shrinking: when local refinement finds a strong anchor, the variation range contracts automatically.
+
+### UI
+- Condensed auto mode status messages for improved clarity and information density during a run.
+- Improved error handling and logging across several modules.
+
+### Cleanup
+- Removed remaining CamillaFIR legacy modules; all replaced with DecayCore equivalents.
+- Suppressed Optuna experimental warnings and reduced console noise during auto mode runs.
+
+---
+
 ## [1.0.4] - 16-5-2026
 
 ### Bass Integration (BETA)

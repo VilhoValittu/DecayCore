@@ -125,7 +125,7 @@ from . import optuna_telemetry as _optuna_telemetry
 
 logger = logging.getLogger("DecayCore")
 MAX_SAFE_BOOST = 12.0
-AUTO_MODE_TRIALS = 100
+AUTO_MODE_TRIALS = 10
 AUTO_MODE_REFINE_TRIALS = 50
 AUTO_MODE_GOAL_DEFAULT = "balanced"
 AUTO_MODE_GOAL_ROOM_SAFE = "room-safe"

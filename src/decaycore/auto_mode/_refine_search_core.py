@@ -129,9 +129,9 @@ def _run_search_refine_phase1_core(
     ctx.search_state.best_preset = None
     phase1_plateau_min_trials = 0
     if bool(use_optuna_trials):
-        startup_floor = int(max(1, getattr(cfg, "optuna_startup_phase1", 32)))
+        startup_floor = int(max(1, getattr(cfg, "optuna_startup_phase1", 6)))
         seed_floor = int(len(phase1_seed_presets or []) + startup_floor)
-        exploration_floor = int(np.ceil(float(max(1, n_trials_eff)) * 0.10))
+        exploration_floor = int(np.ceil(float(max(1, n_trials_eff)) * 0.50))
         phase1_plateau_min_trials = int(
             min(
                 int(max(1, n_trials_eff)),

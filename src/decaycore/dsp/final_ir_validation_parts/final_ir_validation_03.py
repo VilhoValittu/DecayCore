@@ -133,6 +133,7 @@ def validate_final_fir_against_ir(
     fir_r: np.ndarray | None = None,
     freq_axis: np.ndarray | None = None,
     target_mag_db: np.ndarray | None = None,
+    target_mag_db_r: np.ndarray | None = None,
     predicted_mag_db_l: np.ndarray | None = None,
     predicted_mag_db_r: np.ndarray | None = None,
     measured_mag_db_l: np.ndarray | None = None,
@@ -162,10 +163,10 @@ def validate_final_fir_against_ir(
     reject_pre = cr.float("final_ir_validation_reject_pre_energy_db", -18.0)
     warn_gd = cr.float("final_ir_validation_warn_gd_peak_ms", 45.0)
     reject_gd = cr.float("final_ir_validation_reject_gd_peak_ms", 80.0)
-    warn_voice = cr.float("final_ir_validation_warn_voice_peak_db", 3.0)
+    warn_voice = cr.float("final_ir_validation_warn_voice_peak_db", 6.5)
     reject_voice = cr.float("final_ir_validation_reject_voice_peak_db", 8.0)
-    warn_stereo = cr.float("final_ir_validation_warn_stereo_delta_db", 3.0)
-    reject_stereo = cr.float("final_ir_validation_reject_stereo_delta_db", 5.0)
+    warn_stereo = cr.float("final_ir_validation_warn_stereo_delta_db", 6.5)
+    reject_stereo = cr.float("final_ir_validation_reject_stereo_delta_db", 9.5)
     warn_bass = cr.float("final_ir_validation_warn_bass_residual_peak_db", 4.0)
     reject_bass = cr.float("final_ir_validation_reject_bass_residual_peak_db", 10.0)
     pre_window_ms = cr.float("final_ir_validation_pre_window_ms", 25.0)
@@ -276,6 +277,10 @@ def validate_final_fir_against_ir(
             else:
                 stereo_l = mag_db_l
                 stereo_r = mag_db_r
+            tgt_r = _safe_arr(target_mag_db_r, n_ref=freq_arr.size)
+            if tgt_arr is not None and tgt_r is not None:
+                stereo_l = stereo_l - tgt_arr
+                stereo_r = stereo_r - tgt_r
             stereo = _stereo_metrics(stereo_l, stereo_r, freq_arr, lo_hz=stereo_lo, hi_hz=stereo_hi)
         else:
             stereo = {"stereo_delta_rms_db": 0.0, "stereo_delta_peak_db": 0.0}

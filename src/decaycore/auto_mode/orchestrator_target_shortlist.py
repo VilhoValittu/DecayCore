@@ -29,16 +29,21 @@ import numpy as np
 
 from .rank_score import official_rank_score
 from .scoring_ranking import (
+    _auto_goal_uses_local_refine,
     _auto_select_best_scored,
     _tc_score,
 )
 from .shared import (
+    AUTO_MODE_LOCAL_REFINE_ENABLED,
+    AUTO_MODE_LOCAL_REFINE_TOP_K,
+    AUTO_MODE_LOCAL_REFINE_TRIALS_PER_TOP,
     AUTO_MODE_TARGET_BEST_RANK_TIE_EPS,
     AUTO_MODE_TARGET_CACHE_AS_WILDCARD,
     AUTO_MODE_TARGET_MILDER_MAX_ASYM_ADD,
     AUTO_MODE_TARGET_MILDER_MAX_DIFFICULTY_ADD,
     AUTO_MODE_TARGET_MILDER_MAX_FIT_RMS_ADD_DB,
     AUTO_MODE_TARGET_PREFER_MILDER_STEP,
+    AUTO_MODE_TARGET_LOCAL_REFINE_ENABLED,
     AUTO_MODE_TARGET_TOP_N,
     AUTO_MODE_TARGET_TOP_N_SPREAD_DB,
     AUTO_MODE_TARGET_TRIALS_PER_CURVE,
@@ -419,7 +424,13 @@ def _evaluate_target_shortlist_core(
     status_cb,
 ) -> list[dict]:
     evaluated = []
-    total_target_trial_load = int(max(1, len(shortlist_state.shortlisted) * max(1, shortlist_state.trials_eff)))
+    _local_refine_load = 0
+    if (bool(AUTO_MODE_LOCAL_REFINE_ENABLED)
+            and bool(AUTO_MODE_TARGET_LOCAL_REFINE_ENABLED)
+            and _auto_goal_uses_local_refine(setup.goal)):
+        _local_refine_load = int(AUTO_MODE_LOCAL_REFINE_TOP_K) * int(AUTO_MODE_LOCAL_REFINE_TRIALS_PER_TOP)
+    _per_curve_load = int(shortlist_state.trials_eff) + int(_local_refine_load)
+    total_target_trial_load = int(max(1, len(shortlist_state.shortlisted) * max(1, _per_curve_load)))
     curve_budget = int(setup.runtime.auto_trial_workers(base_data, total_target_trial_load))
     curve_workers = int(max(1, min(len(shortlist_state.shortlisted), curve_budget)))
     curve_inner_workers = int(max(1, curve_budget // max(1, curve_workers)))

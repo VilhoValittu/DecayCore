@@ -1,4 +1,4 @@
-# Stability and Reproducibility (v1.0.4)
+# Stability and Reproducibility (v1.0.5)
 
 DecayCore is designed to avoid the classic failure mode:
 
@@ -18,7 +18,7 @@ DecayCore produces repeatable outputs.
 
 The pipeline keeps its behavior deterministic for fixed inputs and settings.
 Automatic mode may use seeded Optuna-backed search, but the seed is derived deterministically from the measurement/signature context so identical runs remain reproducible.
-Current releases, including `v1.0.4` (2026-05-16), keep this deterministic model while retaining smarter cache reuse around automatic-mode target and preset search.
+Current releases, including `v1.0.5` (2026-05-16), keep this deterministic model while retaining smarter cache reuse around automatic-mode target and preset search.
 
 ## 2) Input robustness: TXT and WAV/IR
 
@@ -103,7 +103,7 @@ If two runs differ, diagnostics help explain why.
 
 ## Reproducible-run checklist
 
-1. Use the same app version (`v1.0.4` or a pinned newer release).
+1. Use the same app version (`v1.0.5` or a pinned newer release).
 2. Use identical measurement sources and source type (TXT vs WAV) per comparison.
 3. Keep base fs/taps fixed, or enable comparison mode.
 4. Keep correction guardrails fixed (boost/cut/slope/regularization/phase limit).

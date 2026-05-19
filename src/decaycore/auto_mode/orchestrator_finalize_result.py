@@ -117,6 +117,62 @@ def _p6_stat_arr(st: dict, key: str):
         return None
 
 
+def _p6_analysis_mode(st: dict) -> str:
+    return str(st.get("analysis_mode", "native") or "native").strip().lower()
+
+
+def _p6_active_stat_arr(st: dict, key: str):
+    if _p6_analysis_mode(st) == "comparison":
+        cmp_key = {
+            "freq_axis": "cmp_freq_axis",
+            "target_mags": "cmp_target_mags",
+            "measured_mags": "cmp_measured_mags",
+        }.get(key)
+        if cmp_key:
+            arr = _p6_stat_arr(st, cmp_key)
+            if arr is not None:
+                return arr
+    return _p6_stat_arr(st, key)
+
+
+def _p6_filter_mag_arr(st: dict) -> tuple[object | None, str]:
+    """Pick the magnitude curve that represents the final FIR realization for P6."""
+    if _p6_analysis_mode(st) == "comparison":
+        realized = _p6_stat_arr(st, "cmp_realized_filter_mags")
+        if realized is not None:
+            return realized, "cmp_realized_filter_mags"
+
+        filter_source = str(st.get("cmp_filter_mags_source", "") or "").strip().lower()
+        filter_mags = _p6_stat_arr(st, "cmp_filter_mags")
+        if filter_mags is not None and filter_source == "ir_fft_final":
+            return filter_mags, "cmp_filter_mags:ir_fft_final"
+
+        predicted = _p6_stat_arr(st, "cmp_predicted_filter_mags")
+        if predicted is not None:
+            return predicted, "cmp_predicted_filter_mags"
+
+        if filter_mags is not None:
+            return filter_mags, "cmp_filter_mags:legacy"
+
+    realized = _p6_stat_arr(st, "realized_filter_mags")
+    if realized is not None:
+        return realized, "realized_filter_mags"
+
+    filter_source = str(st.get("filter_mags_source", "") or "").strip().lower()
+    filter_mags = _p6_stat_arr(st, "filter_mags")
+    if filter_mags is not None and filter_source == "ir_fft_final":
+        return filter_mags, "filter_mags:ir_fft_final"
+
+    predicted = _p6_stat_arr(st, "predicted_filter_mags")
+    if predicted is not None:
+        return predicted, "predicted_filter_mags"
+
+    if filter_mags is not None:
+        return filter_mags, "filter_mags:legacy"
+
+    return None, "missing"
+
+
 def _run_p6_final_validation(
     search_state,
     cfg,
@@ -144,7 +200,7 @@ def _run_p6_final_validation(
             key=lambda x: _auto_rank_key(dict((x or {}).get("metrics", {}) or {})),
         )
 
-        results: list[tuple[int, object, object]] = []
+        results: list[tuple[int, object, object, object, str, str]] = []
         for i, cand in enumerate(ranked[:n_check]):
             try:
                 if i == 0 and search_state.best_result is not None:
@@ -158,16 +214,19 @@ def _run_p6_final_validation(
                 fir_l, fir_r, st_l, st_r = _p6_extract_fir_and_stats(result_obj)
                 import numpy as _np
                 fs = int(getattr(cfg, "fs", 48000) or 48000)
+                mag_l, mag_source_l = _p6_filter_mag_arr(st_l)
+                mag_r, mag_source_r = _p6_filter_mag_arr(st_r)
                 vr = validate_final_fir_against_ir(
                     sample_rate=fs,
                     fir_l=fir_l,
                     fir_r=fir_r,
-                    freq_axis=_p6_stat_arr(st_l, "freq_axis"),
-                    target_mag_db=_p6_stat_arr(st_l, "target_mags"),
-                    predicted_mag_db_l=_p6_stat_arr(st_l, "predicted_filter_mags"),
-                    predicted_mag_db_r=_p6_stat_arr(st_r, "predicted_filter_mags"),
-                    measured_mag_db_l=_p6_stat_arr(st_l, "measured_mags"),
-                    measured_mag_db_r=_p6_stat_arr(st_r, "measured_mags"),
+                    freq_axis=_p6_active_stat_arr(st_l, "freq_axis"),
+                    target_mag_db=_p6_active_stat_arr(st_l, "target_mags"),
+                    target_mag_db_r=_p6_active_stat_arr(st_r, "target_mags"),
+                    predicted_mag_db_l=mag_l,
+                    predicted_mag_db_r=mag_r,
+                    measured_mag_db_l=_p6_active_stat_arr(st_l, "measured_mags"),
+                    measured_mag_db_r=_p6_active_stat_arr(st_r, "measured_mags"),
                     ir_anchor_mode=str(st_l.get("ir_anchor_mode", "") or ""),
                     authority_voice_risk=_p6_stat_arr(st_l, "authority_voice_risk"),
                     authority_modal_support=_p6_stat_arr(st_l, "authority_modal_support"),
@@ -175,19 +234,19 @@ def _run_p6_final_validation(
                     authority_reflection_risk=_p6_stat_arr(st_l, "authority_reflection_risk"),
                     config=cfg,
                 )
-                results.append((i, cand, vr, result_obj))
+                results.append((i, cand, vr, result_obj, mag_source_l, mag_source_r))
             except Exception as exc:
                 logger.debug("P6 validation failed for candidate %d: %s: %s", i, type(exc).__name__, exc)
 
         if not results:
             return
 
-        winner_idx, winner_cand, winner_vr, winner_result_obj = results[0]
+        winner_idx, winner_cand, winner_vr, winner_result_obj, winner_mag_source_l, winner_mag_source_r = results[0]
 
         if mode == "reject":
-            non_rejected = [(idx, c, r, ro) for idx, c, r, ro in results if r.severity != "reject"]
+            non_rejected = [(idx, c, r, ro, sl, sr) for idx, c, r, ro, sl, sr in results if r.severity != "reject"]
             if non_rejected:
-                new_idx, new_cand, winner_vr, winner_result_obj = non_rejected[0]
+                new_idx, new_cand, winner_vr, winner_result_obj, winner_mag_source_l, winner_mag_source_r = non_rejected[0]
                 if new_idx != 0:
                     logger.info(
                         "Final IR validation: candidate #1 rejected (severity=%s), selected candidate #%d.",
@@ -208,6 +267,8 @@ def _run_p6_final_validation(
 
         vr_stats = final_ir_validation_to_stats(winner_vr)
         vr_stats["final_ir_validation_mode"] = str(mode)
+        vr_stats["final_ir_validation_filter_mag_source_l"] = str(winner_mag_source_l)
+        vr_stats["final_ir_validation_filter_mag_source_r"] = str(winner_mag_source_r)
         if isinstance(search_state.best_metrics, dict):
             search_state.best_metrics.update(vr_stats)
             if winner_vr.score_penalty > 0.0:
@@ -220,7 +281,7 @@ def _run_p6_final_validation(
 
         logger.info(
             "Final IR validation: severity=%s penalty=%.2f pre=%.1fdB gd=%.0fms "
-            "voice=%.1fdB stereo=%.1fdB bass=%.1fdB reasons=%s",
+            "voice=%.1fdB stereo=%.1fdB bass=%.1fdB mag_source_l=%s mag_source_r=%s reasons=%s",
             str(winner_vr.severity),
             float(winner_vr.score_penalty),
             float(winner_vr.pre_energy_ratio_db) if _np.isfinite(winner_vr.pre_energy_ratio_db) else float("nan"),
@@ -228,6 +289,8 @@ def _run_p6_final_validation(
             float(winner_vr.voice_band_peak_excess_db) if _np.isfinite(winner_vr.voice_band_peak_excess_db) else float("nan"),
             float(winner_vr.stereo_delta_peak_db) if _np.isfinite(winner_vr.stereo_delta_peak_db) else float("nan"),
             float(winner_vr.bass_residual_peak_db) if _np.isfinite(winner_vr.bass_residual_peak_db) else float("nan"),
+            str(winner_mag_source_l),
+            str(winner_mag_source_r),
             ",".join(winner_vr.reasons) or "none",
         )
     except Exception as exc:
@@ -334,4 +397,3 @@ def _build_final_search_result(
         "search_fs": int(fs_v),
         "search_taps": int(taps_v),
     }
-

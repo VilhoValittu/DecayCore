@@ -39,6 +39,7 @@ from .shared import (
     AUTO_MODE_TARGET_BEST_RANK_TIE_EPS,
     AUTO_MODE_TARGET_TOP_N,
     AUTO_MODE_TARGET_TRIALS_PER_CURVE,
+    AUTO_MODE_TARGET_USE_OPTUNA,
     _auto_filter_cache_key,
     _auto_goal,
     _auto_goal_basis_text,
@@ -85,7 +86,7 @@ def _prepare_target_selection_setup(
     rank_basis = _auto_goal_basis_text(goal)
     optimizer_backend = _auto_optimizer_backend(
         base_data,
-        default_optuna_enabled=bool(cfg.optuna_pilot_enabled),
+        default_optuna_enabled=bool(cfg.optuna_pilot_enabled and AUTO_MODE_TARGET_USE_OPTUNA),
     )
     optuna_mod = (
         runtime_obj.auto_import_optuna() if str(optimizer_backend) == "optuna" else None
