@@ -30,6 +30,7 @@ fn clamp(v: f64, lo: f64, hi: f64) -> f64 {
     event_penalty = 0.0,
     lr_delta_penalty = 0.0,
     dsp_penalty = 0.0,
+    bass_prering_penalty = 0.0,
     exc_penalty = 0.0,
     bass_integration_penalty = 0.0,
     bass_feasibility_penalty = 0.0,
@@ -68,6 +69,7 @@ fn compute_rank_score_components(
     event_penalty: f64,
     lr_delta_penalty: f64,
     dsp_penalty: f64,
+    bass_prering_penalty: f64,
     exc_penalty: f64,
     bass_integration_penalty: f64,
     bass_feasibility_penalty: f64,
@@ -103,8 +105,9 @@ fn compute_rank_score_components(
     let boost      = safe_f64(boost_penalty).max(0.0);
     let event      = safe_f64(event_penalty).max(0.0);
     let lr_pen     = safe_f64(lr_delta_penalty).max(0.0);
-    let dsp_pen    = safe_f64(dsp_penalty).max(0.0);
-    let exc_pen    = safe_f64(exc_penalty).max(0.0);
+    let dsp_pen      = safe_f64(dsp_penalty).max(0.0);
+    let bass_prering = safe_f64(bass_prering_penalty).max(0.0);
+    let exc_pen      = safe_f64(exc_penalty).max(0.0);
     let bass_pen   = safe_f64(bass_integration_penalty).max(0.0);
     let bass_feas  = safe_f64(bass_feasibility_penalty).max(0.0);
     let bass_bon   = safe_f64(bass_preference_bonus).max(0.0);
@@ -142,6 +145,7 @@ fn compute_rank_score_components(
         - event
         - lr_pen
         - dsp_pen
+        - bass_prering
         - exc_pen
         - bass_pen
         - bass_feas
@@ -181,6 +185,7 @@ fn compute_rank_score_components(
     d.set_item("event_penalty",                      event)?;
     d.set_item("lr_delta_penalty",                   lr_pen)?;
     d.set_item("dsp_penalty",                        dsp_pen)?;
+    d.set_item("bass_prering_penalty",               bass_prering)?;
     d.set_item("exc_penalty",                        exc_pen)?;
     d.set_item("bass_integration_penalty",           bass_pen)?;
     d.set_item("bass_feasibility_penalty",           bass_feas)?;
@@ -243,6 +248,13 @@ fn calibrated_auto_quality(
                 }
             }
         }
+        if let Ok(Some(v)) = m.get_item("event_penalty") {
+            if let Ok(vf) = v.extract::<f64>() {
+                if vf >= 3.0 {
+                    score = score.min(100.0);
+                }
+            }
+        }
         let mut hard_gate_failed = false;
         if let Ok(Some(v)) = m.get_item("hard_gate_failed") {
             hard_gate_failed |= v.is_truthy().unwrap_or(false);
@@ -262,6 +274,13 @@ fn calibrated_auto_quality(
         }
         if hard_gate_failed {
             score = score.min(59.0);
+        }
+        if let Ok(Some(v)) = m.get_item("residual_peak_penalty") {
+            if let Ok(vf) = v.extract::<f64>() {
+                if vf > 1.5 {
+                    score = score.min(100.0);
+                }
+            }
         }
         if let Ok(Some(v)) = m.get_item("bass_cancellation_risk") {
             if let Ok(vf) = v.extract::<f64>() {
@@ -286,9 +305,9 @@ fn calibrated_auto_quality(
 // Module
 // ---------------------------------------------------------------------------
 #[pymodule]
-fn camillafir_scoring(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn decaycore_scoring(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compute_rank_score_components, m)?)?;
     m.add_function(wrap_pyfunction!(calibrated_auto_quality, m)?)?;
-    m.add("__version__", "0.1.0")?;
+    m.add("__version__", "0.2.0")?;
     Ok(())
 }

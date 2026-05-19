@@ -3,12 +3,12 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "camillafir-scoring"
+name = "decaycore-scoring"
 version = "0.1.0"
 requires-python = ">=3.11"
 description = "DecayCore Rust scoring extension"
 
 [tool.maturin]
-module-name = "camillafir_scoring"
+module-name = "decaycore_scoring"
 python-source = "python"
 

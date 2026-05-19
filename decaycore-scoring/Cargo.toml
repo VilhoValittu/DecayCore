@@ -1,10 +1,10 @@
 [package]
-name = "camillafir-scoring"
-version = "0.1.0"
+name = "decaycore-scoring"
+version = "0.2.0"
 edition = "2021"
 
 [lib]
-name = "camillafir_scoring"
+name = "decaycore_scoring"
 crate-type = ["cdylib"]
 
 [dependencies]

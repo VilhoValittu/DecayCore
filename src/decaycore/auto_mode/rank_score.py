@@ -20,7 +20,7 @@ from .shared import _auto_safe_float
 logger = logging.getLogger("DecayCore")
 
 try:
-    import camillafir_scoring as _rust_scoring
+    import decaycore_scoring as _rust_scoring
     _RUST_SCORING_AVAILABLE = True
 except ImportError:
     _rust_scoring = None  # type: ignore[assignment]
@@ -274,7 +274,7 @@ def compute_rank_score_components(
             legacy["voice_clarity_penalty"] = float(voice_pen_rust)
             return legacy
         except TypeError:
-            logger.warning("camillafir_scoring extension is older than Python rank scorer; using Python fallback.")
+            logger.warning("decaycore_scoring extension is older than Python rank scorer; using Python fallback.")
     avg = float(_auto_safe_float(avg_score, 0.0))
     phase_bonus = float(max(0.0, _auto_safe_float(phase_benefit_bonus, 0.0)))
     boost = float(max(0.0, _auto_safe_float(boost_penalty, 0.0)))
