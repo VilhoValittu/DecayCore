@@ -22,18 +22,22 @@ All releases:
 
 ## Run from release package
 
+---
+
 ### Windows
 
-1. Download `DecayCore_<version>_windows.zip` from Releases.
+1. Download `DecayCore_<version>_windows.7z` from Releases.
 2. Extract the ZIP.
 3. Run `DecayCore.exe`.
 4. If SmartScreen appears, choose `More info` -> `Run anyway`.
 5. Allow private firewall access if prompted. DecayCore runs on internal server on your computer.
 6. Open `http://127.0.0.1:8080` if the browser does not open automatically.
 
+---
+
 ### Ubuntu / Debian Linux
 
-1. Download `DecayCore_<version>_linux.tar.gz` from Releases.
+1. Download `DecayCore_<version>_linux.7z` from Releases.
 2. Extract the archive.
 3. Open Terminal in the extracted folder and run:
 
@@ -49,9 +53,11 @@ sudo apt install libportaudio2
 
 5. Open `http://127.0.0.1:8080` if the browser does not open automatically.
 
+---
+
 ### macOS (Intel + Apple Silicon)
 
-1. Download `DecayCore_<version>_macos.tar.gz` from Releases.
+1. Download `DecayCore_<version>_macos.7z` from Releases.
 2. Extract the archive.
 3. Open Terminal in the extracted folder and run:
 
@@ -62,6 +68,8 @@ chmod +x DecayCore
 
 4. If macOS blocks first launch, open `System Settings -> Privacy & Security -> Open Anyway`.
 5. Open `http://127.0.0.1:8080` if the browser does not open automatically.
+
+---
 
 ## Run directly from Python source
 
@@ -90,6 +98,8 @@ To update an existing clone later:
 cd DecayCore
 git pull
 ```
+
+---
 
 ### Windows
 
@@ -126,6 +136,8 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 Then activate the virtual environment again.
 
+---
+
 ### Ubuntu / Debian Linux
 
 1. Install Git, Python, venv support, pip :
@@ -157,6 +169,8 @@ PYTHONPATH=src python -m decaycore
 ```
 
 6. Open `http://127.0.0.1:8080` if the browser does not open automatically.
+
+---
 
 ### macOS
 
@@ -195,6 +209,8 @@ PYTHONPATH=src python -m decaycore
 ```
 
 7. Open `http://127.0.0.1:8080` if the browser does not open automatically.
+
+---
 
 ## Output path
 
