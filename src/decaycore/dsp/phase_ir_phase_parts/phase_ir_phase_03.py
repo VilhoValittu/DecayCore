@@ -181,7 +181,7 @@ def _pre_ringing_band_protection_floor(f: np.ndarray) -> np.ndarray:
     f = np.asarray(f, dtype=float)
     floor = np.full_like(f, 0.05, dtype=float)
 
-    FLOOR_BASS, FLOOR_VOICE = 0.55, 0.35
+    FLOOR_BASS = 0.55
     F_BASS_TOP, F_VOICE_TOP = 80.0, 200.0
 
     floor = np.where(f <= F_BASS_TOP, FLOOR_BASS, floor)

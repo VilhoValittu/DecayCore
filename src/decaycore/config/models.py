@@ -460,7 +460,7 @@ class FilterConfig:
     is_wav_source: bool = False
 
     bass_integration_enable: bool = False
-    bass_integration_mode: str = "avr_lfe_main_decomposed"
+    bass_integration_mode: str = "direct_dac"
     bass_integration_profile: str = "safe"
     bass_integration_sub_combine_mode: str = "average"
     avr_crossover_hz: float = 80.0

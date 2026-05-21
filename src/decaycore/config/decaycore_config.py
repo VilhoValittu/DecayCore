@@ -64,7 +64,7 @@ def load_config() -> dict:
         "auto_target_mode": "auto",
         "auto_mode_workers": 0,
         "bass_integration_enable": False,
-        "bass_integration_mode": "avr_lfe_main_decomposed",
+        "bass_integration_mode": "direct_dac",
         "bass_integration_profile": "safe",
         "bass_integration_sub_combine_mode": "average",
         "avr_crossover_hz": 80.0,

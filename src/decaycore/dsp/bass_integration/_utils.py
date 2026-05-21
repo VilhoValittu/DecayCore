@@ -10,12 +10,30 @@
 
 from __future__ import annotations
 
+import logging
+import sys
 from typing import Any
 
 import numpy as np
 
 from ...io.measurement_bundle import TransferData
 from ._constants import AVR_CROSSOVER_CANDIDATES, DIRECT_DAC_CROSSOVER_STEP_HZ
+
+_LOG = logging.getLogger("DecayCore.dsp")
+
+
+def _get_bass_integration_pkg(module_name: str):
+    """Return the package module so package-level monkeypatches remain effective."""
+    return sys.modules[module_name.rsplit(".", 1)[0]]
+
+
+def _status_callback(callbacks: Any, message: str) -> None:
+    if callbacks is None:
+        return
+    try:
+        callbacks.status(str(message))
+    except Exception:
+        _LOG.debug("Bass-integration status callback failed", exc_info=True)
 
 
 def _safe_float(value: Any, default: float = float("nan")) -> float:

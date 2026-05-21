@@ -375,7 +375,7 @@ def _auto_signature_payload(
             _auto_safe_float(base_data.get("direct_dac_sub_lpf_hz", float("nan")), float("nan"))
         ),
         "bass_integration_profile": str(base_data.get("bass_integration_profile", "") or ""),
-        "bass_integration_mode": str(base_data.get("bass_integration_mode", "") or ""),
+        "bass_integration_mode": "direct_dac",
         "max_boost": float(_auto_safe_float(base_data.get("max_boost", float("nan")), float("nan"))),
         "max_cut": float(_auto_safe_float(base_data.get("max_cut", float("nan")), float("nan"))),
         "max_slope_db_per_oct": float(_auto_safe_float(base_data.get("max_slope_db_per_oct", float("nan")), float("nan"))),

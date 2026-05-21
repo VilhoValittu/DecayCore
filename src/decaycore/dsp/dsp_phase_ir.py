@@ -167,8 +167,6 @@ def _run_phase_ir_stage(inputs: PhaseIRInputs) -> PhaseIROutputs:
     )
 
     theo_xo = np.asarray(theo["theo_xo"], dtype=float)
-    hpf_freq = theo.get("hpf_freq", None)
-    hpf_slope = theo.get("hpf_slope", None)
     p_rad_interp = np.asarray(theo.get("p_rad_interp", p_rad_interp), dtype=float)
 
     hs = cfg.hpf_settings

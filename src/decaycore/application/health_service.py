@@ -247,9 +247,7 @@ def compute_health(data: Dict[str, Any], mode: str) -> HealthResult:
     bass_integration_on = bool(data.get("bass_integration_enable", False))
 
     if bass_integration_on:
-        bi_mode = str(
-            data.get("bass_integration_mode", "avr_lfe_main_decomposed") or "avr_lfe_main_decomposed"
-        ).strip().lower()
+        bi_mode = "direct_dac"
         is_direct_dac = bi_mode == "direct_dac"
 
         if mode_u != "AUTO":
@@ -309,11 +307,11 @@ def compute_health(data: Dict[str, Any], mode: str) -> HealthResult:
 
         avr_fc = _as_float(data.get("avr_crossover_hz", None))
         if avr_fc is None or avr_fc <= 0.0:
-            issues.append(Issue("crit", _tr("health_avr_crossover_invalid")))
+            issues.append(Issue("crit", _tr("health_main_hpf_invalid")))
         elif avr_fc < 30.0 or avr_fc > 250.0:
-            issues.append(Issue("warn", _tr("health_avr_crossover_unusual"), f"{avr_fc:.1f} Hz"))
+            issues.append(Issue("warn", _tr("health_main_hpf_unusual"), f"{avr_fc:.1f} Hz"))
         else:
-            issues.append(Issue("ok", _tr("health_avr_crossover"), f"{avr_fc:.1f} Hz"))
+            issues.append(Issue("ok", _tr("health_main_hpf"), f"{avr_fc:.1f} Hz"))
 
         issues.append(
             Issue(

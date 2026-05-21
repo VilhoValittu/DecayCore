@@ -213,8 +213,13 @@ def _auto_hard_gate_reasons(
         reasons.append("stereo_policy_gate_failed")
 
     bass_gate_explicit = bool(m.get("bass_integration_hard_gate_failed", False))
+    direct_dac_canonical_bi = bool(
+        str(m.get("bass_integration_mode", "") or "").strip().lower() == "direct_dac"
+        or str(m.get("bass_direct_dac_export_model", "") or "").strip().lower() == "camilladsp_yaml_compatible"
+    )
     bass_gate_from_metrics = bool(
         bool(m.get("bass_integration_enable", False))
+        and not direct_dac_canonical_bi
         and str(m.get("bass_feasibility_class", "") or "").strip().lower() == "infeasible"
     )
     if bass_gate_explicit or bass_gate_from_metrics:

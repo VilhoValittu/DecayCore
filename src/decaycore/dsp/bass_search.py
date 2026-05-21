@@ -11,8 +11,6 @@
 from __future__ import annotations
 
 from .bass_integration import (
-    recommend_avr_crossover,
-    recommend_avr_lfe_main_prepare,
     recommend_direct_dac_alignment,
     recommend_direct_dac_allpass,
     recommend_direct_dac_crossover,
@@ -20,8 +18,6 @@ from .bass_integration import (
 )
 
 __all__ = [
-    "recommend_avr_crossover",
-    "recommend_avr_lfe_main_prepare",
     "recommend_direct_dac_alignment",
     "recommend_direct_dac_allpass",
     "recommend_direct_dac_crossover",

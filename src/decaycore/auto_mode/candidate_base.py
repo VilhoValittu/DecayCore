@@ -320,19 +320,17 @@ def _build_bi_random_params(base_data: dict, rng) -> dict:
         "bass_integration_sub_polarity_invert": bool(polarity),
         "bass_integration_sub_gain_trim_db": float(gain),
     }
-    bi_mode = str(base_data.get("bass_integration_mode", "avr_lfe_main_decomposed") or "avr_lfe_main_decomposed").strip().lower()
-    if bi_mode == "direct_dac":
-        lpf_min = round(float(xo * MIN_DIRECT_DAC_OVERLAP_RATIO), 1)
-        lpf_seed = float(np.clip(_auto_safe_float(base_data.get("direct_dac_sub_lpf_hz", lpf_min), lpf_min), lpf_min, 200.0))
-        lpf = round(float(np.clip(rng.normal(loc=lpf_seed, scale=12.0), lpf_min, 200.0)), 1)
-        out["direct_dac_sub_lpf_hz"] = float(lpf)
-        if bool(base_data.get("bass_integration_allpass_auto_applied", False)):
-            ap_freq_seed = float(np.clip(_auto_safe_float(base_data.get("bass_integration_allpass_freq_hz", 80.0), 80.0), 40.0, 200.0))
-            ap_freq = round(float(np.clip(rng.normal(loc=ap_freq_seed, scale=15.0), 40.0, 200.0)), 1)
-            ap_q_seed = float(np.clip(_auto_safe_float(base_data.get("bass_integration_allpass_q", 0.707), 0.707), 0.5, 2.0))
-            ap_q = round(float(np.clip(rng.normal(loc=ap_q_seed, scale=0.2), 0.5, 2.0)), 3)
-            out["bass_integration_allpass_freq_hz"] = float(ap_freq)
-            out["bass_integration_allpass_q"] = float(ap_q)
+    lpf_min = round(float(xo * MIN_DIRECT_DAC_OVERLAP_RATIO), 1)
+    lpf_seed = float(np.clip(_auto_safe_float(base_data.get("direct_dac_sub_lpf_hz", lpf_min), lpf_min), lpf_min, 200.0))
+    lpf = round(float(np.clip(rng.normal(loc=lpf_seed, scale=12.0), lpf_min, 200.0)), 1)
+    out["direct_dac_sub_lpf_hz"] = float(lpf)
+    if bool(base_data.get("bass_integration_allpass_auto_applied", False)):
+        ap_freq_seed = float(np.clip(_auto_safe_float(base_data.get("bass_integration_allpass_freq_hz", 80.0), 80.0), 40.0, 200.0))
+        ap_freq = round(float(np.clip(rng.normal(loc=ap_freq_seed, scale=15.0), 40.0, 200.0)), 1)
+        ap_q_seed = float(np.clip(_auto_safe_float(base_data.get("bass_integration_allpass_q", 0.707), 0.707), 0.5, 2.0))
+        ap_q = round(float(np.clip(rng.normal(loc=ap_q_seed, scale=0.2), 0.5, 2.0)), 3)
+        out["bass_integration_allpass_freq_hz"] = float(ap_freq)
+        out["bass_integration_allpass_q"] = float(ap_q)
     return out
 
 
@@ -371,33 +369,31 @@ def _suggest_bi_optuna_params(base_data: dict, trial, *, coarse: bool = True, ce
         "bass_integration_sub_polarity_invert": bool(polarity),
         "bass_integration_sub_gain_trim_db": float(gain),
     }
-    bi_mode = str(c.get("bass_integration_mode", "avr_lfe_main_decomposed") or "avr_lfe_main_decomposed").strip().lower()
-    if bi_mode == "direct_dac":
-        lpf_min = round(float(xo * MIN_DIRECT_DAC_OVERLAP_RATIO), 1)
-        lpf_seed = float(np.clip(_auto_safe_float(c.get("direct_dac_sub_lpf_hz", lpf_min), lpf_min), lpf_min, 200.0))
-        lpf_lo = lpf_min
-        lpf_hi = float(np.clip(lpf_seed + (20.0 if coarse else 8.0), lpf_min, 200.0))
-        if lpf_hi <= lpf_lo:
-            lpf_hi = lpf_lo + 0.1
-        lpf = round(float(trial.suggest_float("bi_direct_dac_sub_lpf_hz", float(lpf_lo), float(lpf_hi), step=1.0)), 1)
-        out["direct_dac_sub_lpf_hz"] = float(max(lpf_min, float(lpf)))
-        if bool(c.get("bass_integration_allpass_auto_applied", False)):
-            ap_seed = float(np.clip(_auto_safe_float(c.get("bass_integration_allpass_freq_hz", 80.0), 80.0), 40.0, 200.0))
-            ap_span = 20.0 if coarse else 8.0
-            ap_lo = float(np.clip(ap_seed - ap_span, 40.0, 200.0))
-            ap_hi = float(np.clip(ap_seed + ap_span, 40.0, 200.0))
-            if ap_hi <= ap_lo:
-                ap_hi = ap_lo + 0.1
-            ap_freq = round(float(trial.suggest_float("bi_allpass_freq_hz", float(ap_lo), float(ap_hi), step=1.0)), 1)
-            q_seed = float(np.clip(_auto_safe_float(c.get("bass_integration_allpass_q", 0.707), 0.707), 0.5, 2.0))
-            q_span = 0.3 if coarse else 0.15
-            q_lo = float(np.clip(q_seed - q_span, 0.5, 2.0))
-            q_hi = float(np.clip(q_seed + q_span, 0.5, 2.0))
-            if q_hi <= q_lo:
-                q_hi = q_lo + 0.01
-            ap_q = round(float(trial.suggest_float("bi_allpass_q", float(q_lo), float(q_hi), step=0.01)), 3)
-            out["bass_integration_allpass_freq_hz"] = float(ap_freq)
-            out["bass_integration_allpass_q"] = float(ap_q)
+    lpf_min = round(float(xo * MIN_DIRECT_DAC_OVERLAP_RATIO), 1)
+    lpf_seed = float(np.clip(_auto_safe_float(c.get("direct_dac_sub_lpf_hz", lpf_min), lpf_min), lpf_min, 200.0))
+    lpf_lo = lpf_min
+    lpf_hi = float(np.clip(lpf_seed + (20.0 if coarse else 8.0), lpf_min, 200.0))
+    if lpf_hi <= lpf_lo:
+        lpf_hi = lpf_lo + 0.1
+    lpf = round(float(trial.suggest_float("bi_direct_dac_sub_lpf_hz", float(lpf_lo), float(lpf_hi), step=1.0)), 1)
+    out["direct_dac_sub_lpf_hz"] = float(max(lpf_min, float(lpf)))
+    if bool(c.get("bass_integration_allpass_auto_applied", False)):
+        ap_seed = float(np.clip(_auto_safe_float(c.get("bass_integration_allpass_freq_hz", 80.0), 80.0), 40.0, 200.0))
+        ap_span = 20.0 if coarse else 8.0
+        ap_lo = float(np.clip(ap_seed - ap_span, 40.0, 200.0))
+        ap_hi = float(np.clip(ap_seed + ap_span, 40.0, 200.0))
+        if ap_hi <= ap_lo:
+            ap_hi = ap_lo + 0.1
+        ap_freq = round(float(trial.suggest_float("bi_allpass_freq_hz", float(ap_lo), float(ap_hi), step=1.0)), 1)
+        q_seed = float(np.clip(_auto_safe_float(c.get("bass_integration_allpass_q", 0.707), 0.707), 0.5, 2.0))
+        q_span = 0.3 if coarse else 0.15
+        q_lo = float(np.clip(q_seed - q_span, 0.5, 2.0))
+        q_hi = float(np.clip(q_seed + q_span, 0.5, 2.0))
+        if q_hi <= q_lo:
+            q_hi = q_lo + 0.01
+        ap_q = round(float(trial.suggest_float("bi_allpass_q", float(q_lo), float(q_hi), step=0.01)), 3)
+        out["bass_integration_allpass_freq_hz"] = float(ap_freq)
+        out["bass_integration_allpass_q"] = float(ap_q)
     return out
 
 
@@ -414,13 +410,11 @@ def _seed_bi_optuna_params(base_data: dict, p: dict) -> dict:
         "bi_sub_polarity": bool(c.get("bass_integration_sub_polarity_invert", False)),
         "bi_sub_gain_trim_db": float(gain_seed),
     }
-    bi_mode = str(c.get("bass_integration_mode", "avr_lfe_main_decomposed") or "avr_lfe_main_decomposed").strip().lower()
-    if bi_mode == "direct_dac":
-        lpf_seed = float(np.clip(_auto_safe_float(c.get("direct_dac_sub_lpf_hz", xo_seed), xo_seed), xo_seed, 200.0))
-        out["bi_direct_dac_sub_lpf_hz"] = float(lpf_seed)
-        if bool(c.get("bass_integration_allpass_auto_applied", False)):
-            out["bi_allpass_freq_hz"] = float(np.clip(_auto_safe_float(c.get("bass_integration_allpass_freq_hz", 80.0), 80.0), 40.0, 200.0))
-            out["bi_allpass_q"] = float(np.clip(_auto_safe_float(c.get("bass_integration_allpass_q", 0.707), 0.707), 0.5, 2.0))
+    lpf_seed = float(np.clip(_auto_safe_float(c.get("direct_dac_sub_lpf_hz", xo_seed), xo_seed), xo_seed, 200.0))
+    out["bi_direct_dac_sub_lpf_hz"] = float(lpf_seed)
+    if bool(c.get("bass_integration_allpass_auto_applied", False)):
+        out["bi_allpass_freq_hz"] = float(np.clip(_auto_safe_float(c.get("bass_integration_allpass_freq_hz", 80.0), 80.0), 40.0, 200.0))
+        out["bi_allpass_q"] = float(np.clip(_auto_safe_float(c.get("bass_integration_allpass_q", 0.707), 0.707), 0.5, 2.0))
     return out
 
 

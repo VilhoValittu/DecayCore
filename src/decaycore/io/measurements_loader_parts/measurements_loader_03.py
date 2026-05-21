@@ -28,6 +28,7 @@ from ...dsp.bass_integration import (
     compute_bass_integration_diagnostics,
     compute_direct_dac_bass_integration_diagnostics,
     normalize_sub_combine_mode,
+    prepare_dual_sub_peak_aligned_average,
     sum_complex_responses,
 )
 from ..measurement_bundle import BassIntegrationBundle, TransferData
@@ -173,10 +174,7 @@ def load_bass_integration_measurements(data: dict, *, logger=None):
     Returns a 7-value tuple:
     `(bundle, f_l, m_l, p_l, f_r, m_r, p_r)`.
     """
-    bi_mode = str(
-        data.get("bass_integration_mode", "avr_lfe_main_decomposed") or "avr_lfe_main_decomposed"
-    ).strip().lower()
-    is_direct_dac = bi_mode == "direct_dac"
+    is_direct_dac = True
 
     pre_ms, post_ms, sl = _get_wav_window_params(data)
     anchor_sample = _detect_shared_coherent_anchor_sample(data, logger=logger)
@@ -251,6 +249,58 @@ def load_bass_integration_measurements(data: dict, *, logger=None):
 
     combine_mode = normalize_sub_combine_mode(data.get("bass_integration_sub_combine_mode", "average"))
     _real_subs = [l_sub, r_sub] if r_sub_source_present else [l_sub]
+    dual_sub_diag = {}
+    if is_direct_dac and r_sub_source_present:
+        sub1_peak = _detect_coherent_slot_anchor_sample(
+            data,
+            file_key="file_l_sub",
+            path_key="local_path_l_sub",
+            logger=logger,
+        )
+        sub2_peak = _detect_coherent_slot_anchor_sample(
+            data,
+            file_key="file_r_sub",
+            path_key="local_path_r_sub",
+            logger=logger,
+        )
+        if sub1_peak is not None and sub2_peak is not None:
+            if logger:
+                fs = int(l_sub.sample_rate)
+                logger.info("Bass Integration: 2 subwoofers detected.")
+                logger.info(
+                    "Bass Integration: SUB1 impulse peak at %d samples / %.3f ms.",
+                    int(sub1_peak),
+                    float(sub1_peak) / float(fs) * 1000.0,
+                )
+                logger.info(
+                    "Bass Integration: SUB2 impulse peak at %d samples / %.3f ms.",
+                    int(sub2_peak),
+                    float(sub2_peak) / float(fs) * 1000.0,
+                )
+                logger.info(
+                    "Bass Integration: applied SUB2 -> SUB1 alignment delay: %d samples / %.3f ms.",
+                    int(sub1_peak) - int(sub2_peak),
+                    (float(sub1_peak) - float(sub2_peak)) / float(fs) * 1000.0,
+                )
+            combined_sub, dual_sub_diag = prepare_dual_sub_peak_aligned_average(
+                l_sub,
+                r_sub,
+                sub1_peak_samples=int(sub1_peak),
+                sub2_peak_samples=int(sub2_peak),
+                label="Direct-DAC dual-sub peak-aligned vector average",
+            )
+            dual_sub_diag["dual_sub_original_sub_combine_mode"] = str(combine_mode)
+            if logger:
+                logger.info("Bass Integration: created vector-averaged combined subwoofer response.")
+                logger.info("Bass Integration: using combined subwoofer response for main/sub integration.")
+            l_sub = combined_sub
+            r_sub = _silent_transfer_like(l_sub, label="Direct-DAC inactive sub slot after dual-sub preprocessing")
+            _real_subs = [l_sub]
+            combine_mode = "average"
+        elif logger:
+            logger.warning(
+                "Bass Integration: 2 subwoofers detected but impulse peak detection failed; using configured sub combine mode."
+            )
     l_combined_sub, l_combine_diag = build_combined_sub_transfer(
         l_main,
         *_real_subs,
@@ -293,8 +343,8 @@ def load_bass_integration_measurements(data: dict, *, logger=None):
         guard_hi_ratio = AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO
 
     base_diagnostics = {
-        "sub_slots_present": ["l_sub", "r_sub"] if r_sub_source_present else ["l_sub"],
-        "sub_combine_mode": str(combine_mode),
+        "sub_slots_present": ["l_sub"] if bool(dual_sub_diag.get("dual_sub_preprocessing_applied", False)) else (["l_sub", "r_sub"] if r_sub_source_present else ["l_sub"]),
+        "sub_combine_mode": "dual_sub_peak_aligned_average" if bool(dual_sub_diag.get("dual_sub_preprocessing_applied", False)) else str(combine_mode),
         "sub_combined_level_delta_db_20_120": float(
             l_combine_diag.get(
                 "sub_combined_level_delta_db_20_120",
@@ -322,6 +372,7 @@ def load_bass_integration_measurements(data: dict, *, logger=None):
                 float(r_combine_diag.get("alignment_confidence", 0.0) or 0.0),
             )
         ),
+        **dict(dual_sub_diag or {}),
     }
     bundle_base = BassIntegrationBundle(
         l_main=l_main,
@@ -379,6 +430,11 @@ def load_bass_integration_measurements(data: dict, *, logger=None):
             guard_lo_ratio=float(guard_lo_ratio),
             guard_hi_ratio=float(guard_hi_ratio),
         )
+    final_diagnostics = {**base_diagnostics, **dict(diagnostics or {})}
+    if bool(dual_sub_diag.get("dual_sub_preprocessing_applied", False)):
+        final_diagnostics.update(dict(dual_sub_diag or {}))
+        final_diagnostics["sub_slots_present"] = ["l_sub"]
+        final_diagnostics["sub_combine_mode"] = "dual_sub_peak_aligned_average"
     bundle = BassIntegrationBundle(
         l_main=l_main,
         r_main=r_main,
@@ -388,26 +444,16 @@ def load_bass_integration_measurements(data: dict, *, logger=None):
         r_total=r_total,
         avr_crossover_hz=float(fc_hz),
         profile=profile,
-        diagnostics={**base_diagnostics, **dict(diagnostics or {})},
+        diagnostics=final_diagnostics,
     )
-    if is_direct_dac:
-        return (
-            bundle,
-            l_main.freqs_hz,
-            l_main.mag_db,
-            l_main.phase_deg,
-            r_main.freqs_hz,
-            r_main.mag_db,
-            r_main.phase_deg,
-        )
     return (
         bundle,
-        l_total.freqs_hz,
-        l_total.mag_db,
-        l_total.phase_deg,
-        r_total.freqs_hz,
-        r_total.mag_db,
-        r_total.phase_deg,
+        l_main.freqs_hz,
+        l_main.mag_db,
+        l_main.phase_deg,
+        r_main.freqs_hz,
+        r_main.mag_db,
+        r_main.phase_deg,
     )
 
 

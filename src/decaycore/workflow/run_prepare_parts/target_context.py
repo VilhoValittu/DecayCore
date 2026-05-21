@@ -97,12 +97,10 @@ def _prepare_target_curve_and_run_context(
     bi_allpass_recommendation = {}
     if bool(data.get("bass_integration_enable", False)):
         bundle = ctx.get("bass_integration_bundle", None)
-        bi_mode = str(
-            data.get("bass_integration_mode", "avr_lfe_main_decomposed") or "avr_lfe_main_decomposed"
-        ).strip().lower()
+        bi_mode = "direct_dac"
+        data["bass_integration_mode"] = bi_mode
         _mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
         _auto_active = bool(_mode_u == "AUTO" or data.get("camillafir_automatic_mode", False))
-        _is_direct_dac = bool(bi_mode == "direct_dac")
 
         if _auto_active:
             _status(callbacks, "DecayCore automatic mode: bass integration prepare init")
@@ -123,144 +121,107 @@ def _prepare_target_curve_and_run_context(
         data["bass_integration_allpass_freq_hz"] = float(data.get("bass_integration_allpass_freq_hz", 0.0) or 0.0)
         data["bass_integration_allpass_q"] = float(data.get("bass_integration_allpass_q", 0.707) or 0.707)
         data["bass_integration_allpass_reason"] = ""
-        if bi_mode == "direct_dac":
-            data["bass_integration_allpass_auto_enable"] = False
-            data["bass_integration_allpass_auto_applied"] = False
-            data["bass_integration_allpass_freq_hz"] = 0.0
-            data["bass_integration_allpass_q"] = 0.707
-            data["bass_integration_allpass_reason"] = "Direct DAC rewrite uses polarity/delay/gain only."
-            _bi_unified = {
-                "applied": False,
-                "sub_delay_ms": 0.0,
-                "sub_polarity_invert": False,
-                "sub_gain_trim_db": 0.0,
-                "recommended_hz": float(data.get("avr_crossover_hz", 80.0) or 80.0),
-                "recommended_sub_lpf_hz": float(data.get("direct_dac_sub_lpf_hz", data.get("avr_crossover_hz", 80.0)) or data.get("avr_crossover_hz", 80.0) or 80.0),
-                "baseline": {},
-                "optimized": {},
-                "improvement_score": 0.0,
-                "reason": "Direct DAC optimization runs after FIR prediction.",
-                "allpass_enabled": False,
-                "allpass_freq_hz": 0.0,
-                "allpass_q": 0.707,
-                "allpass_reason": "Direct DAC rewrite uses polarity/delay/gain only.",
-            }
-            bi_alignment_recommendation = {
-                "applied": bool(_bi_unified.get("applied", False)),
-                "sub_delay_ms": float(_bi_unified.get("sub_delay_ms", 0.0) or 0.0),
-                "sub_polarity_invert": bool(_bi_unified.get("sub_polarity_invert", False)),
-                "sub_gain_trim_db": float(_bi_unified.get("sub_gain_trim_db", 0.0) or 0.0),
-                "reason": str(_bi_unified.get("reason", "") or ""),
-                "improvement_score": float(_bi_unified.get("improvement_score", 0.0) or 0.0),
-                "baseline": dict(_bi_unified.get("baseline", {}) or {}),
-                "optimized": dict(_bi_unified.get("optimized", {}) or {}),
-            }
-            data["bass_integration_alignment_auto_applied"] = bool(bi_alignment_recommendation["applied"])
-            data["bass_integration_sub_delay_ms"] = float(bi_alignment_recommendation["sub_delay_ms"])
-            data["bass_integration_sub_polarity_invert"] = bool(bi_alignment_recommendation["sub_polarity_invert"])
-            data["bass_integration_sub_gain_trim_db"] = float(bi_alignment_recommendation["sub_gain_trim_db"])
-            data["bass_integration_alignment_reason"] = bi_alignment_recommendation["reason"]
-            logger.info(
-                "Bass Integration Direct-DAC alignment %s: delay %.2f ms, polarity %s, gain %+0.2f dB",
-                "applied" if bool(data.get("bass_integration_alignment_auto_applied", False)) else "kept baseline",
-                float(data.get("bass_integration_sub_delay_ms", 0.0) or 0.0),
-                "invert" if bool(data.get("bass_integration_sub_polarity_invert", False)) else "normal",
-                float(data.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0),
-            )
-            bi_recommended_xo_hz = _bi_unified.get("recommended_hz", None)
-            bi_recommended_sub_lpf_hz = _bi_unified.get("recommended_sub_lpf_hz", None)
-            bi_rec_xo_l = None
-            bi_rec_xo_r = None
-            if bi_recommended_xo_hz is not None:
-                data["sub_crossover_hz"] = float(bi_recommended_xo_hz)
-                data["avr_crossover_hz"] = float(bi_recommended_xo_hz)
-                _sub_lpf_store = float(bi_recommended_sub_lpf_hz) if bi_recommended_sub_lpf_hz is not None else float(bi_recommended_xo_hz) + 20.0
-                _sub_lpf_store = max(float(bi_recommended_xo_hz) + 20.0, _sub_lpf_store)
-                data["direct_dac_sub_lpf_hz"] = _sub_lpf_store
-                if _sub_lpf_store > float(bi_recommended_xo_hz) + 0.5:
-                    logger.info(
-                        "Bass Integration Direct-DAC auto XO selected: "
-                        f"main HPF {float(bi_recommended_xo_hz):.1f} Hz, "
-                        f"sub LPF {_sub_lpf_store:.1f} Hz (overlap)"
-                    )
-                else:
-                    logger.info(
-                        "Bass Integration Direct-DAC auto XO selected: "
-                        f"{float(bi_recommended_xo_hz):.1f} Hz"
-                    )
-            try:
-                _current_main_hpf = float(data.get("sub_crossover_hz", 80.0) or 80.0)
-            except Exception:
-                _current_main_hpf = 80.0
-            if not math.isfinite(_current_main_hpf) or _current_main_hpf <= 0.0:
-                _current_main_hpf = 80.0
-            try:
-                _current_sub_lpf = float(data.get("direct_dac_sub_lpf_hz", _current_main_hpf) or _current_main_hpf)
-            except Exception:
-                _current_sub_lpf = _current_main_hpf
-            if not math.isfinite(_current_sub_lpf) or _current_sub_lpf <= 0.0:
-                _current_sub_lpf = _current_main_hpf
-            data["direct_dac_sub_lpf_hz"] = float(max(_current_main_hpf + 20.0, _current_sub_lpf))
-            bi_allpass_recommendation = {
-                "enabled": bool(_bi_unified.get("allpass_enabled", False)),
-                "freq_hz": float(_bi_unified.get("allpass_freq_hz", 0.0) or 0.0),
-                "q": float(_bi_unified.get("allpass_q", 0.707) or 0.707),
-                "improvement_score": 0.0,
-                "reason": str(_bi_unified.get("allpass_reason", "") or ""),
-                "baseline": {},
-                "optimized": {},
-            }
-            data["bass_integration_allpass_auto_applied"] = bool(bi_allpass_recommendation["enabled"])
-            data["bass_integration_allpass_freq_hz"] = float(bi_allpass_recommendation["freq_hz"])
-            data["bass_integration_allpass_q"] = float(bi_allpass_recommendation["q"])
-            data["bass_integration_allpass_reason"] = bi_allpass_recommendation["reason"]
-            if bool(data.get("bass_integration_allpass_auto_applied", False)):
+        data["bass_integration_allpass_auto_enable"] = False
+        data["bass_integration_allpass_auto_applied"] = False
+        data["bass_integration_allpass_freq_hz"] = 0.0
+        data["bass_integration_allpass_q"] = 0.707
+        data["bass_integration_allpass_reason"] = "Direct DAC rewrite uses polarity/delay/gain only."
+        _bi_unified = {
+            "applied": False,
+            "sub_delay_ms": 0.0,
+            "sub_polarity_invert": False,
+            "sub_gain_trim_db": 0.0,
+            "recommended_hz": float(data.get("avr_crossover_hz", 80.0) or 80.0),
+            "recommended_sub_lpf_hz": float(data.get("direct_dac_sub_lpf_hz", data.get("avr_crossover_hz", 80.0)) or data.get("avr_crossover_hz", 80.0) or 80.0),
+            "baseline": {},
+            "optimized": {},
+            "improvement_score": 0.0,
+            "reason": "Direct DAC optimization runs after FIR prediction.",
+            "allpass_enabled": False,
+            "allpass_freq_hz": 0.0,
+            "allpass_q": 0.707,
+            "allpass_reason": "Direct DAC rewrite uses polarity/delay/gain only.",
+        }
+        bi_alignment_recommendation = {
+            "applied": bool(_bi_unified.get("applied", False)),
+            "sub_delay_ms": float(_bi_unified.get("sub_delay_ms", 0.0) or 0.0),
+            "sub_polarity_invert": bool(_bi_unified.get("sub_polarity_invert", False)),
+            "sub_gain_trim_db": float(_bi_unified.get("sub_gain_trim_db", 0.0) or 0.0),
+            "reason": str(_bi_unified.get("reason", "") or ""),
+            "improvement_score": float(_bi_unified.get("improvement_score", 0.0) or 0.0),
+            "baseline": dict(_bi_unified.get("baseline", {}) or {}),
+            "optimized": dict(_bi_unified.get("optimized", {}) or {}),
+        }
+        data["bass_integration_alignment_auto_applied"] = bool(bi_alignment_recommendation["applied"])
+        data["bass_integration_sub_delay_ms"] = float(bi_alignment_recommendation["sub_delay_ms"])
+        data["bass_integration_sub_polarity_invert"] = bool(bi_alignment_recommendation["sub_polarity_invert"])
+        data["bass_integration_sub_gain_trim_db"] = float(bi_alignment_recommendation["sub_gain_trim_db"])
+        data["bass_integration_alignment_reason"] = bi_alignment_recommendation["reason"]
+        logger.info(
+            "Bass Integration Direct-DAC alignment %s: delay %.2f ms, polarity %s, gain %+0.2f dB",
+            "applied" if bool(data.get("bass_integration_alignment_auto_applied", False)) else "kept baseline",
+            float(data.get("bass_integration_sub_delay_ms", 0.0) or 0.0),
+            "invert" if bool(data.get("bass_integration_sub_polarity_invert", False)) else "normal",
+            float(data.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0),
+        )
+        bi_recommended_xo_hz = _bi_unified.get("recommended_hz", None)
+        bi_recommended_sub_lpf_hz = _bi_unified.get("recommended_sub_lpf_hz", None)
+        bi_rec_xo_l = None
+        bi_rec_xo_r = None
+        if bi_recommended_xo_hz is not None:
+            data["sub_crossover_hz"] = float(bi_recommended_xo_hz)
+            data["avr_crossover_hz"] = float(bi_recommended_xo_hz)
+            _sub_lpf_store = float(bi_recommended_sub_lpf_hz) if bi_recommended_sub_lpf_hz is not None else float(bi_recommended_xo_hz) + 20.0
+            _sub_lpf_store = max(float(bi_recommended_xo_hz) + 20.0, _sub_lpf_store)
+            data["direct_dac_sub_lpf_hz"] = _sub_lpf_store
+            if _sub_lpf_store > float(bi_recommended_xo_hz) + 0.5:
                 logger.info(
-                    "Bass Integration Direct-DAC auto allpass applied: "
-                    f"{float(data.get('bass_integration_allpass_freq_hz', 0.0)):.1f} Hz, "
-                    f"Q {float(data.get('bass_integration_allpass_q', 0.707)):.3f}"
+                    "Bass Integration Direct-DAC auto XO selected: "
+                    f"main HPF {float(bi_recommended_xo_hz):.1f} Hz, "
+                    f"sub LPF {_sub_lpf_store:.1f} Hz (overlap)"
                 )
             else:
                 logger.info(
-                    "Bass Integration Direct-DAC auto allpass kept OFF: "
-                    f"{str(data.get('bass_integration_allpass_reason', '') or 'No meaningful improvement found.')}"
+                    "Bass Integration Direct-DAC auto XO selected: "
+                    f"{float(bi_recommended_xo_hz):.1f} Hz"
                 )
-        else:
-            if _auto_active:
-                _status(callbacks, "DecayCore automatic mode: bass integration AVR alignment scan")
-            bi_alignment_recommendation = _compute_avr_lfe_main_prepare_recommendation(bundle, data)
-            data["bass_integration_alignment_auto_applied"] = bool(
-                bi_alignment_recommendation.get("applied", False)
-            )
-            data["bass_integration_sub_delay_ms"] = float(
-                bi_alignment_recommendation.get("sub_delay_ms", 0.0) or 0.0
-            )
-            data["bass_integration_sub_polarity_invert"] = bool(
-                bi_alignment_recommendation.get("sub_polarity_invert", False)
-            )
-            data["bass_integration_sub_gain_trim_db"] = float(
-                bi_alignment_recommendation.get("sub_gain_trim_db", 0.0) or 0.0
-            )
-            data["bass_integration_alignment_reason"] = str(
-                bi_alignment_recommendation.get("reason", "") or "Baseline AVR LFE+Main alignment kept."
-            )
-            bi_recommended_xo_hz = bi_alignment_recommendation.get("recommended_hz", None)
-            if bi_recommended_xo_hz is not None:
-                try:
-                    _avr_rec_hz = float(bi_recommended_xo_hz)
-                except Exception:
-                    _avr_rec_hz = float("nan")
-                if math.isfinite(_avr_rec_hz) and _avr_rec_hz > 0.0:
-                    data["avr_crossover_hz"] = float(_avr_rec_hz)
-                    data["sub_crossover_hz"] = float(_avr_rec_hz)
+        try:
+            _current_main_hpf = float(data.get("sub_crossover_hz", 80.0) or 80.0)
+        except Exception:
+            _current_main_hpf = 80.0
+        if not math.isfinite(_current_main_hpf) or _current_main_hpf <= 0.0:
+            _current_main_hpf = 80.0
+        try:
+            _current_sub_lpf = float(data.get("direct_dac_sub_lpf_hz", _current_main_hpf) or _current_main_hpf)
+        except Exception:
+            _current_sub_lpf = _current_main_hpf
+        if not math.isfinite(_current_sub_lpf) or _current_sub_lpf <= 0.0:
+            _current_sub_lpf = _current_main_hpf
+        data["direct_dac_sub_lpf_hz"] = float(max(_current_main_hpf + 20.0, _current_sub_lpf))
+        bi_allpass_recommendation = {
+            "enabled": bool(_bi_unified.get("allpass_enabled", False)),
+            "freq_hz": float(_bi_unified.get("allpass_freq_hz", 0.0) or 0.0),
+            "q": float(_bi_unified.get("allpass_q", 0.707) or 0.707),
+            "improvement_score": 0.0,
+            "reason": str(_bi_unified.get("allpass_reason", "") or ""),
+            "baseline": {},
+            "optimized": {},
+        }
+        data["bass_integration_allpass_auto_applied"] = bool(bi_allpass_recommendation["enabled"])
+        data["bass_integration_allpass_freq_hz"] = float(bi_allpass_recommendation["freq_hz"])
+        data["bass_integration_allpass_q"] = float(bi_allpass_recommendation["q"])
+        data["bass_integration_allpass_reason"] = bi_allpass_recommendation["reason"]
+        if bool(data.get("bass_integration_allpass_auto_applied", False)):
             logger.info(
-                "Bass Integration AVR LFE+Main alignment %s: delay %.2f ms, polarity %s, gain %+0.2f dB",
-                "applied" if bool(data.get("bass_integration_alignment_auto_applied", False)) else "kept baseline",
-                float(data.get("bass_integration_sub_delay_ms", 0.0) or 0.0),
-                "invert" if bool(data.get("bass_integration_sub_polarity_invert", False)) else "normal",
-                float(data.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0),
+                "Bass Integration Direct-DAC auto allpass applied: "
+                f"{float(data.get('bass_integration_allpass_freq_hz', 0.0)):.1f} Hz, "
+                f"Q {float(data.get('bass_integration_allpass_q', 0.707)):.3f}"
             )
-            data["bass_integration_allpass_reason"] = "Direct DAC only."
+        else:
+            logger.info(
+                "Bass Integration Direct-DAC auto allpass kept OFF: "
+                f"{str(data.get('bass_integration_allpass_reason', '') or 'No meaningful improvement found.')}"
+            )
 
         if _auto_active:
             _status(callbacks, "DecayCore automatic mode: bass integration diagnostics refresh")
@@ -382,11 +343,18 @@ def _prepare_target_curve_and_run_context(
     }
     if bool(data.get("bass_integration_enable", False)):
         bundle = ctx.get("bass_integration_bundle", None)
+        bundle_diagnostics = dict(getattr(bundle, "diagnostics", {}) or {})
         data["_bass_integration_meta"] = {
             "enabled": True,
-            "mode": str(data.get("bass_integration_mode", "avr_lfe_main_decomposed") or "avr_lfe_main_decomposed"),
+            "mode": "direct_dac",
             "profile": str(data.get("bass_integration_profile", "safe") or "safe"),
-            "sub_combine_mode": str(data.get("bass_integration_sub_combine_mode", "average") or "average"),
+            "sub_combine_mode": str(
+                bundle_diagnostics.get(
+                    "sub_combine_mode",
+                    data.get("bass_integration_sub_combine_mode", "average"),
+                )
+                or "average"
+            ),
             "avr_crossover_hz": float(data.get("avr_crossover_hz", 80.0) or 80.0),
             "direct_dac_sub_lpf_hz": float(
                 data.get(
@@ -402,7 +370,7 @@ def _prepare_target_curve_and_run_context(
                 "l_sub": str(data.get("local_path_l_sub", "") or "") or str(dict(data.get("file_l_sub", {}) or {}).get("filename", "") or ""),
                 "r_sub": str(data.get("local_path_r_sub", "") or "") or str(dict(data.get("file_r_sub", {}) or {}).get("filename", "") or ""),
             },
-            "diagnostics": dict(bi_selected_diagnostics or getattr(bundle, "diagnostics", {}) or {}),
+            "diagnostics": {**bundle_diagnostics, **dict(bi_selected_diagnostics or {})},
             "recommended_crossover_hz": bi_recommended_xo_hz,
             "recommended_sub_lpf_hz": bi_recommended_sub_lpf_hz,
             "recommended_crossover_hz_l": bi_rec_xo_l,
@@ -430,9 +398,7 @@ def _prepare_target_curve_and_run_context(
         }
         measurements["bass_integration_enabled"] = True
         measurements["bass_integration_bundle"] = bundle
-        measurements["bass_integration_mode"] = str(
-            data.get("bass_integration_mode", "avr_lfe_main_decomposed") or "avr_lfe_main_decomposed"
-        )
+        measurements["bass_integration_mode"] = "direct_dac"
         measurements["bass_integration_sub_combine_mode"] = str(
             data.get("bass_integration_sub_combine_mode", "average") or "average"
         )

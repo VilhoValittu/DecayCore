@@ -25,6 +25,8 @@ _SUB_HPF_ORDER = 2
 
 @dataclass(frozen=True)
 class DirectDacBassIntegrationResult:
+    """Compatibility result for legacy array-level Direct-DAC helper output."""
+
     enabled: bool
     main_hpf_hz: float
     sub_hpf_hz: float
@@ -153,6 +155,11 @@ def score_direct_dac_bass_integration(
     sub_gain_db: float,
     sub_polarity_invert: bool = False,
 ) -> dict[str, Any]:
+    """Score raw array branches for backward-compatible tests and external callers.
+
+    Production Direct-DAC orchestration uses the canonical evaluator path:
+    evaluate_direct_dac_candidate() through compute_final_bass_integration_metrics(..., mode="direct_dac").
+    """
     freqs_arr = _as_freqs(freqs)
     main_arr = _as_complex(main_corrected_complex)
     sub_arr = _as_complex(sub_corrected_complex)
@@ -211,7 +218,9 @@ def score_direct_dac_bass_integration(
     sum_mag = _mag_db(summed)
     branch_max_mag = np.maximum(_mag_db(main_b), _mag_db(sub_b))
     cancellation = np.maximum(0.0, branch_max_mag - sum_mag)
-    cancellation_score = float(np.percentile(cancellation, 95.0))
+    # mean+1.5σ is more robust than 95th percentile: a single narrow notch no longer
+    # dominates the score when the rest of the band integrates cleanly.
+    cancellation_score = float(np.mean(cancellation) + 1.5 * np.std(cancellation))
     ripple = float(np.percentile(sum_mag, 95.0) - np.percentile(sum_mag, 5.0))
     phase_err = _phase_error_deg(main_b, sub_b)
     gd_err = _gd_mismatch_ms(freqs_b, main_b, sub_b)
@@ -415,6 +424,7 @@ def run_direct_dac_bass_integration(
     sub_corrected_complex: Any,
     freqs: Any,
 ) -> DirectDacBassIntegrationResult:
+    """Run the legacy array-level grid optimizer for compatibility callers."""
     freqs_arr = _as_freqs(freqs)
     main_arr = _as_complex(main_corrected_complex)
     sub_arr = _as_complex(sub_corrected_complex)

@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import sys
 from typing import Any
 
 import numpy as np
@@ -21,8 +20,8 @@ from ._constants import COMBINED_SUB_ALIGNMENT_MAX_LAG_MS
 from ._utils import (
     _band_mask,
     _build_transfer_like,
+    _get_bass_integration_pkg,
     _interp_complex_response,
-    _safe_float,
     _sum_component_specs,
     normalize_sub_combine_mode,
 )
@@ -30,7 +29,7 @@ from ._utils import (
 
 def _get_pkg():
     """Return the bass_integration package module for patchable attribute lookup."""
-    return sys.modules[__name__.rsplit(".", 1)[0]]
+    return _get_bass_integration_pkg(__name__)
 
 
 def _transfer_is_effectively_silent(transfer: TransferData | None) -> bool:
@@ -92,7 +91,7 @@ def build_combined_sub_transfer(
     *subs: TransferData,
     mode: str = "average",
     max_lag_ms: float = COMBINED_SUB_ALIGNMENT_MAX_LAG_MS,
-    min_confidence: float = 0.70,
+    min_confidence: float = 0.60,
     label: str = "",
 ) -> tuple[TransferData, dict[str, Any]]:
     freqs = np.asarray(template.freqs_hz, dtype=float)
@@ -188,6 +187,61 @@ def build_combined_sub_transfer(
     return _build_transfer_like(template, combined_spec, label=label), diagnostics
 
 
+def prepare_dual_sub_peak_aligned_average(
+    sub1: TransferData,
+    sub2: TransferData,
+    *,
+    sub1_peak_samples: int,
+    sub2_peak_samples: int,
+    label: str = "Direct-DAC dual-sub combined reference",
+) -> tuple[TransferData, dict[str, Any]]:
+    freqs = np.asarray(sub1.freqs_hz, dtype=float)
+    fs = int(sub1.sample_rate)
+    if fs <= 0:
+        fs = int(sub2.sample_rate)
+    if fs <= 0:
+        fs = 48000
+
+    spec1 = np.asarray(sub1.complex_spec, dtype=np.complex128)
+    if spec1.size != freqs.size:
+        spec1 = _interp_complex_response(sub1, freqs)
+    else:
+        spec1 = spec1.copy()
+    spec2 = _interp_complex_response(sub2, freqs)
+
+    peak1 = int(sub1_peak_samples)
+    peak2 = int(sub2_peak_samples)
+    delay_samples = int(peak1 - peak2)
+    delay_s = float(delay_samples) / float(fs)
+    spec2_aligned = spec2 * np.exp(-1j * 2.0 * np.pi * freqs * float(delay_s))
+    combined_spec = np.asarray((spec1 + spec2_aligned) / 2.0, dtype=np.complex128)
+
+    peak1_ms = float(peak1) / float(fs) * 1000.0
+    peak2_ms = float(peak2) / float(fs) * 1000.0
+    delay_ms = float(delay_samples) / float(fs) * 1000.0
+    # Alignment is reliable when the inferred delay is small relative to the XO period.
+    # > 10 ms direct-peak offset is suspicious in a typical room setup: the peak may be
+    # a reflection rather than the direct sound, which would misalign the integration.
+    alignment_reliable = abs(delay_ms) <= 10.0
+    diagnostics = {
+        "sub_topology": "dual_sub_vector_average_reference",
+        "dual_sub_preprocessing_applied": True,
+        "dual_sub_preprocessing_version": 1,
+        "dual_sub_sub1_peak_samples": int(peak1),
+        "dual_sub_sub2_peak_samples": int(peak2),
+        "dual_sub_sub1_peak_ms": float(peak1_ms),
+        "dual_sub_sub2_peak_ms": float(peak2_ms),
+        "dual_sub_relative_delay_samples": int(delay_samples),
+        "dual_sub_relative_delay_ms": float(delay_ms),
+        "dual_sub_alignment_reliable": bool(alignment_reliable),
+        "dual_sub_combined_method": "peak_aligned_complex_vector_average",
+        "dual_sub_effective_sub_slot_count": 1,
+        "dual_sub_per_sub_optimization": False,
+        "dual_sub_topology_label": "dual-sub vector-average reference",
+    }
+    return _build_transfer_like(sub1, combined_spec, label=label), diagnostics
+
+
 def build_bundle_combined_sub_transfer(
     bundle: BassIntegrationBundle,
     *,
@@ -195,7 +249,7 @@ def build_bundle_combined_sub_transfer(
     mode: str | None = None,
     label: str = "",
     max_lag_ms: float = COMBINED_SUB_ALIGNMENT_MAX_LAG_MS,
-    min_confidence: float = 0.70,
+    min_confidence: float = 0.60,
 ) -> tuple[TransferData, dict[str, Any]]:
     ch = str(channel or "l").strip().lower()
     template = bundle.r_main if ch == "r" else bundle.l_main
@@ -312,7 +366,7 @@ def sum_complex_responses_aligned(
     main: TransferData,
     *subs: TransferData,
     max_lag_ms: float = COMBINED_SUB_ALIGNMENT_MAX_LAG_MS,
-    min_confidence: float = 0.70,
+    min_confidence: float = 0.60,
     label: str = "",
 ) -> tuple[TransferData, dict[str, Any]]:
     """

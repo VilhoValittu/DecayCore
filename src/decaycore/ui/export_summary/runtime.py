@@ -120,8 +120,7 @@ def _append_main_speaker_xo_hpf_summary(summary_content: str, data: dict | None)
         else:
             summary_content += "Crossovers: OFF\n"
 
-        bi_mode = str(ui_data.get("bass_integration_mode", "") or "").strip().lower()
-        if bool(ui_data.get("bass_integration_enable", False)) and bi_mode == "direct_dac":
+        if bool(ui_data.get("bass_integration_enable", False)):
             try:
                 hpf_f = float(
                     ui_data.get(

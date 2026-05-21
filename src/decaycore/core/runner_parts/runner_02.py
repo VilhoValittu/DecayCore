@@ -391,7 +391,7 @@ def _normalize_headless_config(config: dict, *, config_dir: Path, output_dir: Pa
     bi = config.get("bass_integration", {})
     if isinstance(bi, dict) and bool(bi.get("enabled", False)):
         data["bass_integration_enable"] = True
-        data["bass_integration_mode"] = str(bi.get("mode", data.get("bass_integration_mode", "avr_lfe_main_decomposed")) or "avr_lfe_main_decomposed")
+        data["bass_integration_mode"] = "direct_dac"
         data["local_path_l_main"] = _resolve_path(bi.get("main_L", bi.get("left_main", "")), config_dir) or _first_existing(config_dir, ["main_L.wav"])
         data["local_path_r_main"] = _resolve_path(bi.get("main_R", bi.get("right_main", "")), config_dir) or _first_existing(config_dir, ["main_R.wav"])
         data["local_path_l_sub"] = _resolve_path(bi.get("sub_L", bi.get("left_sub", "")), config_dir) or _first_existing(config_dir, ["sub_L.wav"])

@@ -12,10 +12,6 @@ from __future__ import annotations
 
 from ._constants import (
     AVR_CROSSOVER_CANDIDATES,
-    AVR_LFE_MAIN_ALIGNMENT_COARSE_DELAYS_MS,
-    AVR_LFE_MAIN_ALIGNMENT_COARSE_GAINS_DB,
-    AVR_LFE_MAIN_ALIGNMENT_REFINE_DELTA_DB,
-    AVR_LFE_MAIN_ALIGNMENT_REFINE_DELTA_MS,
     BASS_INTEGRATION_FEASIBILITY_OBJECTIVE_PENALTY,
     BASS_INTEGRATION_FEASIBILITY_THRESHOLDS,
     COMBINED_SUB_ALIGNMENT_MAX_LAG_MS,
@@ -45,6 +41,13 @@ from ._diagnostics import (
     compute_bass_integration_diagnostics,
     compute_bass_integration_metric_payload,
 )
+from ._candidate import DirectDacCandidate, DirectDacCandidateMetrics, DirectDacChannelMetrics
+from ._candidate_io import direct_dac_candidate_from_data, write_direct_dac_candidate_to_data
+from ._evaluate_direct_dac import evaluate_direct_dac_candidate
+from ._export_filter_model import (
+    apply_direct_dac_export_branch_model,
+    camilladsp_export_crossover_response,
+)
 from ._final_metrics import compute_final_bass_integration_metrics
 from ._gd_feasibility import (
     compute_direct_dac_bass_integration_analysis,
@@ -55,15 +58,15 @@ from ._gd_feasibility import (
 from ._recommend_alignment import recommend_direct_dac_alignment
 from ._recommend_allpass import recommend_direct_dac_allpass
 from ._recommend_crossover import (
-    recommend_avr_crossover,
     recommend_direct_dac_crossover,
 )
-from ._recommend_prepare_avr import recommend_avr_lfe_main_prepare
+from ._recommend_prepare_dac import _recommend_direct_dac_prepare_builtin_core
 from ._recommend_prepare_optuna import recommend_direct_dac_prepare_optuna
 from ._sub_combine import (
     avg_complex_responses,
     build_bundle_combined_sub_transfer,
     build_combined_sub_transfer,
+    prepare_dual_sub_peak_aligned_average,
     sum_complex_responses,
     sum_complex_responses_aligned,
     _xcorr_lag_from_spectra,
@@ -85,7 +88,7 @@ from ._filters import (
     _apply_polarity_to_transfer,
     _get_filtered_branches,
 )
-from ._bundles import _build_direct_dac_trial_bundle, _build_avr_lfe_main_trial_bundle
+from ._bundles import _build_direct_dac_trial_bundle
 
 __all__ = [
     "AVR_CROSSOVER_CANDIDATES",
@@ -106,14 +109,11 @@ __all__ = [
     "DIRECT_DAC_ALIGNMENT_DELAY_CANDIDATES_MS",
     "DIRECT_DAC_ALIGNMENT_GAIN_CANDIDATES_DB",
     "DIRECT_DAC_ALIGNMENT_MIN_IMPROVEMENT_SCORE",
-    "AVR_LFE_MAIN_ALIGNMENT_COARSE_DELAYS_MS",
-    "AVR_LFE_MAIN_ALIGNMENT_COARSE_GAINS_DB",
-    "AVR_LFE_MAIN_ALIGNMENT_REFINE_DELTA_MS",
-    "AVR_LFE_MAIN_ALIGNMENT_REFINE_DELTA_DB",
     "GD_CONTINUITY_GUARD_LO_RATIO",
     "GD_CONTINUITY_GUARD_HI_RATIO",
     "normalize_sub_combine_mode",
     "build_combined_sub_transfer",
+    "prepare_dual_sub_peak_aligned_average",
     "build_bundle_combined_sub_transfer",
     "sum_complex_responses",
     "avg_complex_responses",
@@ -126,12 +126,19 @@ __all__ = [
     "compute_direct_dac_bass_integration_diagnostics",
     "compute_bass_integration_diagnostics",
     "compute_bass_integration_metric_payload",
+    "DirectDacCandidate",
+    "DirectDacChannelMetrics",
+    "DirectDacCandidateMetrics",
+    "direct_dac_candidate_from_data",
+    "write_direct_dac_candidate_to_data",
+    "evaluate_direct_dac_candidate",
+    "apply_direct_dac_export_branch_model",
+    "camilladsp_export_crossover_response",
     "compute_final_bass_integration_metrics",
     "recommend_direct_dac_alignment",
-    "recommend_avr_crossover",
     "recommend_direct_dac_crossover",
     "recommend_direct_dac_allpass",
-    "recommend_avr_lfe_main_prepare",
+    "_recommend_direct_dac_prepare_builtin_core",
     "recommend_direct_dac_prepare_optuna",
     "DirectDacBassIntegrationResult",
     "run_direct_dac_bass_integration",

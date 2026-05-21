@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import sys
 from typing import Any
 
 import numpy as np
@@ -26,15 +25,18 @@ from ._constants import (
 )
 from ._final_metrics import _final_metric_snapshot
 from ._recommend_alignment import recommend_direct_dac_alignment
-from ._recommend_allpass import recommend_direct_dac_allpass
 from ._recommend_crossover import recommend_direct_dac_crossover
-from ._recommend_prepare_dac import _recommend_direct_dac_prepare_builtin_core
-from ._utils import _safe_float, normalize_sub_combine_mode
+from ._recommend_prepare_dac import (
+    _direct_dac_prepare_allpass_postpass,
+    _direct_dac_prepare_result,
+    _recommend_direct_dac_prepare_builtin_core,
+)
+from ._utils import _LOG, _get_bass_integration_pkg, _safe_float, _status_callback, normalize_sub_combine_mode
 
 
 def _get_pkg():
     """Return the bass_integration package module for patchable attribute lookup."""
-    return sys.modules[__name__.rsplit(".", 1)[0]]
+    return _get_bass_integration_pkg(__name__)
 
 
 def recommend_direct_dac_prepare_optuna(
@@ -71,13 +73,6 @@ def recommend_direct_dac_prepare_optuna(
     sub_hpf_hz_f = max(0.0, float(sub_hpf_hz))
     sub_hpf_order_i = max(1, int(sub_hpf_order))
 
-    def _cb_status(msg: str) -> None:
-        if callbacks is not None:
-            try:
-                callbacks.status(msg)
-            except Exception:
-                pass
-
     weights = _auto_bass_integration_profile_weights(profile)
     w_main_act = float(weights.get("main_activity", 6.0))
 
@@ -99,9 +94,19 @@ def recommend_direct_dac_prepare_optuna(
         fc_q = _quantize_fc(fc)
         delay_q = _quantize_delay(delay_ms)
         gain_q = _quantize_gain(gain_db)
-        cache_key = (fc_q, float(overlap_ratio), delay_q, bool(polarity), gain_q,
-                     str(profile), hpf_order_i, lpf_order_i, sub_hpf_hz_f, sub_hpf_order_i,
-                     combine_mode_norm)
+        cache_key = (
+            fc_q,
+            float(overlap_ratio),
+            delay_q,
+            bool(polarity),
+            gain_q,
+            hpf_order_i,
+            lpf_order_i,
+            sub_hpf_hz_f,
+            sub_hpf_order_i,
+            str(profile),
+            combine_mode_norm,
+        )
         _eval_total[0] += 1
         cached = _eval_cache.get(cache_key)
         if cached is not None:
@@ -145,6 +150,7 @@ def recommend_direct_dac_prepare_optuna(
         import optuna as _optuna  # type: ignore
         _optuna.logging.set_verbosity(_optuna.logging.WARNING)
     except Exception:
+        _LOG.debug("Optuna unavailable for Direct-DAC prepare; falling back to builtin", exc_info=True)
         return _recommend_direct_dac_prepare_builtin_core(
             bundle,
             profile=profile,
@@ -157,7 +163,7 @@ def recommend_direct_dac_prepare_optuna(
             callbacks=callbacks,
         )
 
-    _cb_status("DecayCore automatic mode: bass integration optuna init")
+    _status_callback(callbacks, "DecayCore automatic mode: bass integration optuna init")
 
     # --- Seed candidates from builtins ---
     seeds: list[dict] = [
@@ -186,7 +192,7 @@ def recommend_direct_dac_prepare_optuna(
             "sub_delay_ms": _align_delay, "sub_polarity_invert": _align_polarity, "sub_gain_trim_db": _align_gain,
         })
     except Exception:
-        pass
+        _LOG.debug("Direct-DAC Optuna alignment seed failed; continuing with baseline seed", exc_info=True)
 
     try:
         _xr = recommend_direct_dac_crossover(
@@ -211,7 +217,7 @@ def recommend_direct_dac_prepare_optuna(
             "sub_delay_ms": _align_delay, "sub_polarity_invert": _align_polarity, "sub_gain_trim_db": _align_gain,
         })
     except Exception:
-        pass
+        _LOG.debug("Direct-DAC Optuna crossover seed failed; continuing without crossover seed", exc_info=True)
 
     # --- Global Optuna search ---
     sampler = _optuna.samplers.TPESampler(n_startup_trials=int(startup_trials), seed=42)
@@ -227,7 +233,7 @@ def recommend_direct_dac_prepare_optuna(
                 "sub_gain_trim_db": float(np.clip(_s["sub_gain_trim_db"], _GAIN_LO, _GAIN_HI)),
             })
         except Exception:
-            pass
+            _LOG.debug("Direct-DAC Optuna seed enqueue failed; skipping seed", exc_info=True)
 
     _best_global = [float("-inf")]
     _trial_n = [0]
@@ -246,7 +252,8 @@ def recommend_direct_dac_prepare_optuna(
         if improved:
             _best_global[0] = obj
         if _trial_n[0] % 4 == 0 or improved:
-            _cb_status(
+            _status_callback(
+                callbacks,
                 f"DecayCore automatic mode: bass integration optuna search "
                 f"(trial {_trial_n[0]}/{trials})"
             )
@@ -255,7 +262,7 @@ def recommend_direct_dac_prepare_optuna(
     try:
         study.optimize(_objective, n_trials=int(trials))
     except Exception:
-        pass
+        _LOG.debug("Direct-DAC Optuna global search failed; using best available seed/default", exc_info=True)
 
     # Extract global best params
     best_fc = 80.0
@@ -271,10 +278,10 @@ def recommend_direct_dac_prepare_optuna(
         best_polarity = bool(_gb.params.get("sub_polarity_invert", False))
         best_gain = float(np.clip(_gb.params.get("sub_gain_trim_db", 0.0), _GAIN_LO, _GAIN_HI))
     except Exception:
-        pass
+        _LOG.debug("Direct-DAC Optuna global best extraction failed; using default candidate", exc_info=True)
 
     # --- Local refine around best ---
-    _cb_status("DecayCore automatic mode: bass integration optuna local refine")
+    _status_callback(callbacks, "DecayCore automatic mode: bass integration optuna local refine")
 
     local_fc_lo = float(np.clip(best_fc - 10.0, _FC_LO, _FC_HI))
     local_fc_hi = float(np.clip(best_fc + 10.0, _FC_LO, _FC_HI))
@@ -293,7 +300,7 @@ def recommend_direct_dac_prepare_optuna(
             and abs(_opp_obj - _cur_obj) < 0.05
         )
     except Exception:
-        pass
+        _LOG.debug("Direct-DAC Optuna polarity tie check failed; locking current polarity", exc_info=True)
     local_polarity_choices = [False, True] if _polarity_tie else [best_polarity]
 
     # Overlap ratio: allow ±1 step around best
@@ -321,7 +328,7 @@ def recommend_direct_dac_prepare_optuna(
             "sub_gain_trim_db": best_gain,
         })
     except Exception:
-        pass
+        _LOG.debug("Direct-DAC Optuna local seed enqueue failed", exc_info=True)
 
     def _local_objective(trial) -> float:
         fc = float(trial.suggest_float("fc_hz", local_fc_lo, local_fc_hi))
@@ -335,7 +342,7 @@ def recommend_direct_dac_prepare_optuna(
     try:
         local_study.optimize(_local_objective, n_trials=int(local_trials))
     except Exception:
-        pass
+        _LOG.debug("Direct-DAC Optuna local refine failed; keeping global best", exc_info=True)
 
     # Pick best of global + local
     try:
@@ -348,13 +355,19 @@ def recommend_direct_dac_prepare_optuna(
             best_polarity = bool(_lb.params.get("sub_polarity_invert", best_polarity))
             best_gain = float(np.clip(_lb.params.get("sub_gain_trim_db", best_gain), _GAIN_LO, _GAIN_HI))
     except Exception:
-        pass
+        _LOG.debug("Direct-DAC Optuna local best extraction failed; keeping global best", exc_info=True)
 
     # Final evaluation of chosen params
     best_sub_lpf = float(best_fc * best_ratio)
     _, optimized_metrics = _eval(best_fc, best_ratio, best_delay, best_polarity, best_gain)
     optimized_obj = _safe_float(optimized_metrics.get("objective", float("nan")), float("nan"))
     optimized_snap = _final_metric_snapshot(optimized_metrics)
+    candidate_score = _safe_float(
+        optimized_metrics.get("bass_direct_dac_candidate_score", -optimized_obj),
+        -optimized_obj,
+    )
+    reject_reasons = list(optimized_metrics.get("bass_direct_dac_reject_reasons", []) or [])
+    worst_channel = str(optimized_metrics.get("bass_direct_dac_worst_channel", optimized_metrics.get("bass_dominant_channel", "unknown")) or "unknown")
 
     improvement_score = (
         float(optimized_obj - baseline_obj)
@@ -396,71 +409,55 @@ def recommend_direct_dac_prepare_optuna(
     else:
         reason = "Optuna unified search applied."
 
-    # --- Allpass post-pass (separate, lightweight) ---
-    allpass_enabled = False
-    allpass_freq_hz = 0.0
-    allpass_q = 0.707
-    allpass_reason = "Auto allpass optimization is OFF."
-
-    if allpass_auto_enable:
-        _cb_status("DecayCore automatic mode: bass integration allpass scan")
-        try:
-            _ap = dict(
-                recommend_direct_dac_allpass(
-                    bundle,
-                    fc_hz=best_fc,
-                    profile=profile,
-                    main_hpf_order=hpf_order_i,
-                    sub_lpf_order=lpf_order_i,
-                    sub_hpf_hz=sub_hpf_hz_f,
-                    sub_hpf_order=sub_hpf_order_i,
-                    sub_combine_mode=combine_mode_norm,
-                    sub_delay_ms=best_delay,
-                    sub_polarity_invert=best_polarity,
-                    sub_gain_trim_db=best_gain,
-                    sub_lpf_hz=best_sub_lpf,
-                )
-            )
-            allpass_enabled = bool(_ap.get("enabled", False))
-            allpass_freq_hz = float(_ap.get("freq_hz", 0.0) or 0.0)
-            allpass_q = float(_ap.get("q", 0.707) or 0.707)
-            allpass_reason = str(_ap.get("reason", "") or "")
-        except Exception:
-            allpass_reason = "Allpass post-pass failed."
+    allpass = _direct_dac_prepare_allpass_postpass(
+        bundle,
+        enabled=allpass_auto_enable,
+        callbacks=callbacks,
+        fc_hz=best_fc,
+        profile=profile,
+        main_hpf_order=hpf_order_i,
+        sub_lpf_order=lpf_order_i,
+        sub_hpf_hz=sub_hpf_hz_f,
+        sub_hpf_order=sub_hpf_order_i,
+        sub_combine_mode=combine_mode_norm,
+        sub_delay_ms=best_delay,
+        sub_polarity_invert=best_polarity,
+        sub_gain_trim_db=best_gain,
+        sub_lpf_hz=best_sub_lpf,
+    )
 
     _study_trials = len(getattr(study, "trials", []))
     try:
         _study_trials += len(local_study.trials)
     except Exception:
-        pass
+        _LOG.debug("Direct-DAC Optuna local trial count unavailable", exc_info=True)
 
     # Memoization telemetry
     _unique_evals = len(_eval_cache)
     _hit_ratio = float(_eval_hits[0]) / max(1, _eval_total[0])
-    import logging as _logging
-    _logging.getLogger("DecayCore.dsp").info(
+    _LOG.info(
         f"Bass-integration Optuna: trials={_study_trials}, "
         f"evals={_eval_total[0]}, unique={_unique_evals}, "
         f"cache_hits={_eval_hits[0]} ({_hit_ratio:.0%})"
     )
 
-    _cb_status("DecayCore automatic mode: bass integration diagnostics refresh")
+    _status_callback(callbacks, "DecayCore automatic mode: bass integration diagnostics refresh")
 
-    return {
-        "applied": bool(applied),
-        "backend": "optuna",
-        "sub_delay_ms": float(best_delay if applied else 0.0),
-        "sub_polarity_invert": bool(best_polarity if applied else False),
-        "sub_gain_trim_db": float(best_gain if applied else 0.0),
-        "recommended_hz": float(best_fc),
-        "recommended_sub_lpf_hz": float(best_sub_lpf),
-        "allpass_enabled": bool(allpass_enabled),
-        "allpass_freq_hz": float(allpass_freq_hz),
-        "allpass_q": float(allpass_q),
-        "baseline": dict(baseline_snap),
-        "optimized": dict(optimized_snap),
-        "improvement_score": float(improvement_score) if np.isfinite(improvement_score) else 0.0,
-        "reason": str(reason),
-        "study_trials": int(_study_trials),
-        "allpass_reason": str(allpass_reason),
-    }
+    return _direct_dac_prepare_result(
+        applied=applied,
+        backend="optuna",
+        sub_delay_ms=best_delay,
+        sub_polarity_invert=best_polarity,
+        sub_gain_trim_db=best_gain,
+        recommended_hz=best_fc,
+        recommended_sub_lpf_hz=best_sub_lpf,
+        allpass=allpass,
+        baseline=baseline_snap,
+        optimized=optimized_snap,
+        improvement_score=improvement_score,
+        reason=reason,
+        study_trials=_study_trials,
+        candidate_score=candidate_score,
+        reject_reasons=reject_reasons,
+        worst_channel=worst_channel,
+    )

@@ -69,7 +69,9 @@ def _channel_overlap_metrics(
     main_phase = np.angle(main_spec[mask])
     sub_phase = np.angle(sub_spec[mask])
     phase_delta = np.angle(np.exp(1j * (sub_phase - main_phase)))
-    phase_opposition = np.clip((-np.cos(phase_delta) - 0.15) / 0.85, 0.0, 1.0)
+    # Phase opposition: 0 when in phase (≤90°), ramps to 1 at 180°.
+    # Pure cosine-based — no arbitrary offset shifting the zero crossing.
+    phase_opposition = np.clip(-np.cos(phase_delta), 0.0, 1.0)
     depth_db = 20.0 * np.log10(np.maximum(stronger, 1e-12) / np.maximum(total_mag, 1e-12))
     depth_weight = np.clip(depth_db / 12.0, 0.0, 1.0)
     cancellation_risk = float(np.mean(phase_opposition * depth_weight))
@@ -83,6 +85,18 @@ def _channel_overlap_metrics(
     }
 
 
+def _fc_guard_ratios(fc: float, lo_ratio: float, hi_ratio: float) -> tuple[float, float]:
+    """Scale guard band ratios mildly with XO frequency.
+
+    Higher XO → slightly narrower relative band (modes denser, transitions sharper).
+    Lower XO → slightly wider band. Scale clamped to ±10% to stay conservative.
+    """
+    _scale = float(np.clip(80.0 / max(fc, 1.0), 0.9, 1.1))
+    lo_eff = max(0.05, lo_ratio * (2.0 - _scale))
+    hi_eff = max(lo_eff + 0.05, hi_ratio * _scale)
+    return lo_eff, hi_eff
+
+
 def compute_overlap_metrics(
     main: TransferData,
     sub: TransferData,
@@ -93,8 +107,9 @@ def compute_overlap_metrics(
     guard_hi_ratio: float = AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO,
 ) -> dict[str, float]:
     fc = _safe_float(fc_hz, 80.0)
-    lo = max(5.0, fc * max(0.05, _safe_float(guard_lo_ratio, 0.60)))
-    hi = max(lo + 1.0, fc * max(0.05, _safe_float(guard_hi_ratio, 1.40)))
+    lo_ratio_eff, hi_ratio_eff = _fc_guard_ratios(fc, max(0.05, _safe_float(guard_lo_ratio, 0.60)), max(0.05, _safe_float(guard_hi_ratio, 1.40)))
+    lo = max(5.0, fc * lo_ratio_eff)
+    hi = max(lo + 1.0, fc * hi_ratio_eff)
     ch = _channel_overlap_metrics(main, sub, total, lo_hz=lo, hi_hz=hi)
     return {
         "guard_lo_hz": float(lo),
@@ -114,8 +129,9 @@ def compute_cancellation_metrics(
     guard_hi_ratio: float = AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO,
 ) -> dict[str, float]:
     fc = _safe_float(fc_hz, 80.0)
-    lo = max(5.0, fc * max(0.05, _safe_float(guard_lo_ratio, 0.60)))
-    hi = max(lo + 1.0, fc * max(0.05, _safe_float(guard_hi_ratio, 1.40)))
+    lo_ratio_eff, hi_ratio_eff = _fc_guard_ratios(fc, max(0.05, _safe_float(guard_lo_ratio, 0.60)), max(0.05, _safe_float(guard_hi_ratio, 1.40)))
+    lo = max(5.0, fc * lo_ratio_eff)
+    hi = max(lo + 1.0, fc * hi_ratio_eff)
     ch = _channel_overlap_metrics(main, sub, total, lo_hz=lo, hi_hz=hi)
     return {
         "guard_lo_hz": float(lo),
@@ -224,8 +240,10 @@ def _channel_predicted_sum_metrics(
         right_idx = max_idx
     null_width_hz = float(band_freqs[right_idx] - band_freqs[left_idx]) if band_freqs.size else float("nan")
     width_ref_hz = max(5.0, 0.20 * float(max(fc_hz, 1.0)))
-    width_weight = float(np.clip(np.sqrt(max(float(null_width_hz), 0.0) / width_ref_hz), 0.20, 1.50))
-    null_severity = float(max(0.0, float(null_depth_db)) * width_weight) if np.isfinite(null_depth_db) else float("nan")
+    # log2-based width weight: less steep than sqrt, no hard floor that hides narrow deep nulls.
+    # Minimum 0.5x so a narrow null is never completely ignored.
+    _log_weight = 1.0 + float(np.log2(max(max(float(null_width_hz), 0.0), 1.0) / max(float(width_ref_hz), 1.0)))
+    null_severity = float(max(0.0, float(null_depth_db)) * max(0.5, _log_weight)) if np.isfinite(null_depth_db) else float("nan")
 
     return {
         "predicted_sum_flatness_db": float(flatness_db),

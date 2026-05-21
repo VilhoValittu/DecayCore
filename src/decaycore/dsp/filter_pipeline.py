@@ -28,16 +28,6 @@ from .dsp_ops import (
 )
 from .dsp_phase_ir import run_phase_ir_stage
 from .dsp_preprocess import run_preprocess
-from .dsp_stats import (
-    apply_afdw_stats,
-    apply_boost_blocked_reason,
-    apply_clamp_stats,
-    apply_lf_guard_stats,
-    apply_measured_mag_stats,
-    arr_if_valid_for_stats,
-    safe_stage_probes,
-    safe_stats_update,
-)
 from .dsp_utils import cfg_float_allow_zero as _cfg_float_allow_zero
 from .phase_ir_autogain import compute_auto_gain_and_headroom
 from .phase_ir_residual import apply_residual_pass_if_enabled
@@ -69,8 +59,6 @@ def _run_generate_filter_pre_correction(
     freq_axis = prep.ctx.freq_axis
     gain_db = prep.ctx.gain_db
     st = prep.ctx.st
-    target_mags = prep.ctx.target_mags
-    m_interp = prep.m_interp
     p_rad_interp = prep.p_rad_interp
     delay_slope = prep.delay_slope
     m_plot_db = prep.m_plot_db

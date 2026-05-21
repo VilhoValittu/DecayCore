@@ -600,15 +600,7 @@ def _update_crossover_recommendation_label(data: dict) -> None:
         bi_meta = dict((data or {}).get("_bass_integration_meta", {}) or {})
         rec = bi_meta.get("recommended_crossover_hz", None)
         if rec is not None:
-            bi_mode = str(
-                bi_meta.get("mode", (data or {}).get("bass_integration_mode", "avr_lfe_main_decomposed"))
-                or "avr_lfe_main_decomposed"
-            ).strip().lower()
-            rec_label = (
-                t("bass_integration_main_hpf_recommended")
-                if bi_mode == "direct_dac"
-                else t("bass_integration_crossover_recommended")
-            )
+            rec_label = t("bass_integration_main_hpf_recommended")
             label_el.set_text(f"{rec_label}: {_format_recommended_xo_hz(float(rec))}")
         else:
             label_el.set_text("")

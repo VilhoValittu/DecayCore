@@ -391,13 +391,7 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
                             final_measurements.get("bass_integration_profile", "safe"),
                         )
                     )
-                    bi_mode = str(
-                        final_data.get(
-                            "bass_integration_mode",
-                            final_measurements.get("bass_integration_mode", "avr_lfe_main_decomposed"),
-                        )
-                        or "avr_lfe_main_decomposed"
-                    ).strip().lower()
+                    bi_mode = "direct_dac"
                     try:
                         xo_order = max(1, int(round(float(final_data.get("sub_crossover_slope", 24) or 24.0))) // 6)
                     except Exception:

@@ -93,44 +93,6 @@ def _direct_dac_alignment_params(data: dict) -> tuple[float, bool, float]:
         float(gain_trim_db if math.isfinite(gain_trim_db) else 0.0),
     )
 
-def _compute_avr_lfe_main_prepare_recommendation(bundle: object, data: dict) -> dict:
-    try:
-        if bundle is None:
-            return {
-                "applied": False,
-                "recommended_hz": None,
-                "sub_delay_ms": 0.0,
-                "sub_polarity_invert": False,
-                "sub_gain_trim_db": 0.0,
-                "baseline": {},
-                "optimized": {},
-                "improvement_score": 0.0,
-                "reason": "Baseline AVR LFE+Main alignment kept.",
-            }
-        from ...dsp.bass_integration import recommend_avr_lfe_main_prepare  # noqa: PLC0415
-
-        return dict(
-            recommend_avr_lfe_main_prepare(
-                bundle,
-                profile=str(data.get("bass_integration_profile", "safe") or "safe"),
-                sub_combine_mode=str(data.get("bass_integration_sub_combine_mode", "average") or "average"),
-            )
-            or {}
-        )
-    except Exception:
-        logger.debug("AVR LFE+Main prepare recommendation failed", exc_info=True)
-        return {
-            "applied": False,
-            "recommended_hz": None,
-            "sub_delay_ms": 0.0,
-            "sub_polarity_invert": False,
-            "sub_gain_trim_db": 0.0,
-            "baseline": {},
-            "optimized": {},
-            "improvement_score": 0.0,
-            "reason": "Baseline AVR LFE+Main alignment kept.",
-        }
-
 def _compute_direct_dac_prepare_recommendation(bundle: object, data: dict, callbacks=None) -> dict:
     """Unified direct-DAC prepare: alignment + crossover + allpass in one call.
 
@@ -221,91 +183,64 @@ def _compute_selected_bass_integration_diagnostics(bundle: object, data: dict) -
     try:
         if bundle is None:
             return {}
-        bi_mode = str(
-            data.get("bass_integration_mode", "avr_lfe_main_decomposed") or "avr_lfe_main_decomposed"
-        ).strip().lower()
         profile = str(data.get("bass_integration_profile", "safe") or "safe")
         fc_hz = float(data.get("avr_crossover_hz", 80.0) or 80.0)
         if not math.isfinite(fc_hz) or fc_hz <= 0.0:
             fc_hz = 80.0
         from ...dsp.bass_integration import compute_final_bass_integration_metrics  # noqa: PLC0415
 
-        if bi_mode == "direct_dac":
-            xo_order, sub_hpf_hz, sub_hpf_order = _direct_dac_filter_params(data)
-            sub_delay_ms, sub_polarity_invert, sub_gain_trim_db = _direct_dac_alignment_params(data)
-            sub_allpass_freq_hz = None
-            sub_allpass_q = None
-            if bool(data.get("bass_integration_allpass_auto_applied", False)):
-                try:
-                    sub_allpass_freq_hz = float(data.get("bass_integration_allpass_freq_hz", 0.0) or 0.0)
-                except Exception:
-                    sub_allpass_freq_hz = 0.0
-                try:
-                    sub_allpass_q = float(data.get("bass_integration_allpass_q", 0.707) or 0.707)
-                except Exception:
-                    sub_allpass_q = 0.707
+        xo_order, sub_hpf_hz, sub_hpf_order = _direct_dac_filter_params(data)
+        sub_delay_ms, sub_polarity_invert, sub_gain_trim_db = _direct_dac_alignment_params(data)
+        sub_allpass_freq_hz = None
+        sub_allpass_q = None
+        if bool(data.get("bass_integration_allpass_auto_applied", False)):
             try:
-                _slpf: float | None = float(data.get("direct_dac_sub_lpf_hz") or fc_hz)
-                if not math.isfinite(_slpf) or _slpf < fc_hz:
-                    _slpf = None
+                sub_allpass_freq_hz = float(data.get("bass_integration_allpass_freq_hz", 0.0) or 0.0)
             except Exception:
+                sub_allpass_freq_hz = 0.0
+            try:
+                sub_allpass_q = float(data.get("bass_integration_allpass_q", 0.707) or 0.707)
+            except Exception:
+                sub_allpass_q = 0.707
+        try:
+            _slpf: float | None = float(data.get("direct_dac_sub_lpf_hz") or fc_hz)
+            if not math.isfinite(_slpf) or _slpf < fc_hz:
                 _slpf = None
-            metrics = dict(
-                compute_final_bass_integration_metrics(
-                    bundle,
-                    float(fc_hz),
-                    profile,
-                    mode="direct_dac",
-                    main_hpf_order=int(xo_order),
-                    sub_lpf_order=int(xo_order),
-                    sub_hpf_hz=float(sub_hpf_hz),
-                    sub_hpf_order=int(sub_hpf_order),
-                    sub_combine_mode=str(data.get("bass_integration_sub_combine_mode", "average") or "average"),
-                    sub_delay_ms=float(sub_delay_ms),
-                    sub_polarity_invert=bool(sub_polarity_invert),
-                    sub_gain_trim_db=float(sub_gain_trim_db),
-                    sub_lpf_hz=_slpf,
-                    sub_allpass_freq_hz=sub_allpass_freq_hz,
-                    sub_allpass_q=sub_allpass_q,
-                )
-                or {}
-            )
-            out = dict(metrics.get("diagnostics", {}) or {})
-            out.update(
-                {
-                    "direct_dac_main_hpf_order": int(xo_order),
-                    "direct_dac_sub_lpf_order": int(xo_order),
-                    "direct_dac_sub_hpf_hz": float(sub_hpf_hz),
-                    "direct_dac_sub_hpf_order": int(sub_hpf_order),
-                    "direct_dac_sub_allpass_enabled": bool(metrics.get("bass_allpass_enabled", False)),
-                    "direct_dac_sub_allpass_freq_hz": float(metrics.get("bass_allpass_freq_hz", 0.0) or 0.0),
-                    "direct_dac_sub_allpass_q": float(metrics.get("bass_allpass_q", 0.707) or 0.707),
-                    "bass_integration_sub_delay_ms": float(sub_delay_ms),
-                    "bass_integration_sub_polarity_invert": bool(sub_polarity_invert),
-                    "bass_integration_sub_gain_trim_db": float(sub_gain_trim_db),
-                    "objective": float(metrics.get("objective", float("nan"))),
-                }
-            )
-            return out
+        except Exception:
+            _slpf = None
         metrics = dict(
             compute_final_bass_integration_metrics(
                 bundle,
                 float(fc_hz),
                 profile,
-                mode="avr_lfe_main_decomposed",
+                mode="direct_dac",
+                main_hpf_order=int(xo_order),
+                sub_lpf_order=int(xo_order),
+                sub_hpf_hz=float(sub_hpf_hz),
+                sub_hpf_order=int(sub_hpf_order),
                 sub_combine_mode=str(data.get("bass_integration_sub_combine_mode", "average") or "average"),
-                sub_delay_ms=float(data.get("bass_integration_sub_delay_ms", 0.0) or 0.0),
-                sub_polarity_invert=bool(data.get("bass_integration_sub_polarity_invert", False)),
-                sub_gain_trim_db=float(data.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0),
+                sub_delay_ms=float(sub_delay_ms),
+                sub_polarity_invert=bool(sub_polarity_invert),
+                sub_gain_trim_db=float(sub_gain_trim_db),
+                sub_lpf_hz=_slpf,
+                sub_allpass_freq_hz=sub_allpass_freq_hz,
+                sub_allpass_q=sub_allpass_q,
             )
             or {}
         )
         out = dict(metrics.get("diagnostics", {}) or {})
         out.update(
             {
-                "bass_integration_sub_delay_ms": float(data.get("bass_integration_sub_delay_ms", 0.0) or 0.0),
-                "bass_integration_sub_polarity_invert": bool(data.get("bass_integration_sub_polarity_invert", False)),
-                "bass_integration_sub_gain_trim_db": float(data.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0),
+                "direct_dac_main_hpf_order": int(xo_order),
+                "direct_dac_sub_lpf_order": int(xo_order),
+                "direct_dac_sub_hpf_hz": float(sub_hpf_hz),
+                "direct_dac_sub_hpf_order": int(sub_hpf_order),
+                "direct_dac_sub_allpass_enabled": bool(metrics.get("bass_allpass_enabled", False)),
+                "direct_dac_sub_allpass_freq_hz": float(metrics.get("bass_allpass_freq_hz", 0.0) or 0.0),
+                "direct_dac_sub_allpass_q": float(metrics.get("bass_allpass_q", 0.707) or 0.707),
+                "bass_integration_sub_delay_ms": float(sub_delay_ms),
+                "bass_integration_sub_polarity_invert": bool(sub_polarity_invert),
+                "bass_integration_sub_gain_trim_db": float(sub_gain_trim_db),
                 "objective": float(metrics.get("objective", float("nan"))),
             }
         )
@@ -315,7 +250,7 @@ def _compute_selected_bass_integration_diagnostics(bundle: object, data: dict) -
         return dict(getattr(bundle, "diagnostics", {}) or {}) if bundle is not None else {}
 
 
-__all__ = ['_status', '_direct_dac_filter_params', '_direct_dac_alignment_params', '_compute_avr_lfe_main_prepare_recommendation', '_compute_direct_dac_prepare_recommendation', '_compute_selected_bass_integration_diagnostics']
+__all__ = ['_status', '_direct_dac_filter_params', '_direct_dac_alignment_params', '_compute_direct_dac_prepare_recommendation', '_compute_selected_bass_integration_diagnostics']
 
 
 def _load_sibling_symbols() -> None:

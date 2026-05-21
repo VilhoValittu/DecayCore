@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import sys
 from typing import Any
 
 import numpy as np
@@ -21,17 +20,15 @@ from ...auto_mode.shared import (
 )
 from ...io.measurement_bundle import BassIntegrationBundle
 from ._constants import (
-    DIRECT_DAC_ALIGNMENT_DELAY_CANDIDATES_MS,
-    DIRECT_DAC_ALIGNMENT_GAIN_CANDIDATES_DB,
     DIRECT_DAC_ALIGNMENT_MIN_IMPROVEMENT_SCORE,
 )
 from ._final_metrics import _final_metric_snapshot
-from ._utils import _normalize_candidate_frequencies, _safe_float
+from ._utils import _get_bass_integration_pkg, _safe_float
 
 
 def _get_pkg():
     """Return the bass_integration package module for patchable attribute lookup."""
-    return sys.modules[__name__.rsplit(".", 1)[0]]
+    return _get_bass_integration_pkg(__name__)
 
 
 def _feasibility_rank(value: Any) -> int:

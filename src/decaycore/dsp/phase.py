@@ -37,7 +37,6 @@ def calculate_minimum_phase(mags_lin_fft, max_phase_deg=45.0):
     Lopputulos unwrapataan ja rajataan turvalliseen vaihealueeseen
     `limit_phase_deg()`-funktion kautta.
     """
-    n_fft = (len(mags_lin_fft) - 1) * 2
     ln_mag = np.log(np.maximum(np.abs(mags_lin_fft), 1e-10))
     full_ln_mag = np.concatenate((ln_mag, ln_mag[-2:0:-1]))
     analytic = scipy.signal.hilbert(full_ln_mag)

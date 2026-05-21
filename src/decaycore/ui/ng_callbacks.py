@@ -336,14 +336,11 @@ def _sync_bass_integration_visibility() -> None:
     bi_visible = bool(enabled and mode_u == "AUTO")
     if bi_visible:
         ctrl.set_value("bass_integration_mode", "direct_dac", emit=False)
-    is_avr = False
     is_direct = bool(bi_visible)
     for scope_name, visible in (
         ("files_legacy_topology_scope", not bi_visible),
-        ("files_bass_integration_topology_scope", bi_visible and is_avr),
         ("files_direct_dac_topology_scope", bi_visible and is_direct),
         ("bass_integration_xo_info_scope", bi_visible),
-        ("bass_integration_avr_scope", bi_visible and is_avr),
         ("bass_integration_direct_scope", bi_visible and is_direct),
     ):
         scope = ctrl.get_container(scope_name)
@@ -355,4 +352,4 @@ def _sync_bass_integration_visibility() -> None:
             logger.debug("bass integration visibility update failed: %s", scope_name, exc_info=True)
     ctrl.set_enabled("sub_crossover_hz", False)
     ctrl.set_enabled("sub_crossover_slope", False)
-    ctrl.set_enabled("bass_integration_allpass_auto_enable", False)
+    ctrl.set_enabled("bass_integration_allpass_auto_enable", bool(bi_visible))

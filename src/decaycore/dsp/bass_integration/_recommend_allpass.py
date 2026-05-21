@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import sys
 from typing import Any
 
 import numpy as np
@@ -28,6 +27,7 @@ from ._constants import (
 )
 from ._final_metrics import _final_metric_snapshot
 from ._utils import (
+    _get_bass_integration_pkg,
     _normalize_candidate_frequencies,
     _normalize_candidate_q_values,
     _safe_float,
@@ -37,7 +37,7 @@ from ._utils import (
 
 def _get_pkg():
     """Return the bass_integration package module for patchable attribute lookup."""
-    return sys.modules[__name__.rsplit(".", 1)[0]]
+    return _get_bass_integration_pkg(__name__)
 
 
 def recommend_direct_dac_allpass(
@@ -93,9 +93,9 @@ def recommend_direct_dac_allpass(
     _bl_ripple = _safe_float(baseline_metrics.get("bass_overlap_ripple", float("nan")), float("nan"))
     _bl_gd = _safe_float(baseline_metrics.get("bass_xo_gd_mismatch_ms", float("nan")), float("nan"))
     if (
-        np.isfinite(_bl_cancel) and _bl_cancel < 0.08
-        and np.isfinite(_bl_ripple) and _bl_ripple < 2.0
-        and np.isfinite(_bl_gd) and _bl_gd < 0.8
+        np.isfinite(_bl_cancel) and _bl_cancel < 0.05
+        and np.isfinite(_bl_ripple) and _bl_ripple < 1.5
+        and np.isfinite(_bl_gd) and _bl_gd < 0.6
     ):
         return {
             "enabled": False,

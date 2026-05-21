@@ -94,9 +94,7 @@ def _build_auto_selected_text(run_data: dict) -> str:
     )
     f6_txt = f"{f6_hz:.1f} Hz" if np.isfinite(f6_hz) else "n/a"
 
-    bi_mode = str(
-        run_data.get("bass_integration_mode", "avr_lfe_main_decomposed") or "avr_lfe_main_decomposed"
-    ).strip().lower()
+    bi_mode = "direct_dac"
     is_direct_dac = bool(run_data.get("bass_integration_enable", False) and bi_mode == "direct_dac")
 
     hpf_enabled = True if is_direct_dac else bool(run_data.get("hpf_enable", False))
@@ -143,9 +141,7 @@ def _resolve_auto_hpf_seed_source(
     f_r: np.ndarray,
     m_r: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, str, str, str, bool]:
-    bi_mode = str(
-        data.get("bass_integration_mode", "avr_lfe_main_decomposed") or "avr_lfe_main_decomposed"
-    ).strip().lower()
+    bi_mode = "direct_dac"
     is_direct_dac = bool(data.get("bass_integration_enable", False) and bi_mode == "direct_dac")
     if is_direct_dac:
         bundle = ctx.get("bass_integration_bundle", None)

@@ -668,42 +668,6 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:
     ctrl.register_container("files_legacy_topology_scope", legacy_scope)
     legacy_scope.set_visibility(not bass_integration_active)
 
-    with ui.column().classes("w-full gap-4") as bi_scope:
-        ui.label(t("bass_integration_requires_wav")).classes("text-xs text-gray-400")
-        ui.label(t("bass_integration_wav_format")).classes("text-xs text-gray-400")
-        with ui.row().classes("w-full gap-4"):
-            _build_measurement_slot(
-                upload_key="file_l_main",
-                path_key="local_path_l_main",
-                slot_variant="bi",
-                channel_label_key="upload_l_main",
-                path_label_key="path_l_main",
-            )
-            _build_measurement_slot(
-                upload_key="file_r_main",
-                path_key="local_path_r_main",
-                slot_variant="bi",
-                channel_label_key="upload_r_main",
-                path_label_key="path_r_main",
-            )
-        with ui.row().classes("w-full gap-4"):
-            _build_measurement_slot(
-                upload_key="file_l_sub",
-                path_key="local_path_l_sub",
-                slot_variant="bi",
-                channel_label_key="upload_l_sub",
-                path_label_key="path_l_sub",
-            )
-            _build_measurement_slot(
-                upload_key="file_r_sub",
-                path_key="local_path_r_sub",
-                slot_variant="bi",
-                channel_label_key="upload_r_sub",
-                path_label_key="path_r_sub",
-            )
-    ctrl.register_container("files_bass_integration_topology_scope", bi_scope)
-    bi_scope.set_visibility(bass_integration_active and not is_direct_dac)
-
     with ui.column().classes("w-full gap-4") as direct_dac_scope:
         ui.label(t("bi_direct_sub_help")).classes("text-xs text-gray-400")
         with ui.row().classes("w-full gap-4"):

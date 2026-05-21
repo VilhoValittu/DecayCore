@@ -33,52 +33,29 @@ def _append_bass_integration_summary(summary_content: str, data: dict | None) ->
         summary_content += f"State: {'ON' if bi_on else 'OFF'}\n"
         if not bi_on:
             return summary_content
-        raw_bi_mode = str(
+        raw_bi_mode = "direct_dac"
+        bi_mode = "Direct DAC / CamillaDSP sub output"
+        xo_label = "Main HPF"
+        xo_rec_label = "Recommended Main HPF"
+        xo_value = float(
             bi_meta.get(
-                "mode",
-                ui_data.get("bass_integration_mode", "avr_lfe_main_decomposed"),
+                "avr_crossover_hz",
+                ui_data.get(
+                    "sub_crossover_hz",
+                    ui_data.get("avr_crossover_hz", 80.0),
+                ),
             )
-            or "avr_lfe_main_decomposed"
-        ).strip().lower()
-        bi_mode = raw_bi_mode
-        if raw_bi_mode == "avr_lfe_main_decomposed":
-            bi_mode = "AVR LFE+Main (decomposed)"
-            xo_label = "AVR crossover"
-            xo_rec_label = "Recommended AVR crossover"
-            xo_value = float(bi_meta.get("avr_crossover_hz", ui_data.get("avr_crossover_hz", 80.0)) or 80.0)
-            playback_note = "Playback settings must match the AVR bass-management settings used in measurement.\n"
-            xo_note = "AVR crossover here is separate from the main speaker XO / HPF phase model above.\n"
-        elif raw_bi_mode == "direct_dac":
-            bi_mode = "Direct DAC / CamillaDSP sub output"
-            xo_label = "Main HPF"
-            xo_rec_label = "Recommended Main HPF"
-            xo_value = float(
-                bi_meta.get(
-                    "avr_crossover_hz",
-                    ui_data.get(
-                        "sub_crossover_hz",
-                        ui_data.get("avr_crossover_hz", 80.0),
-                    ),
-                )
-                or 80.0
+            or 80.0
+        )
+        sub_lpf_value = float(
+            bi_meta.get(
+                "direct_dac_sub_lpf_hz",
+                ui_data.get("direct_dac_sub_lpf_hz", xo_value),
             )
-            sub_lpf_value = float(
-                bi_meta.get(
-                    "direct_dac_sub_lpf_hz",
-                    ui_data.get("direct_dac_sub_lpf_hz", xo_value),
-                )
-                or xo_value
-            )
-            playback_note = (
-                "Direct-DAC XO is the crossover between the main-speaker HPF and the subwoofer LPF.\n"
-            )
-            xo_note = "AUTO may use overlap by setting Sub FIR LPF above Main HPF.\n"
-        else:
-            xo_label = "AVR crossover"
-            xo_rec_label = "Recommended AVR crossover"
-            xo_value = float(bi_meta.get("avr_crossover_hz", ui_data.get("avr_crossover_hz", 80.0)) or 80.0)
-            playback_note = "Playback settings must match the AVR bass-management settings used in measurement.\n"
-            xo_note = "AVR crossover here is separate from the main speaker XO / HPF phase model above.\n"
+            or xo_value
+        )
+        playback_note = "Direct-DAC XO is the crossover between the main-speaker HPF and the subwoofer LPF.\n"
+        xo_note = "AUTO may use overlap by setting Sub FIR LPF above Main HPF.\n"
         summary_content += (
             f"Mode: {bi_mode}\n"
         )
@@ -118,6 +95,9 @@ def _append_bass_integration_summary(summary_content: str, data: dict | None) ->
             summary_content += "Optimization: automatic\n"
             summary_content += f"Sub HPF: {float(sub_hpf_value):.1f} Hz\n"
             summary_content += f"Sub overlap above main XO: +{float(overlap_value):.1f} Hz\n"
+            if float(xo_value) > 0.0:
+                summary_content += f"Overlap ratio: {float(sub_lpf_value) / float(xo_value):.2f}\n"
+            summary_content += "Export model: CamillaDSP-compatible\n"
         rec_hz = bi_meta.get("recommended_crossover_hz", None)
         rec_sub_lpf_hz = bi_meta.get("recommended_sub_lpf_hz", None)
         rec_hz_l = bi_meta.get("recommended_crossover_hz_l", None)
@@ -140,6 +120,23 @@ def _append_bass_integration_summary(summary_content: str, data: dict | None) ->
         summary_content += (
             f"Sub combine mode: {str(bi_meta.get('sub_combine_mode', ui_data.get('bass_integration_sub_combine_mode', 'average')) or 'average')}\n"
         )
+        dual_sub_diag = dict(bi_meta.get("diagnostics", {}) or {})
+        if bool(dual_sub_diag.get("dual_sub_preprocessing_applied", False)):
+            sub1_peak_ms = _safe_float(dual_sub_diag.get("dual_sub_sub1_peak_ms", float("nan")), float("nan"))
+            sub2_peak_ms = _safe_float(dual_sub_diag.get("dual_sub_sub2_peak_ms", float("nan")), float("nan"))
+            delay_ms = _safe_float(dual_sub_diag.get("dual_sub_relative_delay_ms", float("nan")), float("nan"))
+            summary_content += "Bass Integration dual-sub preprocessing:\n"
+            summary_content += "Sub topology: dual-sub vector-average reference\n"
+            if sub1_peak_ms == sub1_peak_ms and abs(sub1_peak_ms) != float("inf"):
+                summary_content += f"- SUB1 peak: {float(sub1_peak_ms):.3f} ms\n"
+            if sub2_peak_ms == sub2_peak_ms and abs(sub2_peak_ms) != float("inf"):
+                summary_content += f"- SUB2 peak: {float(sub2_peak_ms):.3f} ms\n"
+            if delay_ms == delay_ms and abs(delay_ms) != float("inf"):
+                summary_content += f"- Applied relative delay: {float(delay_ms):+.3f} ms\n"
+            summary_content += "- Combined sub response: vector average of aligned SUB1 + SUB2\n"
+            summary_content += "- Combined method: complex vector average after peak alignment\n"
+            summary_content += "- Per-sub optimization: no\n"
+            summary_content += "- This is a combined acoustic sub reference, not independent per-sub optimization.\n"
         inputs = dict(bi_meta.get("inputs", {}) or {})
         summary_content += "Inputs used:\n"
         summary_content += f"L main: {str(inputs.get('l_main', '') or 'n/a')}\n"
@@ -184,6 +181,11 @@ def _append_bass_integration_summary(summary_content: str, data: dict | None) ->
                 f"Sub polarity: {'INVERTED' if bool(alignment.get('polarity_invert', ui_data.get('bass_integration_sub_polarity_invert', False))) else 'NORMAL'}\n"
             )
             summary_content += f"Sub gain trim: {float(alignment.get('gain_trim_db', ui_data.get('bass_integration_sub_gain_trim_db', 0.0)) or 0.0):+.2f} dB\n"
+            worst_channel = str(
+                bm.get("bass_direct_dac_worst_channel", diag.get("dominant_channel", "unknown")) or "unknown"
+            ).strip().upper()
+            if worst_channel:
+                summary_content += f"Worst channel: {worst_channel}\n"
             phase_err = _safe_float(diag.get("direct_dac_phase_error_deg", float("nan")), float("nan"))
             direct_gd = _safe_float(diag.get("direct_dac_gd_mismatch_ms", float("nan")), float("nan"))
             direct_cancel = str(diag.get("direct_dac_cancellation_risk", "") or "").strip().lower()
@@ -270,9 +272,6 @@ def _append_bass_integration_allpass_auto_summary(summary_content: str, data: di
     try:
         ui_data = dict(data or {})
         if not bool(ui_data.get("bass_integration_enable", False)):
-            return summary_content
-        bi_mode = str(ui_data.get("bass_integration_mode", "avr_lfe_main_decomposed") or "avr_lfe_main_decomposed").strip().lower()
-        if bi_mode != "direct_dac":
             return summary_content
         bi_meta = dict(ui_data.get("_bass_integration_meta", {}) or {})
         allpass_meta = dict(bi_meta.get("recommended_allpass", {}) or {})

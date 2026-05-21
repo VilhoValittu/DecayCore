@@ -54,8 +54,13 @@ def finalize_score_result_metrics(
     rank_score: float,
     rank_components: dict,
 ) -> dict:
+    direct_dac_canonical_bi = bool(
+        str(metrics_out.get("bass_integration_mode", "") or "").strip().lower() == "direct_dac"
+        or str(metrics_out.get("bass_direct_dac_export_model", "") or "").strip().lower() == "camilladsp_yaml_compatible"
+    )
     bass_failed = bool(
         bool(dict(base_data or {}).get("bass_integration_enable", False))
+        and not direct_dac_canonical_bi
         and str(metrics_out.get("bass_feasibility_class", "") or "").strip().lower() == "infeasible"
     )
     bass_reason = ""

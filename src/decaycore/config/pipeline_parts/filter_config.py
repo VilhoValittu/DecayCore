@@ -367,9 +367,7 @@ def build_filter_config(
     if hasattr(FilterConfig_cls, "bass_integration_enable"):
         bass_integration_kwargs["bass_integration_enable"] = bool(data.get("bass_integration_enable", False))
     if hasattr(FilterConfig_cls, "bass_integration_mode"):
-        bass_integration_kwargs["bass_integration_mode"] = str(
-            data.get("bass_integration_mode", "avr_lfe_main_decomposed") or "avr_lfe_main_decomposed"
-        )
+        bass_integration_kwargs["bass_integration_mode"] = "direct_dac"
     if hasattr(FilterConfig_cls, "bass_integration_profile"):
         bass_integration_kwargs["bass_integration_profile"] = str(
             data.get("bass_integration_profile", "safe") or "safe"
@@ -540,7 +538,7 @@ def build_filter_config(
         if not math.isfinite(direct_sub_lpf_hz) or direct_sub_lpf_hz <= 0.0:
             direct_sub_lpf_hz = sub_xo_hz
         if _is_direct_dac:
-            direct_sub_lpf_hz = max(float(sub_xo_hz) + 20.0, float(direct_sub_lpf_hz))
+            direct_sub_lpf_hz = max(float(sub_xo_hz), float(direct_sub_lpf_hz))
 
         if _is_direct_dac:
             main_hpf_f = 0.0

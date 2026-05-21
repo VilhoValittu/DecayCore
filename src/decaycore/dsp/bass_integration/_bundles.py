@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ...io.measurement_bundle import BassIntegrationBundle, TransferData
+from ...io.measurement_bundle import BassIntegrationBundle
 from ._filters import (
     _apply_allpass_to_transfer,
     _apply_delay_to_transfer,
@@ -22,11 +22,10 @@ from ._filters import (
 )
 from ._sub_combine import (
     _bundle_sub_slot_names,
-    _sum_sub_components,
     build_combined_sub_transfer,
     sum_complex_responses,
 )
-from ._utils import _build_transfer_like, _safe_float, normalize_sub_combine_mode
+from ._utils import _safe_float, normalize_sub_combine_mode
 
 
 def _build_direct_dac_trial_bundle(
@@ -128,63 +127,6 @@ def _build_direct_dac_trial_bundle(
         l_total=l_total_f,
         r_total=r_total_f,
         avr_crossover_hz=float(fc),
-        profile=str(bundle.profile or "safe"),
-        diagnostics=diagnostics,
-    )
-
-
-def _build_avr_lfe_main_trial_bundle(
-    bundle: BassIntegrationBundle,
-    *,
-    sub_combine_mode: str = "average",
-    sub_delay_ms: float = 0.0,
-    sub_polarity_invert: bool = False,
-    sub_gain_trim_db: float = 0.0,
-) -> BassIntegrationBundle:
-    from ._sub_combine import _bundle_active_sub_transfers
-    combine_mode_norm = normalize_sub_combine_mode(sub_combine_mode)
-    combined_sub, combine_diag = build_combined_sub_transfer(
-        bundle.l_main,
-        *_bundle_active_sub_transfers(bundle),
-        mode=combine_mode_norm,
-        label="AVR LFE+Main combined sub trial",
-    )
-    combined_sub = _apply_polarity_to_transfer(
-        combined_sub,
-        invert=bool(sub_polarity_invert),
-        label="AVR LFE+Main combined sub polarity trial",
-    )
-    combined_sub = _apply_gain_trim_to_transfer(
-        combined_sub,
-        gain_trim_db=float(sub_gain_trim_db),
-        label="AVR LFE+Main combined sub gain trial",
-    )
-    combined_sub = _apply_delay_to_transfer(
-        combined_sub,
-        delay_ms=float(sub_delay_ms),
-        label="AVR LFE+Main combined sub delay trial",
-    )
-    l_total = sum_complex_responses(bundle.l_main, combined_sub, label="L AVR LFE+Main trial total")
-    r_total = sum_complex_responses(bundle.r_main, combined_sub, label="R AVR LFE+Main trial total")
-    diagnostics = dict(getattr(bundle, "diagnostics", {}) or {})
-    diagnostics.update(dict(combine_diag or {}))
-    diagnostics.update(
-        {
-            "sub_slots_present": ["l_sub"],
-            "sub_combine_mode": str(combine_mode_norm),
-            "bass_integration_sub_delay_ms": float(_safe_float(sub_delay_ms, 0.0)),
-            "bass_integration_sub_polarity_invert": bool(sub_polarity_invert),
-            "bass_integration_sub_gain_trim_db": float(_safe_float(sub_gain_trim_db, 0.0)),
-        }
-    )
-    return BassIntegrationBundle(
-        l_main=bundle.l_main,
-        r_main=bundle.r_main,
-        l_sub=combined_sub,
-        r_sub=_build_transfer_like(combined_sub, np.zeros_like(combined_sub.complex_spec), label="AVR inactive sub slot"),
-        l_total=l_total,
-        r_total=r_total,
-        avr_crossover_hz=float(bundle.avr_crossover_hz),
         profile=str(bundle.profile or "safe"),
         diagnostics=diagnostics,
     )

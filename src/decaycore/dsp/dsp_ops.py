@@ -166,7 +166,6 @@ def _limit_gd_gradient_ms_per_oct(
         base_lim * 0.67,
         np.where(ff < 500.0, base_lim, base_lim * 1.5),
     )
-    lim_scalar = float(np.min(lim_arr))
     gd_l = gd_ms.copy()
     try:
         sigma = float(grad_smooth_sigma) if float(grad_smooth_sigma) > 0.0 else 0.6

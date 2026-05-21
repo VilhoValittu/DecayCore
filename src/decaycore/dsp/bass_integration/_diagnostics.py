@@ -19,18 +19,12 @@ from ...auto_mode.shared import (
     AUTO_MODE_BASS_INTEGRATION_GUARD_LO_RATIO,
     _auto_bass_integration_profile_norm,
 )
-from ...io.measurement_bundle import BassIntegrationBundle, TransferData
+from ...io.measurement_bundle import BassIntegrationBundle
 from ._channel_metrics import (
     _channel_metric_summary,
     _channel_overlap_extension_metrics,
     _channel_overlap_metrics,
     _channel_predicted_sum_metrics,
-    _metric_delta,
-)
-from ._gd_feasibility import (
-    _classify_bass_integration_feasibility,
-    _dominant_bass_channel,
-    compute_xo_gd_continuity,
 )
 from ._sub_combine import build_bundle_combined_sub_transfer
 from ._utils import _safe_float, normalize_sub_combine_mode
@@ -254,7 +248,7 @@ def compute_bass_integration_metric_payload(
     fc_hz: float,
     profile: str,
     *,
-    mode: str = "avr_lfe_main_decomposed",
+    mode: str = "direct_dac",
     main_hpf_order: int = 4,
     sub_lpf_order: int = 4,
     sub_hpf_hz: float = 20.0,

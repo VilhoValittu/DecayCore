@@ -244,13 +244,7 @@ def evaluate_search_candidate(
                         trial_measurements.get("bass_integration_profile", "safe"),
                     )
                 )
-                bi_mode = str(
-                    trial_data.get(
-                        "bass_integration_mode",
-                        trial_measurements.get("bass_integration_mode", "avr_lfe_main_decomposed"),
-                    )
-                    or "avr_lfe_main_decomposed"
-                ).strip().lower()
+                bi_mode = "direct_dac"
                 try:
                     xo_order = max(1, int(round(float(trial_data.get("sub_crossover_slope", 24) or 24.0))) // 6)
                 except Exception:

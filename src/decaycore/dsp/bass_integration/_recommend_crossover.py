@@ -14,89 +14,20 @@ from typing import Any
 
 import numpy as np
 
-import sys
-
 from ...auto_mode.shared import _auto_bass_integration_profile_weights
 from ...io.measurement_bundle import BassIntegrationBundle
 from ._constants import (
     AVR_CROSSOVER_CANDIDATES,
-    DIRECT_DAC_CROSSOVER_STEP_HZ,
     DIRECT_DAC_OVERLAP_RATIOS,
     MIN_DIRECT_DAC_OVERLAP_RATIO,
 )
 from ._recommend_alignment import _evaluate_metric_grid
-from ._utils import _normalize_candidate_frequencies, _safe_float, normalize_sub_combine_mode
+from ._utils import _get_bass_integration_pkg, _normalize_candidate_frequencies, _safe_float, normalize_sub_combine_mode
 
 
 def _get_pkg():
     """Return the bass_integration package module for patchable attribute lookup."""
-    return sys.modules[__name__.rsplit(".", 1)[0]]
-
-
-def recommend_avr_crossover(
-    bundle: BassIntegrationBundle,
-    candidates: tuple[float, ...] = AVR_CROSSOVER_CANDIDATES,
-    profile: str = "safe",
-    *,
-    sub_combine_mode: str = "average",
-) -> dict[str, Any]:
-    weights = _auto_bass_integration_profile_weights(profile)
-    w_main_act = float(weights.get("main_activity", 6.0))
-    scores: dict[float, dict[str, float]] = {}
-    pkg = _get_pkg()
-    for fc in candidates:
-        fc = float(fc)
-        metrics = pkg.compute_final_bass_integration_metrics(
-            bundle,
-            fc,
-            profile,
-            mode="avr_lfe_main_decomposed",
-            sub_combine_mode=sub_combine_mode,
-        )
-        score = _safe_float(metrics.get("objective", float("nan")), float("nan"))
-        l_drop = pkg._main_guard_band_drop_db(bundle.l_main, fc)
-        r_drop = pkg._main_guard_band_drop_db(bundle.r_main, fc)
-        drop_vals = [v for v in (l_drop, r_drop) if np.isfinite(v)]
-        main_drop_norm = (
-            max(0.0, float(np.mean(np.asarray(drop_vals, dtype=float)))) / 12.0
-            if drop_vals
-            else float("nan")
-        )
-        if np.isfinite(score) and np.isfinite(main_drop_norm):
-            score -= w_main_act * float(main_drop_norm)
-        scores[fc] = {
-            "score": float(score),
-            "cancellation_risk": float(_safe_float(metrics.get("bass_cancellation_risk", float("nan")), float("nan"))),
-            "overlap_ripple_db": float(_safe_float(metrics.get("bass_overlap_ripple", float("nan")), float("nan"))),
-            "sub_dominance_db": float(_safe_float(metrics.get("bass_sub_dominance", float("nan")), float("nan"))),
-            "null_severity": float(_safe_float(metrics.get("bass_null_severity", float("nan")), float("nan"))),
-            "predicted_sum_flatness_db": float(
-                _safe_float(metrics.get("bass_predicted_sum_flatness_db", float("nan")), float("nan"))
-            ),
-            "overlap_ripple_delta_db": float(
-                _safe_float(metrics.get("bass_overlap_ripple_delta_db", float("nan")), float("nan"))
-            ),
-            "sub_dominance_delta_db": float(
-                _safe_float(metrics.get("bass_sub_dominance_delta_db", float("nan")), float("nan"))
-            ),
-            "xo_gd_mismatch_delta_ms": float(
-                _safe_float(metrics.get("bass_xo_gd_mismatch_delta_ms", float("nan")), float("nan"))
-            ),
-            "dominant_channel": str(metrics.get("bass_dominant_channel", "unknown") or "unknown"),
-            "feasibility_class": str(metrics.get("bass_feasibility_class", "marginal") or "marginal"),
-            "feasibility_reason": str(metrics.get("bass_feasibility_reason", "") or ""),
-            "main_activity_drop_db": float(np.mean(np.asarray(drop_vals, dtype=float))) if drop_vals else float("nan"),
-        }
-    valid = {fc: d["score"] for fc, d in scores.items() if np.isfinite(d["score"])}
-    best_hz = float(max(valid, key=lambda item: valid[item])) if valid else float(bundle.avr_crossover_hz)
-    best_entry = dict(scores.get(best_hz, {}) or {})
-    return {
-        "recommended_hz": best_hz,
-        "scores": scores,
-        "feasibility_class": str(best_entry.get("feasibility_class", "marginal") or "marginal"),
-        "feasibility_reason": str(best_entry.get("feasibility_reason", "") or ""),
-        "dominant_channel": str(best_entry.get("dominant_channel", "unknown") or "unknown"),
-    }
+    return _get_bass_integration_pkg(__name__)
 
 
 def recommend_direct_dac_crossover(

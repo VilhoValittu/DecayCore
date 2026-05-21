@@ -139,9 +139,7 @@ def run_batch(config: dict, output_dir: Path, headless: bool = True) -> dict:
     try:
         required = ["local_path_l", "local_path_r"]
         if bool(data.get("bass_integration_enable", False)):
-            required = ["local_path_l_main", "local_path_r_main"]
-            if str(data.get("bass_integration_mode", "")).strip().lower() == "direct_dac":
-                required += ["local_path_l_sub", "local_path_r_sub"]
+            required = ["local_path_l_main", "local_path_r_main", "local_path_l_sub", "local_path_r_sub"]
         missing = [key for key in required if not str(data.get(key, "") or "").strip() or not Path(str(data.get(key))).exists()]
         if missing:
             sink.warning("Missing input files for DSP run: " + ", ".join(missing))

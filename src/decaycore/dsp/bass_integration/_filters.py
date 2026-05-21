@@ -10,19 +10,17 @@
 
 from __future__ import annotations
 
-import sys
-
 import numpy as np
 import scipy.signal
 
 from ...io.measurement_bundle import BassIntegrationBundle, TransferData
 from ..bass_cache import _BUTTER_RESPONSE_CACHE, _get_filtered_branch_cache
-from ._utils import _build_transfer_like, _interp_complex_response, _safe_float
+from ._utils import _build_transfer_like, _get_bass_integration_pkg, _interp_complex_response, _safe_float
 
 
 def _get_pkg():
     """Return the bass_integration package module for patchable attribute lookup."""
-    return sys.modules[__name__.rsplit(".", 1)[0]]
+    return _get_bass_integration_pkg(__name__)
 
 
 def _butterworth_complex_response(
@@ -68,13 +66,17 @@ def _allpass2_complex_response(freqs_hz: np.ndarray, freq_hz: float, q: float) -
     q_v = _safe_float(q, float("nan"))
     if freqs.size == 0 or (not np.isfinite(fc)) or fc <= 0.0 or (not np.isfinite(q_v)) or q_v <= 0.0:
         return np.ones(freqs.shape, dtype=np.complex128)
-    q_v = max(float(q_v), 0.1)  # guard: very low Q causes huge damping and near-zero denominator
-    omega = 2.0 * np.pi * freqs
-    omega_0 = 2.0 * np.pi * float(fc)
-    s = 1j * omega
-    damping = float(omega_0 / float(q_v))
-    num = (s ** 2) - damping * s + (omega_0 ** 2)
-    den = (s ** 2) + damping * s + (omega_0 ** 2)
+    q_v = max(float(q_v), 0.1)
+    # Use bilinear-prewarped formula to match digital biquad behaviour in CamillaDSP.
+    # Infer sample rate from the frequency grid; ensure fc stays well below Nyquist.
+    fs = float(max(2.0 * freqs[-1], 8.0 * float(fc)))
+    # Prewarp center frequency so it lands exactly at fc after bilinear mapping.
+    omega_0_w = 2.0 * fs * float(np.tan(np.pi * float(fc) / fs))
+    damping = omega_0_w / float(q_v)
+    # Bilinear s-substitute: s = j * 2*fs * tan(π*f/fs)
+    s = 1j * 2.0 * fs * np.tan(np.pi * freqs / fs)
+    num = (s ** 2) - damping * s + (omega_0_w ** 2)
+    den = (s ** 2) + damping * s + (omega_0_w ** 2)
     den = np.where(np.abs(den) < 1e-12, 1e-12 + 0j, den)
     return np.asarray(num / den, dtype=np.complex128)
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
+import scipy.signal
 
 from ...auto_mode.shared import (
     AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO,
@@ -20,9 +21,7 @@ from ...auto_mode.shared import (
     _auto_bass_integration_profile_weights,
 )
 from ...io.measurement_bundle import BassIntegrationBundle, TransferData
-from ._channel_metrics import _channel_metric_summary
 from ._constants import (
-    BASS_INTEGRATION_FEASIBILITY_OBJECTIVE_PENALTY,
     BASS_INTEGRATION_FEASIBILITY_THRESHOLDS,
     GD_CONTINUITY_GUARD_HI_RATIO,
     GD_CONTINUITY_GUARD_LO_RATIO,
@@ -80,6 +79,7 @@ def _classify_bass_integration_feasibility(
     dominant_channel: str,
     sub_combine_mode: str,
     sub_level_delta_db_20_120: Any,
+    fc_hz: float = 80.0,
 ) -> tuple[str, str]:
     values = {
         "overlap_ripple_db": _safe_float(overlap_ripple_worst, float("nan")),
@@ -89,6 +89,12 @@ def _classify_bass_integration_feasibility(
         "sub_dominance_delta_db": _safe_float(sub_dominance_delta, float("nan")),
         "xo_gd_mismatch_delta_ms": _safe_float(xo_gd_delta, float("nan")),
     }
+    # Scale GD thresholds by crossover frequency.
+    # 12 ms at 80 Hz is 0.35 wavelengths; the same physical tolerance at 150 Hz is
+    # only 0.18 wavelengths and causes severe comb filtering.  Clamp scale to [0.5, 2.0]
+    # so extreme XO values don't produce unreasonable thresholds.
+    _fc = float(max(_safe_float(fc_hz, 80.0), 1.0))
+    _gd_scale = float(np.clip(80.0 / _fc, 0.5, 2.0))
 
     def _meets(limit_name: str) -> bool:
         limits = dict(BASS_INTEGRATION_FEASIBILITY_THRESHOLDS[limit_name])
@@ -98,7 +104,8 @@ def _classify_bass_integration_feasibility(
             if not np.isfinite(value):
                 continue
             checked = True
-            if float(value) > float(limit):
+            effective_limit = float(limit) * _gd_scale if key == "xo_gd_rms_mismatch_ms" else float(limit)
+            if float(value) > effective_limit:
                 return False
         return bool(checked)
 
@@ -151,6 +158,11 @@ def _gd_ms_from_transfer(transfer: TransferData) -> np.ndarray:
     freqs = np.asarray(transfer.freqs_hz, dtype=float)
     phase_rad = np.deg2rad(np.asarray(transfer.phase_deg, dtype=float))
     omega = 2.0 * np.pi * np.maximum(freqs, 1e-9)
+    # Smooth phase before differentiation to suppress np.gradient noise near DC and Nyquist.
+    n = phase_rad.size
+    if n >= 7:
+        wlen = min(11, n if n % 2 == 1 else n - 1)
+        phase_rad = scipy.signal.savgol_filter(phase_rad, window_length=wlen, polyorder=2)
     gd_s = -np.gradient(phase_rad, omega)
     return np.asarray(gd_s * 1000.0, dtype=float)
 
@@ -166,10 +178,18 @@ def _gd_ms_at_hz(transfer: TransferData, target_hz: float) -> float:
 
 def _main_guard_band_drop_db(main: TransferData, fc_hz: float) -> float:
     """Return how far (dB) the main speaker has fallen in the XO guard band
-    relative to its 200–600 Hz midrange reference.  Positive = rolling off."""
+    relative to its flat midrange reference.  Positive = rolling off.
+
+    Reference band is fc-dependent so speakers with high XO (e.g. 150 Hz) that
+    start rolling off at 200 Hz don't contaminate the reference measurement.
+    ref_lo = max(fc*2, 300), ref_hi = max(fc*4, 600).
+    """
     freqs = np.asarray(main.freqs_hz, dtype=float)
     mag_db = np.asarray(main.mag_db, dtype=float)
-    ref_mask = _band_mask(freqs, 200.0, 600.0)
+    fc = _safe_float(fc_hz, 80.0)
+    ref_lo = max(float(fc) * 2.0, 300.0)
+    ref_hi = max(float(fc) * 4.0, 600.0)
+    ref_mask = _band_mask(freqs, ref_lo, ref_hi)
     if int(np.count_nonzero(ref_mask)) < 3:
         return float("nan")
     ref_db = float(np.mean(mag_db[ref_mask]))

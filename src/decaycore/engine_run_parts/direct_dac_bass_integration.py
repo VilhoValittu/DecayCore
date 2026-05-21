@@ -13,43 +13,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import numpy as np
-
 from ..dsp.bass_integration import (
-    build_bundle_combined_sub_transfer,
-    run_direct_dac_bass_integration,
+    direct_dac_candidate_from_data,
+    evaluate_direct_dac_candidate,
+    write_direct_dac_candidate_to_data,
 )
 
 logger = logging.getLogger("DecayCore")
-
-
-def _fir_complex_response(ir: np.ndarray, fs: int, freq_axis: np.ndarray) -> np.ndarray:
-    x = np.asarray(ir, dtype=float).reshape(-1)
-    freqs = np.asarray(freq_axis, dtype=float).reshape(-1)
-    if x.size < 8 or freqs.size == 0 or int(fs) <= 0:
-        return np.ones(freqs.shape, dtype=np.complex128)
-    h = np.fft.rfft(x)
-    f_fft = np.fft.rfftfreq(x.size, d=1.0 / float(fs))
-    real = np.interp(np.clip(freqs, f_fft[0], f_fft[-1]), f_fft, np.real(h))
-    imag = np.interp(np.clip(freqs, f_fft[0], f_fft[-1]), f_fft, np.imag(h))
-    return np.asarray(real + 1j * imag, dtype=np.complex128)
-
-
-def _interp_complex_to_axis(freq_src: np.ndarray, spec_src: np.ndarray, freq_dst: np.ndarray) -> np.ndarray:
-    fs = np.asarray(freq_src, dtype=float).reshape(-1)
-    sp = np.asarray(spec_src, dtype=np.complex128).reshape(-1)
-    fd = np.asarray(freq_dst, dtype=float).reshape(-1)
-    if fd.size == 0:
-        return np.asarray([], dtype=np.complex128)
-    if fs.size == fd.size and np.allclose(fs, fd, rtol=0.0, atol=1e-9):
-        return sp.copy()
-    if fs.size < 2 or sp.size != fs.size:
-        return np.ones(fd.shape, dtype=np.complex128)
-    fq = np.clip(fd, float(np.min(fs)), float(np.max(fs)))
-    return np.asarray(
-        np.interp(fq, fs, np.real(sp)) + 1j * np.interp(fq, fs, np.imag(sp)),
-        dtype=np.complex128,
-    )
 
 
 def apply_direct_dac_bass_integration_result(
@@ -74,47 +44,35 @@ def apply_direct_dac_bass_integration_result(
     if bundle is None:
         return {}
     try:
-        opt_freqs = np.asarray(bundle.l_main.freqs_hz, dtype=float).reshape(-1)
-        l_main_corr = _interp_complex_to_axis(
-            np.asarray(bundle.l_main.freqs_hz, dtype=float),
-            np.asarray(bundle.l_main.complex_spec, dtype=np.complex128),
-            opt_freqs,
-        ) * _fir_complex_response(np.asarray(l_imp, dtype=float), int(cfg.fs), opt_freqs)
-        r_main_corr = _interp_complex_to_axis(
-            np.asarray(bundle.r_main.freqs_hz, dtype=float),
-            np.asarray(bundle.r_main.complex_spec, dtype=np.complex128),
-            opt_freqs,
-        ) * _fir_complex_response(np.asarray(r_imp, dtype=float), int(cfg.fs), opt_freqs)
-        sub_total_transfer, _diag = build_bundle_combined_sub_transfer(
+        candidate = direct_dac_candidate_from_data(data, cfg)
+        metrics = evaluate_direct_dac_candidate(
             bundle,
-            channel="l",
-            label="Direct-DAC corrected sub optimization",
+            candidate,
+            profile=str(getattr(cfg, "bass_integration_profile", getattr(bundle, "profile", "safe")) or "safe"),
+            sub_combine_mode=str(getattr(cfg, "bass_integration_sub_combine_mode", "average") or "average"),
         )
-        sub_corr = _interp_complex_to_axis(
-            np.asarray(sub_total_transfer.freqs_hz, dtype=float),
-            np.asarray(sub_total_transfer.complex_spec, dtype=np.complex128),
-            opt_freqs,
-        ) * _fir_complex_response(np.asarray(sub_ir, dtype=float), int(cfg.fs), opt_freqs)
-        direct_dac_result = run_direct_dac_bass_integration(
-            0.5 * (l_main_corr + r_main_corr),
-            sub_corr,
-            opt_freqs,
-        )
-        result_dict = direct_dac_result.as_dict()
-        data["bass_integration_mode"] = "direct_dac"
-        data["sub_crossover_hz"] = float(direct_dac_result.main_hpf_hz)
-        data["avr_crossover_hz"] = float(direct_dac_result.main_hpf_hz)
-        data["sub_hpf_freq"] = float(direct_dac_result.sub_hpf_hz)
-        data["direct_dac_sub_lpf_hz"] = float(direct_dac_result.sub_lpf_hz)
-        data["bass_integration_sub_delay_ms"] = float(direct_dac_result.sub_delay_ms)
-        data["bass_integration_sub_gain_trim_db"] = float(direct_dac_result.sub_gain_db)
-        data["bass_integration_sub_polarity_invert"] = bool(direct_dac_result.sub_polarity_invert)
+        write_direct_dac_candidate_to_data(data, candidate, metrics, reason="Direct-DAC final candidate verification.")
+        result_dict = {
+            "enabled": True,
+            "main_hpf_hz": float(candidate.main_hpf_hz),
+            "sub_hpf_hz": float(candidate.sub_hpf_hz),
+            "sub_lpf_hz": float(candidate.sub_lpf_hz),
+            "sub_overlap_hz": float(candidate.sub_lpf_hz - candidate.main_hpf_hz),
+            "sub_delay_ms": float(candidate.sub_delay_ms),
+            "sub_gain_db": float(candidate.sub_gain_trim_db),
+            "sub_polarity_invert": bool(candidate.sub_polarity_invert),
+            "score": float(metrics.score),
+            "objective": float(metrics.objective),
+            "rejected": not bool(metrics.feasible),
+            "reject_reason": ", ".join(metrics.reject_reasons),
+            "reject_reasons": list(metrics.reject_reasons),
+            "worst_channel": str(metrics.dominant_channel),
+            "cancellation_score": float(max(metrics.left.cancellation_risk, metrics.right.cancellation_risk)),
+            "cancellation_risk": str(metrics.summary.get("feasibility_class", "")),
+            "magnitude_ripple_db": float(metrics.summary.get("overlap_ripple_db", float("nan"))),
+        }
         data["bass_integration_alignment_auto_applied"] = True
-        data["bass_integration_alignment_reason"] = "Direct DAC corrected-response optimizer."
-        data["bass_integration_allpass_auto_enable"] = False
-        data["bass_integration_allpass_auto_applied"] = False
-        data["bass_integration_allpass_freq_hz"] = 0.0
-        data["bass_integration_allpass_q"] = 0.707
+        data["bass_integration_alignment_reason"] = "Direct DAC final candidate verified with canonical evaluator."
         sub_target_policy = str(data.get("sub_target_policy", "") or "").strip()
         sub_target_lpf_hz = data.get("sub_target_lpf_hz", None)
         sub_target_slope = data.get("sub_target_lpf_slope_db_per_oct", None)
@@ -125,10 +83,10 @@ def apply_direct_dac_bass_integration_result(
                     "enabled": True,
                     "mode": "direct_dac",
                     "optimization": "automatic",
-                    "avr_crossover_hz": float(direct_dac_result.main_hpf_hz),
-                    "direct_dac_sub_lpf_hz": float(direct_dac_result.sub_lpf_hz),
-                    "recommended_crossover_hz": float(direct_dac_result.main_hpf_hz),
-                    "recommended_sub_lpf_hz": float(direct_dac_result.sub_lpf_hz),
+                    "avr_crossover_hz": float(candidate.main_hpf_hz),
+                    "direct_dac_sub_lpf_hz": float(candidate.sub_lpf_hz),
+                    "recommended_crossover_hz": float(candidate.main_hpf_hz),
+                    "recommended_sub_lpf_hz": float(candidate.sub_lpf_hz),
                     "direct_dac_result": dict(result_dict),
                     **(
                         {
@@ -144,25 +102,24 @@ def apply_direct_dac_bass_integration_result(
             diagnostics = dict(bi_meta.get("diagnostics", {}) or {})
             diagnostics.update(
                 {
-                    "direct_dac_main_hpf_hz": float(direct_dac_result.main_hpf_hz),
-                    "direct_dac_sub_hpf_hz": float(direct_dac_result.sub_hpf_hz),
-                    "direct_dac_sub_lpf_hz": float(direct_dac_result.sub_lpf_hz),
-                    "direct_dac_sub_overlap_hz": float(direct_dac_result.sub_overlap_hz),
-                    "direct_dac_phase_error_deg": float(direct_dac_result.phase_error_deg),
-                    "direct_dac_gd_mismatch_ms": float(direct_dac_result.gd_mismatch_ms),
-                    "direct_dac_cancellation_risk": str(direct_dac_result.cancellation_risk),
-                    "direct_dac_cancellation_score": float(direct_dac_result.cancellation_score),
-                    "direct_dac_magnitude_ripple_db": float(direct_dac_result.magnitude_ripple_db),
+                    "direct_dac_main_hpf_hz": float(candidate.main_hpf_hz),
+                    "direct_dac_sub_hpf_hz": float(candidate.sub_hpf_hz),
+                    "direct_dac_sub_lpf_hz": float(candidate.sub_lpf_hz),
+                    "direct_dac_sub_overlap_hz": float(candidate.sub_lpf_hz - candidate.main_hpf_hz),
+                    "direct_dac_cancellation_score": float(result_dict["cancellation_score"]),
+                    "direct_dac_magnitude_ripple_db": float(result_dict["magnitude_ripple_db"]),
+                    "direct_dac_candidate_score": float(metrics.score),
+                    "direct_dac_worst_channel": str(metrics.dominant_channel),
                 }
             )
             bi_meta["diagnostics"] = diagnostics
             bi_meta["alignment"] = {
                 "applied": True,
-                "delay_ms": float(direct_dac_result.sub_delay_ms),
-                "polarity_invert": bool(direct_dac_result.sub_polarity_invert),
-                "gain_trim_db": float(direct_dac_result.sub_gain_db),
-                "reason": "Direct DAC corrected-response optimizer.",
-                "improvement_score": float(-direct_dac_result.score),
+                "delay_ms": float(candidate.sub_delay_ms),
+                "polarity_invert": bool(candidate.sub_polarity_invert),
+                "gain_trim_db": float(candidate.sub_gain_trim_db),
+                "reason": "Direct DAC final candidate verified with canonical evaluator.",
+                "improvement_score": float(metrics.objective),
                 "baseline_metrics": {},
                 "optimized_metrics": dict(result_dict),
             }
@@ -170,19 +127,29 @@ def apply_direct_dac_bass_integration_result(
             if isinstance(st, dict):
                 st["direct_dac_bass_integration"] = dict(result_dict)
         logger.info(
-            "Direct-DAC Bass Integration selected: main HPF %.1f Hz, sub HPF %.1f Hz, "
-            "sub LPF %.1f Hz, polarity %s, delay %.2f ms, gain %+0.2f dB, score %.3f",
-            float(direct_dac_result.main_hpf_hz),
-            float(direct_dac_result.sub_hpf_hz),
-            float(direct_dac_result.sub_lpf_hz),
-            "invert" if bool(direct_dac_result.sub_polarity_invert) else "normal",
-            float(direct_dac_result.sub_delay_ms),
-            float(direct_dac_result.sub_gain_db),
-            float(direct_dac_result.score),
+            "Direct-DAC Bass Integration final: main HPF %.1f Hz order %d, sub HPF %.1f Hz order %d, "
+            "sub LPF %.1f Hz order %d, overlap ratio %.2f, sub delay %+.2f ms, gain %+0.2f dB, "
+            "polarity %s, allpass %s, score %.3f, worst channel %s, feasibility %s, reject reasons %s, "
+            "export model camilladsp_yaml_compatible",
+            float(candidate.main_hpf_hz),
+            int(candidate.main_hpf_order),
+            float(candidate.sub_hpf_hz),
+            int(candidate.sub_hpf_order),
+            float(candidate.sub_lpf_hz),
+            int(candidate.sub_lpf_order),
+            float(candidate.sub_lpf_hz) / max(float(candidate.main_hpf_hz), 1e-9),
+            float(candidate.sub_delay_ms),
+            float(candidate.sub_gain_trim_db),
+            "invert" if bool(candidate.sub_polarity_invert) else "normal",
+            (f"{candidate.sub_allpass_freq_hz:.1f} Hz Q {candidate.sub_allpass_q:.3f}" if candidate.sub_allpass_enabled else "off"),
+            float(metrics.score),
+            str(metrics.dominant_channel),
+            str(metrics.summary.get("feasibility_class", "")),
+            ",".join(metrics.reject_reasons) if metrics.reject_reasons else "none",
         )
         return dict(result_dict)
     except Exception:
-        logger.debug("Direct-DAC corrected-response optimization failed", exc_info=True)
+        logger.debug("Direct-DAC final candidate verification failed", exc_info=True)
         return {}
 
 

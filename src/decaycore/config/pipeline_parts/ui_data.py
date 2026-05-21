@@ -340,12 +340,10 @@ def collect_ui_data(pin) -> Dict[str, Any]:
     except Exception:
         data["avr_crossover_hz"] = 80.0
     try:
-        bi_mode = str(data.get("bass_integration_mode", "avr_lfe_main_decomposed") or "avr_lfe_main_decomposed").strip().lower()
+        bi_mode = str(data.get("bass_integration_mode", "direct_dac") or "direct_dac").strip().lower()
     except Exception:
-        bi_mode = "avr_lfe_main_decomposed"
-    if bi_mode not in ("avr_lfe_main_decomposed", "direct_dac"):
-        bi_mode = "avr_lfe_main_decomposed"
-    if bool(data.get("bass_integration_enable", False)) and is_auto_mode:
+        bi_mode = "direct_dac"
+    if bi_mode != "direct_dac" or bool(data.get("bass_integration_enable", False)):
         bi_mode = "direct_dac"
     data["bass_integration_mode"] = bi_mode
     try:
@@ -409,7 +407,7 @@ def collect_ui_data(pin) -> Dict[str, Any]:
     if not math.isfinite(direct_sub_lpf_hz) or direct_sub_lpf_hz <= 0.0:
         direct_sub_lpf_hz = main_xo_hz
     if data["bass_integration_mode"] == "direct_dac":
-        direct_sub_lpf_hz = max(float(main_xo_hz) + 20.0, float(direct_sub_lpf_hz))
+        direct_sub_lpf_hz = max(float(main_xo_hz), float(direct_sub_lpf_hz))
     data["direct_dac_sub_lpf_hz"] = float(direct_sub_lpf_hz)
 
     v_raw = data.get("ir_export_window_mode", None)

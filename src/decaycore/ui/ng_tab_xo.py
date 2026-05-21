@@ -41,6 +41,16 @@ def build_xo_tab(*, t: Callable, get_val: Callable) -> None:
             ui.label(t("bass_integration_xo_avr_separate_info")).classes("text-xs text-gray-400")
         ctrl.register_container("bass_integration_xo_info_scope", bass_xo_scope)
         bass_xo_scope.set_visibility(bass_integration_visible)
+        with ui.column().classes("w-full gap-1") as bass_direct_scope:
+            ctrl.register(
+                "bass_integration_allpass_auto_enable",
+                ui.checkbox(
+                    t("bass_integration_allpass_auto_enable"),
+                    value=bool(get_val("bass_integration_allpass_auto_enable", False)),
+                ),
+            )
+        ctrl.register_container("bass_integration_direct_scope", bass_direct_scope)
+        bass_direct_scope.set_visibility(bass_integration_visible)
         ui.separator()
 
         for i in range(1, 6):

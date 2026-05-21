@@ -157,25 +157,10 @@ def _render_bass_integration(*, data: dict) -> None:
         translated = t(key)
         return translated if translated != key else str(value or "unknown")
 
-    bi_mode = str(
-        bi_meta.get("mode", data.get("bass_integration_mode", "avr_lfe_main_decomposed"))
-        or "avr_lfe_main_decomposed"
-    ).strip().lower()
-    bi_mode_label = (
-        t("bi_mode_direct_dac")
-        if bi_mode == "direct_dac"
-        else t("bass_integration_mode_avr_lfe_main_decomposed")
-    )
-    xo_metric_label = (
-        t("results_metric_main_hpf")
-        if bi_mode == "direct_dac"
-        else t("results_metric_avr_crossover")
-    )
-    xo_rec_metric_label = (
-        t("results_metric_main_hpf_recommended")
-        if bi_mode == "direct_dac"
-        else t("results_metric_avr_crossover_recommended")
-    )
+    bi_mode = "direct_dac"
+    bi_mode_label = t("bi_mode_direct_dac")
+    xo_metric_label = t("results_metric_main_hpf")
+    xo_rec_metric_label = t("results_metric_main_hpf_recommended")
     sub_lpf_metric_label = t("results_metric_sub_lpf")
     sub_lpf_rec_metric_label = t("results_metric_sub_lpf_recommended")
     playback_note = (

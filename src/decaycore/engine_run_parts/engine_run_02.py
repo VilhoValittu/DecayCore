@@ -34,10 +34,9 @@ from ..common.result_postprocess import (
 from ..config.models import FilterConfig
 from ..config.results import FilterResult
 from ..dsp.bass_integration import (
-    _apply_delay_to_transfer,
-    _apply_gain_trim_to_transfer,
-    _apply_polarity_to_transfer,
+    apply_direct_dac_export_branch_model,
     build_bundle_combined_sub_transfer,
+    direct_dac_candidate_from_data,
 )
 from ..dsp import decaycore_dsp as dsp
 from ..dsp._measurement_ctx_local import clear_measurement_ctx, set_measurement_ctx
@@ -266,6 +265,10 @@ def run_pipeline(
     sub_f: np.ndarray | None = None
     sub_m: np.ndarray | None = None
     sub_p: np.ndarray | None = None
+    is_direct_dac_bi = bool(
+        getattr(cfg, "bass_integration_enable", False)
+        and str(getattr(cfg, "bass_integration_mode", "") or "").strip().lower() == "direct_dac"
+    )
     if bool(getattr(cfg, "sub_integration_enable", False)) and \
        bool(getattr(cfg, "sub_generate_ir", False)):
         try:
@@ -295,10 +298,6 @@ def run_pipeline(
             sub_hpf_freq = float(getattr(cfg, "sub_hpf_freq", 20.0))
             sub_hpf_order = int(getattr(cfg, "sub_hpf_order", 2))
 
-            is_direct_dac_bi = bool(
-                getattr(cfg, "bass_integration_enable", False)
-                and str(getattr(cfg, "bass_integration_mode", "") or "").strip().lower() == "direct_dac"
-            )
             if is_direct_dac_bi:
                 sub_target = build_subwoofer_target_with_lpf(
                     getattr(cfg, "house_freqs", None),
@@ -513,7 +512,17 @@ def run_pipeline(
                 d_sub = int(main_peak_ref - sub_peak)
             except Exception:
                 d_sub = None
-            if d_sub != 0:
+            if is_direct_dac_bi:
+                bi_meta = data.setdefault("_bass_integration_meta", {})
+                if isinstance(bi_meta, dict):
+                    bi_meta["sub_peak_alignment_diagnostic"] = {
+                        "main_peak_ref_sample": int(main_peak_ref) if "main_peak_ref" in locals() else None,
+                        "sub_peak_sample": int(sub_peak) if "sub_peak" in locals() else None,
+                        "suggested_shift_samples": int(d_sub or 0),
+                        "applied_to_ir": False,
+                        "reason": "Direct-DAC timing is handled by exported delay filters.",
+                    }
+            elif d_sub != 0:
                 sub_ir = _shift_zeropad_1d(sub_imp, int(d_sub))
                 logger.info(f"Sub alignment applied: {int(d_sub)} samples")
 
@@ -575,6 +584,18 @@ def run_pipeline(
         _inject_filter_gd_stats(l_st, l_imp, int(cfg.fs))
         _inject_filter_gd_stats(r_st, r_imp, int(cfg.fs))
 
+    direct_dac_result_dict = apply_direct_dac_bass_integration_result(
+        cfg=cfg,
+        measurements=measurements,
+        data=data,
+        l_imp=np.asarray(l_imp, dtype=float),
+        r_imp=np.asarray(r_imp, dtype=float),
+        sub_ir=np.asarray(sub_ir, dtype=float) if sub_ir is not None else None,
+        l_st=l_st,
+        r_st=r_st,
+        sub_st=sub_st if isinstance(sub_st, dict) else None,
+    )
+
     if bool(include_response_arrays):
         with profiled_section("run_pipeline.response_arrays"):
             _inject_filter_mags_for_ui(l_st, l_imp, int(cfg.fs))
@@ -594,24 +615,28 @@ def run_pipeline(
                             channel="l",
                             label="Direct-DAC sub total",
                         )
-                        sub_total_transfer = _apply_polarity_to_transfer(
+                        candidate = direct_dac_candidate_from_data(data, cfg)
+                        sub_total_transfer = apply_direct_dac_export_branch_model(
                             sub_total_transfer,
-                            invert=bool(measurements.get("bass_integration_sub_polarity_invert", False)),
-                            label="Direct-DAC sub polarity",
-                        )
-                        sub_total_transfer = _apply_gain_trim_to_transfer(
-                            sub_total_transfer,
-                            gain_trim_db=float(measurements.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0),
-                            label="Direct-DAC sub gain",
-                        )
-                        sub_total_transfer = _apply_delay_to_transfer(
-                            sub_total_transfer,
-                            delay_ms=float(measurements.get("bass_integration_sub_delay_ms", 0.0) or 0.0),
-                            label="Direct-DAC sub delay",
+                            hpf_hz=float(candidate.sub_hpf_hz),
+                            hpf_order=int(candidate.sub_hpf_order),
+                            lpf_hz=float(candidate.sub_lpf_hz),
+                            lpf_order=int(candidate.sub_lpf_order),
+                            gain_trim_db=float(candidate.sub_gain_trim_db),
+                            delay_ms=float(candidate.sub_delay_ms),
+                            polarity_invert=bool(candidate.sub_polarity_invert),
+                            allpass_freq_hz=(float(candidate.sub_allpass_freq_hz) if candidate.sub_allpass_enabled else None),
+                            allpass_q=(float(candidate.sub_allpass_q) if candidate.sub_allpass_enabled else None),
+                            label="Direct-DAC final sub branch for plot",
                         )
                         _inject_direct_dac_summed_prediction_for_plot(
                             st=l_st,
-                            main_transfer=bundle.l_main,
+                            main_transfer=apply_direct_dac_export_branch_model(
+                                bundle.l_main,
+                                hpf_hz=float(candidate.main_hpf_hz),
+                                hpf_order=int(candidate.main_hpf_order),
+                                label="L Direct-DAC final main branch for plot",
+                            ),
                             sub_transfer=sub_total_transfer,
                             main_ir=np.asarray(l_imp, dtype=float),
                             sub_ir=np.asarray(sub_ir, dtype=float),
@@ -620,7 +645,12 @@ def run_pipeline(
                         )
                         _inject_direct_dac_summed_prediction_for_plot(
                             st=r_st,
-                            main_transfer=bundle.r_main,
+                            main_transfer=apply_direct_dac_export_branch_model(
+                                bundle.r_main,
+                                hpf_hz=float(candidate.main_hpf_hz),
+                                hpf_order=int(candidate.main_hpf_order),
+                                label="R Direct-DAC final main branch for plot",
+                            ),
                             sub_transfer=sub_total_transfer,
                             main_ir=np.asarray(r_imp, dtype=float),
                             sub_ir=np.asarray(sub_ir, dtype=float),
@@ -654,17 +684,6 @@ def run_pipeline(
         l_phase = np.asarray([], dtype=float)
         r_phase = np.asarray([], dtype=float)
 
-    direct_dac_result_dict = apply_direct_dac_bass_integration_result(
-        cfg=cfg,
-        measurements=measurements,
-        data=data,
-        l_imp=np.asarray(l_imp, dtype=float),
-        r_imp=np.asarray(r_imp, dtype=float),
-        sub_ir=np.asarray(sub_ir, dtype=float) if sub_ir is not None else None,
-        l_st=l_st,
-        r_st=r_st,
-        sub_st=sub_st if isinstance(sub_st, dict) else None,
-    )
     if sub_target_meta and isinstance(data, dict):
         data.update(sub_target_meta)
         bi_meta = data.setdefault("_bass_integration_meta", {})

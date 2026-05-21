@@ -120,7 +120,18 @@ def _auto_measurement_signature(measurements: dict) -> str:
                     {
                         "avr_crossover_hz": float(_auto_safe_float(measurements.get("avr_crossover_hz", float("nan")), float("nan"))),
                         "bass_integration_profile": str(measurements.get("bass_integration_profile", "") or ""),
-                        "bass_integration_mode": str(measurements.get("bass_integration_mode", "") or ""),
+                        "bass_integration_mode": "direct_dac",
+                        "dual_sub_preprocessing": {
+                            key: dict(getattr(bundle, "diagnostics", {}) or {}).get(key)
+                            for key in (
+                                "dual_sub_preprocessing_applied",
+                                "dual_sub_preprocessing_version",
+                                "dual_sub_combined_method",
+                                "dual_sub_relative_delay_samples",
+                                "dual_sub_original_sub_combine_mode",
+                                "sub_combine_mode",
+                            )
+                        },
                     },
                     sort_keys=True,
                 ).encode("utf-8", "ignore")

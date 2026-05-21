@@ -205,13 +205,6 @@ def _direct_dac_yaml_export_settings(data: dict | None, *, include_sub: bool) ->
     if not bool(include_sub):
         return settings
 
-    try:
-        bi_mode = str((data or {}).get("bass_integration_mode", "") or "").strip().lower()
-    except Exception:
-        bi_mode = ""
-    if bi_mode != "direct_dac":
-        return settings
-
     settings["include_sub"] = True
     try:
         sub_delay_ms = float((data or {}).get("bass_integration_sub_delay_ms", 0.0) or 0.0)
@@ -244,7 +237,7 @@ def _direct_dac_yaml_export_settings(data: dict | None, *, include_sub: bool) ->
         sub_lpf_hz = main_hpf_hz + 20.0
     settings["main_hpf_hz"] = float(main_hpf_hz)
     settings["sub_hpf_hz"] = float(sub_hpf_hz)
-    settings["sub_lpf_hz"] = float(max(main_hpf_hz + 20.0, sub_lpf_hz))
+    settings["sub_lpf_hz"] = float(max(main_hpf_hz, sub_lpf_hz))
     try:
         xo_order = int(round(float((data or {}).get("sub_crossover_slope", 12) or 12) / 6.0))
     except Exception:

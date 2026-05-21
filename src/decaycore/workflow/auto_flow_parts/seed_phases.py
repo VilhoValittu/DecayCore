@@ -546,10 +546,7 @@ def _run_auto_mode_seed_phases(
                 # against the summed (main+sub) response, not the main-only response
                 # that ctx["f_l"]/ctx["m_l"] carry in this mode.
                 pre_f_l, pre_m_l, pre_f_r, pre_m_r = f_l, m_l, f_r, m_r
-                bi_mode_pre = str(
-                    data.get("bass_integration_mode", "avr_lfe_main_decomposed")
-                    or "avr_lfe_main_decomposed"
-                ).strip().lower()
+                bi_mode_pre = "direct_dac"
                 if bool(data.get("bass_integration_enable", False)) and bi_mode_pre == "direct_dac":
                     try:
                         _bi_bundle = ctx.get("bass_integration_bundle", None)

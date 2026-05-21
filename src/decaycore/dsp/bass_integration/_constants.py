@@ -32,12 +32,12 @@ BASS_INTEGRATION_FEASIBILITY_THRESHOLDS: dict[str, dict[str, float]] = {
         "xo_gd_mismatch_delta_ms": 10.0,
     },
     "marginal": {
-        "overlap_ripple_db": 12.0,
-        "sub_dominance_db": 12.0,
-        "xo_gd_rms_mismatch_ms": 20.0,
+        "overlap_ripple_db": 24.0,
+        "sub_dominance_db": 18.0,
+        "xo_gd_rms_mismatch_ms": 45.0,
         "overlap_ripple_delta_db": 8.0,
-        "sub_dominance_delta_db": 8.0,
-        "xo_gd_mismatch_delta_ms": 18.0,
+        "sub_dominance_delta_db": 12.0,
+        "xo_gd_mismatch_delta_ms": 24.0,
     },
 }
 BASS_INTEGRATION_FEASIBILITY_OBJECTIVE_PENALTY = {
@@ -95,9 +95,5 @@ DIRECT_DAC_ALIGNMENT_GAIN_CANDIDATES_DB: tuple[float, ...] = (
     15.0,
 )
 DIRECT_DAC_ALIGNMENT_MIN_IMPROVEMENT_SCORE = 0.05
-AVR_LFE_MAIN_ALIGNMENT_COARSE_DELAYS_MS: tuple[float, ...] = (-20.0, -10.0, -4.0, 0.0, 4.0, 10.0, 20.0)
-AVR_LFE_MAIN_ALIGNMENT_COARSE_GAINS_DB: tuple[float, ...] = (-6.0, -3.0, 0.0, 3.0)
-AVR_LFE_MAIN_ALIGNMENT_REFINE_DELTA_MS: tuple[float, ...] = (-2.0, -1.0, 0.0, 1.0, 2.0)
-AVR_LFE_MAIN_ALIGNMENT_REFINE_DELTA_DB: tuple[float, ...] = (-1.0, 0.0, 1.0)
 GD_CONTINUITY_GUARD_LO_RATIO = 0.70
 GD_CONTINUITY_GUARD_HI_RATIO = 1.30
