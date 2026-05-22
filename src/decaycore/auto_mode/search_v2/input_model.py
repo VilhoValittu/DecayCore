@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
-from ..cache_signature import _auto_measurement_signature
+from ..cache_measurement_sig import _auto_measurement_metadata_identity, _auto_measurement_signature
 from ..shared import _auto_filter_cache_key, _auto_filter_type_for_key, _auto_hash_array
 
 _WINNER_ONLY_KEYS = frozenset(
@@ -49,6 +49,7 @@ class AutoSearchInput:
 
     base_data_items: tuple[tuple[str, Any], ...]
     measurement_identity: str
+    measurement_metadata_identity: str
     frequency_grid_identity: str
     fs_v: int
     taps_v: int
@@ -70,6 +71,7 @@ class AutoSearchInput:
         base = self.base_data()
         return {
             "measurement_identity": str(self.measurement_identity),
+            "measurement_metadata_identity": str(self.measurement_metadata_identity),
             "fs": int(self.fs_v),
             "taps": int(self.taps_v),
             "filter_type": str(base.get("filter_type", "") or ""),
@@ -158,16 +160,18 @@ def canonicalize_auto_search_base_data(raw_data: dict | None) -> dict:
 def build_auto_search_input(raw_data, measurements, context: dict | None = None) -> AutoSearchInput:
     ctx = dict(context or {})
     base = canonicalize_auto_search_base_data(dict(raw_data or {}))
-    measurement_identity = str(_auto_measurement_signature(dict(measurements or {})))
+    measurement_dict = dict(measurements or {})
+    measurement_identity = str(_auto_measurement_signature(measurement_dict))
+    measurement_metadata_identity = str(_auto_measurement_metadata_identity(measurement_dict))
     try:
         import numpy as np
 
         frequency_grid_identity = str(
             _auto_hash_array(
                 np.asarray(
-                    dict(measurements or {}).get(
+                    measurement_dict.get(
                         "f_l",
-                        dict(measurements or {}).get("f_r", []),
+                        measurement_dict.get("f_r", []),
                     ),
                     dtype=float,
                 )
@@ -182,6 +186,7 @@ def build_auto_search_input(raw_data, measurements, context: dict | None = None)
     return AutoSearchInput(
         base_data_items=_items(base),
         measurement_identity=str(measurement_identity),
+        measurement_metadata_identity=str(measurement_metadata_identity),
         frequency_grid_identity=str(frequency_grid_identity),
         fs_v=int(ctx.get("fs_v", base.get("fs", 44100)) or 44100),
         taps_v=int(ctx.get("taps_v", base.get("taps", 0)) or 0),

@@ -183,15 +183,18 @@ def collect_ui_data(pin) -> Dict[str, Any]:
         if isinstance(data.get(k, None), list):
             data[k] = bool(data[k])
 
+    mode_raw = data.get("mode", None)
+    mode_explicit = mode_raw not in (None, "")
     try:
-        mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
+        mode_u = str(mode_raw or "BASIC").strip().upper()
     except Exception:
         mode_u = "BASIC"
     if mode_u not in ("BASIC", "ADVANCED", "AUTO"):
         mode_u = "BASIC"
+        mode_explicit = False
 
     is_auto_mode = (mode_u == "AUTO")
-    if not is_auto_mode:
+    if not mode_explicit and not is_auto_mode:
         try:
             is_auto_mode = bool(data.get("camillafir_automatic_mode", False))
         except Exception:

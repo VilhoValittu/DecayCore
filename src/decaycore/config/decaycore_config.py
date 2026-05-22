@@ -54,6 +54,7 @@ def _normalize_filter_type(value) -> str:
 
 
 def load_config() -> dict:
+    saved_mode_explicit = False
     default_conf = {
         "fmt": "WAV",
         "layout": LAYOUT_MONO,
@@ -294,6 +295,7 @@ def load_config() -> dict:
             except Exception:
                 saved["filter_type"] = str(default_conf.get("filter_type", "Asymmetric"))
 
+            saved_mode_explicit = saved.get("mode", None) not in (None, "")
             saved["layout"] = normalize_layout_value(saved.get("layout", default_conf.get("layout")))
             saved["lvl_mode"] = normalize_lvl_mode_value(saved.get("lvl_mode", default_conf.get("lvl_mode")))
             saved["lvl_algo"] = normalize_lvl_algo_value(saved.get("lvl_algo", default_conf.get("lvl_algo")))
@@ -312,7 +314,7 @@ def load_config() -> dict:
     except Exception:
         legacy_auto = False
 
-    if legacy_auto:
+    if legacy_auto and not saved_mode_explicit:
         mode_u = "AUTO"
     if mode_u not in ("AUTO", "BASIC", "ADVANCED"):
         mode_u = "AUTO"

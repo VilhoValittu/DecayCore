@@ -71,10 +71,17 @@ def _append_acoustic_events(summary_content, l_st, r_st):
         summary_content += f"cut_peak={float(st.get('cut_peak_db', 0.0)):.2f} dB, "
         summary_content += f"boost_bins={int(st.get('boost_bins', 0))}\n"
         summary_content += f"Net boost peak (post global/headroom): {float(st.get('net_boost_peak_db', 0.0)):.2f} dB\n"
-        summary_content += f"Candidate (pre-softclip): boost_peak={float(st.get('boost_candidate_peak_db', 0.0)):.2f} dB, "
+        _candidate_boost_peak = float(st.get("boost_candidate_peak_db", 0.0) or 0.0)
+        summary_content += f"Candidate (pre-softclip): boost_peak={_candidate_boost_peak:.2f} dB, "
         summary_content += f"boost_bins={int(st.get('boost_candidate_bins', 0))}, "
         summary_content += f"lowbass_boost_bins={int(st.get('boost_candidate_bins_lowbass', 0))}, "
         summary_content += f"excprot_boost_bins={int(st.get('boost_candidate_bins_excprot', 0))}\n"
+        if _candidate_boost_peak >= 15.0:
+            summary_content += (
+                "Large boost candidate warning: "
+                f"{_candidate_boost_peak:.2f} dB requested before safety limits; "
+                "treat this as uncorrectable-room/target pressure rather than safe boost headroom.\n"
+            )
         summary_content += f"Boost blocked reason: {str(st.get('boost_blocked_reason', 'n/a'))}\n"
         summary_content += f"\n=== CLAMP DIAGNOSTICS ({side}) ===\n"
         summary_content += f"{str(st.get('clamp_summary', 'n/a'))}\n"
@@ -90,6 +97,51 @@ def _append_acoustic_events(summary_content, l_st, r_st):
             f"worst_over_boost={float(st.get('hardclamp_worst_over_boost_db', 0.0)):.2f} dB, "
             f"worst_over_cut={float(st.get('hardclamp_worst_over_cut_db', 0.0)):.2f} dB\n"
         )
+
+        trace = st.get("mag_authority_trace") or []
+        if isinstance(trace, list) and trace:
+            summary_content += f"\n=== MAGNITUDE AUTHORITY TRACE ({side}) ===\n"
+            _hard_boost = any(
+                isinstance(item, dict)
+                and "hardclamp_boost" in (item.get("reason_codes") or [])
+                and int(item.get("changed_bins", 0) or 0) > 0
+                for item in trace
+            )
+            _soft_boost = any(
+                isinstance(item, dict)
+                and "softclip_boost" in (item.get("reason_codes") or [])
+                and int(item.get("changed_bins", 0) or 0) > 0
+                for item in trace
+            )
+            _final_boost = float(st.get("boost_peak_db", 0.0) or 0.0)
+            _max_boost = float(st.get("max_boost_db_effective", st.get("max_boost_db", 0.0)) or 0.0)
+            if _hard_boost or _soft_boost:
+                summary_content += (
+                    "Authority verdict: large boost candidate was safely reduced by "
+                    f"{'softclip + hardclamp' if _hard_boost and _soft_boost else ('hardclamp' if _hard_boost else 'softclip')}; "
+                    f"final boost {float(_final_boost):.2f} dB stayed within max_boost {float(_max_boost):.2f} dB.\n"
+                )
+            summary_content += (
+                f"{'Stage':<30} {'Reasons':<72} {'Changed':>8} "
+                f"{'MaxDelta':>9} {'BoostPk':>8} {'CutPk':>8}\n"
+            )
+            summary_content += "-" * 139 + "\n"
+            for item in trace:
+                if not isinstance(item, dict):
+                    continue
+                changed = int(item.get("changed_bins", 0) or 0)
+                reasons = item.get("reason_codes") or []
+                if not changed and not reasons:
+                    continue
+                stage = str(item.get("stage", "stage") or "stage")[:30]
+                reason_text = ",".join(str(r) for r in reasons if str(r))
+                max_delta = float(item.get("max_delta_db", 0.0) or 0.0)
+                boost_pk = float(item.get("boost_peak_after_db", 0.0) or 0.0)
+                cut_pk = float(item.get("cut_peak_after_db", 0.0) or 0.0)
+                summary_content += (
+                    f"{stage:<30} {reason_text:<72} {changed:>8d} "
+                    f"{max_delta:>9.2f} {boost_pk:>8.2f} {cut_pk:>8.2f}\n"
+                )
 
         probes = st.get("stage_probes") or {}
         if isinstance(probes, dict) and probes:

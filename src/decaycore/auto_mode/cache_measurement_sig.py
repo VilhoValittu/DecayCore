@@ -21,6 +21,98 @@ from .cache_io import _AUTO_CACHE_LOCK
 from .shared import _auto_hash_array_full, _auto_safe_float, logger
 
 
+def _auto_measurement_metadata_identity(measurements: dict) -> str:
+    """Hash measurement-derived metadata that affects DSP policy or scoring.
+
+    The full measurement signature already hashes magnitude/frequency arrays.
+    This identity is intentionally metadata-focused so auto-mode signatures can
+    expose why cache entries differ when source-of-truth measurement context
+    changes without the visible magnitude grid changing.
+    """
+    m = dict(measurements or {})
+    h = hashlib.sha256()
+    h.update(b"measurement-metadata-v1:")
+
+    scalar_keys = (
+        "measured_rt60_l",
+        "measured_rt60_r",
+        "measurement_snr_db_l",
+        "measurement_snr_db_r",
+        "measured_snr_db_l",
+        "measured_snr_db_r",
+        "snr_db_l",
+        "snr_db_r",
+        "capture_samplerate_l",
+        "capture_samplerate_r",
+        "drift_ratio_l",
+        "drift_ratio_r",
+        "reference_latency_s_l",
+        "reference_latency_s_r",
+    )
+    dict_keys = (
+        "rt60_summary_l",
+        "rt60_summary_r",
+        "measured_rt60_bands_l",
+        "measured_rt60_bands_r",
+        "harmonic_risk_summary_l",
+        "harmonic_risk_summary_r",
+        "measurement_health_l",
+        "measurement_health_r",
+        "timing_analysis_l",
+        "timing_analysis_r",
+        "repeat_analysis_l",
+        "repeat_analysis_r",
+        "metadata_l",
+        "metadata_r",
+        "measurement_metadata_l",
+        "measurement_metadata_r",
+    )
+    array_keys = (
+        "harmonic_freq_hz_l",
+        "harmonic_freq_hz_r",
+        "harmonic_risk_freq_hz_l",
+        "harmonic_risk_freq_hz_r",
+        "harmonic_risk_curve_l",
+        "harmonic_risk_curve_r",
+    )
+
+    payload: dict[str, object] = {}
+    for key in scalar_keys:
+        value = _auto_safe_float(m.get(key, float("nan")), float("nan"))
+        if np.isfinite(value):
+            payload[key] = float(value)
+    for key in dict_keys:
+        value = m.get(key)
+        if isinstance(value, dict) and value:
+            payload[key] = value
+    try:
+        h.update(json.dumps(payload, sort_keys=True, default=str, separators=(",", ":")).encode("utf-8", "ignore"))
+    except Exception:
+        logger.exception("measurement metadata payload signature hash update")
+        h.update(str(sorted(payload.items())).encode("utf-8", "ignore"))
+
+    for key in array_keys:
+        value = m.get(key)
+        if value is not None:
+            h.update(str(key).encode("utf-8", "ignore"))
+            h.update(_auto_hash_array_full(np.asarray(value, dtype=float)).encode("ascii", "ignore"))
+
+    for key in ("harmonic_magnitudes_db_l", "harmonic_magnitudes_db_r"):
+        value = m.get(key)
+        if isinstance(value, dict) and value:
+            try:
+                h.update(str(key).encode("utf-8", "ignore"))
+                for order in sorted(value.keys()):
+                    arr = value.get(order)
+                    if arr is not None:
+                        h.update(str(order).encode("utf-8", "ignore"))
+                        h.update(_auto_hash_array_full(np.asarray(arr, dtype=float)).encode("ascii", "ignore"))
+            except Exception:
+                logger.exception("measurement harmonic metadata identity hash update")
+
+    return h.hexdigest()
+
+
 def _auto_get_measurement_signature(measurements: dict) -> str:
     """Return memoized measurement signature for this dict.
 
@@ -43,13 +135,18 @@ def _auto_get_measurement_signature(measurements: dict) -> str:
 def _auto_measurement_signature(measurements: dict) -> str:
     fL = measurements.get("f_l")
     mL = measurements.get("m_l")
+    pL = measurements.get("p_l")
     fR = measurements.get("f_r")
     mR = measurements.get("m_r")
+    pR = measurements.get("p_r")
     h = hashlib.sha256()
     h.update(_auto_hash_array_full(np.asarray(fL) if fL is not None else np.asarray([])).encode("ascii", "ignore"))
     h.update(_auto_hash_array_full(np.asarray(mL) if mL is not None else np.asarray([])).encode("ascii", "ignore"))
+    h.update(_auto_hash_array_full(np.asarray(pL) if pL is not None else np.asarray([])).encode("ascii", "ignore"))
     h.update(_auto_hash_array_full(np.asarray(fR) if fR is not None else np.asarray([])).encode("ascii", "ignore"))
     h.update(_auto_hash_array_full(np.asarray(mR) if mR is not None else np.asarray([])).encode("ascii", "ignore"))
+    h.update(_auto_hash_array_full(np.asarray(pR) if pR is not None else np.asarray([])).encode("ascii", "ignore"))
+    h.update(_auto_measurement_metadata_identity(measurements).encode("ascii", "ignore"))
 
     for _rt60_scalar_key in ("measured_rt60_l", "measured_rt60_r"):
         _rt60_scalar = _auto_safe_float(measurements.get(_rt60_scalar_key, float("nan")), float("nan"))

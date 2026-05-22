@@ -38,7 +38,11 @@ from .cache_io import (
     _auto_cache_stats_snapshot,
 )
 from .cache_lastused import _auto_cache_get_last_used_best, _auto_cache_put_last_used_best
-from .cache_measurement_sig import _auto_get_measurement_signature, _auto_measurement_signature
+from .cache_measurement_sig import (
+    _auto_get_measurement_signature,
+    _auto_measurement_metadata_identity,
+    _auto_measurement_signature,
+)
 from .cache_paths import (
     _auto_cache_compat_token,
     _auto_cache_filename,
@@ -88,6 +92,11 @@ _AUTO_DIP_FILL_RISK_SCORING_ALGO_V = 1
 _AUTO_CHANNEL_OVERFIT_SCORING_ALGO_V = 1
 _AUTO_VOICE_CLARITY_SCORING_ALGO_V = 1
 _AUTO_RESIDUAL_PEAK_WINNER_POLISH_POLICY_V = 2
+_AUTO_GAIN_AUTHORITY_POLICY_V = 1
+_AUTO_CONFIDENCE_MODEL_POLICY_V = 1
+_AUTO_BASS_INTEGRATION_FEASIBILITY_POLICY_V = 1
+_AUTO_PHASE_GD_GUARD_POLICY_V = 1
+_AUTO_MEASUREMENT_METADATA_IDENTITY_V = 1
 
 
 def _auto_signature(
@@ -140,6 +149,7 @@ def _auto_signature_payload(
         "filter_type": ft,
         "auto_goal": str(_auto_goal(base_data)),
         "measurement_sig": str(_auto_get_measurement_signature(measurements)),
+        "measurement_metadata_identity": str(_auto_measurement_metadata_identity(measurements)),
         "frequency_grid_sig": str(
             _auto_hash_array(
                 np.asarray(
@@ -233,6 +243,100 @@ def _auto_signature_payload(
             "residual_authority_smooth_oct": float(
                 _auto_safe_float(base_data.get("residual_authority_smooth_oct", 1.0 / 9.0), 1.0 / 9.0)
             ),
+        },
+        "signature_policy_versions": {
+            "gain_authority_policy_v": int(_AUTO_GAIN_AUTHORITY_POLICY_V),
+            "confidence_model_policy_v": int(_AUTO_CONFIDENCE_MODEL_POLICY_V),
+            "residual_peak_scorer_v": int(_AUTO_BROAD_RESIDUAL_PEAK_SCORING_ALGO_V),
+            "bass_integration_feasibility_policy_v": int(_AUTO_BASS_INTEGRATION_FEASIBILITY_POLICY_V),
+            "phase_gd_guard_policy_v": int(_AUTO_PHASE_GD_GUARD_POLICY_V),
+            "measurement_metadata_identity_v": int(_AUTO_MEASUREMENT_METADATA_IDENTITY_V),
+        },
+        "gain_authority_policy": {
+            "policy_v": int(_AUTO_GAIN_AUTHORITY_POLICY_V),
+            "max_boost": float(_auto_safe_float(base_data.get("max_boost", float("nan")), float("nan"))),
+            "max_boost_db": float(_auto_safe_float(base_data.get("max_boost_db", float("nan")), float("nan"))),
+            "max_cut": float(_auto_safe_float(base_data.get("max_cut", float("nan")), float("nan"))),
+            "max_cut_db": float(_auto_safe_float(base_data.get("max_cut_db", float("nan")), float("nan"))),
+            "low_bass_cut_enable": bool(base_data.get("low_bass_cut_enable", True)),
+            "low_bass_cut_hz": float(_auto_safe_float(base_data.get("low_bass_cut_hz", float("nan")), float("nan"))),
+            "low_bass_cut_strength": float(
+                _auto_safe_float(base_data.get("low_bass_cut_strength", float("nan")), float("nan"))
+            ),
+            "exc_prot": bool(base_data.get("exc_prot", False)),
+            "exc_freq": float(_auto_safe_float(base_data.get("exc_freq", float("nan")), float("nan"))),
+            "bass_boost_cap_enable": bool(base_data.get("bass_boost_cap_enable", True)),
+            "bass_boost_cap_extra_db": float(
+                _auto_safe_float(base_data.get("bass_boost_cap_extra_db", 5.0), 5.0)
+            ),
+            "bass_boost_cap_hz": float(_auto_safe_float(base_data.get("bass_boost_cap_hz", 200.0), 200.0)),
+            "bass_boost_cap_conf_min": float(
+                _auto_safe_float(base_data.get("bass_boost_cap_conf_min", 0.55), 0.55)
+            ),
+            "bass_boost_post_restore_enable": bool(base_data.get("bass_boost_post_restore_enable", True)),
+            "bass_boost_post_restore_strength": float(
+                _auto_safe_float(base_data.get("bass_boost_post_restore_strength", 1.05), 1.05)
+            ),
+            "acoustic_authority_limits_enable": bool(base_data.get("acoustic_authority_limits_enable", True)),
+        },
+        "confidence_model": {
+            "policy_v": int(_AUTO_CONFIDENCE_MODEL_POLICY_V),
+            "conf_pull_floor": float(_auto_safe_float(base_data.get("conf_pull_floor", 0.05), 0.05)),
+            "conf_pull_ceil": float(_auto_safe_float(base_data.get("conf_pull_ceil", 0.95), 0.95)),
+            "conf_pull_max_hz": float(_auto_safe_float(base_data.get("conf_pull_max_hz", float("nan")), float("nan"))),
+            "conf_pull_gamma_cut": float(_auto_safe_float(base_data.get("conf_pull_gamma_cut", 0.55), 0.55)),
+            "conf_pull_gamma_boost": float(_auto_safe_float(base_data.get("conf_pull_gamma_boost", 1.35), 1.35)),
+            "conf_pull_conf_smooth_sigma": float(
+                _auto_safe_float(base_data.get("conf_pull_conf_smooth_sigma", 2.0), 2.0)
+            ),
+            "conf_pull_bass_floor_hz": float(
+                _auto_safe_float(base_data.get("conf_pull_bass_floor_hz", 120.0), 120.0)
+            ),
+            "conf_pull_bass_floor_min": float(
+                _auto_safe_float(base_data.get("conf_pull_bass_floor_min", 0.25), 0.25)
+            ),
+            "bass_first_ai": bool(base_data.get("bass_first_ai", True)),
+            "bass_first_mode_max_hz": float(
+                _auto_safe_float(base_data.get("bass_first_mode_max_hz", float("nan")), float("nan"))
+            ),
+        },
+        "residual_peak_scorer": {
+            "scorer_v": int(_AUTO_BROAD_RESIDUAL_PEAK_SCORING_ALGO_V),
+            "winner_polish_policy_v": int(_AUTO_RESIDUAL_PEAK_WINNER_POLISH_POLICY_V),
+            "threshold_db": float(
+                _auto_safe_float(base_data.get("auto_mode_residual_peak_threshold_db", base_data.get("residual_peak_threshold_db", 3.0)), 3.0)
+            ),
+            "hard_gate_db": float(
+                _auto_safe_float(base_data.get("auto_mode_residual_peak_hard_gate_db", base_data.get("residual_peak_hard_gate_db", 6.0)), 6.0)
+            ),
+            "penalty_cap": float(
+                _auto_safe_float(base_data.get("auto_mode_residual_peak_penalty_cap", base_data.get("residual_peak_penalty_cap", 20.0)), 20.0)
+            ),
+        },
+        "bass_integration_feasibility": {
+            "policy_v": int(_AUTO_BASS_INTEGRATION_FEASIBILITY_POLICY_V),
+            "guard_lo_ratio": float(
+                _auto_safe_float(base_data.get("bass_integration_guard_lo_ratio", 0.60), 0.60)
+            ),
+            "guard_hi_ratio": float(
+                _auto_safe_float(base_data.get("bass_integration_guard_hi_ratio", 1.40), 1.40)
+            ),
+            "profile": str(base_data.get("bass_integration_profile", "") or ""),
+            "sub_combine_mode": str(base_data.get("bass_integration_sub_combine_mode", "average") or "average"),
+        },
+        "phase_gd_guard": {
+            "policy_v": int(_AUTO_PHASE_GD_GUARD_POLICY_V),
+            "phase_limit": float(_auto_safe_float(base_data.get("phase_limit", float("nan")), float("nan"))),
+            "mixed_freq": float(_auto_safe_float(base_data.get("mixed_freq", float("nan")), float("nan"))),
+            "excess_phase_strength": float(
+                _auto_safe_float(base_data.get("excess_phase_strength", float("nan")), float("nan"))
+            ),
+            "phase_correction_enable": bool(base_data.get("phase_correction_enable", base_data.get("enable_phase_correction", True))),
+            "phase_guard_max_gd_gradient_ms_per_oct": float(
+                _auto_safe_float(base_data.get("phase_guard_max_gd_gradient_ms_per_oct", 50.0), 50.0)
+            ),
+            "phase_guard_prering_enable": bool(base_data.get("phase_guard_prering_enable", True)),
+            "phase_guard_excess_delay_enable": bool(base_data.get("phase_guard_excess_delay_enable", True)),
         },
         "enable_tdc": bool(base_data.get("enable_tdc", True)),
         "bass_first_ai": bool(base_data.get("bass_first_ai", True)),

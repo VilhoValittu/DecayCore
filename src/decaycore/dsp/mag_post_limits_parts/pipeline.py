@@ -19,6 +19,29 @@ from .._measurement_ctx_local import get_measurement_ctx
 from ..dsp_config import CfgReader
 from ..dsp_telemetry import safe_put_many
 from ..gain_policy import apply_cuts_only_guard, build_low_frequency_guard_mask, resolve_gain_policy
+from ..mag_authority_trace import (
+    MAG_AUTHORITY_TRACE_VERSION,
+    REASON_ACOUSTIC_AUTHORITY_BOOST_CAP,
+    REASON_ACOUSTIC_AUTHORITY_CUT_CAP,
+    REASON_BASS_BOOST_RESTORE,
+    REASON_CONFIDENCE_PULL,
+    REASON_EXCURSION_FULL_BLOCK,
+    REASON_EXCURSION_SOFT_CAP,
+    REASON_HARDCLAMP_BOOST,
+    REASON_HARDCLAMP_CUT,
+    REASON_LOW_BASS_CUTS_ONLY,
+    REASON_LOW_BASS_FLOOR_REAPPLIED,
+    REASON_REGULARIZATION_SMOOTH,
+    REASON_SLOPE_LIMIT,
+    REASON_SOFTCLIP_BOOST,
+    REASON_SOFTCLIP_CUT,
+    REASON_TRANSITION_FADE,
+    REASON_USER_BOOST_CAP,
+    REASON_USER_CUT_CAP,
+    REASON_WAV_TRANSITION_SMOOTH,
+    append_mag_authority_stage,
+    summarize_mag_authority_trace,
+)
 from ..mag_limits import (
     _apply_hard_boost_cut_clamp,
     _apply_max_boost_cut,
@@ -61,7 +84,17 @@ def apply_post_limits_and_metrics(
     _filter_smooth = inputs.filter_smooth
     debug_stage_stats = inputs.debug_stage_stats
     stage_probes = dict(inputs.stage_probes)
+    mag_authority_trace: list[dict[str, object]] = []
     apply_confidence_weighted_target_pull = inputs.apply_confidence_weighted_target_pull
+
+    append_mag_authority_stage(
+        mag_authority_trace,
+        "post_input",
+        gain_apply,
+        gain_apply,
+        freq_axis,
+        mask_c,
+    )
 
     boost_peak_db = 0.0
     cut_peak_db = 0.0
@@ -85,6 +118,7 @@ def apply_post_limits_and_metrics(
     low_cut_enable = bool(gain_policy.low_cut_enable)
     low_hz = float(gain_policy.low_cut_hz)
     low_cut_strength = float(gain_policy.low_cut_strength)
+    _pre_lowbass_policy = np.asarray(gain_apply, dtype=float).copy()
     low_cut_floor_ref = _apply_low_frequency_policy(
         freq_axis=freq_axis,
         mask_c=mask_c,
@@ -97,6 +131,20 @@ def apply_post_limits_and_metrics(
         stage_probe_fn=_stage_probe,
         cfg=cfg,
         logger=logger,
+    )
+    _lowbass_reasons = []
+    if bool(low_cut_enable):
+        _lowbass_reasons.append(REASON_LOW_BASS_CUTS_ONLY)
+        if low_cut_floor_ref is not None:
+            _lowbass_reasons.append(REASON_LOW_BASS_FLOOR_REAPPLIED)
+    append_mag_authority_stage(
+        mag_authority_trace,
+        "after_lowbass_policy",
+        _pre_lowbass_policy,
+        gain_apply,
+        freq_axis,
+        mask_c,
+        reason_codes=_lowbass_reasons,
     )
     try:
         logger.info(
@@ -136,6 +184,8 @@ def apply_post_limits_and_metrics(
     )
     boost_cap_db = np.asarray(authority_caps["boost_cap_db"], dtype=float)
     cut_cap_db = np.asarray(authority_caps["cut_cap_db"], dtype=float)
+    authority_boost_reduced_bins = int(authority_caps.get("boost_reduced_bins", 0) or 0)
+    authority_cut_reduced_bins = int(authority_caps.get("cut_reduced_bins", 0) or 0)
 
     (
         boost_cand_peak,
@@ -151,6 +201,8 @@ def apply_post_limits_and_metrics(
         gain_policy=gain_policy,
     )
 
+    _pre_softclip = np.zeros_like(gain_db, dtype=float)
+    _pre_softclip[mask_c] = gain_apply[mask_c]
     tmp, over_boost, over_cut, softclip_boost_bins, softclip_cut_bins = _apply_soft_clamps(
         cfg=cfg,
         freq_axis=freq_axis,
@@ -164,6 +216,35 @@ def apply_post_limits_and_metrics(
         stage_probes=stage_probes,
         stage_probe_fn=_stage_probe,
         logger=logger,
+    )
+    _softclip_reasons = []
+    try:
+        _softclip_changed = mask_c & (np.abs(np.asarray(tmp, dtype=float) - np.asarray(_pre_softclip, dtype=float)) > 1e-9)
+        _softclip_reduced_boost = bool(
+            np.any(_softclip_changed & (_pre_softclip > 0.0) & (np.asarray(tmp, dtype=float) < _pre_softclip))
+        )
+        _softclip_limited_cut = bool(
+            np.any(_softclip_changed & (_pre_softclip < 0.0) & (np.asarray(tmp, dtype=float) > _pre_softclip))
+        )
+    except (TypeError, ValueError, FloatingPointError):
+        _softclip_reduced_boost = False
+        _softclip_limited_cut = False
+    if int(softclip_boost_bins) > 0 or _softclip_reduced_boost:
+        _softclip_reasons.extend([REASON_SOFTCLIP_BOOST, REASON_USER_BOOST_CAP])
+        if authority_boost_reduced_bins > 0:
+            _softclip_reasons.append(REASON_ACOUSTIC_AUTHORITY_BOOST_CAP)
+    if int(softclip_cut_bins) > 0 or _softclip_limited_cut:
+        _softclip_reasons.extend([REASON_SOFTCLIP_CUT, REASON_USER_CUT_CAP])
+        if authority_cut_reduced_bins > 0:
+            _softclip_reasons.append(REASON_ACOUSTIC_AUTHORITY_CUT_CAP)
+    append_mag_authority_stage(
+        mag_authority_trace,
+        "after_softclip",
+        _pre_softclip,
+        tmp,
+        freq_axis,
+        mask_c,
+        reason_codes=_softclip_reasons,
     )
 
     gain_db[mask_c] = tmp[mask_c]
@@ -189,12 +270,33 @@ def apply_post_limits_and_metrics(
             logger=logger,
             enabled=debug_stage_stats,
         )
+        append_mag_authority_stage(
+            mag_authority_trace,
+            "after_mid_refit",
+            _pre_mid_refit,
+            gain_db,
+            freq_axis,
+            mask_c,
+        )
     except (TypeError, ValueError, FloatingPointError):
         pass
+    _pre_slope = np.asarray(gain_db, dtype=float).copy()
     gain_db, slope_info = _apply_slope_limits(gain_db, freq_axis, cfg, st, mask_c)
     max_slope = float(slope_info["max_slope"])
     max_slope_boost = float(slope_info["max_slope_boost"])
     max_slope_cut = float(slope_info["max_slope_cut"])
+    _slope_reasons = []
+    if max_slope > 0 or max_slope_boost > 0 or max_slope_cut > 0:
+        _slope_reasons.append(REASON_SLOPE_LIMIT)
+    append_mag_authority_stage(
+        mag_authority_trace,
+        "after_slope",
+        _pre_slope,
+        gain_db,
+        freq_axis,
+        mask_c,
+        reason_codes=_slope_reasons,
+    )
     if max_slope > 0 or max_slope_boost > 0 or max_slope_cut > 0:
         _log_stage_stats("gain_db_post_slope", gain_db, mask_c, logger=logger, enabled=debug_stage_stats)
         try:
@@ -211,6 +313,15 @@ def apply_post_limits_and_metrics(
                 apply_confidence_weighted_target_pull=apply_confidence_weighted_target_pull,
             )
             _log_stage_stats("gain_db_post_confpull", gain_db, mask_c, ref=_pre, logger=logger, enabled=debug_stage_stats)
+            append_mag_authority_stage(
+                mag_authority_trace,
+                "after_confpull",
+                _pre,
+                gain_db,
+                freq_axis,
+                mask_c,
+                reason_codes=[REASON_CONFIDENCE_PULL],
+            )
         except (TypeError, ValueError, FloatingPointError):
             pass
         try:
@@ -222,7 +333,17 @@ def apply_post_limits_and_metrics(
             )
         except (AttributeError, TypeError, ValueError):
             pass
+    else:
+        append_mag_authority_stage(
+            mag_authority_trace,
+            "after_confpull",
+            gain_db,
+            gain_db,
+            freq_axis,
+            mask_c,
+        )
     try:
+        _pre_regularization = np.asarray(gain_db, dtype=float).copy()
         if np.any(mask_c):
             mix = float(np.clip(float(cfg_reader.float("reg_strength", 30.0)) / 100.0, 0.0, 1.0))
             if mix > 0.0:
@@ -235,9 +356,19 @@ def apply_post_limits_and_metrics(
                     mix=mix,
                 )
                 _log_stage_stats("gain_db_post_filter_smooth", gain_db, mask_c, ref=_pre, logger=logger, enabled=debug_stage_stats)
+        append_mag_authority_stage(
+            mag_authority_trace,
+            "after_regularization_smooth",
+            _pre_regularization,
+            gain_db,
+            freq_axis,
+            mask_c,
+            reason_codes=[REASON_REGULARIZATION_SMOOTH],
+        )
     except (TypeError, ValueError, FloatingPointError):
         pass
 
+    _pre_excursion = np.asarray(gain_db, dtype=float).copy()
     if gain_policy.exc_prot:
         f_start = float(gain_policy.exc_freq)
         f_end = float(gain_policy.exc_soft_hz)
@@ -249,8 +380,22 @@ def apply_post_limits_and_metrics(
             allowed_boost = fade * float(max_boost_db_base)
             gain_db[trans_mask] = np.minimum(gain_db[trans_mask], allowed_boost)
         logger.info(f"Exc Prot: Full protection < {f_start}Hz, Soft fade up to {f_end:.1f}Hz.")
+    append_mag_authority_stage(
+        mag_authority_trace,
+        "after_excursion_protection",
+        _pre_excursion,
+        gain_db,
+        freq_axis,
+        mask_c,
+        reason_codes=(
+            [REASON_EXCURSION_FULL_BLOCK, REASON_EXCURSION_SOFT_CAP]
+            if bool(gain_policy.exc_prot)
+            else []
+        ),
+    )
 
     try:
+        _pre_wav_transition = np.asarray(gain_db, dtype=float).copy()
         if cfg_reader.bool("is_wav_source", False) and np.any(mask_c):
             cmin = cfg_reader.float_allow_zero("mag_c_min", 0.0)
             cmax = cfg_reader.float_allow_zero("mag_c_max", 0.0)
@@ -278,6 +423,15 @@ def apply_post_limits_and_metrics(
                     if isinstance(st, dict):
                         st["wav_transition_smoothing"] = True
                         st["wav_transition_smoothing_zone_hz"] = [float(f_lo), float(f_hi)]
+        append_mag_authority_stage(
+            mag_authority_trace,
+            "after_wav_transition_smooth",
+            _pre_wav_transition,
+            gain_db,
+            freq_axis,
+            mask_c,
+            reason_codes=[REASON_WAV_TRANSITION_SMOOTH],
+        )
     except (TypeError, ValueError, FloatingPointError):
         pass
     try:
@@ -286,6 +440,7 @@ def apply_post_limits_and_metrics(
     except (TypeError, ValueError, FloatingPointError, IndexError):
         pass
 
+    _pre_hardclamp = np.asarray(gain_db, dtype=float).copy()
     (
         gain_db,
         hardclamp_boost_bins,
@@ -309,7 +464,26 @@ def apply_post_limits_and_metrics(
         logger=logger,
         st=st,
     )
+    _hardclamp_reasons = []
+    if int(hardclamp_boost_bins) > 0:
+        _hardclamp_reasons.extend([REASON_HARDCLAMP_BOOST, REASON_USER_BOOST_CAP])
+        if authority_boost_reduced_bins > 0:
+            _hardclamp_reasons.append(REASON_ACOUSTIC_AUTHORITY_BOOST_CAP)
+    if int(hardclamp_cut_bins) > 0:
+        _hardclamp_reasons.extend([REASON_HARDCLAMP_CUT, REASON_USER_CUT_CAP])
+        if authority_cut_reduced_bins > 0:
+            _hardclamp_reasons.append(REASON_ACOUSTIC_AUTHORITY_CUT_CAP)
+    append_mag_authority_stage(
+        mag_authority_trace,
+        "after_hardclamp",
+        _pre_hardclamp,
+        gain_db,
+        freq_axis,
+        mask_c,
+        reason_codes=_hardclamp_reasons,
+    )
     try:
+        _pre_wav_final = np.asarray(gain_db, dtype=float).copy()
         if cfg_reader.bool("is_wav_source", False) and np.any(mask_c):
             cmin = cfg_reader.float_allow_zero("mag_c_min", 0.0)
             cmax = cfg_reader.float_allow_zero("mag_c_max", 0.0)
@@ -344,19 +518,28 @@ def apply_post_limits_and_metrics(
                     if isinstance(st, dict):
                         st["wav_final_ripple_polish"] = True
                         st["wav_final_ripple_polish_zone_hz"] = [float(f_lo), float(f_hi)]
+        append_mag_authority_stage(
+            mag_authority_trace,
+            "after_wav_final_ripple_polish",
+            _pre_wav_final,
+            gain_db,
+            freq_axis,
+            mask_c,
+            reason_codes=[REASON_WAV_TRANSITION_SMOOTH],
+        )
     except (TypeError, ValueError, FloatingPointError):
         pass
 
     # Ensure bass boost changes can propagate to final filter (post-limits domain),
     # instead of being fully neutralized by conf-pull/slope interactions.
     try:
+        _pre_post_restore = np.asarray(gain_db, dtype=float).copy()
         if bool(bass_boost_post_restore_enable) and np.any(mask_c):
             restore_lo = float(max(20.0, float(low_hz) + 1e-6))
             restore_hi = float(max(restore_lo, bass_boost_cap_hz))
             tgt_restore = np.asarray(gain_apply, dtype=float).copy()
             tgt_restore = np.minimum(tgt_restore, np.asarray(boost_cap_db, dtype=float))
             tgt_restore = np.maximum(tgt_restore, -np.asarray(cut_cap_db, dtype=float))
-            _pre_post_restore = np.asarray(gain_db, dtype=float).copy()
             gain_db, _restore_meta = apply_bass_boost_post_restore(
                 gain_db,
                 tgt_restore,
@@ -397,11 +580,23 @@ def apply_post_limits_and_metrics(
                 logger=logger,
                 enabled=debug_stage_stats,
             )
+        append_mag_authority_stage(
+            mag_authority_trace,
+            "after_bass_boost_restore",
+            _pre_post_restore,
+            gain_db,
+            freq_axis,
+            mask_c,
+            reason_codes=[REASON_BASS_BOOST_RESTORE],
+            restored_allowed_correction=True,
+        )
     except (TypeError, ValueError, FloatingPointError):
         pass
 
     # Final hard reapply: low-bass cuts-only policy must survive all smoothing/clamps.
     try:
+        _pre_lowbass_reapply = np.asarray(gain_db, dtype=float).copy()
+        lf_guard_meta = {}
         if bool(low_cut_enable) and np.isfinite(float(low_hz)) and float(low_hz) > 0.0:
             low_mask_final = build_low_frequency_guard_mask(
                 freq_axis,
@@ -437,6 +632,20 @@ def apply_post_limits_and_metrics(
                         )
                 except (TypeError, ValueError):
                     pass
+        _lf_reapply_reasons = []
+        if int(lf_guard_meta.get("boost_clamped_bins", 0) or 0) > 0:
+            _lf_reapply_reasons.append(REASON_LOW_BASS_CUTS_ONLY)
+        if int(lf_guard_meta.get("floor_reapplied_bins", 0) or 0) > 0:
+            _lf_reapply_reasons.append(REASON_LOW_BASS_FLOOR_REAPPLIED)
+        append_mag_authority_stage(
+            mag_authority_trace,
+            "after_lowbass_hard_reapply",
+            _pre_lowbass_reapply,
+            gain_db,
+            freq_axis,
+            mask_c,
+            reason_codes=_lf_reapply_reasons,
+        )
     except (TypeError, ValueError, FloatingPointError):
         pass
 
@@ -459,6 +668,7 @@ def apply_post_limits_and_metrics(
     f_start = max(mag_c_max_fade - trans_width_fade, mag_c_min_fade)
     f_mask = (freq_axis > f_start) & (freq_axis <= mag_c_max_fade)
     fade_len = mag_c_max_fade - f_start
+    _pre_transition_fade = np.asarray(gain_db, dtype=float).copy()
     if np.any(f_mask) and fade_len > 0:
         x = (freq_axis[f_mask] - f_start) / fade_len
         w = _cosine_fade_out_01(x)
@@ -480,6 +690,36 @@ def apply_post_limits_and_metrics(
                     pass
         except (TypeError, ValueError):
             pass
+    append_mag_authority_stage(
+        mag_authority_trace,
+        "after_transition_fade",
+        _pre_transition_fade,
+        gain_db,
+        freq_axis,
+        mask_c,
+        reason_codes=[REASON_TRANSITION_FADE],
+    )
+    append_mag_authority_stage(
+        mag_authority_trace,
+        "final",
+        gain_db,
+        gain_db,
+        freq_axis,
+        mask_c,
+    )
+    try:
+        if isinstance(st, dict):
+            trace_summary = summarize_mag_authority_trace(mag_authority_trace)
+            safe_put_many(
+                st,
+                {
+                    "mag_authority_trace": list(mag_authority_trace),
+                    "mag_authority_trace_version": int(MAG_AUTHORITY_TRACE_VERSION),
+                    **trace_summary,
+                },
+            )
+    except (TypeError, ValueError):
+        pass
     _record_stage_probe(stage_probes, "after_fade", _stage_probe, freq_axis, gain_db, mask_c, cfg, logger)
     _store_realized_pre_ir_metrics(
         st=st,

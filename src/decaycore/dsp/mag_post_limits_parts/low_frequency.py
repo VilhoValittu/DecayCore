@@ -132,10 +132,11 @@ def _prepare_boost_caps(
             )
             bass_boost_cap_mask = mask_c & (freq_axis >= 20.0) & (freq_axis <= float(bass_boost_cap_hz))
             if np.any(bass_boost_cap_mask):
-                boost_cap_db[bass_boost_cap_mask] = (
+                local_cap = (
                     float(max_boost_db_base)
                     + float(bass_boost_cap_extra_db) * np.asarray(w[bass_boost_cap_mask], dtype=float)
                 )
+                boost_cap_db[bass_boost_cap_mask] = np.minimum(local_cap, float(max_boost_db_base))
                 bass_boost_cap_enabled = bool(
                     np.any(boost_cap_db[bass_boost_cap_mask] > (max_boost_db_base + 1e-6))
                 )

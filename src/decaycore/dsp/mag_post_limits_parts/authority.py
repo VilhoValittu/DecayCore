@@ -70,6 +70,15 @@ def _apply_acoustic_authority_caps(
             cap_db=cut_out,
         )
         try:
+            m_bins = np.asarray(mask_c, dtype=bool)
+            if m_bins.shape != boost_reduction.shape:
+                m_bins = np.ones_like(boost_reduction, dtype=bool)
+            boost_bins = int(np.count_nonzero(m_bins & (boost_reduction > 1e-9)))
+            cut_bins = int(np.count_nonzero(m_bins & (cut_reduction > 1e-9)))
+        except (TypeError, ValueError):
+            boost_bins = 0
+            cut_bins = 0
+        try:
             if isinstance(st, dict):
                 safe_put_many(
                     st,
@@ -82,6 +91,8 @@ def _apply_acoustic_authority_caps(
                         "authority_cut_cap_reduction_mean_db_20_300": float(cut_mean),
                         "authority_boost_cap_min_db_20_300": float(boost_min),
                         "authority_cut_cap_min_db_20_300": float(cut_min),
+                        "authority_boost_cap_reduced_bins": int(boost_bins),
+                        "authority_cut_cap_reduced_bins": int(cut_bins),
                     },
                 )
         except (TypeError, ValueError):
@@ -95,6 +106,8 @@ def _apply_acoustic_authority_caps(
             "boost_reduction_mean_db_20_300": float(boost_mean),
             "cut_reduction_max_db": float(cut_max),
             "cut_reduction_mean_db_20_300": float(cut_mean),
+            "boost_reduced_bins": int(boost_bins),
+            "cut_reduced_bins": int(cut_bins),
         }
 
     try:

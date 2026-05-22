@@ -33,7 +33,9 @@ def _signature_diff_reason(payload: dict) -> str:
     sections = [
         "schema/compat",
         "measurement identity",
+        "measurement metadata identity",
         "frequency grid summary",
+        "DSP/scorer policy versions",
         "target identity",
         "correction band",
         "smoothing",
@@ -65,6 +67,7 @@ def compute_auto_search_signature_object(search_input: AutoSearchInput) -> AutoS
         include_hc_mode=bool(search_input.include_hc_mode),
     )
     payload["measurement_sig"] = str(search_input.measurement_identity)
+    payload["measurement_metadata_identity"] = str(search_input.measurement_metadata_identity)
     payload["frequency_grid_sig"] = str(search_input.frequency_grid_identity)
     h = hashlib.sha256()
     try:
