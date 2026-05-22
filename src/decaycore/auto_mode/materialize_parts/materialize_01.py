@@ -174,7 +174,7 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
     goal = str(ctx.goal or "")
     status_cb = ctx.status_cb
     transient_keys = tuple(str(key) for key in tuple(ctx.preset_transient_keys or ()))
-    score_only_materialize_cache: dict[str, tuple[object, dict, dict]] = {}
+    score_only_materialize_cache: dict[str, tuple[None, dict, dict]] = {}
     score_only_cache_stats = {"hits": 0, "misses": 0, "stores": 0}
 
     def _current_exact_cached_metrics() -> dict | None:
@@ -479,8 +479,10 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
                 "score_only_cache_misses": int(score_only_cache_stats.get("misses", 0) or 0),
                 "score_only_cache_stores": int(score_only_cache_stats.get("stores", 0) or 0),
             }
+            if len(score_only_materialize_cache) >= 64:
+                score_only_materialize_cache.clear()
             score_only_materialize_cache[str(score_only_cache_key)] = (
-                result,
+                None,  # result not needed; all score-only callers discard it
                 dict(metrics or {}),
                 dict(final_data or {}),
             )

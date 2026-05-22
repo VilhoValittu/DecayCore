@@ -13,6 +13,8 @@ def reset_runtime_caches() -> None:
     This resets in-memory helper caches only. It does not remove on-disk
     auto-mode cache files or ``__pycache__`` bytecode folders.
     """
+    import gc
+
     try:
         importlib.invalidate_caches()
     except Exception:
@@ -27,6 +29,8 @@ def reset_runtime_caches() -> None:
         dsp_preprocess,
         smoothing,
     )
+    from ..ui.results_sections.plots_export import clear_plot_render_cache
+    from ..ui.target_preview_cache import clear_target_preview_caches
 
     clearers: list[tuple[str, Callable[[], None]]] = [
         ("auto_mode_filter_priors", filter_priors.clear_auto_mode_filter_priors_cache),
@@ -39,6 +43,8 @@ def reset_runtime_caches() -> None:
         ("rt60", correction_baseline._clear_rt60_cache),
         ("smoothing", smoothing.clear_smoothing_cache),
         ("preprocess", dsp_preprocess.clear_preprocess_cache),
+        ("plot_render_cache", clear_plot_render_cache),
+        ("target_preview_cache", clear_target_preview_caches),
     ]
 
     cleared = 0
@@ -49,4 +55,5 @@ def reset_runtime_caches() -> None:
         except Exception:
             logger.exception("Runtime cache reset failed: %s", cache_name)
 
+    gc.collect()
     logger.debug("Reset %d runtime caches before run", cleared)

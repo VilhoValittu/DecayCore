@@ -31,6 +31,11 @@ from typing import Any
 # ---------------------------------------------------------------------------
 _PLOT_RENDER_CACHE: dict = {}
 
+
+def clear_plot_render_cache() -> None:
+    """Clear the per-run plotly figure cache. Called by reset_runtime_caches()."""
+    _PLOT_RENDER_CACHE.clear()
+
 from ...resources.i8n.decaycore_i18n import t
 from ...auto_mode.rank_score import calibrated_auto_quality
 from .. import decaycore_plot as plots
