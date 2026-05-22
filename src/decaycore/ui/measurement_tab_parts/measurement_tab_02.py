@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import math
 import sys
 import threading
 from pathlib import Path
@@ -160,8 +161,16 @@ def _measurement_summary_html(
             else t("measurement_calibration_none")
         )
     )
+    if peak_dbfs >= -3.0 or bundle.health.clipped:
+        level_hint = f" — {t('measurement_level_clip_risk')}"
+    elif peak_dbfs >= -20.0:
+        level_hint = f" — {t('measurement_level_ok')}"
+    elif peak_dbfs > -40.0:
+        level_hint = f" — {t('measurement_level_low')}"
+    else:
+        level_hint = f" — {t('measurement_level_very_low')}"
     html = (
-        f"<div><b>{t('measurement_recording_peak')}</b>: {peak_dbfs:+.1f} dBFS</div>"
+        f"<div><b>{t('measurement_recording_peak')}</b>: {peak_dbfs:+.1f} dBFS{level_hint}</div>"
         f"<div><b>{t('measurement_timing_reference')}</b>: {timing_reference_text}</div>"
         f"<div><b>{t('measurement_reference_arrival')}</b>: {_format_ms(reference_arrival_ms, t)}</div>"
         f"<div><b>{t('measurement_sweep_peak')}</b>: {_format_ms(sweep_peak_ms, t)}</div>"
@@ -188,6 +197,30 @@ def _measurement_summary_html(
         rel_ms = bundle.health.latency_ms - timing_ref_latency_ms
         sign = "+" if rel_ms >= 0 else ""
         html += f"<div><b>{t('measurement_left_ref_delay')}</b>: {sign}{rel_ms:.2f} ms</div>"
+    snr = bundle.health.snr_db
+    if snr is not None and math.isfinite(float(snr)):
+        if float(snr) >= 30.0:
+            snr_label = t("measurement_snr_good")
+        elif float(snr) >= 15.0:
+            snr_label = t("measurement_snr_fair")
+        else:
+            snr_label = t("measurement_snr_poor")
+        html += f"<div><b>{t('measurement_snr')}</b>: {float(snr):.1f} dB ({snr_label})</div>"
+    if timing is not None and timing.reference_expected:
+        mode = str(bundle.metadata.get("timing_mode", "") or "")
+        corr_pre = bundle.metadata.get("pre_chirp_correlation_score")
+        corr_post = bundle.metadata.get("post_chirp_correlation_score")
+        corr_vals = [
+            float(v) for v in (corr_pre, corr_post)
+            if v is not None and math.isfinite(float(v))
+        ]
+        corr_txt = f" (corr {max(corr_vals):.2f})" if corr_vals else ""
+        mode_label = {
+            "reference_anchored": t("measurement_timing_mode_anchored"),
+            "source_anchored": t("measurement_timing_mode_source"),
+            "reference_failed_fallback": t("measurement_timing_mode_fallback"),
+        }.get(mode, mode)
+        html += f"<div><b>{t('measurement_timing_mode')}</b>: {mode_label}{corr_txt}</div>"
     return html
 
 def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:

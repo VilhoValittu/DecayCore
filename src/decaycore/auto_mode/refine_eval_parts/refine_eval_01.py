@@ -19,6 +19,7 @@ from typing import Any, Callable
 
 import numpy as np
 
+from ..compute_context import AutoRunComputeContext
 from ..rank_score import official_rank_score
 from ..search_v2.candidates import deduplicate_presets
 from ..search_state import _AutoModePhaseState, _AutoModeSearchState, _auto_set_search_winner
@@ -96,6 +97,7 @@ class RefineEvalContext:
     winner_target_name: str | None
     search_state: _AutoModeSearchState
     runtime: Any
+    compute_ctx: AutoRunComputeContext | None = None
 
     def __post_init__(self) -> None:
         if self.cfg is None:
@@ -183,6 +185,8 @@ def evaluate_search_candidate(
     focus_lo_hz: float | None,
     focus_hi_hz: float | None,
 ) -> dict:
+    if ctx.compute_ctx is not None:
+        ctx.compute_ctx.begin_trial(0)
     trial_data = dict(ctx.search_base_data or {})
     trial_data.update(dict(preset or {}))
     if str(ctx.filter_key) in ("linear", "asym"):

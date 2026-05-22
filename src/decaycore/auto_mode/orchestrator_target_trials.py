@@ -24,13 +24,17 @@ _USE_PROCESS_POOL = _sys.platform != "win32"
 # Fork-inherited runtime — set in _run_target_trials before pool creation.
 # Workers read this global directly, bypassing pickle.
 _PROC_RUNTIME = None
+# Fork-inherited per-run compute context — set alongside _PROC_RUNTIME.
+_PROC_COMPUTE_CTX = None
 
 import numpy as np
 
 from .cache_signature import (
     _auto_apply_seed,
+    _auto_compat_version,
     _auto_seed_from_signature,
 )
+from .compute_context import AutoRunComputeContext
 from .cache_measurement_sig import _auto_get_measurement_signature
 from .candidate_generation import _build_auto_mode_candidates
 from .search_v2.candidates import deduplicate_presets
@@ -68,7 +72,11 @@ def _target_eval_one(
     hc_m_arr,
     pin_obj,
     filter_key: str,
+    _compute_ctx: AutoRunComputeContext | None = None,
+    _trial_idx: int = 0,
 ) -> dict:
+    if _compute_ctx is not None:
+        _compute_ctx.begin_trial(int(_trial_idx))
     trial_data = dict(base_tc)
     trial_data.update(dict(preset or {}))
     if str(filter_key) in ("linear", "asym"):
@@ -162,6 +170,7 @@ def _target_eval_one_proc(
     hc_f_arr,
     hc_m_arr,
     filter_key: str,
+    _trial_idx: int = 0,
 ) -> dict:
     """ProcessPool wrapper: uses fork-inherited _PROC_RUNTIME instead of pickled runtime."""
     return _target_eval_one(
@@ -177,6 +186,8 @@ def _target_eval_one_proc(
         hc_m_arr=hc_m_arr,
         pin_obj=None,
         filter_key=filter_key,
+        _compute_ctx=_PROC_COMPUTE_CTX,
+        _trial_idx=int(_trial_idx),
     )
 
 
@@ -207,6 +218,16 @@ def _run_target_trials(
     optuna_builder=None,
     seed_to_params=None,
 ) -> list[dict]:
+    # Per-run compute context: caches measurement-fixed preprocess data and
+    # tracks trial boundaries. Lives for the duration of this function call.
+    _compute_ctx = AutoRunComputeContext(
+        fs=int(fs_v),
+        taps=int(taps_v),
+        measurement_signature=_auto_get_measurement_signature(measurements),
+        filter_key=str(filter_key or ""),
+        compat_version=str(_auto_compat_version(base_tc)),
+    )
+
     use_optuna_trials = bool(
         str(optimizer_backend) == "optuna"
         and runtime.auto_optuna_module_ready(optuna_mod)
@@ -258,6 +279,8 @@ def _run_target_trials(
                 hc_m_arr=hc_m_arr,
                 pin_obj=pin_obj,
                 filter_key=filter_key,
+                _compute_ctx=_compute_ctx,
+                _trial_idx=int(idx),
             )
             out = dict(out or {})
             out["idx"] = int(idx)
@@ -329,6 +352,8 @@ def _run_target_trials(
                     hc_m_arr=hc_m_arr,
                     pin_obj=pin_obj,
                     filter_key=filter_key,
+                    _compute_ctx=_compute_ctx,
+                    _trial_idx=int(idx),
                 )
             except Exception as exc:
                 out = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
@@ -337,13 +362,15 @@ def _run_target_trials(
         chunk_size = int(_auto_trial_chunk_size(workers))
         _ExecutorCls = ProcessPoolExecutor if _USE_PROCESS_POOL else ThreadPoolExecutor
         if _USE_PROCESS_POOL:
-            _ctx = multiprocessing.get_context("fork")
-            _executor_kwargs = {"mp_context": _ctx, "initializer": _auto_worker_init}
+            _mp_ctx = multiprocessing.get_context("fork")
+            _executor_kwargs = {"mp_context": _mp_ctx, "initializer": _auto_worker_init}
         else:
             _executor_kwargs = {}
         if _USE_PROCESS_POOL:
             global _PROC_RUNTIME
             _PROC_RUNTIME = runtime
+            global _PROC_COMPUTE_CTX
+            _PROC_COMPUTE_CTX = _compute_ctx
         with _ExecutorCls(max_workers=int(workers), **_executor_kwargs) as executor:
             for c0 in range(0, int(len(idx_presets)), int(chunk_size)):
                 chunk = idx_presets[c0 : c0 + int(chunk_size)]
@@ -361,10 +388,14 @@ def _run_target_trials(
                             hc_f_arr=hc_f_arr,
                             hc_m_arr=hc_m_arr,
                             filter_key=filter_key,
+                            _trial_idx=int(idx),
                         ): int(idx)
                         for idx, preset in chunk
                     }
                 else:
+                    # ThreadPool: ctx is shared across threads; Python GIL makes
+                    # dict operations safe (no corrupted reads), so occasional
+                    # duplicate computation is the only risk.
                     future_map = {
                         executor.submit(
                             _target_eval_one,
@@ -380,6 +411,8 @@ def _run_target_trials(
                             hc_m_arr=hc_m_arr,
                             pin_obj=pin_obj,
                             filter_key=filter_key,
+                            _compute_ctx=_compute_ctx,
+                            _trial_idx=int(idx),
                         ): int(idx)
                         for idx, preset in chunk
                     }
@@ -393,6 +426,12 @@ def _run_target_trials(
                         out = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
                     out_by_idx[int(idx)] = dict(out or {})
 
+    logger.debug(
+        "Target trials compute context stats (target=%s phase=%s):\n%s",
+        str(target_name),
+        str(phase_tag),
+        _compute_ctx.cache_stats_text(),
+    )
     return [
         dict(
             out_by_idx.get(

@@ -1,4 +1,4 @@
-# Why DecayCore Works (v1.0.5)
+# Why DecayCore Works (v1.0.6)
 
 DecayCore is not "magic EQ". It is a bounded DSP workflow built for real room data.
 

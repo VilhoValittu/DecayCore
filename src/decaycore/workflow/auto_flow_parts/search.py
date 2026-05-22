@@ -278,6 +278,7 @@ def _run_auto_mode_search_if_needed(
                     ),
                 },
                 "top": list(auto_res.get("top", []) or []),
+                "winner_explanation": dict(auto_res.get("winner_explanation", {}) or {}),
             }
             best_rank_official = official_rank_score(best_metrics)
             auto_status(

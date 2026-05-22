@@ -582,6 +582,14 @@ def _render_auto_diagnostics(*, data: dict) -> None:
                 total=trials_total,
             )
         )
+        winner_expl = dict(auto_meta.get("winner_explanation", {}) or {})
+        expl_summary = str(winner_expl.get("summary", "") or "").strip()
+        expl_reasons = list(winner_expl.get("reasons", []) or [])
+        if expl_summary or expl_reasons:
+            reasons_md = "\n\n".join(expl_reasons) if expl_reasons else ""
+            body = "\n\n".join(filter(None, [expl_summary, reasons_md]))
+            ui.markdown(f"**{t('results_auto_diag_rationale_header')}**\n\n{body}")
+
         polish_lines = _build_auto_polish_lines(auto_meta)
         if polish_lines:
             ui.markdown(f"**{t('results_auto_diag_polish_header')}**\n\n" + "\n\n".join(polish_lines))
