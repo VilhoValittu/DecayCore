@@ -8,7 +8,7 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
-## [1.0.6] - 22-5-2026
+## [1.0.6] - 26-5-2026
 
 ### Hybrid IIR + FIR bass correction — new feature
 
