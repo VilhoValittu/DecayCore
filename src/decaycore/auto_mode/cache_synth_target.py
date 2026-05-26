@@ -55,7 +55,7 @@ def get_or_build_synth_target(
 
     Returns the same value as synth_fn(...): a (hc_f, hc_m) tuple or None on failure.
     synth_fn must accept (f_l, m_l, f_r, m_r, *, bass_comp_frac, bass_comp_ref_db,
-    tilt_comp_frac, hf_comp_frac, smooth_oct).
+    tilt_comp_frac, hf_comp_frac, smooth_oct, measurements=None).
     """
     msig = _auto_get_measurement_signature(measurements)
     key = _synth_target_cache_key(
@@ -81,6 +81,7 @@ def get_or_build_synth_target(
             tilt_comp_frac=float(tilt_comp_frac),
             hf_comp_frac=float(hf_comp_frac),
             smooth_oct=float(smooth_oct),
+            measurements=measurements,
         )
     except Exception:
         result = None

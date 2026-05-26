@@ -47,7 +47,7 @@ from ..runtime_context import (
     _auto_pick_metric,
 )
 
-from .metrics_common import _auto_stats_pick_arr, _finite_json_float
+from .metrics_common import _auto_stats_band_n, _auto_stats_pick_arr, _finite_json_float
 
 BROAD_RESIDUAL_PEAK_SCORING_VERSION = 1
 MODAL_INTELLIGENCE_METRICS_VERSION = 1
@@ -186,11 +186,12 @@ def compute_broad_residual_peak_metrics(
     if not (np.isfinite(lo) and np.isfinite(hi)) or float(hi) <= float(lo):
         return dict(out_empty)
 
-    f = _auto_stats_pick_arr(st, "freq_axis")
-    measured = _auto_stats_pick_arr(st, "measured_mags")
-    target = _auto_stats_pick_arr(st, "target_mags")
-    realized = _auto_stats_pick_arr(st, "realized_filter_mags", "filter_mags", "predicted_filter_mags")
-    conf = _auto_stats_pick_arr(st, "confidence_mask")
+    _n_lim = _auto_stats_band_n(st, float(hi) * 2.5)
+    f = _auto_stats_pick_arr(st, "freq_axis", _max_n=_n_lim)
+    measured = _auto_stats_pick_arr(st, "measured_mags", _max_n=_n_lim)
+    target = _auto_stats_pick_arr(st, "target_mags", _max_n=_n_lim)
+    realized = _auto_stats_pick_arr(st, "realized_filter_mags", "filter_mags", "predicted_filter_mags", _max_n=_n_lim)
+    conf = _auto_stats_pick_arr(st, "confidence_mask", _max_n=_n_lim)
     n = int(min(f.size, measured.size, target.size, realized.size))
     if n < 8:
         return dict(out_empty)

@@ -187,6 +187,11 @@ def _extract_result_payload(result: FilterResult) -> tuple[Any, ...]:
     )
 
 
+def _validated_device_format(data: dict | None) -> str:
+    fmt = str((data or {}).get("device_audio_format", "S32_LE") or "S32_LE").upper()
+    return fmt if fmt in ("S32_LE", "S16_LE") else "S32_LE"
+
+
 def _direct_dac_yaml_export_settings(data: dict | None, *, include_sub: bool) -> dict[str, Any]:
     settings: dict[str, Any] = {
         "include_sub": False,
@@ -265,6 +270,15 @@ def _direct_dac_yaml_export_settings(data: dict | None, *, include_sub: bool) ->
         settings["sub_allpass_freq_hz"] = float(freq_hz)
         settings["sub_allpass_q"] = float(q)
     return settings
+
+
+def _hybrid_iir_biquads_from_result(result: Any, side: str) -> list[dict]:
+    st_name = "l_st" if str(side).lower().startswith("l") else "r_st"
+    try:
+        st = dict(getattr(result, st_name, {}) or {})
+    except Exception:
+        st = {}
+    return [dict(item) for item in list(st.get("hybrid_iir_biquads", []) or []) if isinstance(item, dict)]
 
 
 def _write_fs_outputs(
@@ -455,6 +469,9 @@ def _write_fs_outputs(
             main_hpf_order=yaml_settings.get("main_hpf_order"),
             sub_hpf_order=yaml_settings.get("sub_hpf_order"),
             sub_lpf_order=yaml_settings.get("sub_lpf_order"),
+            device_format=_validated_device_format(data),
+            left_iir_biquads=_hybrid_iir_biquads_from_result(result, "left"),
+            right_iir_biquads=_hybrid_iir_biquads_from_result(result, "right"),
         )
         zf.writestr(
             _camilladsp_yaml_name(data=data, ft_short=ft_short, irw_tag=irw_tag, fs_v=int(fs_v)),

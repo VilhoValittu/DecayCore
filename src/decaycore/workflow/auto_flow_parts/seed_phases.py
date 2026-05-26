@@ -611,6 +611,7 @@ def _run_auto_mode_seed_phases(
                         m_l=pre_m_l,
                         f_r=pre_f_r,
                         m_r=pre_m_r,
+                        measurements=pre_measurements,
                     )
                 if isinstance(tc_pick, dict):
                     chosen_hc = str(tc_pick.get("selected_hc_mode", "Harman6") or "Harman6")

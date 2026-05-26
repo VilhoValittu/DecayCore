@@ -211,10 +211,15 @@ def _auto_dip_fill_risk_metrics_from_stats(
         "dip_fill_deep_narrow_count": 0,
         "dip_fill_risk_scoring_version": int(DIP_FILL_RISK_SCORING_VERSION),
     }
-    f = _auto_stats_pick_arr(st, "freq_axis")
-    measured = _auto_stats_pick_arr(st, "measured_mags")
-    target = _auto_stats_pick_arr(st, "target_mags")
-    filt = _auto_stats_pick_arr(st, "predicted_filter_mags", "realized_filter_mags", "filter_mags")
+    f_full = _auto_stats_pick_arr(st, "freq_axis")
+    # Pre-slice to relevant band before extracting other arrays — freq_axis may span
+    # 0..Nyquist (100k+ pts) but the band tops out at hi_hz (default 250 Hz).
+    _n_band = int(np.searchsorted(f_full, float(hi_hz) * 2.5, side="right")) if f_full.size >= 8 else f_full.size
+    _n_lim = _n_band if _n_band >= 8 else f_full.size
+    f = f_full[:_n_lim]
+    measured = _auto_stats_pick_arr(st, "measured_mags")[:_n_lim]
+    target = _auto_stats_pick_arr(st, "target_mags")[:_n_lim]
+    filt = _auto_stats_pick_arr(st, "predicted_filter_mags", "realized_filter_mags", "filter_mags")[:_n_lim]
     n = int(min(f.size, measured.size, target.size, filt.size))
     if n < 8:
         return dict(out)

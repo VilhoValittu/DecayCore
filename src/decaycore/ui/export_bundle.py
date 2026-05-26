@@ -33,11 +33,22 @@ from .export_outputs import (
     _export_version_tag,
     _export_winner_rank_score,
     _export_winner_rank_tag,
+    _hybrid_iir_biquads_from_result,
     _write_fs_outputs,
 )
 from .export_scoring import _build_export_ranking
 
 logger = logging.getLogger("DecayCore")
+
+_VALID_FILTER_WAV_FORMATS = ("FLOAT32", "S32_LE", "S16_LE")
+
+
+def _convert_ir_for_export(ir: np.ndarray, fmt: str) -> np.ndarray:
+    if fmt == "S32_LE":
+        return (np.clip(ir, -1.0, 1.0) * 2147483647).astype(np.int32)
+    if fmt == "S16_LE":
+        return (np.clip(ir, -1.0, 1.0) * 32767).astype(np.int16)
+    return ir.astype(np.float32)
 
 
 def build_export_zip(
@@ -65,6 +76,13 @@ def build_export_zip(
     multi_rate_on = bool(data.get("multi_rate_opt", False))
     ranking_context = _build_export_ranking(results)
 
+    wav_fmt = str(data.get("filter_wav_format", "FLOAT32") or "FLOAT32").upper()
+    if wav_fmt not in _VALID_FILTER_WAV_FORMATS:
+        wav_fmt = "FLOAT32"
+    device_fmt = str(data.get("device_audio_format", "S32_LE") or "S32_LE").upper()
+    if device_fmt not in ("S32_LE", "S16_LE"):
+        device_fmt = "S32_LE"
+
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         for result in list(results or []):
             fs_v = int(result.fs)
@@ -82,8 +100,8 @@ def build_export_zip(
                 stereo_wav = io.BytesIO()
                 stereo_ir = np.column_stack(
                     (
-                        result.l_ir.astype("float32"),
-                        result.r_ir.astype("float32"),
+                        _convert_ir_for_export(result.l_ir, wav_fmt),
+                        _convert_ir_for_export(result.r_ir, wav_fmt),
                     )
                 )
                 scipy.io.wavfile.write(stereo_wav, fs_v, stereo_ir)
@@ -91,14 +109,14 @@ def build_export_zip(
             else:
                 wav_l = io.BytesIO()
                 wav_r = io.BytesIO()
-                scipy.io.wavfile.write(wav_l, fs_v, result.l_ir.astype("float32"))
-                scipy.io.wavfile.write(wav_r, fs_v, result.r_ir.astype("float32"))
+                scipy.io.wavfile.write(wav_l, fs_v, _convert_ir_for_export(result.l_ir, wav_fmt))
+                scipy.io.wavfile.write(wav_r, fs_v, _convert_ir_for_export(result.r_ir, wav_fmt))
                 zf.writestr(str(spec["bundle_names"][0]), wav_l.getvalue())
                 zf.writestr(str(spec["bundle_names"][1]), wav_r.getvalue())
 
             if getattr(result, "sub_ir", None) is not None and result.sub_ir.size > 0:
                 wav_sub = io.BytesIO()
-                scipy.io.wavfile.write(wav_sub, fs_v, result.sub_ir.astype("float32"))
+                scipy.io.wavfile.write(wav_sub, fs_v, _convert_ir_for_export(result.sub_ir, wav_fmt))
                 sub_name = str(
                     sub_filter_wav_export_spec(
                         fs_v,
@@ -118,6 +136,7 @@ def build_export_zip(
                 irw_tag=irw_tag,
                 target_curve_tag=target_curve_tag,
                 layout=data.get("layout", "Mono"),
+                wav_fmt=wav_fmt,
             )
             zf.writestr(
                 bypass_zip_path(f"Bypass_Config_{ft_short}_{fs_v}Hz_{irw_tag}.cfg"),
@@ -191,6 +210,9 @@ def build_export_zip(
                 main_hpf_order=yaml_settings.get("main_hpf_order"),
                 sub_hpf_order=yaml_settings.get("sub_hpf_order"),
                 sub_lpf_order=yaml_settings.get("sub_lpf_order"),
+                device_format=device_fmt,
+                left_iir_biquads=_hybrid_iir_biquads_from_result(results[0] if results else None, "left"),
+                right_iir_biquads=_hybrid_iir_biquads_from_result(results[0] if results else None, "right"),
             )
             zf.writestr(
                 _camilladsp_yaml_name(data=data, ft_short=ft_short, irw_tag=irw_tag),

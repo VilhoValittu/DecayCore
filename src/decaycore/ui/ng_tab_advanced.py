@@ -275,6 +275,108 @@ def build_advanced_tab(*, t: Callable, get_val: Callable, max_safe_boost: float)
 
     ui.separator()
 
+    with ui.card().classes("w-full gap-3"):
+        ui.label(t("hybrid_iir_title")).classes("text-sm font-semibold")
+        ui.label(t("hybrid_iir_help")).classes("text-xs text-gray-500")
+        ctrl.register(
+            "hybrid_iir_enabled",
+            ui.checkbox(
+                t("hybrid_iir_enabled"),
+                value=bool(get_val("hybrid_iir_enabled", False)),
+            ),
+        )
+        with ui.expansion(t("hybrid_iir_tuning_title")).classes("w-full"):
+            with ui.column().classes("w-full gap-3"):
+                with ui.row().classes("w-full gap-4"):
+                    ctrl.register(
+                        "hybrid_iir_max_filters_per_channel",
+                        ui.number(
+                            label=t("hybrid_iir_max_filters_per_channel"),
+                            value=int(get_val("hybrid_iir_max_filters_per_channel", 3) or 3),
+                            format="%d",
+                        ).props("dense outlined").classes("flex-1"),
+                    )
+                    ctrl.register(
+                        "hybrid_iir_max_cut_db",
+                        ui.number(
+                            label=t("hybrid_iir_max_cut_db"),
+                            value=float(get_val("hybrid_iir_max_cut_db", 6.0) or 6.0),
+                            format="%.1f",
+                        ).props("dense outlined").classes("flex-1"),
+                    )
+                with ui.row().classes("w-full gap-4"):
+                    ctrl.register(
+                        "hybrid_iir_min_freq_hz",
+                        ui.number(
+                            label=t("hybrid_iir_min_freq_hz"),
+                            value=float(get_val("hybrid_iir_min_freq_hz", 20.0) or 20.0),
+                            format="%.1f",
+                        ).props("dense outlined").classes("flex-1"),
+                    )
+                    ctrl.register(
+                        "hybrid_iir_max_freq_hz",
+                        ui.number(
+                            label=t("hybrid_iir_max_freq_hz"),
+                            value=float(get_val("hybrid_iir_max_freq_hz", 150.0) or 150.0),
+                            format="%.1f",
+                        ).props("dense outlined").classes("flex-1"),
+                    )
+                with ui.row().classes("w-full gap-4"):
+                    ctrl.register(
+                        "hybrid_iir_min_peak_db",
+                        ui.number(
+                            label=t("hybrid_iir_min_peak_db"),
+                            value=float(get_val("hybrid_iir_min_peak_db", 4.0) or 4.0),
+                            format="%.1f",
+                        ).props("dense outlined").classes("flex-1"),
+                    )
+                    ctrl.register(
+                        "hybrid_iir_min_confidence",
+                        ui.number(
+                            label=t("hybrid_iir_min_confidence"),
+                            value=float(get_val("hybrid_iir_min_confidence", 0.65) or 0.65),
+                            format="%.2f",
+                        ).props("dense outlined").classes("flex-1"),
+                    )
+                with ui.row().classes("w-full gap-4"):
+                    ctrl.register(
+                        "hybrid_iir_min_q",
+                        ui.number(
+                            label=t("hybrid_iir_min_q"),
+                            value=float(get_val("hybrid_iir_min_q", 3.0) or 3.0),
+                            format="%.1f",
+                        ).props("dense outlined").classes("flex-1"),
+                    )
+                    ctrl.register(
+                        "hybrid_iir_max_q",
+                        ui.number(
+                            label=t("hybrid_iir_max_q"),
+                            value=float(get_val("hybrid_iir_max_q", 12.0) or 12.0),
+                            format="%.1f",
+                        ).props("dense outlined").classes("flex-1"),
+                    )
+                    ctrl.register(
+                        "hybrid_iir_min_gd_excess_ms",
+                        ui.number(
+                            label=t("hybrid_iir_min_gd_excess_ms"),
+                            value=float(get_val("hybrid_iir_min_gd_excess_ms", 15.0) or 15.0),
+                            format="%.1f",
+                        ).props("dense outlined").classes("flex-1"),
+                    )
+                    ctrl.register(
+                        "hybrid_iir_min_cut_priority",
+                        ui.number(
+                            label=t("hybrid_iir_min_cut_priority"),
+                            value=float(get_val("hybrid_iir_min_cut_priority", 0.0)),
+                            format="%.2f",
+                            min=0.0,
+                            max=1.0,
+                            step=0.05,
+                        ).props("dense outlined").classes("flex-1"),
+                    )
+
+    ui.separator()
+
     conf_pull_col = ui.column().classes("w-full")
     ctrl.register_container("conf_pull_scope", conf_pull_col)
     with conf_pull_col:

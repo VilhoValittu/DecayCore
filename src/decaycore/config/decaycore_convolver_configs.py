@@ -202,6 +202,25 @@ def _extend_camilladsp_crossover_filter(
     )
 
 
+def _normalize_camilladsp_biquads(value) -> list[dict[str, float]]:
+    out: list[dict[str, float]] = []
+    for raw in list(value or []):
+        if not isinstance(raw, dict):
+            continue
+        try:
+            freq = float(raw.get("freq", raw.get("freq_hz")))
+            q = float(raw.get("q"))
+            gain = float(raw.get("gain", raw.get("gain_db")))
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if not (freq == freq and q == q and gain == gain):
+            continue
+        if freq <= 0.0 or q <= 0.0 or gain > 0.0:
+            continue
+        out.append({"freq": freq, "q": q, "gain": gain})
+    return out
+
+
 def generate_raspberry_yaml(
     fs,
     ft_short,
@@ -224,7 +243,13 @@ def generate_raspberry_yaml(
     main_hpf_order: int | float | str | None = None,
     sub_hpf_order: int | float | str | None = None,
     sub_lpf_order: int | float | str | None = None,
+    device_format: str = "S32_LE",
+    left_iir_biquads=None,
+    right_iir_biquads=None,
 ):
+    if device_format not in ("S32_LE", "S16_LE"):
+        raise ValueError(f"device_format must be 'S32_LE' or 'S16_LE', got {device_format!r}")
+    yaml_device_format = str(device_format).replace("_", "_")
     tc = _tc_segment(target_curve_tag)
     title_meta = _title_suffix(program_version=program_version, winner_rank_score=winner_rank_score)
     spec = filter_wav_export_spec(
@@ -307,6 +332,8 @@ def generate_raspberry_yaml(
     main_hpf_order_i = _camilladsp_crossover_order(main_hpf_order, 2)
     sub_hpf_order_i = _camilladsp_crossover_order(sub_hpf_order, 2)
     sub_lpf_order_i = _camilladsp_crossover_order(sub_lpf_order, 2)
+    left_iir = _normalize_camilladsp_biquads(left_iir_biquads)
+    right_iir = _normalize_camilladsp_biquads(right_iir_biquads)
 
     playback_channels = 3 if include_sub else 2
     left_filter_names = ["mastergain"]
@@ -317,6 +344,8 @@ def generate_raspberry_yaml(
     if use_main_hpf:
         left_filter_names.append("main_hpf")
         right_filter_names.append("main_hpf")
+    left_filter_names.extend([f"l_hybrid_iir_{idx}" for idx in range(1, len(left_iir) + 1)])
+    right_filter_names.extend([f"r_hybrid_iir_{idx}" for idx in range(1, len(right_iir) + 1)])
     left_filter_names.append("ir_left")
     right_filter_names.append("ir_right")
 
@@ -339,12 +368,12 @@ def generate_raspberry_yaml(
         "  capture:",
         "    type: Stdin",
         "    channels: 2",
-        "    format: S32_LE",
+        f"    format: {yaml_device_format}",
         "  playback:",
         "    type: Alsa",
         "    device: plughw:0,0",
         f"    channels: {playback_channels}",
-        "    format: S32_LE",
+        f"    format: {yaml_device_format}",
         f"  samplerate: {int(fs)}",
         "  enable_rate_adjust: true",
         "  chunksize: 2048",
@@ -366,6 +395,32 @@ def generate_raspberry_yaml(
         f"      filename: {r_wav}",
         f"      channel: {r_ch}",
     ]
+    for idx, biquad in enumerate(left_iir, start=1):
+        lines.extend(
+            [
+                "",
+                f"  l_hybrid_iir_{idx}:",
+                "    type: Biquad",
+                "    parameters:",
+                "      type: Peaking",
+                f"      freq: {float(biquad['freq']):.3f}",
+                f"      q: {float(biquad['q']):.6f}",
+                f"      gain: {float(biquad['gain']):.3f}",
+            ]
+        )
+    for idx, biquad in enumerate(right_iir, start=1):
+        lines.extend(
+            [
+                "",
+                f"  r_hybrid_iir_{idx}:",
+                "    type: Biquad",
+                "    parameters:",
+                "      type: Peaking",
+                f"      freq: {float(biquad['freq']):.3f}",
+                f"      q: {float(biquad['q']):.6f}",
+                f"      gain: {float(biquad['gain']):.3f}",
+            ]
+        )
     if include_sub:
         lines.extend(
             [

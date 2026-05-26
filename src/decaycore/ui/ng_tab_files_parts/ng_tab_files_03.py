@@ -25,7 +25,16 @@ logger = logging.getLogger("DecayCore")
 from .. import ng_controls as ctrl
 from ...app_paths import default_measurements_dir
 from ...io.measurements_loader import _try_load_harmonic_sidecar, _try_load_rt60_sidecar
-from ...ui_i18n import LAYOUT_MONO, LAYOUT_OPTION_LABEL_KEYS, normalize_layout_value, tr_options
+from ...ui_i18n import (
+    DEVICE_AUDIO_FORMAT_OPTION_LABEL_KEYS,
+    DEVICE_AUDIO_FORMAT_S32LE,
+    FILTER_WAV_FORMAT_FLOAT32,
+    FILTER_WAV_FORMAT_OPTION_LABEL_KEYS,
+    LAYOUT_MONO,
+    LAYOUT_OPTION_LABEL_KEYS,
+    normalize_layout_value,
+    tr_options,
+)
 
 
 
@@ -716,6 +725,30 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:
                 ui.radio(
                     tr_options(t, LAYOUT_OPTION_LABEL_KEYS),
                     value=normalize_layout_value(get_val("layout", LAYOUT_MONO), t),
+                ),
+            )
+
+    # Filter WAV format
+    with ui.row().classes("w-full gap-4 items-end"):
+        with ui.column().classes("gap-1"):
+            ui.label(t("filter_wav_format")).classes("text-sm font-medium")
+            ctrl.register(
+                "filter_wav_format",
+                ui.radio(
+                    tr_options(t, FILTER_WAV_FORMAT_OPTION_LABEL_KEYS),
+                    value=str(get_val("filter_wav_format", FILTER_WAV_FORMAT_FLOAT32) or FILTER_WAV_FORMAT_FLOAT32),
+                ),
+            )
+
+    # CamillaDSP device audio format
+    with ui.row().classes("w-full gap-4 items-end"):
+        with ui.column().classes("gap-1"):
+            ui.label(t("device_audio_format")).classes("text-sm font-medium")
+            ctrl.register(
+                "device_audio_format",
+                ui.radio(
+                    tr_options(t, DEVICE_AUDIO_FORMAT_OPTION_LABEL_KEYS),
+                    value=str(get_val("device_audio_format", DEVICE_AUDIO_FORMAT_S32LE) or DEVICE_AUDIO_FORMAT_S32LE),
                 ),
             )
 

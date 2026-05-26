@@ -10,6 +10,7 @@ def compute_rank_score_components(
     event_penalty: float = ...,
     lr_delta_penalty: float = ...,
     dsp_penalty: float = ...,
+    bass_prering_penalty: float = ...,
     exc_penalty: float = ...,
     bass_integration_penalty: float = ...,
     bass_feasibility_penalty: float = ...,

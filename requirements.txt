@@ -4,4 +4,4 @@ nicegui>=1.4
 plotly
 optuna
 numba
-
+sounddevice

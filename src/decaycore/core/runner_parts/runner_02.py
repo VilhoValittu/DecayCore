@@ -29,6 +29,15 @@ from typing import Any
 import numpy as np
 
 from ...application.run_request import RunRequest
+
+
+def _convert_ir_for_export(ir: np.ndarray, fmt: str) -> np.ndarray:
+    if fmt == "S32_LE":
+        return (np.clip(ir, -1.0, 1.0) * 2147483647).astype(np.int32)
+    if fmt == "S16_LE":
+        return (np.clip(ir, -1.0, 1.0) * 32767).astype(np.int16)
+    return ir.astype(np.float32)
+
 from ...auto_mode.api import AUTO_MODE_COMPAT_VERSION
 from ...auto_mode.rank_score import attach_official_rank_score, official_rank_score
 from ...config.decaycore_config import load_config
@@ -121,6 +130,16 @@ def _headless_camilladsp_yaml_name(*, data: dict | None, ft_short: str, irw_tag:
         parts.append(f"rank{rank:.3f}")
     return "_".join(parts) + ".yml"
 
+
+def _headless_hybrid_iir_biquads(result, side: str) -> list[dict]:
+    st_name = "l_st" if str(side).lower().startswith("l") else "r_st"
+    try:
+        st = dict(getattr(result, st_name, {}) or {})
+    except Exception:
+        st = {}
+    return [dict(item) for item in list(st.get("hybrid_iir_biquads", []) or []) if isinstance(item, dict)]
+
+
 def _headless_summary_content(data: dict, result: Any) -> str:
     l_st = dict(getattr(result, "l_st", {}) or {})
     r_st = dict(getattr(result, "r_st", {}) or {})
@@ -180,6 +199,12 @@ def _build_headless_export_zip(
         yaml_sub_hpf_order = int(round(float(data.get("sub_hpf_slope", 12) or 12) / 6.0))
     except Exception:
         yaml_sub_hpf_order = 2
+    wav_fmt = str(data.get("filter_wav_format", "FLOAT32") or "FLOAT32").upper()
+    if wav_fmt not in ("FLOAT32", "S32_LE", "S16_LE"):
+        wav_fmt = "FLOAT32"
+    device_fmt = str(data.get("device_audio_format", "S32_LE") or "S32_LE").upper()
+    if device_fmt not in ("S32_LE", "S16_LE"):
+        device_fmt = "S32_LE"
 
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         for result in list(results or []):
@@ -194,14 +219,17 @@ def _build_headless_export_zip(
             )
             if str(spec.get("layout")) == "Stereo":
                 stereo_wav = io.BytesIO()
-                stereo_ir = np.column_stack((result.l_ir.astype("float32"), result.r_ir.astype("float32")))
+                stereo_ir = np.column_stack((
+                    _convert_ir_for_export(result.l_ir, wav_fmt),
+                    _convert_ir_for_export(result.r_ir, wav_fmt),
+                ))
                 scipy.io.wavfile.write(stereo_wav, fs_v, stereo_ir)
                 zf.writestr(str(spec["bundle_names"][0]), stereo_wav.getvalue())
             else:
                 wav_l = io.BytesIO()
                 wav_r = io.BytesIO()
-                scipy.io.wavfile.write(wav_l, fs_v, result.l_ir.astype("float32"))
-                scipy.io.wavfile.write(wav_r, fs_v, result.r_ir.astype("float32"))
+                scipy.io.wavfile.write(wav_l, fs_v, _convert_ir_for_export(result.l_ir, wav_fmt))
+                scipy.io.wavfile.write(wav_r, fs_v, _convert_ir_for_export(result.r_ir, wav_fmt))
                 zf.writestr(str(spec["bundle_names"][0]), wav_l.getvalue())
                 zf.writestr(str(spec["bundle_names"][1]), wav_r.getvalue())
 
@@ -209,7 +237,7 @@ def _build_headless_export_zip(
             include_sub = bool(sub_ir is not None and getattr(sub_ir, "size", 0) > 0)
             if include_sub:
                 wav_sub = io.BytesIO()
-                scipy.io.wavfile.write(wav_sub, fs_v, sub_ir.astype("float32"))
+                scipy.io.wavfile.write(wav_sub, fs_v, _convert_ir_for_export(sub_ir, wav_fmt))
                 sub_name = str(sub_filter_wav_export_spec(fs_v, ft_short, file_ts, irw_tag=irw_tag)["bundle_name"])
                 zf.writestr(sub_name, wav_sub.getvalue())
 
@@ -222,6 +250,7 @@ def _build_headless_export_zip(
                 irw_tag=irw_tag,
                 target_curve_tag=target_curve_tag,
                 layout=data.get("layout", "Mono"),
+                wav_fmt=wav_fmt,
             )
 
             zf.writestr(
@@ -272,6 +301,9 @@ def _build_headless_export_zip(
                         main_hpf_order=yaml_xo_order,
                         sub_hpf_order=yaml_sub_hpf_order,
                         sub_lpf_order=yaml_xo_order,
+                        device_format=device_fmt,
+                        left_iir_biquads=_headless_hybrid_iir_biquads(result, "left"),
+                        right_iir_biquads=_headless_hybrid_iir_biquads(result, "right"),
                     ),
                 )
 
@@ -303,6 +335,9 @@ def _build_headless_export_zip(
                     main_hpf_order=yaml_xo_order,
                     sub_hpf_order=yaml_sub_hpf_order,
                     sub_lpf_order=yaml_xo_order,
+                    device_format=device_fmt,
+                    left_iir_biquads=_headless_hybrid_iir_biquads(results[0] if results else None, "left"),
+                    right_iir_biquads=_headless_hybrid_iir_biquads(results[0] if results else None, "right"),
                 ),
             )
 

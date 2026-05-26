@@ -83,6 +83,27 @@ def _append_acoustic_events(summary_content, l_st, r_st):
                 "treat this as uncorrectable-room/target pressure rather than safe boost headroom.\n"
             )
         summary_content += f"Boost blocked reason: {str(st.get('boost_blocked_reason', 'n/a'))}\n"
+        summary_content += f"\n=== HYBRID IIR MODAL CUTS ({side}) ===\n"
+        enabled = bool(st.get("hybrid_iir_enabled", False))
+        biquads = [dict(item) for item in list(st.get("hybrid_iir_biquads", []) or []) if isinstance(item, dict)]
+        rejected = [dict(item) for item in list(st.get("hybrid_iir_rejected", []) or []) if isinstance(item, dict)]
+        summary_content += f"State: {'ON' if enabled else 'OFF'}\n"
+        summary_content += "Mode: magnitude preconditioning only\n"
+        if biquads:
+            summary_content += "IIR modal cuts reduce excitation of selected minimum-phase-like bass peaks.\n"
+            for idx, biquad in enumerate(biquads, start=1):
+                summary_content += (
+                    f"- #{idx}: {float(biquad.get('freq', 0.0) or 0.0):.1f} Hz, "
+                    f"Q {float(biquad.get('q', 0.0) or 0.0):.2f}, "
+                    f"gain {float(biquad.get('gain', 0.0) or 0.0):+.2f} dB, "
+                    f"confidence {float(biquad.get('confidence', 0.0) or 0.0):.2f}, "
+                    f"safe_cut {float(biquad.get('safe_cut_db', 0.0) or 0.0):.2f} dB\n"
+                )
+        elif enabled:
+            summary_content += "Selected cuts: none\n"
+            if rejected:
+                reasons = ", ".join(sorted({str(item.get("reason", "unknown")) for item in rejected[:6]}))
+                summary_content += f"Rejected candidate reasons: {reasons}\n"
         summary_content += f"\n=== CLAMP DIAGNOSTICS ({side}) ===\n"
         summary_content += f"{str(st.get('clamp_summary', 'n/a'))}\n"
         summary_content += (

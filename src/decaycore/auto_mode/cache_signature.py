@@ -71,6 +71,7 @@ from .shared import (
     _auto_safe_float,
     logger,
 )
+from ..dsp.hybrid_iir import HYBRID_IIR_POLICY_VERSION
 
 def _auto_cache_resolve_path(*, compat_version: str | None = None) -> str:
     if compat_version is None:
@@ -97,6 +98,7 @@ _AUTO_CONFIDENCE_MODEL_POLICY_V = 1
 _AUTO_BASS_INTEGRATION_FEASIBILITY_POLICY_V = 1
 _AUTO_PHASE_GD_GUARD_POLICY_V = 1
 _AUTO_MEASUREMENT_METADATA_IDENTITY_V = 1
+_AUTO_HYBRID_IIR_POLICY_V = HYBRID_IIR_POLICY_VERSION
 
 
 def _auto_signature(
@@ -251,6 +253,24 @@ def _auto_signature_payload(
             "bass_integration_feasibility_policy_v": int(_AUTO_BASS_INTEGRATION_FEASIBILITY_POLICY_V),
             "phase_gd_guard_policy_v": int(_AUTO_PHASE_GD_GUARD_POLICY_V),
             "measurement_metadata_identity_v": int(_AUTO_MEASUREMENT_METADATA_IDENTITY_V),
+            "hybrid_iir_policy_v": int(_AUTO_HYBRID_IIR_POLICY_V),
+        },
+        "hybrid_iir": {
+            "policy_v": int(_AUTO_HYBRID_IIR_POLICY_V),
+            "enabled": bool(base_data.get("hybrid_iir_enabled", False)),
+            "max_filters_per_channel": int(
+                _auto_safe_float(base_data.get("hybrid_iir_max_filters_per_channel", 3), 3)
+            ),
+            "min_freq_hz": float(_auto_safe_float(base_data.get("hybrid_iir_min_freq_hz", 20.0), 20.0)),
+            "max_freq_hz": float(_auto_safe_float(base_data.get("hybrid_iir_max_freq_hz", 150.0), 150.0)),
+            "min_peak_db": float(_auto_safe_float(base_data.get("hybrid_iir_min_peak_db", 4.0), 4.0)),
+            "min_q": float(_auto_safe_float(base_data.get("hybrid_iir_min_q", 3.0), 3.0)),
+            "max_q": float(_auto_safe_float(base_data.get("hybrid_iir_max_q", 12.0), 12.0)),
+            "max_cut_db": float(_auto_safe_float(base_data.get("hybrid_iir_max_cut_db", 6.0), 6.0)),
+            "min_confidence": float(_auto_safe_float(base_data.get("hybrid_iir_min_confidence", 0.65), 0.65)),
+            "min_gd_excess_ms": float(
+                _auto_safe_float(base_data.get("hybrid_iir_min_gd_excess_ms", 15.0), 15.0)
+            ),
         },
         "gain_authority_policy": {
             "policy_v": int(_AUTO_GAIN_AUTHORITY_POLICY_V),

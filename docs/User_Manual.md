@@ -133,6 +133,14 @@ What it does:
 - keeps the workflow guarded compared with unrestricted expert tuning
 - can use harmonic curves and IACC-aware ranking to avoid overly aggressive or overly symmetric winners
 
+**Target selection strategy**
+
+In AUTO mode, the target curve can be determined three ways (selectable from the Basic tab):
+
+- **Auto: search best built-in** (default) — evaluates multiple built-in target curves in parallel and picks the best-ranked result. Most robust choice, especially with external measurements.
+- **Adaptive: derive target from room acoustics** — synthesizes a Harman6-based target from the measured room's bass buildup, tilt, and RT60 characteristics. Faster than the search path. See section 6 for full details and RT60 requirements.
+- **Use selected target curve from Target page** — uses the target curve you manually selected in the Target tab.
+
 Best for:
 
 - first-pass results
@@ -190,7 +198,22 @@ General guidance:
 - bass-heavy targets can sound impressive, but they increase headroom demand
 - if you are unsure, start with a moderate built-in target and listen before pushing bass harder
 
-In automatic mode, DecayCore can also select a target automatically when that workflow is enabled.
+In automatic mode, DecayCore can also determine the target automatically. Three strategies are available (see section 5.1).
+
+### Adaptive target
+
+The `Adaptive: derive target from room acoustics` strategy synthesizes a custom Harman6-based target instead of searching through built-in curves.
+
+How it works:
+
+1. Starts with a Harman6-style reference shape as a base.
+2. Estimates the room's natural bass buildup and tilt from the measurement.
+3. Adjusts bass and tilt compensation fractions based on those estimates.
+4. When RT60 data is available, further refines the compensation using measured decay times across bass, mid, and treble bands (bounded to ±2 dB).
+
+**RT60 requirement:** adaptive target achieves its full room-specific behavior only when RT60 data is present in the measurement. RT60 is captured automatically by DecayCore's built-in measurement tool. With external REW exports or WAV impulse files, RT60 data is typically absent — in that case the RT60-based compensation step is skipped and the target is derived from bass buildup and tilt only.
+
+If you are using external measurements without RT60 data, `Auto: search best built-in` is the safer choice. It evaluates how well different built-in curves match the measured room without requiring RT60 data.
 
 ## 7. Filter Types
 
@@ -384,6 +407,34 @@ Additional controls affect timing and final impulse behavior:
 
 These matter most when you are refining latency behavior, channel alignment, or export impulse shape.
 
+### 9.7 Hybrid IIR (FIR + IIR bass preconditioning)
+
+Hybrid IIR is an optional bass mode that adds a small set of narrow IIR Peaking EQ biquad cuts targeting confirmed room modes, before the FIR filter is synthesized.
+
+What it does:
+
+- detects narrow modal peaks in the bass using confidence and group delay excess criteria
+- designs conservative Peaking EQ cuts (no boosts) for confirmed peaks
+- subtracts the IIR biquad contribution from the FIR magnitude gain curve — the FIR then handles only what remains after the IIR stage
+
+The result is a combined correction: IIR biquads handle the narrowest peaks precisely, and the FIR handles the broader response.
+
+When to use it:
+
+- one or two narrow room modes in the bass remain clearly audible despite FIR correction
+- measurements show high-confidence, high-Q peaks with strong group delay excess
+- you are deploying to CamillaDSP and can run an IIR biquad filter stage alongside the FIR convolver
+
+When not to use it:
+
+- measurements are noisy or uncertain
+- the room bass does not show clear narrow modal peaks
+- your deployment target cannot run IIR biquads
+
+**CamillaDSP deployment note:** when hybrid IIR produces biquads, they are included in the exported CamillaDSP YAML alongside the FIR convolver. Both stages must be active in the pipeline. Loading only the FIR WAV file without the IIR biquads will result in incomplete bass correction, because the FIR was designed with the IIR contribution already subtracted from its target.
+
+Controls are available in the Advanced tab under a collapsible hybrid IIR tuning section. Default state is disabled.
+
 ## 10. Running Filter Generation
 
 When the main settings look correct:
@@ -411,6 +462,8 @@ After a successful run, DecayCore produces a result bundle. Common output files 
   Collected export bundle for convenient deployment
 
 Depending on the workflow, the export package can also contain additional configuration files alongside the WAV filters.
+
+**When Hybrid IIR is enabled and biquads are produced**, the CamillaDSP YAML will include both the FIR convolver block and the IIR Peaking EQ biquad blocks. Both must be deployed in the pipeline for the bass correction to function as designed. See section 9.7 for details.
 
 ## 12. Reading the Summary
 

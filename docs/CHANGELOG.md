@@ -8,6 +8,48 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
+## [1.0.6] - 22-5-2026
+
+### Hybrid IIR + FIR bass correction — new feature
+
+DecayCore can now combine a small set of IIR Peaking EQ biquad cuts with the standard FIR filter to handle the narrowest, most stubborn room modes more precisely.
+
+- **Targeted narrow-mode cuts**: the hybrid stage detects confirmed modal peaks in the bass using confidence and group-delay excess thresholds, then designs conservative IIR cuts (no boosts ever). The FIR magnitude target is adjusted so the FIR corrects only what the IIR leaves behind.
+- **CamillaDSP integration**: the designed biquads are exported as Peaking EQ filter entries in the CamillaDSP YAML configuration alongside the FIR convolver, ready to deploy as a two-stage pipeline.
+- **Conservative by default**: disabled by default. Up to 3 cuts per channel, limited to the 20–150 Hz range, with minimum confidence and group-delay excess requirements. Controlled from the Advanced tab.
+
+### Adaptive Target — new target strategy
+
+AUTO mode now offers three target selection strategies. The new `Adaptive` mode derives a custom target directly from room measurements instead of searching through built-in curves.
+
+- **Faster runs**: skips the multi-curve search phase entirely. When you have a clear room measurement, Adaptive can reach a good starting filter significantly faster than the default search.
+- **Room-aware target synthesis**: starts from a Harman6-style reference and adjusts bass buildup and tilt compensation based on what the measurement actually shows. When RT60 data is available (automatic with DecayCore's built-in measurement tool), the compensation is further refined using measured decay times across bass, mid, and treble bands.
+- **Best with built-in measurements**: RT60 data is captured automatically when you measure with DecayCore's integrated tool. External REW or WAV imports typically do not include RT60 data — in that case, the `Auto: search best built-in` strategy remains the safer and more thorough choice.
+
+### Bass Integration — Direct DAC improvements
+- **Dual subwoofer support**: AUTO mode can now average two subwoofer measurements together before integration, improving reliability when two subs are in use.
+- **Allpass filter option**: Direct DAC bass integration can now apply an allpass filter to improve sub-to-main phase alignment. The option is selectable from the UI and AUTO mode can choose it automatically.
+- **Smarter integration scoring**: cancellation risk evaluation, guard band handling, and group-delay thresholds have all been tightened. More integration candidates are now correctly rejected before they reach the winner stage.
+- **Clearer rejection reasons**: when a bass integration candidate is dropped, the reason is now logged explicitly so it is easy to understand why a particular configuration was ruled out.
+
+### Auto mode
+- **Winner rationale**: AUTO mode now explains why a particular filter was selected, including the key factors that made it the winner. This appears in the diagnostics and search results sections.
+- **Per-run compute context**: auto mode now builds a stable computation context at run start and caches intermediate results within that run, reducing redundant recalculation during long searches.
+- **Measurement metadata identity**: the measurement identity is now tracked more precisely through DSP policy, ensuring the cache correctly separates results that differ only in measurement or policy details.
+- Corrected the maximum safe boost cap to 8 dB for consistency across all code paths.
+
+### Measurement
+- SNR (signal-to-noise ratio) and timing mode are now shown in the measurement summary after a built-in measurement session.
+
+### Performance / Cache
+- Plot render cache is now cleared together with other runtime caches when a reset is triggered.
+- Materialize cache is pruned when it grows too large, preventing unbounded memory use during long auto mode searches.
+
+### CamillaDSP
+- Config file supports version > 4.xxx
+
+---
+
 ## [1.0.5] - 19-5-2026
 
 ### Performance / Auto mode — major speedup without quality loss

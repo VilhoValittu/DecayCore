@@ -43,6 +43,14 @@ def _bypass_ir_like(reference_ir: Any) -> np.ndarray:
     return bypass
 
 
+def _convert_bypass_ir(ir: np.ndarray, fmt: str) -> np.ndarray:
+    if fmt == "S32_LE":
+        return (np.clip(ir, -1.0, 1.0) * 2147483647).astype(np.int32)
+    if fmt == "S16_LE":
+        return (np.clip(ir, -1.0, 1.0) * 32767).astype(np.int16)
+    return ir.astype(np.float32)
+
+
 def write_bypass_fir_wavs(
     zf: zipfile.ZipFile,
     *,
@@ -53,6 +61,7 @@ def write_bypass_fir_wavs(
     irw_tag: str = "auto",
     target_curve_tag: str = "",
     layout: str | None = "Mono",
+    wav_fmt: str = "FLOAT32",
 ) -> None:
     spec = bypass_filter_wav_export_spec(
         fs,
@@ -72,20 +81,23 @@ def write_bypass_fir_wavs(
             l_bypass = np.pad(l_bypass, (0, n - int(l_bypass.size)))
         if int(r_bypass.size) != n:
             r_bypass = np.pad(r_bypass, (0, n - int(r_bypass.size)))
-        scipy.io.wavfile.write(stereo_wav, int(fs), np.column_stack((l_bypass, r_bypass)))
+        scipy.io.wavfile.write(
+            stereo_wav, int(fs),
+            np.column_stack((_convert_bypass_ir(l_bypass, wav_fmt), _convert_bypass_ir(r_bypass, wav_fmt))),
+        )
         zf.writestr(bypass_zip_path(str(spec["bundle_names"][0])), stereo_wav.getvalue())
     else:
         wav_l = io.BytesIO()
         wav_r = io.BytesIO()
-        scipy.io.wavfile.write(wav_l, int(fs), l_bypass)
-        scipy.io.wavfile.write(wav_r, int(fs), r_bypass)
+        scipy.io.wavfile.write(wav_l, int(fs), _convert_bypass_ir(l_bypass, wav_fmt))
+        scipy.io.wavfile.write(wav_r, int(fs), _convert_bypass_ir(r_bypass, wav_fmt))
         zf.writestr(bypass_zip_path(str(spec["bundle_names"][0])), wav_l.getvalue())
         zf.writestr(bypass_zip_path(str(spec["bundle_names"][1])), wav_r.getvalue())
 
     sub_ir = getattr(result, "sub_ir", None)
     if sub_ir is not None and getattr(sub_ir, "size", 0) > 0:
         wav_sub = io.BytesIO()
-        scipy.io.wavfile.write(wav_sub, int(fs), _bypass_ir_like(sub_ir))
+        scipy.io.wavfile.write(wav_sub, int(fs), _convert_bypass_ir(_bypass_ir_like(sub_ir), wav_fmt))
         sub_name = str(
             bypass_sub_filter_wav_export_spec(
                 fs,

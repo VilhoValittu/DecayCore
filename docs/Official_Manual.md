@@ -50,20 +50,27 @@ at a more technical level than the simplified pipeline overview.
              │                                  │
              ▼                                  ▼
    ┌──────────────────────────┐     ┌────────────────────────────┐
-   │ Level Matching           │     │ Excess-Phase Reconstruction │
-   │ (Smart / Manual)         │     │ & Min-Phase Separation      │
-   └─────────┬────────────────┘     └──────────┬─────────────────┘
-             │                                  │
-             ▼                                  ▼
-   ┌──────────────────────────┐     ┌────────────────────────────┐
-   │ Magnitude Correction     │     │ Conditional GD Stabilization│
-   │ - Boost/Cut limits       │     │ (Bass-focused, soft-limited)│
-   │ - Slope limits           │     └──────────┬─────────────────┘
-   │ - Confidence Pull        │                │
-   │ - A-FDW                  │                ▼
+   │ Hybrid IIR               │     │ Excess-Phase Reconstruction │
+   │ Preconditioning          │     │ & Min-Phase Separation      │
+   │ (optional; modal IIR     │     └──────────┬─────────────────┘
+   │  cuts subtracted from    │                │
+   │  FIR gain curve)         │                ▼
+   └─────────┬────────────────┘     ┌────────────────────────────┐
+             │                      │ Conditional GD Stabilization│
+             ▼                      │ (Bass-focused, soft-limited)│
+   ┌──────────────────────────┐     └──────────┬─────────────────┘
+   │ Level Matching           │                │
+   │ (Smart / Manual)         │                ▼
    └─────────┬────────────────┘     ┌────────────────────────────┐
              │                      │ Phase Safety Clamp (±45°)  │
-             │                      └──────────┬─────────────────┘
+             ▼                      └──────────┬─────────────────┘
+   ┌──────────────────────────┐                │
+   │ Magnitude Correction     │                │
+   │ - Boost/Cut limits       │                │
+   │ - Slope limits           │                │
+   │ - Confidence Pull        │                │
+   │ - A-FDW                  │                │
+   └─────────┬────────────────┘                │
              │                                 │
              └──────────────┬──────────────────┘
                             ▼
@@ -81,6 +88,8 @@ at a more technical level than the simplified pipeline overview.
                                ▼
                 ┌──────────────────────────────┐
                 │ Multi-rate Export            │
+                │ + Optional Hybrid IIR        │
+                │   biquad export (CamillaDSP) │
                 └──────────────────────────────┘
 ```
 
@@ -97,6 +106,10 @@ at a more technical level than the simplified pipeline overview.
 - Temporal Decay Control (TDC) modifies time-domain energy storage
   independently from steady-state magnitude equalization.
 
+- Optional Hybrid IIR preconditioning subtracts narrow IIR biquad cuts
+  from the FIR gain curve before magnitude correction, allowing the FIR
+  to focus on the remaining broadband response.
+
 
 ---
 
@@ -106,13 +119,14 @@ at a more technical level than the simplified pipeline overview.
 3. Optional smoothing (Standard / Psychoacoustic / Adaptive FDW)
 4. TOF detection & removal
 5. Confidence analysis & reflection detection
-6. Target curve construction
-7. Level matching (Smart Scan or Manual window)
-8. Magnitude correction with safety guards
-9. Phase reconstruction (Linear / Minimum / Mixed / Asymmetric)
-10. Optional TDC (decay control)
-11. FIR synthesis, optional normalization
-12. Multi-rate export (optional)
+6. Target curve construction (built-in / adaptive / user-selected)
+7. Optional Hybrid IIR preconditioning (modal biquad cuts subtracted from FIR gain curve)
+8. Level matching (Smart Scan or Manual window)
+9. Magnitude correction with safety guards
+10. Phase reconstruction (Linear / Minimum / Mixed / Asymmetric)
+11. Optional TDC (decay control)
+12. FIR synthesis, optional normalization
+13. Multi-rate export + optional Hybrid IIR biquad export (CamillaDSP YAML)
 
 ---
 
@@ -404,6 +418,85 @@ Recommended:
 - Use **Median** for room measurements (immune to narrow peaks/dips).
 - Use **Average** mainly for nearfield or very smooth data.
 
+### 5.6 Hybrid IIR (FIR + IIR bass preconditioning)
+
+Hybrid IIR is an optional bass preconditioning stage that combines narrow IIR Peaking EQ biquad cuts with the standard FIR pipeline.
+
+#### What it does
+
+When enabled, DecayCore:
+
+1. Detects narrow room modes in the configured bass frequency range using confidence and group-delay excess thresholds.
+2. Designs conservative Peaking EQ biquad cuts for confirmed modal peaks (cuts only — no boosts ever).
+3. Subtracts the IIR biquad magnitude response from the FIR target gain curve before magnitude correction. The FIR corrects only the remaining residual response.
+4. Exports the IIR biquad parameters into the CamillaDSP YAML configuration alongside the FIR convolver.
+
+This keeps the two filter types clearly separated in responsibility: IIR for precision narrow-band cuts, FIR for everything else.
+
+#### When to use
+
+Hybrid IIR is appropriate when:
+
+- narrow, high-Q room modes in the bass persist despite FIR correction
+- measurement confidence and group delay excess confirm that those peaks are reliable
+- the deployment target is CamillaDSP and an IIR biquad filter stage can be inserted in the pipeline
+
+Leave it disabled when:
+
+- measurements are noisy or low-confidence in the bass region
+- the room does not show clear narrow modal peaks
+- the deployment target cannot run IIR biquads alongside the FIR convolver
+
+#### CamillaDSP deployment
+
+When hybrid IIR produces biquads, they are included in the exported CamillaDSP YAML as Peaking EQ filter entries. **Both the IIR biquad stage and the FIR convolver must be active in the pipeline.** Loading only the FIR WAV without the IIR biquads will leave the bass correction incomplete because the FIR target was designed with the IIR contribution already subtracted.
+
+#### Key parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `enabled` | `false` | Enables hybrid IIR preconditioning |
+| `max_filters_per_channel` | `3` | Maximum IIR biquad cuts per channel |
+| `min_freq_hz` | `20 Hz` | Lower bound of modal detection range |
+| `max_freq_hz` | `150 Hz` | Upper bound of modal detection range |
+| `min_peak_db` | `4.0 dB` | Minimum peak height required to place a cut |
+| `min_q` | `3.0` | Minimum allowed biquad Q |
+| `max_q` | `12.0` | Maximum allowed biquad Q |
+| `max_cut_db` | `6.0 dB` | Maximum cut depth per biquad |
+| `min_confidence` | `0.65` | Minimum confidence required at the mode frequency |
+| `min_gd_excess_ms` | `15.0 ms` | Minimum group delay excess required |
+| `min_cut_priority` | `0.0` | Minimum cut priority score to place a filter |
+| `max_voice_clarity_risk` | `0.45` | Limits cuts that could reduce voice clarity |
+
+Controls are in the Advanced tab under a collapsible hybrid IIR tuning section.
+
+See also: [Hybrid IIR + FIR Room Correction](hybrid-iir-fir.html)
+
+---
+
+### 5.7 Adaptive Target
+
+In AUTO mode, DecayCore supports three target selection strategies:
+
+- **Auto: search best built-in** (default) — evaluates multiple built-in target curves in parallel and picks the best-ranked result.
+- **Adaptive: derive target from room acoustics** — synthesizes a custom Harman6-based target from the measured room's bass buildup, tilt, and RT60 characteristics. Skips the multi-curve search entirely.
+- **Use selected target curve from Target page** — uses the target curve manually selected in the Target tab.
+
+#### How adaptive target synthesis works
+
+1. Starts from a Harman6-style reference shape.
+2. Estimates the room's natural bass buildup and overall tilt from the measured response.
+3. Adjusts bass and tilt compensation fractions based on those estimates.
+4. When RT60 data is available, further refines compensation using measured decay times across bass (20–125 Hz), mid (400–2000 Hz), and treble (2000–8000 Hz) bands. The RT60 adjustment is bounded to ±2 dB.
+
+#### RT60 requirement
+
+RT60 data is automatically available when measurements are produced by DecayCore's built-in measurement tool. With external REW exports or WAV impulse files, RT60 data is typically absent — the RT60 refinement step is skipped and the target is derived from bass buildup and tilt only.
+
+If RT60 data is not available, `Auto: search best built-in` is generally the safer strategy.
+
+See also: [Adaptive Target](adaptive-target.html)
+
 ---
 
 ## 6. Temporal Decay Control (TDC)
@@ -429,7 +522,7 @@ Typical output package contains:
 - Bypass config file (`.yml`) for easy A/B switching between corrected and bypassed signal
 - Summary report (`Summary.txt`)
 - Config snippet (`.cfg`)
-- CamillaDSP YAML (`.yml`)
+- CamillaDSP YAML (`.yml`) — includes Hybrid IIR Peaking EQ biquad blocks when Hybrid IIR is enabled and produces biquads
 - Optional dashboard plots (PNG, depending on export/performance mode)
 
 The Summary report typically includes:

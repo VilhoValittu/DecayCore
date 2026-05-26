@@ -91,4 +91,8 @@ def summarize_run(result: FilterResult) -> dict:
         "boost_peak_db_r": _as_float(r_st.get("boost_peak_db", 0.0), 0.0),
         "cut_peak_db_l": _as_float(l_st.get("cut_peak_db", 0.0), 0.0),
         "cut_peak_db_r": _as_float(r_st.get("cut_peak_db", 0.0), 0.0),
+        "hybrid_iir_enabled_l": bool(l_st.get("hybrid_iir_enabled", False)),
+        "hybrid_iir_enabled_r": bool(r_st.get("hybrid_iir_enabled", False)),
+        "hybrid_iir_filter_count_l": int(l_st.get("hybrid_iir_filter_count", 0) or 0),
+        "hybrid_iir_filter_count_r": int(r_st.get("hybrid_iir_filter_count", 0) or 0),
     }

@@ -405,6 +405,17 @@ class FilterConfig:
     auto_voice_clarity_penalty_weight: float = 1.0
     auto_voice_band_lo_hz: float = 70.0
     auto_voice_band_hi_hz: float = 180.0
+    hybrid_iir_enabled: bool = False
+    hybrid_iir_max_filters_per_channel: int = 3
+    hybrid_iir_min_freq_hz: float = 20.0
+    hybrid_iir_max_freq_hz: float = 150.0
+    hybrid_iir_min_peak_db: float = 4.0
+    hybrid_iir_min_q: float = 3.0
+    hybrid_iir_max_q: float = 12.0
+    hybrid_iir_max_cut_db: float = 6.0
+    hybrid_iir_min_confidence: float = 0.65
+    hybrid_iir_min_gd_excess_ms: float = 15.0
+    hybrid_iir_min_cut_priority: float = 0.0
 
     comparison_mode: bool = True
     comparison_ref_fs: int = 44100

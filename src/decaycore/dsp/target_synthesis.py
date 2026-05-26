@@ -48,6 +48,86 @@ def _slope_db_oct(f_hz, mag_db, f_lo=None, f_hi=None) -> float:
 
 # Precompute Harman6 slope the same way we will estimate measurements
 _SYNTH_HARMAN6_SLOPE_DB_OCT = _slope_db_oct(_SYNTH_FREQS[1:], _SYNTH_BASE_MAGS[1:])
+_RT60_TARGET_DELTA_LIMIT_DB = 2.0
+
+
+def _coerce_rt60_bands(value) -> dict[float, float]:
+    if not isinstance(value, dict):
+        return {}
+    out: dict[float, float] = {}
+    for raw_f, raw_rt in value.items():
+        try:
+            f_hz = float(raw_f)
+            rt_s = float(raw_rt)
+        except (TypeError, ValueError):
+            continue
+        if np.isfinite(f_hz) and np.isfinite(rt_s) and f_hz > 0.0 and 0.05 < rt_s < 5.0:
+            out[float(f_hz)] = float(rt_s)
+    return out
+
+
+def _combined_rt60_bands(measurements: dict | None) -> dict[float, float]:
+    if not isinstance(measurements, dict):
+        return {}
+    values: dict[float, list[float]] = {}
+    for key in ("measured_rt60_bands_l", "measured_rt60_bands_r"):
+        for f_hz, rt_s in _coerce_rt60_bands(measurements.get(key)).items():
+            values.setdefault(float(f_hz), []).append(float(rt_s))
+    return {
+        f_hz: float(np.mean(rt_vals))
+        for f_hz, rt_vals in values.items()
+        if rt_vals
+    }
+
+
+def _rt60_band_mean(bands: dict[float, float], f_lo: float, f_hi: float, *, min_count: int = 2) -> float:
+    vals = [
+        float(rt_s)
+        for f_hz, rt_s in bands.items()
+        if np.isfinite(float(f_hz))
+        and np.isfinite(float(rt_s))
+        and float(f_lo) <= float(f_hz) <= float(f_hi)
+    ]
+    return float(np.mean(vals)) if len(vals) >= int(min_count) else float("nan")
+
+
+def _interp_clamped(x: float, x0: float, x1: float, y0: float, y1: float) -> float:
+    if not np.isfinite(x):
+        return float("nan")
+    if float(x1) <= float(x0):
+        return float(y0)
+    t = float(np.clip((float(x) - float(x0)) / (float(x1) - float(x0)), 0.0, 1.0))
+    return float(y0 + (y1 - y0) * t)
+
+
+def _rt60_adjusted_compensation(
+    measurements: dict | None,
+    *,
+    bass_comp_frac: float,
+    tilt_comp_frac: float,
+) -> tuple[float, float]:
+    bands = _combined_rt60_bands(measurements)
+    if not bands:
+        return float(bass_comp_frac), float(tilt_comp_frac)
+
+    bass_rt = _rt60_band_mean(bands, 20.0, 125.0)
+    mid_rt = _rt60_band_mean(bands, 400.0, 2000.0)
+    treble_rt = _rt60_band_mean(bands, 2000.0, 8000.0)
+
+    bass_eff = float(bass_comp_frac)
+    tilt_eff = float(tilt_comp_frac)
+    if abs(bass_eff) > 1e-9 and np.isfinite(bass_rt) and np.isfinite(mid_rt) and mid_rt > 1e-6:
+        bass_to_mid = float(bass_rt / mid_rt)
+        bass_target = _interp_clamped(bass_to_mid, 0.8, 1.5, 0.30, 0.75)
+        if np.isfinite(bass_target):
+            bass_eff = bass_target
+    if abs(tilt_eff) > 1e-9 and np.isfinite(treble_rt) and np.isfinite(mid_rt) and mid_rt > 1e-6:
+        treble_to_mid = float(treble_rt / mid_rt)
+        tilt_target = _interp_clamped(treble_to_mid, 0.70, 1.10, 0.18, 0.42)
+        if np.isfinite(tilt_target):
+            tilt_eff = tilt_target
+
+    return float(bass_eff), float(tilt_eff)
 
 
 def synthesize_target_from_measurements(
@@ -63,6 +143,7 @@ def synthesize_target_from_measurements(
     mid_ref_lo_hz: float = 500.0,
     mid_ref_hi_hz: float = 2000.0,
     hf_break_hz: float = 2000.0,
+    measurements: dict | None = None,
 ):
     """Synthesize a custom target curve from L/R room measurements.
 
@@ -130,50 +211,65 @@ def synthesize_target_from_measurements(
     meas_slope = _slope_db_oct(fg, m_sm, f_lo=200.0, f_hi=8000.0)
     hf_slope = _slope_db_oct(fg, m_sm, f_lo=float(hf_break_hz))
 
-    # Working grid: standard 20-pt anchors excluding the 0 Hz sentinel
     f_work = _SYNTH_FREQS[1:].copy()   # 19 points: 20..20000 Hz
-    m_work = _SYNTH_BASE_MAGS[1:].copy()
 
-    # --- Bass shelf adjustment ---
-    # tanh-limited: if room adds X dB bass, target gets ~X/2 less bass boost
-    bass_adj = (
-        -float(bass_comp_frac)
-        * np.tanh(bass_excess_db / float(bass_comp_ref_db))
-        * float(bass_comp_ref_db)
-    )
-    if np.isfinite(bass_adj) and abs(bass_adj) > 1e-4:
-        log_lo = np.log10(max(float(bass_ref_lo_hz), 1.))
-        log_hi = np.log10(400.)
-        log_f = np.log10(np.maximum(f_work, 1.))
-        shelf_w = np.where(
-            f_work <= float(bass_ref_lo_hz), 1.0,
-            np.where(
-                f_work >= 400., 0.0,
-                1.0 - (log_f - log_lo) / (log_hi - log_lo),
-            ),
+    def _build_m_work(*, bass_frac: float, tilt_frac: float) -> np.ndarray:
+        m_out = _SYNTH_BASE_MAGS[1:].copy()
+
+        # --- Bass shelf adjustment ---
+        # tanh-limited: if room adds X dB bass, target gets ~X/2 less bass boost
+        bass_adj = (
+            -float(bass_frac)
+            * np.tanh(bass_excess_db / float(bass_comp_ref_db))
+            * float(bass_comp_ref_db)
         )
-        shelf_w = np.clip(shelf_w, 0., 1.)
-        m_work += float(bass_adj) * shelf_w
+        if np.isfinite(bass_adj) and abs(bass_adj) > 1e-4:
+            log_lo = np.log10(max(float(bass_ref_lo_hz), 1.))
+            log_hi = np.log10(400.)
+            log_f = np.log10(np.maximum(f_work, 1.))
+            shelf_w = np.where(
+                f_work <= float(bass_ref_lo_hz), 1.0,
+                np.where(
+                    f_work >= 400., 0.0,
+                    1.0 - (log_f - log_lo) / (log_hi - log_lo),
+                ),
+            )
+            shelf_w = np.clip(shelf_w, 0., 1.)
+            m_out += float(bass_adj) * shelf_w
 
-    # --- Broadband tilt adjustment (pivot at 1 kHz) ---
-    if np.isfinite(meas_slope) and np.isfinite(_SYNTH_HARMAN6_SLOPE_DB_OCT):
-        tilt_adj_per_oct = float(tilt_comp_frac) * float(meas_slope - _SYNTH_HARMAN6_SLOPE_DB_OCT)
-        if abs(tilt_adj_per_oct) > 1e-4:
-            log2_f_over_1k = np.log2(np.maximum(f_work, 1.) / 1000.)
-            m_work += tilt_adj_per_oct * log2_f_over_1k
+        # --- Broadband tilt adjustment (pivot at 1 kHz) ---
+        if np.isfinite(meas_slope) and np.isfinite(_SYNTH_HARMAN6_SLOPE_DB_OCT):
+            tilt_adj_per_oct = float(tilt_frac) * float(meas_slope - _SYNTH_HARMAN6_SLOPE_DB_OCT)
+            if abs(tilt_adj_per_oct) > 1e-4:
+                log2_f_over_1k = np.log2(np.maximum(f_work, 1.) / 1000.)
+                m_out += tilt_adj_per_oct * log2_f_over_1k
 
-    # --- HF roll-off accommodation (above hf_break_hz) ---
-    # Use the same fg grid as hf_slope so both estimates have >= 6 points above hf_break_hz.
-    # (_SYNTH_FREQS has only 3 points above 5 kHz, which makes _slope_db_oct return nan.)
-    harman6_hf_ref = np.interp(fg, _SYNTH_FREQS[1:], _SYNTH_BASE_MAGS[1:])
-    harman6_hf_slope = _slope_db_oct(fg, harman6_hf_ref, f_lo=float(hf_break_hz))
-    if np.isfinite(hf_slope) and np.isfinite(harman6_hf_slope) and abs(hf_slope - harman6_hf_slope) > 0.5:
-        hf_excess_slope = float(hf_slope - harman6_hf_slope)  # negative
-        hf_adj_per_oct = float(hf_comp_frac) * hf_excess_slope  # negative: lowers target HF
-        if abs(hf_adj_per_oct) > 1e-4:
-            mask_hf = f_work > float(hf_break_hz)
-            log2_f_over_break = np.log2(np.maximum(f_work[mask_hf], 1.) / float(hf_break_hz))
-            m_work[mask_hf] += hf_adj_per_oct * log2_f_over_break
+        # --- HF roll-off accommodation (above hf_break_hz) ---
+        # Use the same fg grid as hf_slope so both estimates have >= 6 points above hf_break_hz.
+        # (_SYNTH_FREQS has only 3 points above 5 kHz, which makes _slope_db_oct return nan.)
+        harman6_hf_ref = np.interp(fg, _SYNTH_FREQS[1:], _SYNTH_BASE_MAGS[1:])
+        harman6_hf_slope = _slope_db_oct(fg, harman6_hf_ref, f_lo=float(hf_break_hz))
+        if np.isfinite(hf_slope) and np.isfinite(harman6_hf_slope) and abs(hf_slope - harman6_hf_slope) > 0.5:
+            hf_excess_slope = float(hf_slope - harman6_hf_slope)  # negative
+            hf_adj_per_oct = float(hf_comp_frac) * hf_excess_slope  # negative: lowers target HF
+            if abs(hf_adj_per_oct) > 1e-4:
+                mask_hf = f_work > float(hf_break_hz)
+                log2_f_over_break = np.log2(np.maximum(f_work[mask_hf], 1.) / float(hf_break_hz))
+                m_out[mask_hf] += hf_adj_per_oct * log2_f_over_break
+        return m_out
+
+    m_base = _build_m_work(bass_frac=float(bass_comp_frac), tilt_frac=float(tilt_comp_frac))
+    bass_eff, tilt_eff = _rt60_adjusted_compensation(
+        measurements,
+        bass_comp_frac=float(bass_comp_frac),
+        tilt_comp_frac=float(tilt_comp_frac),
+    )
+    if abs(bass_eff - float(bass_comp_frac)) > 1e-9 or abs(tilt_eff - float(tilt_comp_frac)) > 1e-9:
+        m_rt60 = _build_m_work(bass_frac=float(bass_eff), tilt_frac=float(tilt_eff))
+        rt60_delta = np.clip(m_rt60 - m_base, -_RT60_TARGET_DELTA_LIMIT_DB, _RT60_TARGET_DELTA_LIMIT_DB)
+        m_work = m_base + rt60_delta
+    else:
+        m_work = m_base
 
     # Clip and assemble output
     m_work = np.clip(m_work, -12., 14.)

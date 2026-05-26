@@ -13,6 +13,7 @@ from __future__ import annotations
 import numpy as np
 
 from ... import shared
+from ...auto_mode_profile import profiled_section
 from ..component_scores import (
     score_acoustic_fit,
     score_bass_integration,
@@ -50,55 +51,63 @@ def _auto_score_result(
     r_st = dict(getattr(result, "r_st", {}) or {})
     result_metrics = dict(getattr(result, "metrics", {}) or {})
 
-    af = score_acoustic_fit(result, l_st, r_st, base_data=base_data)
-    sl = score_safety_limits(
-        l_st, r_st, auto_exc_freq_hz=auto_exc_freq_hz, base_data=base_data,
-        net_boost_max=af["net_boost_max"], lr_delta=af["lr_delta"],
-        l_refs=af["l_refs"], r_refs=af["r_refs"],
-    )
-    pq = score_phase_quality(l_st, r_st, base_data=base_data)
-    td = score_temporal_decay(l_st, r_st, base_data=base_data)
-    rp = score_residual_peaks(l_st, r_st, base_data=base_data)
-    bi = score_bass_integration(
-        result, l_st, r_st, base_data=base_data,
-        net_boost_max=af["net_boost_max"],
-        peak_lo=rp["peak_lo"], peak_hi=rp["peak_hi"],
-        exc_penalty=sl["exc_penalty"],
-    )
-    sp = score_stereo_policy(l_st, r_st, base_data=base_data)
-    cr = combine_rank_score(
-        l_st, r_st, result,
-        focus_lo_hz=focus_lo_hz, focus_hi_hz=focus_hi_hz, base_data=base_data,
-        avg_score=af["avg_score"],
-        phase_benefit_bonus=pq["phase_benefit_bonus"],
-        boost_pen=sl["boost_pen"],
-        event_pen=sl["event_pen"],
-        lr_pen=sl["lr_pen"],
-        dsp_penalty=sl["dsp_penalty"],
-        bass_prering_penalty=sl["bass_prering_penalty"],
-        exc_penalty=sl["exc_penalty"],
-        bass_integration_penalty=bi["bass_integration_penalty"],
-        bass_feasibility_penalty=bi["bass_feasibility_penalty"],
-        bass_preference_bonus=bi["bass_preference_bonus"],
-        decay_penalty=td["decay_penalty"],
-        residual_peak_penalty=rp["residual_peak_penalty"],
-        correction_sharpness_penalty=bi["correction_sharpness_penalty"],
-        dip_fill_risk_penalty=bi["dip_fill_risk_penalty"],
-        channel_overfit_penalty=bi["channel_overfit_penalty"],
-        target_tracking_penalty=bi["target_tracking_penalty"],
-        voice_clarity_penalty=bi["voice_clarity_penalty"],
-        phase_risk_penalty=pq["phase_risk_penalty"],
-        phase_limit_penalty=pq["phase_limit_penalty"],
-        thd_boost_penalty=td["thd_boost_penalty"],
-        stereo_coherence_penalty=sp["stereo_coherence_penalty"],
-        phantom_center_stability_penalty=sp["phantom_center_stability_penalty"],
-        policy_divergence_penalty=sp["policy_divergence_penalty"],
-        asymmetry_budget_overflow_penalty=sp["asymmetry_budget_overflow_penalty"],
-        worst_channel_relief_bonus=sp["worst_channel_relief_bonus"],
-        shared_preference_bias=sp["shared_preference_bias"],
-        rt60_policy_pen=td["rt60_policy_pen"],
-        harmonic_local_pen=td["harmonic_local_pen"],
-    )
+    with profiled_section("auto_score.acoustic_fit"):
+        af = score_acoustic_fit(result, l_st, r_st, base_data=base_data)
+    with profiled_section("auto_score.safety_limits"):
+        sl = score_safety_limits(
+            l_st, r_st, auto_exc_freq_hz=auto_exc_freq_hz, base_data=base_data,
+            net_boost_max=af["net_boost_max"], lr_delta=af["lr_delta"],
+            l_refs=af["l_refs"], r_refs=af["r_refs"],
+        )
+    with profiled_section("auto_score.phase_quality"):
+        pq = score_phase_quality(l_st, r_st, base_data=base_data)
+    with profiled_section("auto_score.temporal_decay"):
+        td = score_temporal_decay(l_st, r_st, base_data=base_data)
+    with profiled_section("auto_score.residual_peaks"):
+        rp = score_residual_peaks(l_st, r_st, base_data=base_data)
+    with profiled_section("auto_score.bass_integration"):
+        bi = score_bass_integration(
+            result, l_st, r_st, base_data=base_data,
+            net_boost_max=af["net_boost_max"],
+            peak_lo=rp["peak_lo"], peak_hi=rp["peak_hi"],
+            exc_penalty=sl["exc_penalty"],
+        )
+    with profiled_section("auto_score.stereo_policy"):
+        sp = score_stereo_policy(l_st, r_st, base_data=base_data)
+    with profiled_section("auto_score.combine_rank"):
+        cr = combine_rank_score(
+            l_st, r_st, result,
+            focus_lo_hz=focus_lo_hz, focus_hi_hz=focus_hi_hz, base_data=base_data,
+            avg_score=af["avg_score"],
+            phase_benefit_bonus=pq["phase_benefit_bonus"],
+            boost_pen=sl["boost_pen"],
+            event_pen=sl["event_pen"],
+            lr_pen=sl["lr_pen"],
+            dsp_penalty=sl["dsp_penalty"],
+            bass_prering_penalty=sl["bass_prering_penalty"],
+            exc_penalty=sl["exc_penalty"],
+            bass_integration_penalty=bi["bass_integration_penalty"],
+            bass_feasibility_penalty=bi["bass_feasibility_penalty"],
+            bass_preference_bonus=bi["bass_preference_bonus"],
+            decay_penalty=td["decay_penalty"],
+            residual_peak_penalty=rp["residual_peak_penalty"],
+            correction_sharpness_penalty=bi["correction_sharpness_penalty"],
+            dip_fill_risk_penalty=bi["dip_fill_risk_penalty"],
+            channel_overfit_penalty=bi["channel_overfit_penalty"],
+            target_tracking_penalty=bi["target_tracking_penalty"],
+            voice_clarity_penalty=bi["voice_clarity_penalty"],
+            phase_risk_penalty=pq["phase_risk_penalty"],
+            phase_limit_penalty=pq["phase_limit_penalty"],
+            thd_boost_penalty=td["thd_boost_penalty"],
+            stereo_coherence_penalty=sp["stereo_coherence_penalty"],
+            phantom_center_stability_penalty=sp["phantom_center_stability_penalty"],
+            policy_divergence_penalty=sp["policy_divergence_penalty"],
+            asymmetry_budget_overflow_penalty=sp["asymmetry_budget_overflow_penalty"],
+            worst_channel_relief_bonus=sp["worst_channel_relief_bonus"],
+            shared_preference_bias=sp["shared_preference_bias"],
+            rt60_policy_pen=td["rt60_policy_pen"],
+            harmonic_local_pen=td["harmonic_local_pen"],
+        )
 
     avg_score = af["avg_score"]
     l_score = af["l_score"]

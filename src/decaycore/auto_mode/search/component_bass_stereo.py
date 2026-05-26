@@ -19,6 +19,8 @@ import numpy as np
 
 _logger = logging.getLogger(__name__)
 
+from ..auto_mode_profile import profiled_section
+
 from ...common.acoustic_stats import calc_acoustic_score, calc_ai_summary_from_stats
 from ...config.models import StereoAutoPolicyConfig, StereoResolvedAutoPolicies
 from ...dsp.quality_metrics import (
@@ -63,19 +65,22 @@ from .penalty_voice import (
 )
 
 def score_bass_integration(result, l_st, r_st, *, base_data, net_boost_max, peak_lo, peak_hi, exc_penalty) -> dict:
-    bass_integration_penalty, bass_feasibility_penalty, bass_dbg = _auto_bass_integration_penalty(
-        result,
-        base_data=base_data,
-        net_boost_max_db=net_boost_max,
-    )
+    with profiled_section("bass_score.integration_penalty"):
+        bass_integration_penalty, bass_feasibility_penalty, bass_dbg = _auto_bass_integration_penalty(
+            result,
+            base_data=base_data,
+            net_boost_max_db=net_boost_max,
+        )
 
     goal_norm = shared._auto_goal(base_data)
-    target_tracking_l = _auto_target_tracking_metrics_from_stats(l_st)
-    target_tracking_r = _auto_target_tracking_metrics_from_stats(r_st)
+    with profiled_section("bass_score.target_tracking"):
+        target_tracking_l = _auto_target_tracking_metrics_from_stats(l_st)
+        target_tracking_r = _auto_target_tracking_metrics_from_stats(r_st)
     target_tracking_metrics = _auto_merge_target_tracking_metrics(target_tracking_l, target_tracking_r)
     target_tracking_penalty = _auto_target_tracking_penalty(target_tracking_metrics)
-    bass_under_target_l = _auto_bass_under_target_metrics_from_stats(l_st)
-    bass_under_target_r = _auto_bass_under_target_metrics_from_stats(r_st)
+    with profiled_section("bass_score.bass_under_target"):
+        bass_under_target_l = _auto_bass_under_target_metrics_from_stats(l_st)
+        bass_under_target_r = _auto_bass_under_target_metrics_from_stats(r_st)
     bass_under_target_metrics = _auto_merge_bass_under_target_metrics(bass_under_target_l, bass_under_target_r)
     bass_under_target_penalty = 0.0
     if goal_norm == shared.AUTO_MODE_GOAL_FLAT:
@@ -90,8 +95,9 @@ def score_bass_integration(result, l_st, r_st, *, base_data, net_boost_max, peak
             )
         )
         target_tracking_penalty = float(np.clip(target_tracking_penalty + bass_under_target_penalty, 0.0, 16.0))
-    bass_boost_l = _auto_bass_boost_metrics_from_stats(l_st)
-    bass_boost_r = _auto_bass_boost_metrics_from_stats(r_st)
+    with profiled_section("bass_score.bass_boost"):
+        bass_boost_l = _auto_bass_boost_metrics_from_stats(l_st)
+        bass_boost_r = _auto_bass_boost_metrics_from_stats(r_st)
     bass_boost_metrics = _auto_merge_bass_boost_metrics(bass_boost_l, bass_boost_r)
     _lf_boost_l = shared._auto_safe_float(l_st.get("lf_boost_max_db", 0.0), 0.0)
     _lf_boost_r = shared._auto_safe_float(r_st.get("lf_boost_max_db", 0.0), 0.0)
@@ -110,8 +116,9 @@ def score_bass_integration(result, l_st, r_st, *, base_data, net_boost_max, peak
     )
     if goal_norm == shared.AUTO_MODE_GOAL_FLAT:
         bass_preference_bonus = float(np.clip(bass_preference_bonus * 2.5, 0.0, 7.5))
-    sharpness_l = _auto_correction_sharpness_metrics_from_stats(l_st, lo_hz=float(peak_lo), hi_hz=float(peak_hi))
-    sharpness_r = _auto_correction_sharpness_metrics_from_stats(r_st, lo_hz=float(peak_lo), hi_hz=float(peak_hi))
+    with profiled_section("bass_score.sharpness"):
+        sharpness_l = _auto_correction_sharpness_metrics_from_stats(l_st, lo_hz=float(peak_lo), hi_hz=float(peak_hi))
+        sharpness_r = _auto_correction_sharpness_metrics_from_stats(r_st, lo_hz=float(peak_lo), hi_hz=float(peak_hi))
     sharpness_metrics = _auto_merge_correction_sharpness_metrics(sharpness_l, sharpness_r)
     correction_sharpness_penalty = float(
         np.clip(
@@ -120,8 +127,9 @@ def score_bass_integration(result, l_st, r_st, *, base_data, net_boost_max, peak
             8.0,
         )
     )
-    dip_fill_l = _auto_dip_fill_risk_metrics_from_stats(l_st, lo_hz=float(peak_lo), hi_hz=float(peak_hi))
-    dip_fill_r = _auto_dip_fill_risk_metrics_from_stats(r_st, lo_hz=float(peak_lo), hi_hz=float(peak_hi))
+    with profiled_section("bass_score.dip_fill"):
+        dip_fill_l = _auto_dip_fill_risk_metrics_from_stats(l_st, lo_hz=float(peak_lo), hi_hz=float(peak_hi))
+        dip_fill_r = _auto_dip_fill_risk_metrics_from_stats(r_st, lo_hz=float(peak_lo), hi_hz=float(peak_hi))
     dip_fill_metrics = _auto_merge_dip_fill_risk_metrics(dip_fill_l, dip_fill_r)
     dip_fill_risk_penalty = float(
         np.clip(
@@ -130,7 +138,8 @@ def score_bass_integration(result, l_st, r_st, *, base_data, net_boost_max, peak
             10.0,
         )
     )
-    channel_overfit_metrics = _auto_channel_overfit_metrics_from_stats(l_st, r_st, lo_hz=float(peak_lo), hi_hz=float(peak_hi))
+    with profiled_section("bass_score.channel_overfit"):
+        channel_overfit_metrics = _auto_channel_overfit_metrics_from_stats(l_st, r_st, lo_hz=float(peak_lo), hi_hz=float(peak_hi))
     channel_overfit_penalty = float(
         np.clip(
             shared._auto_safe_float(channel_overfit_metrics.get("channel_overfit_penalty", 0.0), 0.0),
@@ -143,9 +152,10 @@ def score_bass_integration(result, l_st, r_st, *, base_data, net_boost_max, peak
     if not (np.isfinite(voice_lo) and np.isfinite(voice_hi) and float(voice_hi) > float(voice_lo)):
         voice_lo = 70.0
         voice_hi = 180.0
-    voice_l = voice_clarity_metrics_from_stats(l_st, lo_hz=float(voice_lo), hi_hz=float(voice_hi))
-    voice_r = voice_clarity_metrics_from_stats(r_st, lo_hz=float(voice_lo), hi_hz=float(voice_hi))
-    voice_lr = voice_clarity_lr_metrics_from_stats(l_st, r_st, lo_hz=float(voice_lo), hi_hz=float(voice_hi))
+    with profiled_section("bass_score.voice_clarity"):
+        voice_l = voice_clarity_metrics_from_stats(l_st, lo_hz=float(voice_lo), hi_hz=float(voice_hi))
+        voice_r = voice_clarity_metrics_from_stats(r_st, lo_hz=float(voice_lo), hi_hz=float(voice_hi))
+        voice_lr = voice_clarity_lr_metrics_from_stats(l_st, r_st, lo_hz=float(voice_lo), hi_hz=float(voice_hi))
     voice_metrics = merge_voice_clarity_metrics(voice_l, voice_r, voice_lr)
     voice_enabled = bool((base_data or {}).get("auto_voice_clarity_penalty_enable", True))
     voice_weight = shared._auto_safe_float((base_data or {}).get("auto_voice_clarity_penalty_weight", 1.0), 1.0)

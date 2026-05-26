@@ -63,7 +63,7 @@ def _auto_focus_ripple_from_stats(
 
     mode = str(st.get("analysis_mode", "native") or "native").strip().lower()
 
-    def _pick_arr(base_key: str, *fallback_keys: str) -> np.ndarray:
+    def _pick_arr(base_key: str, *fallback_keys: str, _max_n: int | None = None) -> np.ndarray:
         keys: list[str] = []
         if mode == "comparison":
             keys.append(f"cmp_{str(base_key)}")
@@ -72,20 +72,33 @@ def _auto_focus_ripple_from_stats(
         keys.extend([str(k) for k in fallback_keys])
         for key in keys:
             try:
-                arr = np.asarray(st.get(key, []), dtype=float).reshape(-1)
+                raw = st.get(key, [])
+                if _max_n is not None:
+                    raw = raw[:_max_n]  # slice before asarray — avoids 131k copy
+                arr = np.asarray(raw, dtype=float).reshape(-1)
             except Exception:
                 arr = np.asarray([], dtype=float)
             if arr.size:
-                return np.asarray(arr, dtype=float)
+                return arr
         return np.asarray([], dtype=float)
+
+    # Get freq first to compute band limit before creating other large arrays.
+    # focus_hi_hz is the highest frequency of interest; guard at 2.5× to be safe.
+    f_full = _pick_arr("freq_axis")
+    _n_lim: int | None = None
+    if f_full.size >= 8:
+        _n_band = int(np.searchsorted(f_full, float(hi) * 2.5, side="right"))
+        if _n_band >= 8:
+            _n_lim = _n_band
+
+    f = f_full[:_n_lim] if _n_lim else f_full
+    m_meas = _pick_arr("measured_mags", _max_n=_n_lim)
+    t_tgt = _pick_arr("target_mags", _max_n=_n_lim)
+    g_real = _pick_arr("realized_filter_mags", "filter_mags", _max_n=_n_lim)
+    c_mask = _pick_arr("confidence_mask", _max_n=_n_lim)
 
     # Primary metric: local corrected-response RMS vs target inside the detected focus band.
     # This keeps auto-mode decisions tied to residual acoustic error instead of IR realization fidelity.
-    f = _pick_arr("freq_axis")
-    m_meas = _pick_arr("measured_mags")
-    t_tgt = _pick_arr("target_mags")
-    g_real = _pick_arr("realized_filter_mags", "filter_mags")
-    c_mask = _pick_arr("confidence_mask")
     n = int(min(f.size, m_meas.size, t_tgt.size))
     if n >= 8:
         f = np.asarray(f[:n], dtype=float)
@@ -105,8 +118,8 @@ def _auto_focus_ripple_from_stats(
             return float(np.sqrt(np.mean(err_use * err_use)))
 
     # Fallback: if corrected-response data is incomplete, fall back to filter-realization delta.
-    g_pred = _pick_arr("predicted_filter_mags")
-    g_real = _pick_arr("realized_filter_mags", "filter_mags")
+    g_pred = _pick_arr("predicted_filter_mags", _max_n=_n_lim)
+    g_real = _pick_arr("realized_filter_mags", "filter_mags", _max_n=_n_lim)
     n = int(min(f.size, g_pred.size, g_real.size))
     if n < 8:
         return None
@@ -131,7 +144,7 @@ def _auto_target_tracking_metrics_from_stats(st: dict | None) -> dict:
     }
     mode = str(st.get("analysis_mode", "native") or "native").strip().lower()
 
-    def _pick_arr(base_key: str, *fallback_keys: str) -> np.ndarray:
+    def _pick_arr(base_key: str, *fallback_keys: str, _max_n: int | None = None) -> np.ndarray:
         keys: list[str] = []
         if mode == "comparison":
             keys.append(f"cmp_{str(base_key)}")
@@ -140,18 +153,27 @@ def _auto_target_tracking_metrics_from_stats(st: dict | None) -> dict:
         keys.extend([str(k) for k in fallback_keys])
         for key in keys:
             try:
-                arr = np.asarray(st.get(key, []), dtype=float).reshape(-1)
+                raw = st.get(key, [])
+                if _max_n is not None:
+                    raw = raw[:_max_n]  # slice before asarray — avoids 131k copy
+                arr = np.asarray(raw, dtype=float).reshape(-1)
             except Exception:
                 arr = np.asarray([], dtype=float)
             if arr.size:
-                return np.asarray(arr, dtype=float)
+                return arr
         return np.asarray([], dtype=float)
 
-    f = _pick_arr("freq_axis")
-    measured = _pick_arr("measured_mags")
-    target = _pick_arr("target_mags")
-    filt = _pick_arr("filter_mags", "realized_filter_mags")
-    conf = _pick_arr("confidence_mask")
+    # Get freq_axis first to determine the band limit, then restrict all other arrays.
+    # This avoids creating 131k-element temporaries for the narrow bass bands.
+    f_full = _pick_arr("freq_axis")
+    _n_band = int(np.searchsorted(f_full, 1250.0, side="right")) if f_full.size >= 8 else f_full.size
+    _n_lim: int | None = _n_band if _n_band >= 8 else None
+
+    f = f_full[:_n_lim] if _n_lim else f_full
+    measured = _pick_arr("measured_mags", _max_n=_n_lim)
+    target = _pick_arr("target_mags", _max_n=_n_lim)
+    filt = _pick_arr("filter_mags", "realized_filter_mags", _max_n=_n_lim)
+    conf = _pick_arr("confidence_mask", _max_n=_n_lim)
     n = int(min(f.size, measured.size, target.size, filt.size))
     if n < 8:
         return dict(out)
@@ -238,7 +260,7 @@ def _auto_bass_under_target_metrics_from_stats(st: dict | None) -> dict:
     }
     mode = str(st.get("analysis_mode", "native") or "native").strip().lower()
 
-    def _pick_arr(base_key: str, *fallback_keys: str) -> np.ndarray:
+    def _pick_arr(base_key: str, *fallback_keys: str, _max_n: int | None = None) -> np.ndarray:
         keys: list[str] = []
         if mode == "comparison":
             keys.append(f"cmp_{str(base_key)}")
@@ -247,18 +269,26 @@ def _auto_bass_under_target_metrics_from_stats(st: dict | None) -> dict:
         keys.extend([str(k) for k in fallback_keys])
         for key in keys:
             try:
-                arr = np.asarray(st.get(key, []), dtype=float).reshape(-1)
+                raw = st.get(key, [])
+                if _max_n is not None:
+                    raw = raw[:_max_n]  # slice before asarray — avoids 131k copy
+                arr = np.asarray(raw, dtype=float).reshape(-1)
             except Exception:
                 arr = np.asarray([], dtype=float)
             if arr.size:
-                return np.asarray(arr, dtype=float)
+                return arr
         return np.asarray([], dtype=float)
 
-    f = _pick_arr("freq_axis")
-    measured = _pick_arr("measured_mags")
-    target = _pick_arr("target_mags")
-    filt = _pick_arr("realized_filter_mags", "filter_mags")
-    conf = _pick_arr("confidence_mask")
+    # Get freq_axis first to determine the band limit, then restrict all other arrays.
+    f_full = _pick_arr("freq_axis")
+    _n_band = int(np.searchsorted(f_full, 500.0, side="right")) if f_full.size >= 8 else f_full.size
+    _n_lim: int | None = _n_band if _n_band >= 8 else None
+
+    f = f_full[:_n_lim] if _n_lim else f_full
+    measured = _pick_arr("measured_mags", _max_n=_n_lim)
+    target = _pick_arr("target_mags", _max_n=_n_lim)
+    filt = _pick_arr("realized_filter_mags", "filter_mags", _max_n=_n_lim)
+    conf = _pick_arr("confidence_mask", _max_n=_n_lim)
     n = int(min(f.size, measured.size, target.size, filt.size))
     if n < 8:
         return dict(out)
@@ -312,7 +342,7 @@ def _auto_bass_boost_metrics_from_stats(st: dict | None) -> dict:
     st = dict(st or {})
     mode = str(st.get("analysis_mode", "native") or "native").strip().lower()
 
-    def _pick_arr(base_key: str, *fallback_keys: str) -> np.ndarray:
+    def _pick_arr(base_key: str, *fallback_keys: str, _max_n: int | None = None) -> np.ndarray:
         keys: list[str] = []
         if mode == "comparison":
             keys.append(f"cmp_{str(base_key)}")
@@ -321,15 +351,22 @@ def _auto_bass_boost_metrics_from_stats(st: dict | None) -> dict:
         keys.extend([str(k) for k in fallback_keys])
         for key in keys:
             try:
-                arr = np.asarray(st.get(key, []), dtype=float).reshape(-1)
+                raw = st.get(key, [])
+                if _max_n is not None:
+                    raw = raw[:_max_n]
+                arr = np.asarray(raw, dtype=float).reshape(-1)
             except Exception:
                 arr = np.asarray([], dtype=float)
             if arr.size:
-                return np.asarray(arr, dtype=float)
+                return arr
         return np.asarray([], dtype=float)
 
-    f = _pick_arr("freq_axis")
-    filt = _pick_arr("filter_mags", "realized_filter_mags")
+    f_full = _pick_arr("freq_axis")
+    _n_band = int(np.searchsorted(f_full, 500.0, side="right")) if f_full.size >= 4 else f_full.size
+    _n_lim: int | None = _n_band if _n_band >= 4 else None
+
+    f = f_full[:_n_lim] if _n_lim else f_full
+    filt = _pick_arr("filter_mags", "realized_filter_mags", _max_n=_n_lim)
     n = int(min(f.size, filt.size))
     out = {
         "bass_boost_20_200_db": 0.0,

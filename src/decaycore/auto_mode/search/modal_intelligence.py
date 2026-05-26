@@ -47,7 +47,7 @@ from ..runtime_context import (
     _auto_pick_metric,
 )
 
-from .metrics_common import _auto_stats_pick_arr, _finite_json_float
+from .metrics_common import _auto_stats_band_n, _auto_stats_pick_arr, _finite_json_float
 
 MODAL_INTELLIGENCE_METRICS_VERSION = 1
 
@@ -91,14 +91,15 @@ def _modal_result_to_metrics(result: ModalAnalysisResult, *, top_n: int = 6) -> 
 
 def compute_modal_intelligence_metrics(st: dict | None, *, lo_hz: float, hi_hz: float, top_n: int = 6) -> dict:
     st = dict(st or {})
-    f = _auto_stats_pick_arr(st, "freq_axis")
-    measured = _auto_stats_pick_arr(st, "measured_mags")
-    target = _auto_stats_pick_arr(st, "target_mags")
-    corrected = _auto_stats_pick_arr(st, "realized_filter_mags", "filter_mags", "predicted_filter_mags")
-    conf = _auto_stats_pick_arr(st, "confidence_mask")
-    gd = _auto_stats_pick_arr(st, "group_delay_ms", "gd_ms", "gd_curve_ms")
-    left = _auto_stats_pick_arr(st, "left_mag_db", "l_measured_mags")
-    right = _auto_stats_pick_arr(st, "right_mag_db", "r_measured_mags")
+    _n_lim = _auto_stats_band_n(st, float(hi_hz) * 2.5)
+    f = _auto_stats_pick_arr(st, "freq_axis", _max_n=_n_lim)
+    measured = _auto_stats_pick_arr(st, "measured_mags", _max_n=_n_lim)
+    target = _auto_stats_pick_arr(st, "target_mags", _max_n=_n_lim)
+    corrected = _auto_stats_pick_arr(st, "realized_filter_mags", "filter_mags", "predicted_filter_mags", _max_n=_n_lim)
+    conf = _auto_stats_pick_arr(st, "confidence_mask", _max_n=_n_lim)
+    gd = _auto_stats_pick_arr(st, "group_delay_ms", "gd_ms", "gd_curve_ms", _max_n=_n_lim)
+    left = _auto_stats_pick_arr(st, "left_mag_db", "l_measured_mags", _max_n=_n_lim)
+    right = _auto_stats_pick_arr(st, "right_mag_db", "r_measured_mags", _max_n=_n_lim)
     result = detect_room_modes(
         f,
         measured,

@@ -47,6 +47,7 @@ def _auto_target_mode_options(*, t: Callable, auto_goal) -> dict[str, str]:
         return selected_option
     return {
         "auto":     t("auto_target_mode_auto"),
+        "adaptive": t("auto_target_mode_adaptive"),
         **selected_option,
     }
 
@@ -57,6 +58,8 @@ def _normalize_auto_target_mode_value(value, *, auto_goal=None) -> str:
     raw = str(value or "").strip().lower()
     if raw in ("selected", "manual", "fixed", "user"):
         return "selected"
+    if "adapt" in raw:
+        return "adaptive"
     return "auto"
 
 

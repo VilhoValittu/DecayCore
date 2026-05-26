@@ -47,6 +47,7 @@ from ..runtime_context import (
     _auto_pick_metric,
 )
 
+from ..auto_mode_profile import profiled_section
 from .modal_intelligence import (
     _attach_modal_support_to_residual_metrics,
     _auto_merge_modal_intelligence_metrics,
@@ -102,28 +103,30 @@ def score_residual_peaks(l_st, r_st, *, base_data) -> dict:
                 shared.AUTO_MODE_RESIDUAL_PEAK_HARD_GATE_DB,
             ),
         )
-        l_residual_peak_metrics = _auto_residual_peak_metrics_from_stats(
-            l_st,
-            lo_hz=float(peak_lo),
-            hi_hz=float(peak_hi),
-            threshold_db=float(residual_peak_threshold_db),
-            hard_gate_db=float(residual_peak_hard_gate_db),
-        )
-        r_residual_peak_metrics = _auto_residual_peak_metrics_from_stats(
-            r_st,
-            lo_hz=float(peak_lo),
-            hi_hz=float(peak_hi),
-            threshold_db=float(residual_peak_threshold_db),
-            hard_gate_db=float(residual_peak_hard_gate_db),
-        )
+        with profiled_section("residual_score.peak_metrics"):
+            l_residual_peak_metrics = _auto_residual_peak_metrics_from_stats(
+                l_st,
+                lo_hz=float(peak_lo),
+                hi_hz=float(peak_hi),
+                threshold_db=float(residual_peak_threshold_db),
+                hard_gate_db=float(residual_peak_hard_gate_db),
+            )
+            r_residual_peak_metrics = _auto_residual_peak_metrics_from_stats(
+                r_st,
+                lo_hz=float(peak_lo),
+                hi_hz=float(peak_hi),
+                threshold_db=float(residual_peak_threshold_db),
+                hard_gate_db=float(residual_peak_hard_gate_db),
+            )
         residual_peak_metrics = _auto_merge_residual_peak_metrics(
             l_residual_peak_metrics,
             r_residual_peak_metrics,
         )
-        modal_intelligence_metrics = _auto_merge_modal_intelligence_metrics(
-            compute_modal_intelligence_metrics(l_st, lo_hz=float(peak_lo), hi_hz=float(peak_hi)),
-            compute_modal_intelligence_metrics(r_st, lo_hz=float(peak_lo), hi_hz=float(peak_hi)),
-        )
+        with profiled_section("residual_score.modal_intelligence"):
+            modal_intelligence_metrics = _auto_merge_modal_intelligence_metrics(
+                compute_modal_intelligence_metrics(l_st, lo_hz=float(peak_lo), hi_hz=float(peak_hi)),
+                compute_modal_intelligence_metrics(r_st, lo_hz=float(peak_lo), hi_hz=float(peak_hi)),
+            )
         residual_peak_metrics = _attach_modal_support_to_residual_metrics(
             residual_peak_metrics,
             modal_intelligence_metrics,

@@ -369,10 +369,12 @@ def _auto_build_synth_target_candidate(
     m_l,
     f_r,
     m_r,
+    measurements: dict | None = None,
 ) -> dict | None:
     """Build and score a synthesized adaptive target candidate from measurements."""
     try:
-        _ms = {"f_l": f_l, "m_l": m_l, "f_r": f_r, "m_r": m_r}
+        _ms = dict(measurements or {})
+        _ms.update({"f_l": f_l, "m_l": m_l, "f_r": f_r, "m_r": m_r})
         synth = get_or_build_synth_target(
             _ms,
             tilt_comp_frac=float(AUTO_MODE_SYNTH_TARGET_TILT_COMP_FRAC),
@@ -496,6 +498,7 @@ def _auto_select_builtin_target_curve(
     m_l,
     f_r,
     m_r,
+    measurements: dict | None = None,
 ) -> dict | None:
     try:
         fl = np.asarray(f_l, dtype=float).reshape(-1)
@@ -622,7 +625,14 @@ def _auto_select_builtin_target_curve(
 
     if bool(AUTO_MODE_SYNTH_TARGET_ENABLED):
         try:
-            synth_tc = _auto_build_synth_target_candidate(data, f_l=fl, m_l=ml, f_r=fr, m_r=mr)
+            synth_tc = _auto_build_synth_target_candidate(
+                data,
+                f_l=fl,
+                m_l=ml,
+                f_r=fr,
+                m_r=mr,
+                measurements=measurements,
+            )
             if isinstance(synth_tc, dict) and synth_tc:
                 scored.append(dict(synth_tc))
         except Exception:

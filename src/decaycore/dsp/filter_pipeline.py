@@ -9,6 +9,7 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 import logging
+from dataclasses import replace
 
 import numpy as np
 
@@ -29,10 +30,119 @@ from .dsp_ops import (
 from .dsp_phase_ir import run_phase_ir_stage
 from .dsp_preprocess import run_preprocess
 from .dsp_utils import cfg_float_allow_zero as _cfg_float_allow_zero
+from .hybrid_iir import HybridIIRPolicy, design_hybrid_iir
+from .modal_analysis import detect_room_modes
 from .phase_ir_autogain import compute_auto_gain_and_headroom
 from .phase_ir_residual import apply_residual_pass_if_enabled
 
 logger = logging.getLogger("DecayCore.dsp")
+
+
+def _array_from_stats(st: dict, *keys: str) -> np.ndarray:
+    for key in keys:
+        try:
+            arr = np.asarray(st.get(key, []), dtype=float).reshape(-1)
+        except (TypeError, ValueError):
+            arr = np.asarray([], dtype=float)
+        if arr.size:
+            return arr
+    return np.asarray([], dtype=float)
+
+
+def _apply_hybrid_iir_preconditioning(
+    *,
+    cfg: FilterConfig,
+    freq_axis: np.ndarray,
+    gain_db: np.ndarray,
+    m_anal: np.ndarray,
+    calc_offset_db: float,
+    target_mags: np.ndarray,
+    conf_mask: np.ndarray,
+    phase_rad: np.ndarray | None = None,
+    st: dict,
+) -> tuple[np.ndarray, dict]:
+    policy = HybridIIRPolicy.from_config(cfg)
+    if not policy.enabled:
+        return gain_db, {
+            "hybrid_iir_enabled": False,
+            "hybrid_iir_policy_version": int(policy.to_signature_dict()["policy_v"]),
+        }
+    gd = _array_from_stats(st, "group_delay_ms", "gd_ms", "gd_curve_ms")
+    gd_source = "stats"
+    if gd.size != np.asarray(freq_axis).size:
+        gd = _group_delay_excess_from_phase(freq_axis, phase_rad)
+        gd_source = "phase"
+    has_gd = bool(gd.size == np.asarray(freq_axis).size)
+    if not has_gd:
+        policy = replace(policy, min_gd_excess_ms=0.0)
+        gd_source = "unavailable"
+    try:
+        modal = detect_room_modes(
+            freq_axis,
+            np.asarray(m_anal, dtype=float) - float(calc_offset_db),
+            target_mag_db=target_mags,
+            corrected_mag_db=None,
+            group_delay_ms=gd if has_gd else None,
+            confidence_mask=conf_mask,
+            lo_hz=float(policy.min_freq_hz),
+            hi_hz=float(policy.max_freq_hz),
+            min_peak_db=float(policy.min_peak_db),
+        )
+        result = design_hybrid_iir(
+            modal.events,
+            np.asarray(freq_axis, dtype=float),
+            int(getattr(cfg, "fs", 0) or 0),
+            policy,
+        )
+    except Exception as exc:
+        logger.warning("Hybrid IIR design failed; continuing FIR-only", exc_info=True)
+        return gain_db, {
+            "hybrid_iir_enabled": True,
+            "hybrid_iir_error": f"{type(exc).__name__}: {exc}",
+            "hybrid_iir_policy_version": int(policy.to_signature_dict()["policy_v"]),
+        }
+
+    stats = result.to_stats()
+    stats["hybrid_iir_modal_event_count"] = int(getattr(modal, "mode_count", 0) or 0)
+    stats["hybrid_iir_gd_source"] = str(gd_source)
+    stats["hybrid_iir_min_gd_excess_ms_effective"] = float(policy.min_gd_excess_ms)
+    if result.biquads and result.mag_db.size == np.asarray(gain_db).size:
+        iir_mag = np.asarray(result.mag_db, dtype=float)
+        adjusted_gain = np.asarray(gain_db, dtype=float) - iir_mag
+        stats["hybrid_iir_preconditioned_mags"] = (
+            np.asarray(m_anal, dtype=float) - float(calc_offset_db) + iir_mag
+        ).tolist()
+        stats["hybrid_iir_fir_gain_before_db"] = np.asarray(gain_db, dtype=float).tolist()
+        stats["hybrid_iir_fir_gain_after_db"] = np.asarray(adjusted_gain, dtype=float).tolist()
+        logger.debug("Hybrid IIR enabled: selected %d modal cuts", len(result.biquads))
+        return adjusted_gain, stats
+    logger.debug("Hybrid IIR enabled: no eligible modal cuts selected")
+    return gain_db, stats
+
+
+def _group_delay_excess_from_phase(freq_axis: np.ndarray, phase_rad: np.ndarray | None) -> np.ndarray:
+    try:
+        freq = np.asarray(freq_axis, dtype=float).reshape(-1)
+        phase = np.asarray(phase_rad, dtype=float).reshape(-1)
+    except (TypeError, ValueError):
+        return np.asarray([], dtype=float)
+    if freq.size < 8 or phase.size != freq.size:
+        return np.asarray([], dtype=float)
+    valid = np.isfinite(freq) & np.isfinite(phase) & (freq > 0.0)
+    if int(np.count_nonzero(valid)) < 8:
+        return np.asarray([], dtype=float)
+    phase_u = np.unwrap(np.nan_to_num(phase, nan=0.0, posinf=0.0, neginf=0.0))
+    omega = 2.0 * np.pi * np.maximum(freq, 1e-9)
+    try:
+        gd_ms = -np.gradient(phase_u, omega) * 1000.0
+    except (TypeError, ValueError, FloatingPointError):
+        return np.asarray([], dtype=float)
+    gd_ms = np.nan_to_num(gd_ms, nan=0.0, posinf=0.0, neginf=0.0)
+    band = valid & (freq >= 20.0) & (freq <= 300.0)
+    if int(np.count_nonzero(band)) < 8:
+        band = valid
+    baseline = float(np.nanmedian(gd_ms[band])) if int(np.count_nonzero(band)) else 0.0
+    return np.maximum(0.0, gd_ms - baseline)
 
 
 def _run_generate_filter_pre_correction(
@@ -279,6 +389,20 @@ def _run_generate_filter_pipeline(
     use_bassfirst = state["use_bassfirst"]
     afdw_on = state["afdw_on"]
 
+    gain_db, hybrid_iir_stats = _apply_hybrid_iir_preconditioning(
+        cfg=cfg,
+        freq_axis=freq_axis,
+        gain_db=np.asarray(gain_db, dtype=float),
+        m_anal=np.asarray(m_anal, dtype=float),
+        calc_offset_db=float(calc_offset_db),
+        target_mags=np.asarray(target_mags, dtype=float),
+        conf_mask=np.asarray(conf_mask, dtype=float),
+        phase_rad=np.asarray(p_rad_interp, dtype=float),
+        st=st,
+    )
+    if isinstance(st, dict) and hybrid_iir_stats:
+        st.update(hybrid_iir_stats)
+
     _output_tilt = float(getattr(cfg, "output_tilt_db_per_oct", 0.0) or 0.0)
     if _output_tilt != 0.0:
         _safe_f = np.maximum(freq_axis, 1.0)
@@ -342,6 +466,7 @@ def _run_generate_filter_pipeline(
         "s_max": state["s_max"],
         "target_shift_db": state["target_shift_db"],
         "gain_db": gain_db,
+        "hybrid_iir_stats": hybrid_iir_stats,
         "afdw_on": state["afdw_on"],
         "mask_c": mask_c,
         "stage_probes": state["stage_probes"],

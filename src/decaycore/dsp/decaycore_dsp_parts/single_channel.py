@@ -128,6 +128,14 @@ def generate_filter(
     s_max = pipeline["s_max"]
     target_shift_db = pipeline["target_shift_db"]
     gain_db = pipeline["gain_db"]
+    hybrid_iir_stats = dict(pipeline.get("hybrid_iir_stats", {}) or {})
+    hybrid_iir_mag_db = np.asarray(hybrid_iir_stats.get("hybrid_iir_mag_db", []), dtype=float).reshape(-1)
+    hybrid_iir_active = bool(hybrid_iir_stats.get("hybrid_iir_enabled", False)) and hybrid_iir_mag_db.size == np.asarray(gain_db).size
+    combined_gain_db = (
+        np.asarray(gain_db, dtype=float) + hybrid_iir_mag_db
+        if hybrid_iir_active
+        else np.asarray(gain_db, dtype=float)
+    )
     afdw_on = pipeline["afdw_on"]
     mask_c = pipeline["mask_c"]
     stage_probes = pipeline["stage_probes"]
@@ -169,10 +177,11 @@ def generate_filter(
         'target_mags': target_mags.tolist(),
         'measured_mags_raw': m_anal.tolist(),
         'measured_mags': (m_anal - calc_offset_db).tolist(),
-        'predicted_filter_mags': gain_db.tolist(),
-        'predicted_filter_mags_source': "mag_post_limits_pre_ir",
-        'filter_mags': gain_db.tolist(),
-        'filter_mags_source': "mag_post_limits_pre_ir",
+        'predicted_filter_mags': combined_gain_db.tolist(),
+        'predicted_filter_mags_source': "hybrid_iir_plus_mag_post_limits_pre_ir" if hybrid_iir_active else "mag_post_limits_pre_ir",
+        'filter_mags': combined_gain_db.tolist(),
+        'filter_mags_source': "hybrid_iir_plus_mag_post_limits_pre_ir" if hybrid_iir_active else "mag_post_limits_pre_ir",
+        'fir_only_predicted_filter_mags': np.asarray(gain_db, dtype=float).tolist(),
         'mag_mask': np.asarray(mask_c, dtype=float).tolist(),
         'confidence_mask': conf_mask.tolist(),
         'afdw_active': bool(afdw_on),
@@ -318,6 +327,8 @@ def generate_filter(
 
 
     safe_stats_update(stats, st)
+    if hybrid_iir_stats:
+        safe_stats_update(stats, hybrid_iir_stats)
     # Keep target on a shared absolute reference level for scoring/quality.
     # Preserve measured arrays from `st` when available to keep UI view
     # behavior stable; only fill missing measured fields.
@@ -419,12 +430,21 @@ def generate_filter(
                             stats.get("filter_mags_source", "mag_post_limits_pre_ir") or "mag_post_limits_pre_ir"
                         )
 
-                g_real_native = np.interp(f_q, f_fft, g_db)
+                g_real_native_fir = np.interp(f_q, f_fft, g_db)
+                if hybrid_iir_active:
+                    iir_native = np.asarray(hybrid_iir_mag_db, dtype=float).reshape(-1)
+                    iir_eval = iir_native[: g_real_native_fir.size]
+                    g_real_native = g_real_native_fir + iir_eval
+                    if bool(include_response_arrays):
+                        stats["fir_only_realized_filter_mags"] = g_real_native_fir.tolist()
+                    stats["fir_only_filter_mags"] = g_real_native_fir.tolist()
+                else:
+                    g_real_native = g_real_native_fir
                 if bool(include_response_arrays):
                     stats["realized_filter_mags"] = g_real_native.tolist()
-                    stats["realized_filter_mags_source"] = "ir_fft_final"
+                    stats["realized_filter_mags_source"] = "hybrid_iir_plus_ir_fft_final" if hybrid_iir_active else "ir_fft_final"
                 stats["filter_mags"] = g_real_native.tolist()
-                stats["filter_mags_source"] = "ir_fft_final"
+                stats["filter_mags_source"] = "hybrid_iir_plus_ir_fft_final" if hybrid_iir_active else "ir_fft_final"
 
                 f_cmp = np.asarray(stats.get("cmp_freq_axis", []), dtype=float).reshape(-1)
                 if f_cmp.size >= 4:

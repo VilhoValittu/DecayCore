@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import bisect
 import inspect
 import logging
 import math
@@ -49,7 +50,7 @@ from ..runtime_context import (
 
 _AI_SUMMARY_SCORING_RANGE_SUPPORT_CACHE: dict[tuple[int, str], bool] = {}
 
-def _auto_stats_pick_arr(st: dict | None, base_key: str, *fallback_keys: str) -> np.ndarray:
+def _auto_stats_pick_arr(st: dict | None, base_key: str, *fallback_keys: str, _max_n: int | None = None) -> np.ndarray:
     st = dict(st or {})
     mode = str(st.get("analysis_mode", "native") or "native").strip().lower()
     keys: list[str] = []
@@ -60,12 +61,38 @@ def _auto_stats_pick_arr(st: dict | None, base_key: str, *fallback_keys: str) ->
     keys.extend([str(k) for k in fallback_keys])
     for key in keys:
         try:
-            arr = np.asarray(st.get(key, []), dtype=float).reshape(-1)
+            raw = st.get(key, [])
+            if _max_n is not None and raw is not None:
+                raw = raw[:_max_n]
+            arr = np.asarray(raw, dtype=float).reshape(-1)
         except Exception:
             arr = np.asarray([], dtype=float)
         if arr.size:
             return np.asarray(arr, dtype=float)
     return np.asarray([], dtype=float)
+
+
+def _auto_stats_band_n(st: dict | None, hi_guard: float, key: str = "freq_axis") -> int | None:
+    """Return the index limit for hi_guard Hz without materializing the full array.
+
+    Uses bisect for Python lists (O(log n)) and searchsorted for numpy arrays (O(log n)).
+    Returns None if the array is too small or the limit cannot be determined.
+    """
+    st = dict(st or {})
+    mode = str(st.get("analysis_mode", "native") or "native").strip().lower()
+    raw = st.get(f"cmp_{key}") if mode == "comparison" else None
+    if raw is None:
+        raw = st.get(key)
+    if raw is None:
+        return None
+    try:
+        if isinstance(raw, np.ndarray):
+            n = int(np.searchsorted(raw, hi_guard, side="right"))
+        else:
+            n = bisect.bisect_right(raw, hi_guard)
+        return n if n >= 8 else None
+    except Exception:
+        return None
 
 
 def _finite_json_float(value, default: float | None = 0.0):
@@ -155,4 +182,4 @@ def _ai_score_with_fallback(st: dict, ai: dict, *, scoring_range) -> float:
 
 
 
-__all__ = ["calc_ai_summary_from_stats", "_auto_stats_pick_arr", "_finite_json_float", "_calc_ai_summary_from_stats_auto", "_get_auto_scoring_range", "_ai_score_with_fallback"]
+__all__ = ["calc_ai_summary_from_stats", "_auto_stats_pick_arr", "_auto_stats_band_n", "_finite_json_float", "_calc_ai_summary_from_stats_auto", "_get_auto_scoring_range", "_ai_score_with_fallback"]
