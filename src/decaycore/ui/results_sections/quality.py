@@ -21,7 +21,12 @@ import html
 import logging
 import math
 import time
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # _section is loaded at runtime by _load_sibling_symbols() from overview.py.
+    # This import is only for static analysis; it is never executed at runtime.
+    from .overview import _section  # noqa: F401
 
 # ---------------------------------------------------------------------------
 # Interactive plot render cache
@@ -309,7 +314,69 @@ def _render_lr_difference(*, l_st_f: dict, r_st_f: dict) -> None:
         logger.debug("_render_lr_difference failed", exc_info=True)
 
 
-__all__ = ['_render_ir_alignment', '_render_dsp_quality', '_render_lr_difference']
+def _fmt_biquad(b: dict | None) -> str:
+    if b is None:
+        return "-"
+    freq = float(b.get("freq", 0.0) or 0.0)
+    q = float(b.get("q", 0.0) or 0.0)
+    gain = float(b.get("gain", 0.0) or 0.0)
+    conf = float(b.get("confidence", 0.0) or 0.0)
+    return f"{freq:.1f} Hz, Q {q:.2f}, {gain:+.2f} dB (conf {conf:.2f})"
+
+
+def _rejected_reasons(st: dict) -> str:
+    rejected = [d for d in (st.get("hybrid_iir_rejected") or []) if isinstance(d, dict)]
+    reasons = sorted({str(d.get("reason", "unknown")) for d in rejected[:6]})
+    return ", ".join(reasons)
+
+
+def _render_hybrid_iir_cuts(*, l_st_f: dict, r_st_f: dict) -> None:
+    """Render collapsible Hybrid FIR-IIR modal cuts section."""
+    l_enabled = bool(l_st_f.get("hybrid_iir_enabled", False))
+    r_enabled = bool(r_st_f.get("hybrid_iir_enabled", False))
+    if not l_enabled and not r_enabled:
+        return
+
+    l_biquads = [dict(b) for b in (l_st_f.get("hybrid_iir_biquads") or []) if isinstance(b, dict)]
+    r_biquads = [dict(b) for b in (r_st_f.get("hybrid_iir_biquads") or []) if isinstance(b, dict)]
+    l_count = int(l_st_f.get("hybrid_iir_filter_count", len(l_biquads)))
+    r_count = int(r_st_f.get("hybrid_iir_filter_count", len(r_biquads)))
+    l_events = int(l_st_f.get("hybrid_iir_modal_event_count", 0))
+    r_events = int(r_st_f.get("hybrid_iir_modal_event_count", 0))
+    l_gd_src = str(l_st_f.get("hybrid_iir_gd_source", "stats") or "stats")
+    r_gd_src = str(r_st_f.get("hybrid_iir_gd_source", "stats") or "stats")
+
+    rows: list[dict] = [
+        metric_row(t("results_metric_hybrid_iir_active_cuts"), str(l_count), str(r_count)),
+        metric_row(t("results_metric_hybrid_iir_detected_events"), str(l_events), str(r_events)),
+    ]
+    n_cuts = max(len(l_biquads), len(r_biquads))
+    for i in range(n_cuts):
+        lb = l_biquads[i] if i < len(l_biquads) else None
+        rb = r_biquads[i] if i < len(r_biquads) else None
+        rows.append(metric_row(
+            f"{t('results_metric_hybrid_iir_cut')} #{i + 1}",
+            _fmt_biquad(lb),
+            _fmt_biquad(rb),
+        ))
+    if l_gd_src != "stats" or r_gd_src != "stats":
+        rows.append(metric_row(t("results_metric_hybrid_iir_gd_source"), l_gd_src, r_gd_src))
+
+    summary_lines: list[str] = []
+    if l_count == 0 and l_enabled:
+        reasons = _rejected_reasons(l_st_f)
+        if reasons:
+            summary_lines.append(f"L — {t('results_hybrid_iir_no_cuts')}: {reasons}")
+    if r_count == 0 and r_enabled:
+        reasons = _rejected_reasons(r_st_f)
+        if reasons:
+            summary_lines.append(f"R — {t('results_hybrid_iir_no_cuts')}: {reasons}")
+
+    _section(t("results_section_hybrid_iir_cuts"), rows, summary_lines or None)
+
+
+__all__ = ['_render_ir_alignment', '_render_dsp_quality', '_render_lr_difference',
+           '_render_hybrid_iir_cuts', '_fmt_biquad', '_rejected_reasons']
 
 
 def _load_sibling_symbols() -> None:

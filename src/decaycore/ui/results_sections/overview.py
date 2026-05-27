@@ -162,6 +162,7 @@ def render_results(
         _render_auto_diagnostics(data=data)
         _append_auto_polish_to_status_log(data=data)
         _render_bass_integration(data=data)
+        _render_hybrid_iir_cuts(l_st_f=l_st_f, r_st_f=r_st_f)
         _render_ir_alignment(l_st_f=l_st_f)
         _render_dsp_quality(data=data, l_st_f=l_st_f, r_st_f=r_st_f, psl_str=psl_str)
         _render_lr_difference(l_st_f=l_st_f, r_st_f=r_st_f)
