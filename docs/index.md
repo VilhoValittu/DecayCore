@@ -57,6 +57,35 @@ hide_title: true
   </section>
 </div>
 
+## Interface
+
+<div class="screenshot-gallery">
+  <div class="screenshot-item">
+    <img src="{{ '/pics/ui_1.png' | relative_url }}" alt="Files tab — load measurement files and set output format" loading="lazy">
+    <p class="screenshot-item__caption">1. Files — load measurement files and set output format</p>
+  </div>
+  <div class="screenshot-item">
+    <img src="{{ '/pics/ui_2.png' | relative_url }}" alt="Basic tab — FIR engine, filter type, and sample rate" loading="lazy">
+    <p class="screenshot-item__caption">3. Basic — FIR engine, filter type, and sample rate</p>
+  </div>
+  <div class="screenshot-item">
+    <img src="{{ '/pics/ui_3.png' | relative_url }}" alt="Target tab — correction target curve, leveling, and gain" loading="lazy">
+    <p class="screenshot-item__caption">4. Target — correction target curve, leveling, and gain</p>
+  </div>
+  <div class="screenshot-item">
+    <img src="{{ '/pics/ui_4.png' | relative_url }}" alt="Advanced tab — correction shaping, bass protection, confidence-pull" loading="lazy">
+    <p class="screenshot-item__caption">5. Advanced — correction shaping, bass protection, confidence-pull</p>
+  </div>
+  <div class="screenshot-item">
+    <img src="{{ '/pics/ui_5.png' | relative_url }}" alt="IR Window & Decay Control tab — IR windowing, A-FDW, Temporal Decay Control" loading="lazy">
+    <p class="screenshot-item__caption">6. IR Window & Decay Control — windowing, A-FDW, Temporal Decay Control</p>
+  </div>
+  <div class="screenshot-item">
+    <img src="{{ '/pics/ui_6.png' | relative_url }}" alt="XO tab — crossover frequency and slope definition" loading="lazy">
+    <p class="screenshot-item__caption">7. XO — crossover frequency and slope definition</p>
+  </div>
+</div>
+
 ## Documentation
 
 <div class="doc-grid">

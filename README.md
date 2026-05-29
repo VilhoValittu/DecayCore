@@ -32,6 +32,16 @@ REW-style measurement data may also be used in compatible workflows, but DecayCo
 - Uses conservative correction limits to avoid unsafe boosts and unrealistic room correction
 - Includes automatic target optimization and Temporal Decay Control
 
+## Screenshots
+
+![Files tab — load measurement files and set output format](docs/pics/ui_1.png)
+
+![Target tab — correction target curve and leveling](docs/pics/ui_3.png)
+
+![Advanced tab — correction shaping and bass protection](docs/pics/ui_4.png)
+
+![IR Window & Decay Control — windowing, A-FDW, Temporal Decay Control](docs/pics/ui_5.png)
+
 ## Documentation
 
 - [Getting started](https://vilhovalittu.github.io/DecayCore/getting-started/)

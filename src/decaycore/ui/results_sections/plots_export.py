@@ -89,7 +89,7 @@ def _build_combined_fig(freq_hz, measured_db, predicted_db, title: str,
             fig.add_trace(go.Scatter(
                 x=f_plot, y=m[mask],
                 name="Measured (combined)",
-                line=dict(color="#888888", width=1.2, dash="dot"),
+                line=dict(color="rgba(148,163,184,0.55)", width=1.2, dash="dot"),
             ))
     if predicted_db is not None:
         p = np.asarray(predicted_db, dtype=float)
@@ -97,7 +97,7 @@ def _build_combined_fig(freq_hz, measured_db, predicted_db, title: str,
             fig.add_trace(go.Scatter(
                 x=f_plot, y=p[mask],
                 name="Predicted (combined)",
-                line=dict(color="#4488ff", width=2.0),
+                line=dict(color="#60a5fa", width=2.0),
             ))
     if target_db is not None:
         tgt = np.asarray(target_db, dtype=float)
@@ -105,7 +105,7 @@ def _build_combined_fig(freq_hz, measured_db, predicted_db, title: str,
             fig.add_trace(go.Scatter(
                 x=f_plot, y=tgt[mask],
                 name="Target",
-                line=dict(color="green", width=1.5, dash="dash"),
+                line=dict(color="#34d399", width=1.5, dash="dash"),
             ))
     fig.update_xaxes(
         type="log",
@@ -116,7 +116,10 @@ def _build_combined_fig(freq_hz, measured_db, predicted_db, title: str,
     fig.update_layout(
         title_text=f"{title} Analysis",
         height=350,
-        template="plotly_white",
+        template="plotly_dark",
+        paper_bgcolor="#0e1219",
+        plot_bgcolor="#0e1219",
+        font=dict(color="#c8cdd5", family="Inter, system-ui, sans-serif"),
         uirevision="keep",
     )
     return fig
