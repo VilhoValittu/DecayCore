@@ -1,6 +1,6 @@
 ---
 title: DecayCore - FIR Room Correction and Measurement Tool
-description: DecayCore is a free, open-source FIR room correction and acoustic measurement tool. Exports WAV FIR filters for CamillaDSP, Roon, Equalizer APO, and any FIR-capable DSP engine. Phase-aware correction and temporal decay control.
+description: DecayCore is a free FIR room correction and acoustic measurement tool. Exports WAV FIR filters for CamillaDSP, Roon, Equalizer APO, and any FIR-capable DSP engine. Phase-aware correction and temporal decay control.
 permalink: /
 hide_title: true
 ---
@@ -9,7 +9,7 @@ hide_title: true
   <div>
     <p class="hero__eyebrow">FIR room correction and measurement</p>
     <h1>DecayCore — FIR Room Correction and Measurement Tool</h1>
-    <p class="hero__copy">A free, open-source acoustic measurement tool, FIR room correction tool, and WAV FIR filter generator. Works with any DSP engine that accepts FIR filters in WAV format — including CamillaDSP, Roon convolution, Equalizer APO, HiFi DSP, MiniDSP, and similar platforms. DecayCore was formerly known as CamillaFIR.</p>
+    <p class="hero__copy">A free acoustic measurement tool, FIR room correction tool, and WAV FIR filter generator. Works with any DSP engine that accepts FIR filters in WAV format — including CamillaDSP, Roon convolution, Equalizer APO, HiFi DSP, MiniDSP, and similar platforms. DecayCore was formerly known as CamillaFIR.</p>
     <p class="hero__copy">DecayCore focuses on physically sane, band-limited room correction, phase-aware correction, automatic target optimization, and Temporal Decay Control for low-frequency room behavior.</p>
     <div class="action-row">
       <a class="button button--primary" href="https://github.com/VilhoValittu/DecayCore/releases">Download releases</a>
