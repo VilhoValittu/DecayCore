@@ -21,6 +21,21 @@ DecayCore supports:
 
 Each mode has different tradeoffs in latency, phase correction, pre-ringing risk, and correction behavior.
 
+## Why not just use parametric EQ?
+
+Parametric EQ (PEQ) is a common and useful tool, but it has limits in room correction.
+
+PEQ applies static gain and filter curves in the frequency domain. It does not control phase behavior or decay behavior. A PEQ boost or cut applied to a room mode may reduce the measured amplitude at a single point, but does not necessarily change how long that mode stores energy.
+
+FIR filters can correct both magnitude and phase simultaneously, and can apply correction with awareness of the measured impulse response. This allows DecayCore to:
+
+- correct magnitude and phase together where beneficial
+- avoid narrow corrections that look good in REW but do not translate to better sound
+- apply Temporal Decay Control for low-frequency energy behavior, not just amplitude shaping
+- use conservative limits to avoid boosting deep nulls or narrow problem areas
+
+PEQ remains useful for simple tonal adjustments or post-correction trim. It is not a substitute for FIR-based room correction when decay behavior, phase response, or cross-band interactions are the actual problem.
+
 ## Related pages
 
 - [Measurement workflow](../measurement-workflow/)

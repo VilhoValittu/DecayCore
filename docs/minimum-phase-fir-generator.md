@@ -4,8 +4,6 @@ description: DecayCore can generate minimum phase FIR correction filters for roo
 permalink: /minimum-phase-fir-generator/
 ---
 
-# Minimum Phase FIR Filter Generator
-
 DecayCore supports Minimum Phase FIR filter generation for room correction workflows.
 
 Minimum phase correction is useful when low latency is important and when the goal is to correct magnitude behavior while keeping timing behavior closer to a causal acoustic system.

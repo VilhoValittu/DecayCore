@@ -4,8 +4,6 @@ description: DecayCore supports mixed phase FIR room correction with phase-aware
 permalink: /mixed-phase-room-correction/
 ---
 
-# Mixed Phase Room Correction
-
 DecayCore supports Mixed Phase FIR room correction.
 
 Mixed phase correction can combine magnitude correction with controlled phase correction. The goal is not to blindly force a perfect phase response, but to apply correction where it is useful and safe.

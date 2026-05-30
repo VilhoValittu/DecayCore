@@ -4,8 +4,6 @@ description: Temporal Decay Control is a DecayCore feature for controlling low-f
 permalink: /temporal-decay-control/
 ---
 
-# Temporal Decay Control
-
 Temporal Decay Control is one of DecayCore's core ideas.
 
 Traditional room correction often focuses mainly on frequency response. DecayCore also considers low-frequency decay behavior, because bass problems are often temporal problems as much as amplitude problems.
