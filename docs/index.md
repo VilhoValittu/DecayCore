@@ -122,6 +122,14 @@ hide_title: true
     <p>Why bass problems are often time-domain problems too.</p>
   </section>
   <section class="doc-card">
+    <h3><a href="{{ '/adaptive-target/' | relative_url }}">Adaptive Target</a></h3>
+    <p>How DecayCore derives a room-aware target curve from measurement data instead of searching built-in curves.</p>
+  </section>
+  <section class="doc-card">
+    <h3><a href="{{ '/hybrid-iir-fir/' | relative_url }}">Hybrid IIR + FIR Correction</a></h3>
+    <p>Combining narrow IIR biquad cuts with FIR correction for stubborn room modes in the bass region.</p>
+  </section>
+  <section class="doc-card">
     <h3><a href="{{ '/faq/' | relative_url }}">FAQ</a></h3>
     <p>Short answers about measurement, exports, compatibility, and releases.</p>
   </section>
