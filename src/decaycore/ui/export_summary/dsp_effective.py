@@ -48,13 +48,37 @@ def _append_dsp_effective_params(summary_content, data, fs_v):
             _otilt = float(data.get("output_tilt_db_per_oct", 0.0) or 0.0)
             if _otilt != 0.0:
                 summary_content += f"Output tilt: {_otilt:+.1f} dB/oct @ 1 kHz\n"
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("output tilt summary line")
         try:
             psl = str(data.get("plot_smoothing_level", "Psychoacoustic") or "Psychoacoustic").strip()
             psl_display = "DecayCore Reference" if "psy" in psl.lower() else psl
             summary_content += f"Plot smoothing: {psl_display}\n"
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("plot smoothing summary line")
 
         if enable_afdw:
@@ -550,9 +574,33 @@ def _append_dsp_effective_params(summary_content, data, fs_v):
                     picked = [f"{k}={bp[k]}" for k in keys if k in bp]
                     if picked:
                         summary_content += "Best preset: " + ", ".join(picked) + "\n"
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("best preset summary line")
-    except Exception as e:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as e:
         summary_content += "\n=== DSP EFFECTIVE PARAMS (THIS SAMPLE RATE) ===\n"
         summary_content += f"Could not compute effective params: {type(e).__name__}: {e}\n"
 
@@ -587,7 +635,19 @@ def _append_realized_phase_limit(summary_content: str, data, l_st, r_st) -> str:
                 summary_content += f"[{side}] Realized upper limit: {float(realized_hz):.1f} Hz ({source})\n"
             else:
                 summary_content += f"[{side}] Realized upper limit: n/a\n"
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("realized phase limit summary section")
     return summary_content
 
@@ -595,7 +655,7 @@ def _append_realized_phase_limit(summary_content: str, data, l_st, r_st) -> str:
 __all__ = ['_append_dsp_effective_params', '_append_realized_phase_limit']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['runtime', 'bass_integration', 'stereo_policy', 'dsp_effective', 'events']:
@@ -606,4 +666,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

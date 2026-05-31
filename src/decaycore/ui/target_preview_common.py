@@ -20,7 +20,19 @@ def apply_manual_target_preview_shift(target_curve, shift_db: float):
     target_arr = np.asarray(target_curve, dtype=float)
     try:
         shift = float(shift_db)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         shift = 0.0
 
     if not np.isfinite(shift) or abs(shift) <= 1e-9:

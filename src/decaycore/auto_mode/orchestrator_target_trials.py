@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import logging
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
@@ -56,6 +57,38 @@ from .orchestrator_target_types import (
 )
 
 logger = logging.getLogger("DecayCore")
+
+
+@dataclass
+class _TargetTrialDispatch:
+    runtime: object
+    cfg: object
+    optimizer_backend: str
+    optuna_mod: object
+    target_study_sig: str
+    seed_target: int
+    base_tc: dict
+    measurements: dict
+    fs_v: int
+    taps_v: int
+    xos: list
+    hpf: dict | None
+    hc_f_arr: object
+    hc_m_arr: object
+    pin_obj: object
+    filter_key: str
+    phase_tag: str
+    target_name: str
+    phase_kind: str | None
+    n_total_override: int | None
+    seed_presets: list[dict]
+    optuna_builder: object
+    seed_to_params: object
+    compute_ctx: AutoRunComputeContext
+    use_optuna_trials: bool
+    eval_candidates: list[dict]
+    n_total: int
+    workers: int
 
 
 def _target_eval_one(
@@ -114,7 +147,19 @@ def _target_eval_one(
             "bass_smooth_w_max",
             float(trial_data.get("bass_smooth_w_max", 0.45)),
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         # Optional trial-only smoothing knobs may be absent on older config objects.
         pass
 
@@ -191,6 +236,308 @@ def _target_eval_one_proc(
     )
 
 
+def _prepare_target_trial_dispatch(
+    *,
+    runtime,
+    cfg,
+    optimizer_backend: str,
+    optuna_mod,
+    target_study_sig: str,
+    seed_target: int,
+    cands: list[dict],
+    base_tc: dict,
+    measurements: dict,
+    fs_v: int,
+    taps_v: int,
+    xos: list,
+    hpf: dict | None,
+    hc_f_arr,
+    hc_m_arr,
+    pin_obj,
+    filter_key: str,
+    phase_tag: str,
+    target_name: str,
+    phase_kind: str | None,
+    n_total_override: int | None,
+    seed_presets: list[dict] | None,
+    optuna_builder,
+    seed_to_params,
+) -> _TargetTrialDispatch:
+    compute_ctx = AutoRunComputeContext(
+        fs=int(fs_v),
+        taps=int(taps_v),
+        measurement_signature=_auto_get_measurement_signature(measurements),
+        filter_key=str(filter_key or ""),
+        compat_version=str(_auto_compat_version(base_tc)),
+    )
+    use_optuna_trials = bool(
+        str(optimizer_backend) == "optuna"
+        and runtime.auto_optuna_module_ready(optuna_mod)
+        and callable(optuna_builder)
+    )
+    seed_presets_eff = list(seed_presets or [])
+    eval_candidates = list(cands or [])
+    if not bool(use_optuna_trials):
+        eval_candidates = deduplicate_presets([*seed_presets_eff, *eval_candidates])
+    n_total = int(n_total_override) if n_total_override is not None else int(len(eval_candidates))
+    workers = int(runtime.auto_trial_workers(base_tc, n_total)) if n_total > 0 else 0
+    if workers > 1:
+        logger.info(
+            "Automatic mode target trials: target=%s, phase=%s, parallel workers=%d",
+            str(target_name),
+            str(phase_tag),
+            int(workers),
+        )
+    return _TargetTrialDispatch(
+        runtime=runtime,
+        cfg=cfg,
+        optimizer_backend=str(optimizer_backend),
+        optuna_mod=optuna_mod,
+        target_study_sig=str(target_study_sig),
+        seed_target=int(seed_target),
+        base_tc=dict(base_tc or {}),
+        measurements=dict(measurements or {}),
+        fs_v=int(fs_v),
+        taps_v=int(taps_v),
+        xos=list(xos or []),
+        hpf=hpf,
+        hc_f_arr=hc_f_arr,
+        hc_m_arr=hc_m_arr,
+        pin_obj=pin_obj,
+        filter_key=str(filter_key),
+        phase_tag=str(phase_tag),
+        target_name=str(target_name),
+        phase_kind=phase_kind,
+        n_total_override=n_total_override,
+        seed_presets=seed_presets_eff,
+        optuna_builder=optuna_builder,
+        seed_to_params=seed_to_params,
+        compute_ctx=compute_ctx,
+        use_optuna_trials=bool(use_optuna_trials),
+        eval_candidates=list(eval_candidates or []),
+        n_total=int(n_total),
+        workers=int(workers),
+    )
+
+
+def _dispatch_target_trial_eval(*, dispatch: _TargetTrialDispatch, idx: int, preset: dict) -> dict:
+    return _target_eval_one(
+        runtime=dispatch.runtime,
+        preset=dict(preset or {}),
+        base_tc=dispatch.base_tc,
+        measurements=dispatch.measurements,
+        fs_v=int(dispatch.fs_v),
+        taps_v=int(dispatch.taps_v),
+        xos=dispatch.xos,
+        hpf=dispatch.hpf,
+        hc_f_arr=dispatch.hc_f_arr,
+        hc_m_arr=dispatch.hc_m_arr,
+        pin_obj=dispatch.pin_obj,
+        filter_key=dispatch.filter_key,
+        _compute_ctx=dispatch.compute_ctx,
+        _trial_idx=int(idx),
+    )
+
+
+def _run_target_trials_optuna(*, dispatch: _TargetTrialDispatch) -> list[dict]:
+    out_by_idx: dict[int, dict] = {}
+    base_tc_optuna = dict(dispatch.base_tc or {})
+    base_tc_optuna["_optuna_measurement_sig"] = _auto_get_measurement_signature(dispatch.measurements)
+    base_tc_optuna["_optuna_journal_kind"] = "target"
+    base_tc_optuna["_optuna_filter_key"] = str(dispatch.filter_key or "")
+    raw_scope = f"target-{str(dispatch.target_name)}-{str(dispatch.phase_tag)}"
+    scope_eff = dispatch.runtime.auto_optuna_effective_scope(
+        base_tc_optuna,
+        raw_scope,
+        phase_kind=dispatch.phase_kind,
+    )
+    study_name = dispatch.runtime.auto_optuna_study_name(
+        study_sig=dispatch.target_study_sig,
+        scope=scope_eff,
+    )
+
+    def _eval_one(idx: int, preset: dict) -> dict:
+        out = _dispatch_target_trial_eval(
+            dispatch=dispatch,
+            idx=int(idx),
+            preset=dict(preset or {}),
+        )
+        out = dict(out or {})
+        out["idx"] = int(idx)
+        return out
+
+    def _consume_one(idx: int, out: dict) -> bool:
+        out_by_idx[int(idx)] = dict(out or {})
+        return False
+
+    dispatch.runtime.auto_run_optuna_eval_loop(
+        optuna_mod=dispatch.optuna_mod,
+        cfg=dispatch.cfg,
+        n_total=int(dispatch.n_total),
+        seed=int(
+            dispatch.seed_target
+            + sum(ord(ch) for ch in str(dispatch.target_name)) * 31
+            + sum(ord(ch) for ch in str(dispatch.phase_tag)) * 17
+        ),
+        base_data=base_tc_optuna,
+        seed_presets=list(dispatch.seed_presets or []),
+        build_preset=dispatch.optuna_builder,
+        eval_one=_eval_one,
+        consume_one=_consume_one,
+        objective_value=lambda out, _goal=str((dispatch.base_tc or {}).get("auto_goal", "") or ""): dispatch.runtime.auto_optuna_objective_value(
+            dict((out or {}).get("metrics", {}) or {}),
+            use_refine_tiebreak=False,
+            goal=_goal,
+        ),
+        workers=int(dispatch.workers),
+        seed_to_params=dispatch.seed_to_params,
+        study_name=study_name,
+        study_scope=raw_scope,
+        phase_label=f"target {str(dispatch.target_name)} {str(dispatch.phase_tag)}",
+        phase_kind=dispatch.phase_kind,
+        study_user_attrs={
+            "decaycore_kind": "target_search",
+            "decaycore_target_name": str(dispatch.target_name),
+            "decaycore_target_study_sig": str(dispatch.target_study_sig),
+            "decaycore_target_cache_version": 3,
+            "decaycore_filter_key": str(dispatch.filter_key),
+        },
+    )
+    return [
+        dict(
+            out_by_idx.get(
+                int(idx),
+                {"idx": int(idx), "ok": False, "error": "missing worker result"},
+            )
+            or {}
+        )
+        for idx in range(1, int(dispatch.n_total) + 1)
+    ]
+
+
+def _run_target_trials_serial(
+    *,
+    dispatch: _TargetTrialDispatch,
+    idx_presets: list[tuple[int, dict]],
+) -> dict[int, dict]:
+    out_by_idx: dict[int, dict] = {}
+    for idx, preset in idx_presets:
+        try:
+            out = _dispatch_target_trial_eval(
+                dispatch=dispatch,
+                idx=int(idx),
+                preset=dict(preset or {}),
+            )
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ) as exc:
+            out = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+        out_by_idx[int(idx)] = dict(out or {})
+    return out_by_idx
+
+
+def _run_target_trials_parallel(
+    *,
+    dispatch: _TargetTrialDispatch,
+    idx_presets: list[tuple[int, dict]],
+) -> dict[int, dict]:
+    out_by_idx: dict[int, dict] = {}
+    chunk_size = int(_auto_trial_chunk_size(dispatch.workers))
+    executor_cls = ProcessPoolExecutor if _USE_PROCESS_POOL else ThreadPoolExecutor
+    if _USE_PROCESS_POOL:
+        mp_ctx = multiprocessing.get_context("fork")
+        executor_kwargs = {"mp_context": mp_ctx, "initializer": _auto_worker_init}
+    else:
+        executor_kwargs = {}
+    if _USE_PROCESS_POOL:
+        global _PROC_RUNTIME
+        _PROC_RUNTIME = dispatch.runtime
+        global _PROC_COMPUTE_CTX
+        _PROC_COMPUTE_CTX = dispatch.compute_ctx
+    with executor_cls(max_workers=int(dispatch.workers), **executor_kwargs) as executor:
+        for c0 in range(0, int(len(idx_presets)), int(chunk_size)):
+            chunk = idx_presets[c0 : c0 + int(chunk_size)]
+            if _USE_PROCESS_POOL:
+                future_map = {
+                    executor.submit(
+                        _target_eval_one_proc,
+                        preset=dict(preset or {}),
+                        base_tc=dispatch.base_tc,
+                        measurements=dispatch.measurements,
+                        fs_v=int(dispatch.fs_v),
+                        taps_v=int(dispatch.taps_v),
+                        xos=dispatch.xos,
+                        hpf=dispatch.hpf,
+                        hc_f_arr=dispatch.hc_f_arr,
+                        hc_m_arr=dispatch.hc_m_arr,
+                        filter_key=dispatch.filter_key,
+                        _trial_idx=int(idx),
+                    ): int(idx)
+                    for idx, preset in chunk
+                }
+            else:
+                # ThreadPool: ctx is shared across threads; Python GIL makes dict
+                # operations safe, so occasional duplicate computation is the only risk.
+                future_map = {
+                    executor.submit(
+                        _dispatch_target_trial_eval,
+                        dispatch=dispatch,
+                        idx=int(idx),
+                        preset=dict(preset or {}),
+                    ): int(idx)
+                    for idx, preset in chunk
+                }
+            for future in as_completed(list(future_map.keys())):
+                idx = int(future_map.get(future, 0))
+                try:
+                    out = future.result()
+                    if not isinstance(out, dict):
+                        out = {"ok": False, "error": "invalid worker result"}
+                except (
+
+                    AttributeError,
+                    TypeError,
+                    ValueError,
+                    KeyError,
+                    IndexError,
+                    RuntimeError,
+                    OSError,
+                    ImportError,
+                    ModuleNotFoundError,
+                    NameError,
+                ) as exc:
+                    out = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+                out_by_idx[int(idx)] = dict(out or {})
+    return out_by_idx
+
+
+def _collect_target_trial_results(
+    *,
+    idx_presets: list[tuple[int, dict]],
+    out_by_idx: dict[int, dict],
+) -> list[dict]:
+    return [
+        dict(
+            out_by_idx.get(
+                int(idx),
+                {"ok": False, "error": "missing worker result"},
+            )
+            or {}
+        )
+        for idx, _preset in idx_presets
+    ]
+
+
 def _run_target_trials(
     *,
     runtime,
@@ -218,230 +565,58 @@ def _run_target_trials(
     optuna_builder=None,
     seed_to_params=None,
 ) -> list[dict]:
-    # Per-run compute context: caches measurement-fixed preprocess data and
-    # tracks trial boundaries. Lives for the duration of this function call.
-    _compute_ctx = AutoRunComputeContext(
-        fs=int(fs_v),
-        taps=int(taps_v),
-        measurement_signature=_auto_get_measurement_signature(measurements),
-        filter_key=str(filter_key or ""),
-        compat_version=str(_auto_compat_version(base_tc)),
+    dispatch = _prepare_target_trial_dispatch(
+        runtime=runtime,
+        cfg=cfg,
+        optimizer_backend=optimizer_backend,
+        optuna_mod=optuna_mod,
+        target_study_sig=target_study_sig,
+        seed_target=int(seed_target),
+        cands=list(cands or []),
+        base_tc=dict(base_tc or {}),
+        measurements=dict(measurements or {}),
+        fs_v=int(fs_v),
+        taps_v=int(taps_v),
+        xos=list(xos or []),
+        hpf=hpf,
+        hc_f_arr=hc_f_arr,
+        hc_m_arr=hc_m_arr,
+        pin_obj=pin_obj,
+        filter_key=str(filter_key),
+        phase_tag=str(phase_tag),
+        target_name=str(target_name),
+        phase_kind=phase_kind,
+        n_total_override=n_total_override,
+        seed_presets=seed_presets,
+        optuna_builder=optuna_builder,
+        seed_to_params=seed_to_params,
     )
-
-    use_optuna_trials = bool(
-        str(optimizer_backend) == "optuna"
-        and runtime.auto_optuna_module_ready(optuna_mod)
-        and callable(optuna_builder)
-    )
-    eval_candidates = list(cands or [])
-    if not bool(use_optuna_trials):
-        eval_candidates = deduplicate_presets([*list(seed_presets or []), *eval_candidates])
-    n_total = int(n_total_override) if n_total_override is not None else int(len(eval_candidates))
-    if n_total <= 0:
+    if dispatch.n_total <= 0:
         return []
-    workers = int(runtime.auto_trial_workers(base_tc, n_total))
-    if workers > 1:
-        logger.info(
-            "Automatic mode target trials: target=%s, phase=%s, parallel workers=%d",
-            str(target_name),
-            str(phase_tag),
-            int(workers),
+    if bool(dispatch.use_optuna_trials):
+        return _run_target_trials_optuna(dispatch=dispatch)
+
+    idx_presets = list(enumerate(list(dispatch.eval_candidates or []), start=1))
+    if dispatch.workers <= 1 or dispatch.n_total <= 1:
+        out_by_idx = _run_target_trials_serial(
+            dispatch=dispatch,
+            idx_presets=idx_presets,
         )
-
-    if bool(use_optuna_trials):
-        out_by_idx: dict[int, dict] = {}
-        base_tc_optuna = dict(base_tc or {})
-        base_tc_optuna["_optuna_measurement_sig"] = _auto_get_measurement_signature(measurements)
-        base_tc_optuna["_optuna_journal_kind"] = "target"
-        base_tc_optuna["_optuna_filter_key"] = str(filter_key or "")
-        raw_scope = f"target-{str(target_name)}-{str(phase_tag)}"
-        scope_eff = runtime.auto_optuna_effective_scope(
-            base_tc_optuna,
-            raw_scope,
-            phase_kind=phase_kind,
-        )
-        study_name = runtime.auto_optuna_study_name(
-            study_sig=target_study_sig,
-            scope=scope_eff,
-        )
-
-        def _eval_one(idx: int, preset: dict) -> dict:
-            out = _target_eval_one(
-                runtime=runtime,
-                preset=dict(preset or {}),
-                base_tc=base_tc,
-                measurements=measurements,
-                fs_v=int(fs_v),
-                taps_v=int(taps_v),
-                xos=xos,
-                hpf=hpf,
-                hc_f_arr=hc_f_arr,
-                hc_m_arr=hc_m_arr,
-                pin_obj=pin_obj,
-                filter_key=filter_key,
-                _compute_ctx=_compute_ctx,
-                _trial_idx=int(idx),
-            )
-            out = dict(out or {})
-            out["idx"] = int(idx)
-            return out
-
-        def _consume_one(idx: int, out: dict) -> bool:
-            out_by_idx[int(idx)] = dict(out or {})
-            return False
-
-        runtime.auto_run_optuna_eval_loop(
-            optuna_mod=optuna_mod,
-            cfg=cfg,
-            n_total=int(n_total),
-            seed=int(
-                seed_target
-                + sum(ord(ch) for ch in str(target_name)) * 31
-                + sum(ord(ch) for ch in str(phase_tag)) * 17
-            ),
-            base_data=base_tc_optuna,
-            seed_presets=list(seed_presets or []),
-            build_preset=optuna_builder,
-            eval_one=_eval_one,
-            consume_one=_consume_one,
-            objective_value=lambda out, _goal=str((base_tc or {}).get("auto_goal", "") or ""): runtime.auto_optuna_objective_value(
-                dict((out or {}).get("metrics", {}) or {}),
-                use_refine_tiebreak=False,
-                goal=_goal,
-            ),
-            workers=int(workers),
-            seed_to_params=seed_to_params,
-            study_name=study_name,
-            study_scope=raw_scope,
-            phase_label=f"target {str(target_name)} {str(phase_tag)}",
-            phase_kind=phase_kind,
-            study_user_attrs={
-                "decaycore_kind": "target_search",
-                "decaycore_target_name": str(target_name),
-                "decaycore_target_study_sig": str(target_study_sig),
-                "decaycore_target_cache_version": 3,
-                "decaycore_filter_key": str(filter_key),
-            },
-        )
-        return [
-            dict(
-                out_by_idx.get(
-                    int(idx),
-                    {"idx": int(idx), "ok": False, "error": "missing worker result"},
-                )
-                or {}
-            )
-            for idx in range(1, int(n_total) + 1)
-        ]
-
-    idx_presets = list(enumerate(list(eval_candidates or []), start=1))
-    out_by_idx: dict[int, dict] = {}
-    if workers <= 1 or n_total <= 1:
-        for idx, preset in idx_presets:
-            try:
-                out = _target_eval_one(
-                    runtime=runtime,
-                    preset=dict(preset or {}),
-                    base_tc=base_tc,
-                    measurements=measurements,
-                    fs_v=int(fs_v),
-                    taps_v=int(taps_v),
-                    xos=xos,
-                    hpf=hpf,
-                    hc_f_arr=hc_f_arr,
-                    hc_m_arr=hc_m_arr,
-                    pin_obj=pin_obj,
-                    filter_key=filter_key,
-                    _compute_ctx=_compute_ctx,
-                    _trial_idx=int(idx),
-                )
-            except Exception as exc:
-                out = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
-            out_by_idx[int(idx)] = dict(out or {})
     else:
-        chunk_size = int(_auto_trial_chunk_size(workers))
-        _ExecutorCls = ProcessPoolExecutor if _USE_PROCESS_POOL else ThreadPoolExecutor
-        if _USE_PROCESS_POOL:
-            _mp_ctx = multiprocessing.get_context("fork")
-            _executor_kwargs = {"mp_context": _mp_ctx, "initializer": _auto_worker_init}
-        else:
-            _executor_kwargs = {}
-        if _USE_PROCESS_POOL:
-            global _PROC_RUNTIME
-            _PROC_RUNTIME = runtime
-            global _PROC_COMPUTE_CTX
-            _PROC_COMPUTE_CTX = _compute_ctx
-        with _ExecutorCls(max_workers=int(workers), **_executor_kwargs) as executor:
-            for c0 in range(0, int(len(idx_presets)), int(chunk_size)):
-                chunk = idx_presets[c0 : c0 + int(chunk_size)]
-                if _USE_PROCESS_POOL:
-                    future_map = {
-                        executor.submit(
-                            _target_eval_one_proc,
-                            preset=dict(preset or {}),
-                            base_tc=base_tc,
-                            measurements=measurements,
-                            fs_v=int(fs_v),
-                            taps_v=int(taps_v),
-                            xos=xos,
-                            hpf=hpf,
-                            hc_f_arr=hc_f_arr,
-                            hc_m_arr=hc_m_arr,
-                            filter_key=filter_key,
-                            _trial_idx=int(idx),
-                        ): int(idx)
-                        for idx, preset in chunk
-                    }
-                else:
-                    # ThreadPool: ctx is shared across threads; Python GIL makes
-                    # dict operations safe (no corrupted reads), so occasional
-                    # duplicate computation is the only risk.
-                    future_map = {
-                        executor.submit(
-                            _target_eval_one,
-                            runtime=runtime,
-                            preset=dict(preset or {}),
-                            base_tc=base_tc,
-                            measurements=measurements,
-                            fs_v=int(fs_v),
-                            taps_v=int(taps_v),
-                            xos=xos,
-                            hpf=hpf,
-                            hc_f_arr=hc_f_arr,
-                            hc_m_arr=hc_m_arr,
-                            pin_obj=pin_obj,
-                            filter_key=filter_key,
-                            _compute_ctx=_compute_ctx,
-                            _trial_idx=int(idx),
-                        ): int(idx)
-                        for idx, preset in chunk
-                    }
-                for future in as_completed(list(future_map.keys())):
-                    idx = int(future_map.get(future, 0))
-                    try:
-                        out = future.result()
-                        if not isinstance(out, dict):
-                            out = {"ok": False, "error": "invalid worker result"}
-                    except Exception as exc:
-                        out = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
-                    out_by_idx[int(idx)] = dict(out or {})
-
+        out_by_idx = _run_target_trials_parallel(
+            dispatch=dispatch,
+            idx_presets=idx_presets,
+        )
     logger.debug(
         "Target trials compute context stats (target=%s phase=%s):\n%s",
-        str(target_name),
-        str(phase_tag),
-        _compute_ctx.cache_stats_text(),
+        str(dispatch.target_name),
+        str(dispatch.phase_tag),
+        dispatch.compute_ctx.cache_stats_text(),
     )
-    return [
-        dict(
-            out_by_idx.get(
-                int(idx),
-                {"ok": False, "error": "missing worker result"},
-            )
-            or {}
-        )
-        for idx, _preset in idx_presets
-    ]
+    return _collect_target_trial_results(
+        idx_presets=idx_presets,
+        out_by_idx=out_by_idx,
+    )
 
 
 def _materialize_target_candidate(*, tc: dict) -> _TargetEvalMaterialization:
@@ -539,7 +714,19 @@ def _load_target_curve_arrays(
             hc_f_raw, hc_m_raw = runtime.get_house_curve_by_name(hc_name)
             hc_f = np.asarray(hc_f_raw, dtype=float)
             hc_m = np.asarray(hc_m_raw, dtype=float)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None
     if hc_f.size < 4 or hc_m.size != hc_f.size:
         return None

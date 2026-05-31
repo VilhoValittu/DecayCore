@@ -40,6 +40,13 @@ def _slope_passes(g, x, max_db_per_oct):
 
 @numba.njit(cache=True)
 def _slope_passes_asym(g, x, boost, cut):
+    _slope_passes_asym_forward(g, x, boost, cut)
+    _slope_passes_asym_backward(g, x, boost, cut)
+    return g
+
+
+@numba.njit(cache=True)
+def _slope_passes_asym_forward(g, x, boost, cut):
     n = x.size
     for k in range(1, n):
         dx = x[k] - x[k - 1]
@@ -53,6 +60,11 @@ def _slope_passes_asym(g, x, boost, cut):
             g[k] = g[k - 1] + lim
         elif dg < -lim:
             g[k] = g[k - 1] - lim
+
+
+@numba.njit(cache=True)
+def _slope_passes_asym_backward(g, x, boost, cut):
+    n = x.size
     for k in range(n - 2, -1, -1):
         dx = x[k + 1] - x[k]
         if dx <= 0.0:
@@ -65,7 +77,6 @@ def _slope_passes_asym(g, x, boost, cut):
             g[k] = g[k + 1] + lim
         elif dg < -lim:
             g[k] = g[k + 1] - lim
-    return g
 
 
 def soft_clip_gain(gain_db, max_boost_db, max_cut_db):

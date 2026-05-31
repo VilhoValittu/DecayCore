@@ -93,19 +93,55 @@ def _default_make_callbacks(run_started_at: float) -> ProcessRunCallbacks:
     def _elapsed() -> float:
         try:
             return max(0.0, float(time.perf_counter() - run_started_at))
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             return 0.0
 
     def _status(msg: str) -> None:
         try:
             ui_state.update_status(f"{msg} | {_elapsed():.1f} s")
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("status update")
 
     def _set_auto_selected_bar(msg: typing.Any = "") -> None:
         try:
             ui_state.update_auto_selected_bar(msg)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("auto selected bar update")
 
     return ProcessRunCallbacks(status=_status, set_auto_selected_bar=_set_auto_selected_bar)

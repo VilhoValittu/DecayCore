@@ -188,7 +188,19 @@ def _run_optuna_seed_trials(
             )
         try:
             out = eval_one(int(idx_next), dict(preset_eval or {}))
-        except Exception as exc:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ) as exc:
             out = {
                 "idx": int(idx_next),
                 "ok": False,
@@ -223,30 +235,45 @@ def _run_optuna_serial_trials(
     for idx in range(int(idx_next), int(total) + 1):
         trial_obj, preset, params_sig, ask_error = ask_new_trial()
         if trial_obj is None:
-            out = {
-                "idx": int(idx),
-                "ok": False,
-                "error": str(ask_error or "no unique optuna candidate available"),
-            }
-            if consume_one(int(idx), dict(out or {})):
+            if _emit_optuna_ask_failure(
+                idx=int(idx),
+                ask_error=ask_error,
+                consume_one=consume_one,
+                finalize_telemetry=finalize_telemetry,
+            ):
                 return dict(finalize_telemetry() or {})
             continue
-        if pruner is not None:
-            _set_pruning_hook(make_pruning_hook(trial_obj))
+        _maybe_set_pruning_hook(pruner=pruner, make_pruning_hook=make_pruning_hook, trial_obj=trial_obj)
         try:
             out = eval_one(int(idx), dict(preset))
-        except Exception as exc:
-            if trial_pruned_cls is not None and isinstance(exc, trial_pruned_cls):
-                if pruned_state is not None:
-                    try:
-                        study.tell(trial_obj, state=pruned_state)
-                    except Exception:
-                        logger.exception("optuna tell pruned trial")
-                if params_sig:
-                    reserved_signatures.discard(str(params_sig))
-                out = _optuna_pruned_result(idx=int(idx))
-                if consume_one(int(idx), dict(out or {})):
-                    return dict(finalize_telemetry() or {})
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ) as exc:
+            prune_state = _handle_serial_pruned_trial(
+                idx=int(idx),
+                exc=exc,
+                trial_pruned_cls=trial_pruned_cls,
+                pruned_state=pruned_state,
+                study=study,
+                trial_obj=trial_obj,
+                params_sig=params_sig,
+                reserved_signatures=reserved_signatures,
+                consume_one=consume_one,
+                finalize_telemetry=finalize_telemetry,
+            )
+            if prune_state == "consumed":
+                return dict(finalize_telemetry() or {})
+            if prune_state == "continue":
                 continue
             out = {
                 "idx": int(idx),
@@ -259,6 +286,67 @@ def _run_optuna_serial_trials(
         if consume_one(int(idx), dict(out or {})):
             return dict(finalize_telemetry() or {})
     return None
+
+
+def _emit_optuna_ask_failure(
+    *,
+    idx: int,
+    ask_error,
+    consume_one,
+    finalize_telemetry,
+) -> bool:
+    out = {
+        "idx": int(idx),
+        "ok": False,
+        "error": str(ask_error or "no unique optuna candidate available"),
+    }
+    if consume_one(int(idx), dict(out or {})):
+        return True
+    return False
+
+
+def _maybe_set_pruning_hook(*, pruner, make_pruning_hook, trial_obj) -> None:
+    if pruner is not None:
+        _set_pruning_hook(make_pruning_hook(trial_obj))
+
+
+def _handle_serial_pruned_trial(
+    *,
+    idx: int,
+    exc: Exception,
+    trial_pruned_cls,
+    pruned_state,
+    study,
+    trial_obj,
+    params_sig: str | None,
+    reserved_signatures: set[str],
+    consume_one,
+    finalize_telemetry,
+):
+    if trial_pruned_cls is None or not isinstance(exc, trial_pruned_cls):
+        return "not_pruned"
+    if pruned_state is not None:
+        try:
+            study.tell(trial_obj, state=pruned_state)
+        except (
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
+            logger.exception("optuna tell pruned trial")
+    if params_sig:
+        reserved_signatures.discard(str(params_sig))
+    out = _optuna_pruned_result(idx=int(idx))
+    if consume_one(int(idx), dict(out or {})):
+        return "consumed"
+    return "continue"
 
 
 def _run_optuna_parallel_trials(
@@ -312,22 +400,70 @@ def _run_optuna_parallel_trials(
             chunk_out: dict[int, dict] = {}
             for fut in as_completed(list(fut_map.keys())):
                 idx, trial_obj, params_sig = fut_map.get(fut, (0, None, ""))
-                try:
-                    out = fut.result()
-                    if not isinstance(out, dict):
-                        out = {"idx": int(idx), "ok": False, "error": "invalid worker result"}
-                except Exception as exc:
+                out = None
+                exc = None
+                if trial_pruned_cls is not None:
+                    try:
+                        out = fut.result()
+                    except trial_pruned_cls as pruned_exc:
+                        exc = pruned_exc
+                    except (
+
+                        AttributeError,
+                        TypeError,
+                        ValueError,
+                        KeyError,
+                        IndexError,
+                        RuntimeError,
+                        OSError,
+                        ImportError,
+                        ModuleNotFoundError,
+                        NameError,
+                    ) as recoverable_exc:
+                        exc = recoverable_exc
+                else:
+                    try:
+                        out = fut.result()
+                    except (
+
+                        AttributeError,
+                        TypeError,
+                        ValueError,
+                        KeyError,
+                        IndexError,
+                        RuntimeError,
+                        OSError,
+                        ImportError,
+                        ModuleNotFoundError,
+                        NameError,
+                    ) as recoverable_exc:
+                        exc = recoverable_exc
+                if exc is not None:
                     if trial_pruned_cls is not None and isinstance(exc, trial_pruned_cls):
                         if trial_obj is not None and pruned_state is not None:
                             try:
                                 study.tell(trial_obj, state=pruned_state)
-                            except Exception:
+                            except (
+
+                                AttributeError,
+                                TypeError,
+                                ValueError,
+                                KeyError,
+                                IndexError,
+                                RuntimeError,
+                                OSError,
+                                ImportError,
+                                ModuleNotFoundError,
+                                NameError,
+                            ):
                                 logger.exception("optuna tell pruned trial in parallel")
                         if params_sig:
                             reserved_signatures.discard(str(params_sig))
                         chunk_out[int(idx)] = _optuna_pruned_result(idx=int(idx))
                         continue
                     out = {"idx": int(idx), "ok": False, "error": f"{type(exc).__name__}: {exc}"}
+                if not isinstance(out, dict):
+                    out = {"idx": int(idx), "ok": False, "error": "invalid worker result"}
                 tell_trial(trial_obj, out, params_sig=params_sig, source="optuna")
                 chunk_out[int(idx)] = dict(out or {})
 

@@ -21,7 +21,19 @@ logger = logging.getLogger("DecayCore")
 def _irwin_tag(mode: Any) -> str:
     try:
         m = str(mode or "auto").strip().lower()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         m = "auto"
     if m == "rew_sym":
         return "sym"
@@ -129,13 +141,37 @@ def _ensure_scoring_keys(st: dict | None, f_in, m_in, hc_f, hc_m):
                 hm = np.asarray(hc_m if hc_m is not None else [], dtype=float)
                 if f.size > 1 and hf.size > 1 and hm.size > 1:
                     st["target_mags"] = np.interp(f, hf, hm)
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.exception("target mags interpolate")
 
         if st.get("confidence_mask") is None and f.size > 1:
             st["confidence_mask"] = np.ones_like(f, dtype=float)
         return st
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return st
 
 
@@ -167,14 +203,38 @@ def _inject_filter_mags_for_ui(st: dict | None, filt_ir, fs: int):
         f_q = np.clip(f_axis, float(np.min(f_fft)), float(np.max(f_fft)))
         st[key_g] = np.interp(f_q, f_fft, g_db).tolist()
         st[f"{key_g}_source"] = "ir_fft_final"
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return
 
 
 def _gd_abs_spread_ms(gd_ms, *, mask=None) -> float | None:
     try:
         gd = np.asarray(gd_ms, dtype=float).reshape(-1)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None
     if gd.size == 0:
         return None
@@ -183,7 +243,19 @@ def _gd_abs_spread_ms(gd_ms, *, mask=None) -> float | None:
     if mask is not None:
         try:
             band_mask = np.asarray(mask, dtype=bool).reshape(-1)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             return None
         if band_mask.size != gd.size:
             return None
@@ -223,7 +295,19 @@ def _inject_filter_gd_stats(st: dict | None, filt_ir, fs: int, lo_hz: float = 20
             st["gd_abs_max_20_500_ms"] = None
         else:
             st["gd_abs_max_20_500_ms"] = float(gd_range)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         if isinstance(st, dict):
             st["gd_abs_max_20_500_ms"] = None
 
@@ -237,7 +321,19 @@ def _avg_confidence_pct(st: dict) -> float:
         if v is not None:
             try:
                 return float(v)
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.exception("cmp_avg_confidence parse")
         cm_src = st.get("cmp_confidence_mask", None)
         cm = np.asarray(cm_src if cm_src is not None else [], dtype=float)
@@ -248,7 +344,19 @@ def _avg_confidence_pct(st: dict) -> float:
     if v is not None:
         try:
             return float(v)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("avg_confidence parse")
     cm_src = st.get("confidence_mask", None)
     cm = np.asarray(cm_src if cm_src is not None else [], dtype=float)

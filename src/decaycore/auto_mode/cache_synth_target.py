@@ -83,7 +83,19 @@ def get_or_build_synth_target(
             smooth_oct=float(smooth_oct),
             measurements=measurements,
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         result = None
     with _SYNTH_TARGET_CACHE_LOCK:
         hit = _SYNTH_TARGET_CACHE.get(key, _SYNTH_TARGET_MISS)

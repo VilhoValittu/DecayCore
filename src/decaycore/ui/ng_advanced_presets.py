@@ -262,14 +262,38 @@ def _render_summary(scope_name: str, summary: str) -> None:
         container.clear()
         with container:
             ui.label(summary).classes("w-full text-sm text-gray-300").style("white-space: normal; line-height: 1.5;")
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return
 
 
 def _as_float(value: object, default: float) -> float:
     try:
         return float(value)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return float(default)
 
 

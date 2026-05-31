@@ -74,7 +74,19 @@ _TARGET_PREVIEW_PLOT = None
 def _step_manual_target(delta_db: float) -> None:
     try:
         cur = float(ctrl.value("lvl_manual_db", 0.0) or 0.0)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         cur = 0.0
 
     nxt = round((float(cur) + float(delta_db)) * 10.0) / 10.0
@@ -84,7 +96,19 @@ def _step_manual_target(delta_db: float) -> None:
 def _step_manual_target_tilt(delta_db_per_oct: float) -> None:
     try:
         cur = float(ctrl.value("manual_target_tilt_db_per_oct", 0.0) or 0.0)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         cur = 0.0
 
     nxt = round((float(cur) + float(delta_db_per_oct)) * 10.0) / 10.0
@@ -329,7 +353,19 @@ def refresh_target_preview() -> None:
     else:
         try:
             _TARGET_PREVIEW_PLOT.update_figure(fig)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             _TARGET_PREVIEW_PLOT = _mount_target_preview_plot(preview_col, fig)
     _TARGET_PREVIEW_DRAG_ACTIVE = False
 
@@ -439,14 +475,38 @@ def _build_target_preview_fig():
                 x = float(v)
                 if math.isfinite(x):
                     return x
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.exception("float parse in target preview")
             return float(default)
 
         def _smooth_for_preview(freq_axis, m):
             try:
                 return _psycho_smooth(freq_axis, np.asarray(m, dtype=float))
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 return m
 
         # --- collect ctrl values ---
@@ -490,7 +550,19 @@ def _build_target_preview_fig():
                     if tf_f.size >= 2 and tf_m.size == tf_f.size:
                         target_curve = np.interp(freq_axis, tf_f, tf_m, left=tf_m[0], right=tf_m[-1])
                         src = "Custom upload"
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.exception("custom target curve load")
 
         if target_curve is None:
@@ -517,7 +589,19 @@ def _build_target_preview_fig():
                     return m_curve
                 diff = np.nanmedian(t_curve[mask] - np.asarray(m_curve, dtype=float)[mask])
                 return np.asarray(m_curve, dtype=float) + diff
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 return m_curve
 
         speaker_interp = {}
@@ -559,7 +643,19 @@ def _build_target_preview_fig():
                     if ff.size < 8 or mm.size != ff.size:
                         return None
                     return np.interp(freq_axis, ff, mm, left=mm[0], right=mm[-1])
-                except Exception:
+                except (
+
+                    AttributeError,
+                    TypeError,
+                    ValueError,
+                    KeyError,
+                    IndexError,
+                    RuntimeError,
+                    OSError,
+                    ImportError,
+                    ModuleNotFoundError,
+                    NameError,
+                ):
                     return None
 
             for ch in ("L", "R"):
@@ -822,7 +918,19 @@ def _build_target_preview_fig():
         }
         return fig_dict, drag_base_points, tilt_handle_points
 
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         import logging  # noqa: PLC0415
         logging.getLogger("DecayCore").warning("_build_target_preview_fig failed", exc_info=True)
         return None, [], []
@@ -831,7 +939,7 @@ def _build_target_preview_fig():
 __all__ = ['_step_manual_target', '_step_manual_target_tilt', 'build_target_tab', 'refresh_target_preview', '_mount_target_preview_plot', '_schedule_target_preview_refresh', '_on_target_preview_relayout', '_build_target_preview_fig']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['ng_tab_target_01']:
@@ -842,4 +950,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

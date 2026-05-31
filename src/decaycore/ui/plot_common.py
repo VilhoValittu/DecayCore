@@ -22,6 +22,15 @@ GD_SMOOTH_OCT = 0.1
 GD_SMOOTH_SIGMA = 0.1
 logger = logging.getLogger("DecayCore")
 
+_RECOVERABLE_PLOT_EXCEPTIONS = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    RuntimeError,
+    OverflowError,
+    FloatingPointError,
+)
+
 
 def _maybe_shift_to_abs(mags_db, avg_t_db):
     try:
@@ -34,7 +43,7 @@ def _maybe_shift_to_abs(mags_db, avg_t_db):
         if np.isfinite(med) and (-20.0 < med < 40.0):
             return a + float(avg_t_db)
         return a
-    except Exception:
+    except _RECOVERABLE_PLOT_EXCEPTIONS:
         return np.asarray(mags_db, dtype=float)
 
 
@@ -56,7 +65,7 @@ def _align_meas_to_target_window(freqs_hz, meas_db, targ_db, f_min_hz, f_max_hz)
         if not np.isfinite(off):
             return m
         return m - off
-    except Exception:
+    except _RECOVERABLE_PLOT_EXCEPTIONS:
         return np.asarray(meas_db, dtype=float)
 
 
@@ -93,7 +102,7 @@ def _prepare_curve_for_target_plot(
             if np.isfinite(off):
                 return m_abs - off
         return m_abs
-    except Exception:
+    except _RECOVERABLE_PLOT_EXCEPTIONS:
         return np.asarray(mags_db, dtype=float)
 
 
@@ -122,7 +131,7 @@ def _confidence_bad_segments(
     try:
         f = np.asarray(freqs, dtype=float)
         c = np.asarray(conf_mask, dtype=float)
-    except Exception:
+    except _RECOVERABLE_PLOT_EXCEPTIONS:
         return []
     if f.size != c.size or f.size < 8:
         return []
@@ -198,7 +207,7 @@ def calculate_clean_gd(freqs, complex_resp, *, sigma: float = GD_SMOOTH_SIGMA):
     gd_ms = np.nan_to_num(gd_ms, nan=0.0, posinf=0.0, neginf=0.0)
     try:
         sigma_v = float(sigma)
-    except Exception:
+    except _RECOVERABLE_PLOT_EXCEPTIONS:
         sigma_v = float(GD_SMOOTH_SIGMA)
     if sigma_v > 0.0:
         gd_ms = scipy.ndimage.gaussian_filter1d(gd_ms, sigma=sigma_v)
@@ -219,7 +228,7 @@ def remove_ir_peak_delay(freqs, complex_resp, ir, fs):
         delay_s = float(peak_idx) / fs_v
         rot = np.exp(1j * 2.0 * np.pi * f * delay_s)
         return h * rot, delay_s * 1000.0
-    except Exception:
+    except _RECOVERABLE_PLOT_EXCEPTIONS:
         return np.asarray(complex_resp, dtype=complex).reshape(-1), 0.0
 
 
@@ -247,8 +256,56 @@ def _filter_focus_band(freqs, filt_db, *, delta_db: float = 0.75) -> tuple[float
         if hi <= lo:
             return None
         return lo, hi
-    except Exception:
+    except _RECOVERABLE_PLOT_EXCEPTIONS:
         return None
+
+
+def _axis_valid_mask(
+    freqs: np.ndarray,
+    values: np.ndarray,
+    *,
+    focus_band: tuple[float, float] | None,
+) -> np.ndarray:
+    valid = np.isfinite(freqs) & np.isfinite(values)
+    if focus_band is not None:
+        lo_f, hi_f = focus_band
+        valid &= (freqs >= float(lo_f)) & (freqs <= float(hi_f))
+    if np.count_nonzero(valid) < 12:
+        valid = np.isfinite(values)
+    return valid
+
+
+def _axis_quantile_bounds(values: np.ndarray, q_lo: float, q_hi: float) -> tuple[float, float]:
+    lo = float(np.quantile(values, float(q_lo)))
+    hi = float(np.quantile(values, float(q_hi)))
+    if np.isfinite(lo) and np.isfinite(hi) and hi > lo:
+        return lo, hi
+    lo = float(np.min(values))
+    hi = float(np.max(values))
+    return lo, hi
+
+
+def _axis_apply_padding(lo: float, hi: float, *, pad_ratio: float) -> tuple[float, float]:
+    span = float(hi - lo)
+    return lo - span * float(pad_ratio), hi + span * float(pad_ratio)
+
+
+def _axis_apply_min_span(lo: float, hi: float, *, min_span: float) -> tuple[float, float]:
+    if (hi - lo) >= float(min_span):
+        return lo, hi
+    mid = 0.5 * (hi + lo)
+    return mid - 0.5 * float(min_span), mid + 0.5 * float(min_span)
+
+
+def _axis_include_zero(lo: float, hi: float) -> tuple[float, float]:
+    return min(lo, 0.0), max(hi, 0.0)
+
+
+def _axis_apply_max_span(lo: float, hi: float, *, max_span: float, include_zero: bool) -> tuple[float, float]:
+    if (hi - lo) <= float(max_span):
+        return lo, hi
+    center = 0.0 if include_zero else 0.5 * (hi + lo)
+    return center - 0.5 * float(max_span), center + 0.5 * float(max_span)
 
 
 def _robust_axis_range(
@@ -266,44 +323,25 @@ def _robust_axis_range(
     try:
         f = np.asarray(freqs, dtype=float).reshape(-1)
         y = np.asarray(values, dtype=float).reshape(-1)
-        valid = np.isfinite(f) & np.isfinite(y)
-        if focus_band is not None:
-            lo_f, hi_f = focus_band
-            valid &= (f >= float(lo_f)) & (f <= float(hi_f))
-        if np.count_nonzero(valid) < 12:
-            valid = np.isfinite(y)
+        valid = _axis_valid_mask(f, y, focus_band=focus_band)
         if np.count_nonzero(valid) < 4:
             return None
         yy = y[valid]
-        lo = float(np.quantile(yy, float(q_lo)))
-        hi = float(np.quantile(yy, float(q_hi)))
-        if not (np.isfinite(lo) and np.isfinite(hi)) or hi <= lo:
-            lo = float(np.min(yy))
-            hi = float(np.max(yy))
+        lo, hi = _axis_quantile_bounds(yy, q_lo, q_hi)
         if hi <= lo:
             mid = float(lo)
             lo = mid - 0.5 * float(min_span)
             hi = mid + 0.5 * float(min_span)
-        span = float(hi - lo)
-        lo -= span * float(pad_ratio)
-        hi += span * float(pad_ratio)
+        lo, hi = _axis_apply_padding(lo, hi, pad_ratio=pad_ratio)
         if include_zero:
-            lo = min(lo, 0.0)
-            hi = max(hi, 0.0)
-        span = float(hi - lo)
-        if span < float(min_span):
-            mid = 0.5 * (hi + lo)
-            lo = mid - 0.5 * float(min_span)
-            hi = mid + 0.5 * float(min_span)
+            lo, hi = _axis_include_zero(lo, hi)
+        lo, hi = _axis_apply_min_span(lo, hi, min_span=min_span)
         if include_zero:
-            lo = min(lo, 0.0)
-            hi = max(hi, 0.0)
-        if max_span is not None and (hi - lo) > float(max_span):
-            center = 0.0 if include_zero else 0.5 * (hi + lo)
-            lo = center - 0.5 * float(max_span)
-            hi = center + 0.5 * float(max_span)
+            lo, hi = _axis_include_zero(lo, hi)
+        if max_span is not None:
+            lo, hi = _axis_apply_max_span(lo, hi, max_span=float(max_span), include_zero=include_zero)
         return [float(lo), float(hi)]
-    except Exception:
+    except _RECOVERABLE_PLOT_EXCEPTIONS:
         return None
 
 
@@ -321,7 +359,7 @@ def _view_mags_for_plot(freqs, mags, *, plot_smoothing_level="Psychoacoustic"):
 
     try:
         lvl = int(psl)
-    except Exception:
+    except _RECOVERABLE_PLOT_EXCEPTIONS:
         return m
 
     lvl = max(1, lvl)

@@ -40,10 +40,34 @@ def _auto_cache_path(*, compat_version: str | None = None) -> str:
 
     try:
         os.makedirs(preferred_base, exist_ok=True)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         try:
             os.makedirs(legacy_base, exist_ok=True)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("cache dir create fallback")
         return legacy_path
 
@@ -67,17 +91,53 @@ def _auto_cache_path(*, compat_version: str | None = None) -> str:
         if (not os.path.isfile(preferred_path)) and source_path:
             try:
                 os.replace(source_path, preferred_path)
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 with open(source_path, "rb") as src_f:
                     payload = src_f.read()
                 with open(preferred_path, "wb") as dst_f:
                     dst_f.write(payload)
                 try:
                     os.remove(source_path)
-                except Exception:
+                except (
+
+                    AttributeError,
+                    TypeError,
+                    ValueError,
+                    KeyError,
+                    IndexError,
+                    RuntimeError,
+                    OSError,
+                    ImportError,
+                    ModuleNotFoundError,
+                    NameError,
+                ):
                     logger.exception("cache source file remove after copy")
             logger.info(f"Automatic mode cache migrated to: {preferred_path}")
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return legacy_path
 
     return preferred_path

@@ -330,76 +330,24 @@ def _attach_modal_support_to_residual_metrics(residual_metrics: dict, modal_metr
         "cut_priority": 0.0,
         "modal_priority": 0.0,
     }
-    # Build harmonic-series membership from modal events once for all peaks.
-    modal_events_list = [
-        dict(e) for e in list(dict(modal_metrics or {}).get("modal_events", []) or [])
-        if isinstance(e, dict)
-    ]
-    harmonic_partners = _detect_modal_harmonic_series(modal_events_list)
-    modal_event_freqs = [
-        shared._auto_safe_float(e.get("freq_hz", float("nan")), float("nan"))
-        for e in modal_events_list
-    ]
+    harmonic_partners, modal_event_freqs = _modal_event_support_context(modal_metrics)
 
     for raw in list(out.get("residual_peak_candidates", []) or []):
         if not isinstance(raw, dict):
             continue
         peak = dict(raw)
-        freq = shared._auto_safe_float(peak.get("freq_hz"), float("nan"))
-        width_oct = shared._auto_safe_float(peak.get("width_oct"), float("nan"))
-        if np.isfinite(freq) and float(freq) > 0.0:
-            if not np.isfinite(width_oct) or float(width_oct) <= 0.0:
-                width_oct = 1.0 / 8.0
-            half = max(1.0 / 48.0, 0.5 * float(width_oct))
-            f_min = float(freq) / float(2.0**half)
-            f_max = float(freq) * float(2.0**half)
-            support = _modal_support_for_band_from_metrics(
-                modal_metrics,
-                f_min=f_min,
-                f_max=f_max,
-                channel=str(peak.get("channel", "") or ""),
-            )
-        else:
-            support = dict(strongest)
-        priority = float(
-            np.clip(
-                float(support.get("support", 0.0) or 0.0)
-                * max(float(support.get("max_severity", 0.0) or 0.0), float(support.get("cut_priority", 0.0) or 0.0))
-                * max(float(support.get("confidence", 0.0) or 0.0), 0.35),
-                0.0,
-                1.0,
-            )
+        support = _modal_support_for_residual_peak(peak, modal_metrics, strongest)
+        priority, harmonic_partner_count = _modal_priority_with_harmonics(
+            support,
+            modal_event_freqs=modal_event_freqs,
+            harmonic_partners=harmonic_partners,
         )
-        # Harmonic series membership boost: if the dominant modal event for this
-        # residual peak is part of a recognisable harmonic series, boost priority
-        # by up to +0.15 (capped at 1.0).  This reflects that a peak at a series
-        # member frequency is more likely a correctable room mode than an isolated
-        # structural resonance.
-        dom_hz = support.get("dominant_freq_hz")
-        harmonic_partner_count = 0
-        if dom_hz is not None and np.isfinite(shared._auto_safe_float(dom_hz, float("nan"))):
-            best_dist = float("inf")
-            best_idx = -1
-            for idx, ef in enumerate(modal_event_freqs):
-                if not np.isfinite(ef) or ef <= 0.0:
-                    continue
-                d = abs(float(np.log2(float(dom_hz) / float(ef))))
-                if d < best_dist:
-                    best_dist = d
-                    best_idx = idx
-            if best_idx >= 0 and best_dist < 0.12:
-                harmonic_partner_count = int(harmonic_partners.get(best_idx, 0))
-        harmonic_boost = float(np.clip(0.10 * float(harmonic_partner_count), 0.0, 0.15))
-        priority = float(np.clip(priority + harmonic_boost, 0.0, 1.0))
-
-        peak["modal_support"] = float(support.get("support", 0.0) or 0.0)
-        peak["modal_max_severity"] = float(support.get("max_severity", 0.0) or 0.0)
-        peak["modal_confidence"] = float(support.get("confidence", 0.0) or 0.0)
-        peak["modal_priority"] = float(priority)
-        peak["harmonic_partner_count"] = int(harmonic_partner_count)
-        peak["harmonic_series_member"] = bool(harmonic_partner_count > 0)
-        peak["modal_dominant_freq_hz"] = support.get("dominant_freq_hz")
-        peak["modal_safe_cut_db"] = float(support.get("safe_cut_db", 0.0) or 0.0)
+        _attach_peak_modal_fields(
+            peak,
+            support=support,
+            priority=priority,
+            harmonic_partner_count=harmonic_partner_count,
+        )
         peaks.append(peak)
         if priority > float(strongest.get("modal_priority", 0.0) or 0.0):
             strongest = dict(support)
@@ -412,6 +360,102 @@ def _attach_modal_support_to_residual_metrics(residual_metrics: dict, modal_metr
     out["residual_peak_modal_dominant_freq_hz"] = strongest.get("dominant_freq_hz")
     out["residual_peak_modal_event_count"] = int(strongest.get("event_count", 0) or 0)
     return out
+
+
+def _modal_event_support_context(modal_metrics: dict) -> tuple[dict[int, int], list[float]]:
+    modal_events_list = [
+        dict(event)
+        for event in list(dict(modal_metrics or {}).get("modal_events", []) or [])
+        if isinstance(event, dict)
+    ]
+    harmonic_partners = _detect_modal_harmonic_series(modal_events_list)
+    modal_event_freqs = [
+        shared._auto_safe_float(event.get("freq_hz", float("nan")), float("nan"))
+        for event in modal_events_list
+    ]
+    return harmonic_partners, modal_event_freqs
+
+
+def _modal_support_for_residual_peak(peak: dict, modal_metrics: dict, fallback_support: dict) -> dict:
+    freq = shared._auto_safe_float(peak.get("freq_hz"), float("nan"))
+    width_oct = shared._auto_safe_float(peak.get("width_oct"), float("nan"))
+    if not (np.isfinite(freq) and float(freq) > 0.0):
+        return dict(fallback_support)
+    if not np.isfinite(width_oct) or float(width_oct) <= 0.0:
+        width_oct = 1.0 / 8.0
+    half = max(1.0 / 48.0, 0.5 * float(width_oct))
+    f_min = float(freq) / float(2.0**half)
+    f_max = float(freq) * float(2.0**half)
+    return _modal_support_for_band_from_metrics(
+        modal_metrics,
+        f_min=f_min,
+        f_max=f_max,
+        channel=str(peak.get("channel", "") or ""),
+    )
+
+
+def _modal_priority_with_harmonics(
+    support: dict,
+    *,
+    modal_event_freqs: list[float],
+    harmonic_partners: dict[int, int],
+) -> tuple[float, int]:
+    base_priority = float(
+        np.clip(
+            float(support.get("support", 0.0) or 0.0)
+            * max(float(support.get("max_severity", 0.0) or 0.0), float(support.get("cut_priority", 0.0) or 0.0))
+            * max(float(support.get("confidence", 0.0) or 0.0), 0.35),
+            0.0,
+            1.0,
+        )
+    )
+    harmonic_partner_count = _modal_harmonic_partner_count(
+        support.get("dominant_freq_hz"),
+        modal_event_freqs=modal_event_freqs,
+        harmonic_partners=harmonic_partners,
+    )
+    harmonic_boost = float(np.clip(0.10 * float(harmonic_partner_count), 0.0, 0.15))
+    return float(np.clip(base_priority + harmonic_boost, 0.0, 1.0)), int(harmonic_partner_count)
+
+
+def _modal_harmonic_partner_count(
+    dominant_hz,
+    *,
+    modal_event_freqs: list[float],
+    harmonic_partners: dict[int, int],
+) -> int:
+    dom_hz = shared._auto_safe_float(dominant_hz, float("nan"))
+    if not np.isfinite(dom_hz):
+        return 0
+    best_dist = float("inf")
+    best_idx = -1
+    for idx, event_freq in enumerate(modal_event_freqs):
+        if not np.isfinite(event_freq) or event_freq <= 0.0:
+            continue
+        dist = abs(float(np.log2(float(dom_hz) / float(event_freq))))
+        if dist < best_dist:
+            best_dist = dist
+            best_idx = idx
+    if best_idx >= 0 and best_dist < 0.12:
+        return int(harmonic_partners.get(best_idx, 0))
+    return 0
+
+
+def _attach_peak_modal_fields(
+    peak: dict,
+    *,
+    support: dict,
+    priority: float,
+    harmonic_partner_count: int,
+) -> None:
+    peak["modal_support"] = float(support.get("support", 0.0) or 0.0)
+    peak["modal_max_severity"] = float(support.get("max_severity", 0.0) or 0.0)
+    peak["modal_confidence"] = float(support.get("confidence", 0.0) or 0.0)
+    peak["modal_priority"] = float(priority)
+    peak["harmonic_partner_count"] = int(harmonic_partner_count)
+    peak["harmonic_series_member"] = bool(harmonic_partner_count > 0)
+    peak["modal_dominant_freq_hz"] = support.get("dominant_freq_hz")
+    peak["modal_safe_cut_db"] = float(support.get("safe_cut_db", 0.0) or 0.0)
 
 
 def _modal_residual_fallback_metrics(

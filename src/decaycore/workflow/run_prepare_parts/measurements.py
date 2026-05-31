@@ -58,15 +58,51 @@ logger = logging.getLogger("DecayCore")
 def _get_wav_window_params(data: dict) -> tuple[float, float, int]:
     try:
         pre_ms = float(data.get("ir_window_left", 85.0) or 85.0)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         pre_ms = 85.0
     try:
         post_ms = float(data.get("ir_window_right", data.get("ir_window", 500.0)) or 500.0)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         post_ms = 500.0
     try:
         smoothing_level = int(data.get("smoothing_level", 0) or 0)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         smoothing_level = 0
     return float(pre_ms), float(post_ms), int(smoothing_level)
 
@@ -164,7 +200,19 @@ def _prepare_ui_and_measurements(
         hr = compute_health(data, mode)
         if support.ui_bridge.toast_health_gate_result(hr, mode):
             return None
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("health gate check")
 
     ir_export_window_mode = data.get("ir_export_window_mode")
@@ -174,7 +222,19 @@ def _prepare_ui_and_measurements(
 
     try:
         sh = str(data.get("ir_export_window_shape", "hann") or "hann").strip().lower()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         sh = "hann"
     if sh not in ("hann", "tukey"):
         sh = "hann"
@@ -182,7 +242,19 @@ def _prepare_ui_and_measurements(
 
     try:
         alpha = float(data.get("ir_export_tukey_alpha", 0.25))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         alpha = 0.25
     if not math.isfinite(alpha):
         alpha = 0.25
@@ -194,7 +266,19 @@ def _prepare_ui_and_measurements(
             data["ir_window_mode"] = "rew_asym"
             data["ir_export_window_shape"] = "tukey"
             data["ir_export_tukey_alpha"] = 0.25
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("asymmetric filter window mode set")
 
     taps_base = int(float(data.get("taps", 65536) or 65536))
@@ -361,7 +445,7 @@ def _prepare_ui_and_measurements(
 __all__ = ['_get_wav_window_params', '_extract_generated_source_rt60', '_extract_generated_source_snr', '_load_generated_measurement_pair', '_prepare_ui_and_measurements']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['bass_diagnostics', 'measurements', 'target_context']:
@@ -372,4 +456,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

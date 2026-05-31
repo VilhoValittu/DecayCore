@@ -22,7 +22,19 @@ def _auto_metric_summary(values) -> dict:
             fv = float(v)
             if np.isfinite(fv):
                 vals.append(float(fv))
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             pass
 
     if not vals:
@@ -46,7 +58,19 @@ def _auto_metric_summary_text(name: str, summary: dict | None, ndigits: int = 3)
             fx = float(x)
             if np.isfinite(fx):
                 return f"{fx:.{int(ndigits)}f}"
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             pass
         return "n/a"
 
@@ -122,7 +146,19 @@ def _auto_optuna_fmt_value(v, ndigits: int = 3) -> str:
         fv = float(v)
         if np.isfinite(fv):
             return f"{fv:.{int(ndigits)}f}"
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         pass
     return "n/a"
 
@@ -154,35 +190,54 @@ def _auto_optuna_telemetry_text_ex(tel: dict | None, *, include_phase_kind: bool
         parts.append(f"dup={dup_n}")
 
     if bool(t.get("constraints_active", False)):
-        cflags = dict(t.get("constraint_flags", {}) or {})
-        thr = dict(t.get("constraint_thresholds", {}) or {})
-        feas_n = int(t.get("feasible_trials", 0) or 0)
-        infeas_n = int(t.get("infeasible_trials", 0) or 0)
-        parts.append(f"feas={feas_n}/{feas_n + infeas_n}")
-        if not bool(cflags.get("use_events", True)):
-            parts.append("events=off")
-        ripple_thr = thr.get("max_mode_ripple_db", None)
-        if ripple_thr is not None:
-            parts.append(f"ripple<={_auto_optuna_fmt_value(ripple_thr, 3)}")
-        best_raw = t.get("best_raw_value", None)
-        best_feas = t.get("best_feasible_value", None)
-        if best_raw is not None:
-            parts.append(f"raw={_auto_optuna_fmt_value(best_raw, 3)}")
-        if best_feas is not None:
-            parts.append(f"best={_auto_optuna_fmt_value(best_feas, 3)}")
-
-        vc = dict(t.get("violation_counts", {}) or {})
-        vr = int(vc.get("ripple", 0) or 0)
-        ve = int(vc.get("events", 0) or 0)
-        vb = int(vc.get("boost", 0) or 0)
-        if (vr + ve + vb) > 0:
-            parts.append(f"viol r/e/b={vr}/{ve}/{vb}")
+        parts.extend(_auto_optuna_constraint_summary_parts(t))
     else:
-        best_raw = t.get("best_raw_value", None)
-        if best_raw is not None:
-            parts.append(f"best={_auto_optuna_fmt_value(best_raw, 3)}")
+        _auto_optuna_append_best_only(parts, t.get("best_raw_value", None))
 
     return ", ".join(parts)
+
+
+def _auto_optuna_constraint_summary_parts(tel: dict) -> list[str]:
+    parts: list[str] = []
+    cflags = dict(tel.get("constraint_flags", {}) or {})
+    thr = dict(tel.get("constraint_thresholds", {}) or {})
+    feas_n = int(tel.get("feasible_trials", 0) or 0)
+    infeas_n = int(tel.get("infeasible_trials", 0) or 0)
+    parts.append(f"feas={feas_n}/{feas_n + infeas_n}")
+    if not bool(cflags.get("use_events", True)):
+        parts.append("events=off")
+    ripple_thr = thr.get("max_mode_ripple_db", None)
+    if ripple_thr is not None:
+        parts.append(f"ripple<={_auto_optuna_fmt_value(ripple_thr, 3)}")
+    _auto_optuna_append_best_values(parts, tel)
+    violation_part = _auto_optuna_violation_part(tel)
+    if violation_part:
+        parts.append(violation_part)
+    return parts
+
+
+def _auto_optuna_append_best_only(parts: list[str], best_raw) -> None:
+    if best_raw is not None:
+        parts.append(f"best={_auto_optuna_fmt_value(best_raw, 3)}")
+
+
+def _auto_optuna_append_best_values(parts: list[str], tel: dict) -> None:
+    best_raw = tel.get("best_raw_value", None)
+    best_feas = tel.get("best_feasible_value", None)
+    if best_raw is not None:
+        parts.append(f"raw={_auto_optuna_fmt_value(best_raw, 3)}")
+    if best_feas is not None:
+        parts.append(f"best={_auto_optuna_fmt_value(best_feas, 3)}")
+
+
+def _auto_optuna_violation_part(tel: dict) -> str:
+    vc = dict(tel.get("violation_counts", {}) or {})
+    vr = int(vc.get("ripple", 0) or 0)
+    ve = int(vc.get("events", 0) or 0)
+    vb = int(vc.get("boost", 0) or 0)
+    if (vr + ve + vb) <= 0:
+        return ""
+    return f"viol r/e/b={vr}/{ve}/{vb}"
 
 def _auto_optuna_events_debug_text(tel: dict | None, ndigits: int = 3) -> str:
     t = dict(tel or {})
@@ -197,7 +252,19 @@ def _auto_optuna_events_debug_text(tel: dict | None, ndigits: int = 3) -> str:
             fx = float(x)
             if np.isfinite(fx):
                 return f"{fx:.{int(ndigits)}f}"
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             pass
         return "n/a"
 
@@ -274,7 +341,19 @@ def _auto_optuna_telemetry_rollup(items: list[dict] | None) -> dict:
                     out["best_raw_value"] is None or brf > float(out["best_raw_value"])
                 ):
                     out["best_raw_value"] = float(brf)
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 pass
 
         bf = t.get("best_feasible_value", None)
@@ -285,7 +364,19 @@ def _auto_optuna_telemetry_rollup(items: list[dict] | None) -> dict:
                     out["best_feasible_value"] is None or bff > float(out["best_feasible_value"])
                 ):
                     out["best_feasible_value"] = float(bff)
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 pass
 
         vc = dict(t.get("violation_counts", {}) or {})

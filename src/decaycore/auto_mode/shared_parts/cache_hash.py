@@ -55,7 +55,19 @@ def _auto_filter_type_for_key(filter_key: str | None) -> str:
 def _auto_hash_array(a: np.ndarray, *, decimals: int = 4, max_len: int = 1200) -> str:
     try:
         x = np.asarray(a, dtype=float).reshape(-1)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return ""
     if x.size <= 0:
         return ""
@@ -73,7 +85,19 @@ def _auto_hash_array(a: np.ndarray, *, decimals: int = 4, max_len: int = 1200) -
 def _auto_hash_array_full(a: np.ndarray) -> str:
     try:
         raw = np.asarray(a)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return ""
     if raw.size <= 0:
         return ""
@@ -81,7 +105,19 @@ def _auto_hash_array_full(a: np.ndarray) -> str:
         x = raw.reshape(-1)
         mask = np.isfinite(x)
         x = x[mask]
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return ""
     if x.size <= 0:
         return ""
@@ -92,7 +128,19 @@ def _auto_hash_array_full(a: np.ndarray) -> str:
     else:
         try:
             canonical = np.ascontiguousarray(x.astype(np.dtype("<f8"), copy=False))
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             return ""
         dtype_name = "float64"
     h.update(str(dtype_name).encode("ascii", "ignore"))
@@ -105,7 +153,7 @@ def _auto_hash_array_full(a: np.ndarray) -> str:
 __all__ = ['_auto_filter_cache_key', '_auto_hash_array', '_auto_hash_array_full']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['cache_hash', 'goal_profile', 'safe_values', 'backend', 'config', 'phase_sampling']:
@@ -116,4 +164,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

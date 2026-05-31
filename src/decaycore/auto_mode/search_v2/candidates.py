@@ -23,7 +23,19 @@ def preset_identity(preset: dict | None) -> str:
     }
     try:
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return str(sorted(payload.items()))
 
 

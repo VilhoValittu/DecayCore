@@ -36,6 +36,15 @@ from .orchestrator_target_types import (
 
 logger = logging.getLogger("DecayCore")
 
+_RECOVERABLE_CACHE_EXCEPTIONS = (
+    AttributeError,
+    KeyError,
+    TypeError,
+    ValueError,
+    RuntimeError,
+    OSError,
+)
+
 
 def _cache_target_valid(runtime, hc_name: str | None) -> bool:
     if str(hc_name or "").strip() == AUTO_MODE_SYNTH_TARGET_NAME:
@@ -48,7 +57,7 @@ def _cache_target_valid(runtime, hc_name: str | None) -> bool:
         c_f = np.asarray(c_f, dtype=float).reshape(-1)
         c_m = np.asarray(c_m, dtype=float).reshape(-1)
         return bool(c_f.size >= 4 and c_m.size == c_f.size)
-    except Exception:
+    except _RECOVERABLE_CACHE_EXCEPTIONS:
         # Cache validation must stay resilient to malformed or missing house-curve data.
         return False
 
@@ -92,7 +101,7 @@ def _cached_target_fit(
             offset_db = float(
                 _auto_safe_float(target_candidate.get("offset_db", 0.0), 0.0)
             )
-    except Exception:
+    except _RECOVERABLE_CACHE_EXCEPTIONS:
         # Cached targets are best-effort metadata and should not abort target selection.
         pass
     return float(fit_rms_db), float(offset_db)
@@ -242,7 +251,7 @@ def _cached_target_state_from_optuna_study(
             setup.optuna_mod,
             base_data=storage_base_data,
         )
-    except Exception:
+    except _RECOVERABLE_CACHE_EXCEPTIONS:
         storage = None
     if storage is None:
         return None
@@ -260,21 +269,21 @@ def _cached_target_state_from_optuna_study(
     best_value = float("-inf")
     try:
         summaries = list(get_summaries(storage=storage) or [])
-    except Exception:
+    except _RECOVERABLE_CACHE_EXCEPTIONS:
         summaries = []
     for summary in summaries:
         study = None
         study_name = ""
         try:
             study_name = str(getattr(summary, "study_name", "") or "").strip()
-        except Exception:
+        except _RECOVERABLE_CACHE_EXCEPTIONS:
             study_name = ""
         attrs = dict(getattr(summary, "user_attrs", {}) or {})
         if not attrs and study_name:
             try:
                 study = load_study(study_name=str(study_name), storage=storage)
                 attrs = dict(getattr(study, "user_attrs", {}) or {})
-            except Exception:
+            except _RECOVERABLE_CACHE_EXCEPTIONS:
                 attrs = {}
         if attrs.get("decaycore_kind") != "target_search":
             continue
@@ -293,7 +302,7 @@ def _cached_target_state_from_optuna_study(
             if trial_obj is None and study is not None:
                 trial_obj = getattr(study, "best_trial", None)
             score_value = float(getattr(trial_obj, "value", float("nan")))
-        except Exception:
+        except _RECOVERABLE_CACHE_EXCEPTIONS:
             score_value = float("nan")
         if not np.isfinite(score_value) or float(score_value) < float(best_value):
             continue
@@ -320,7 +329,7 @@ def _cached_target_state_from_optuna_study(
         )
         if not isinstance(best_preset, dict) or not best_preset:
             best_preset = dict(getattr(best_trial, "params", {}) or {})
-    except Exception:
+    except _RECOVERABLE_CACHE_EXCEPTIONS:
         best_preset = {}
 
     state = _TargetCacheState()
@@ -363,7 +372,7 @@ def _resolve_cached_target_state(
             goal=setup.goal,
             compat_version=setup.compat_version,
         )
-    except Exception:
+    except _RECOVERABLE_CACHE_EXCEPTIONS:
         cached_target_entry = None
     cached_source = "cache_measurement_global"
     cached_status = "measurement global"
@@ -392,7 +401,7 @@ def _resolve_cached_target_state(
                 filter_key=setup.filter_key,
                 compat_version=setup.compat_version,
             )
-        except Exception:
+        except _RECOVERABLE_CACHE_EXCEPTIONS:
             cached_target_entry = None
         cached_source = "cache_measurement"
         cached_status = "measurement"
@@ -479,7 +488,7 @@ def _resolve_cached_target_state(
                     str(cached_hc or "n/a"),
                     str(base_data.get("hc_mode", "n/a") or "n/a"),
                 )
-        except Exception:
+        except _RECOVERABLE_CACHE_EXCEPTIONS:
             logger.exception("cache signature target state set")
     if not _cached_target_has_exact_preset(runtime=setup.runtime, cache_state=state):
         optuna_state = _cached_target_state_from_optuna_study(

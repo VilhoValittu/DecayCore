@@ -102,7 +102,19 @@ def _guess_upload_format(file_data: dict[str, Any] | None) -> str:
 def _normalize_local_path_value(value: Any) -> str:
     try:
         return str(value or "").strip().strip('"').strip("'")
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return ""
 
 def _describe_local_path(path_raw: Any) -> dict[str, Any]:
@@ -149,7 +161,19 @@ def _describe_local_path(path_raw: Any) -> dict[str, Any]:
 def _format_upload_size(size_bytes: Any) -> str:
     try:
         size = float(size_bytes)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         size = 0.0
     if size <= 0:
         return "0 KB"
@@ -177,7 +201,7 @@ def _file_slot_input_name(path_key: str, slot_variant: str) -> str:
 __all__ = ['_normalize_layout_value', '_guess_upload_format', '_normalize_local_path_value', '_describe_local_path', '_format_upload_size', '_build_upload_payload', '_file_slot_scope_name', '_file_slot_input_name']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['ng_tab_files_01', 'ng_tab_files_02', 'ng_tab_files_03']:
@@ -188,4 +212,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

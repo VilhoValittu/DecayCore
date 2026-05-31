@@ -166,7 +166,19 @@ def _try_adaptive_target_fast_path(
                 "_synth_hc_f": synth_f,
                 "_synth_hc_m": synth_m,
             }
-    except Exception as exc:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
         logger.warning("Adaptive target synthesis failed: %s: %s", type(exc).__name__, exc)
     return None
 

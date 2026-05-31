@@ -49,7 +49,19 @@ def _make_comparison_stats(stats: dict, ref_fs: int = 44100, ref_taps: int = 655
         g = np.asarray(g, dtype=float) if g is not None else None
         c = np.asarray(c, dtype=float) if c is not None else None
         mm = np.asarray(mm, dtype=float) if mm is not None else None
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return out
 
     if f.ndim != 1 or f.size < 32 or m is None or t is None:
@@ -131,7 +143,19 @@ def _make_comparison_stats(stats: dict, ref_fs: int = 44100, ref_taps: int = 655
             if np.isfinite(v):
                 out["eff_target_db"] = v
                 out["cmp_eff_target_db"] = v
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("eff_target_db parse in comparison stats")
 
     if "target_level_db_window" in stats:

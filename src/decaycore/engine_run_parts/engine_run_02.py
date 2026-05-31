@@ -20,6 +20,7 @@ from ..auto_mode.auto_mode_profile import profiled_section
 from ..common.comparison_stats import _make_comparison_stats
 from ..common.measurement_features import (
     build_harmonic_boost_risk_curve,
+    estimate_schroeder_hz,
     normalize_rt60_bands,
     normalize_rt60_value,
 )
@@ -33,14 +34,15 @@ from ..common.result_postprocess import (
 )
 from ..config.models import FilterConfig
 from ..config.results import FilterResult
+from ..dsp import decaycore_dsp as dsp
+from ..dsp._measurement_ctx_local import clear_measurement_ctx, set_measurement_ctx
 from ..dsp.bass_integration import (
     apply_direct_dac_export_branch_model,
     build_bundle_combined_sub_transfer,
     direct_dac_candidate_from_data,
 )
-from ..dsp import decaycore_dsp as dsp
-from ..dsp._measurement_ctx_local import clear_measurement_ctx, set_measurement_ctx
 from ..dsp.correction_types import MeasurementSideContext
+from ..dsp.hybrid_iir import peaking_eq_response as _peaking_eq_response
 from ..engine_build import _as_float
 from ..engine_summary import summarize_run
 from .direct_dac_bass_integration import apply_direct_dac_bass_integration_result
@@ -82,22 +84,35 @@ def _call_generate_filter_pair(f_l, m_l, p_l, f_r, m_r, p_r, cfg, *, include_res
 def _stats_level_comp_factor(st: dict | None) -> float:
     try:
         ag_db = float((st or {}).get("auto_global_gain_db", 0.0) or 0.0)
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         ag_db = 0.0
     try:
         ah_db = float((st or {}).get("auto_headroom_db", 0.0) or 0.0)
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         ah_db = 0.0
     try:
         return float(np.power(10.0, -0.05 * (float(ag_db) + float(ah_db))))
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         return 1.0
+
+def _iir_response_on_axis(st: dict | None, f_axis: np.ndarray, fs: int) -> np.ndarray:
+    """Combined IIR complex response from stored biquad stats, on f_axis."""
+    biquads = (st or {}).get("hybrid_iir_biquads", [])
+    h = np.ones(len(f_axis), dtype=complex)
+    for b in biquads or []:
+        try:
+            h *= _peaking_eq_response(f_axis, float(fs), float(b["freq"]), float(b["q"]), float(b["gain"]))
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+            pass
+    return h
+
 
 def _apply_measured_rt60_override(
     st: dict | None,
     *,
     measured_rt60: object,
     measured_bands: object,
+    room_volume_m3: object = 40.0,
 ) -> None:
     if not isinstance(st, dict):
         return
@@ -112,10 +127,22 @@ def _apply_measured_rt60_override(
     st["rt60_val"] = float(rt60_val)
     st["rt60_reliability"] = 1.0
     st["rt60_source"] = "measured"
+    schroeder_hz = estimate_schroeder_hz(rt60_val, room_volume_m3=room_volume_m3)
+    if schroeder_hz is not None:
+        st["schroeder_hz_estimate"] = float(schroeder_hz)
 
     if not isinstance(measured_bands, dict) or not measured_bands:
         return
 
+    band_map = _measured_rt60_band_map(measured_bands)
+    if not band_map:
+        return
+
+    st["rt60_bands"] = band_map
+    st["rt60_band_avg"] = _measured_rt60_band_average(band_map)
+
+
+def _measured_rt60_band_map(measured_bands: dict) -> dict[float, float]:
     band_map: dict[float, float] = {}
     for key, value in measured_bands.items():
         try:
@@ -125,17 +152,16 @@ def _apply_measured_rt60_override(
             continue
         if np.isfinite(freq_hz) and np.isfinite(band_rt60) and band_rt60 > 0.0:
             band_map[float(freq_hz)] = float(band_rt60)
-    if not band_map:
-        return
+    return band_map
 
-    st["rt60_bands"] = band_map
+
+def _measured_rt60_band_average(band_map: dict[float, float]) -> float:
     ks = np.array(sorted(band_map.keys()), dtype=float)
     vs = np.array([band_map[key] for key in ks], dtype=float)
     mid = (ks >= 125.0) & (ks <= 4000.0) & (vs > 0.05) & (vs < 5.0)
     if np.any(mid):
-        st["rt60_band_avg"] = float(np.median(vs[mid]))
-    else:
-        st["rt60_band_avg"] = float(np.median(vs))
+        return float(np.median(vs[mid]))
+    return float(np.median(vs))
 
 def _inject_direct_dac_summed_prediction_for_plot(
     *,
@@ -168,25 +194,27 @@ def _inject_direct_dac_summed_prediction_for_plot(
         )
         main_h = _ir_fft_on_axis(np.asarray(main_ir, dtype=float), int(fs), f_axis)
         sub_h = _ir_fft_on_axis(np.asarray(sub_ir, dtype=float), int(fs), f_axis)
+        main_iir = _iir_response_on_axis(st, f_axis, int(fs))
+        sub_iir = _iir_response_on_axis(sub_st, f_axis, int(fs))
 
         total_measured = main_meas + sub_meas
         st["direct_dac_sum_measured_mags"] = (
             20.0 * np.log10(np.maximum(np.abs(total_measured), 1e-12))
         ).astype(float).tolist()
 
-        total_export = main_meas * main_h + sub_meas * sub_h
+        total_export = main_meas * (main_h * main_iir) + sub_meas * (sub_h * sub_iir)
         st["direct_dac_sum_predicted_mags"] = (
             20.0 * np.log10(np.maximum(np.abs(total_export), 1e-12))
         ).astype(float).tolist()
 
         main_comp = float(_stats_level_comp_factor(st))
         sub_comp = float(_stats_level_comp_factor(sub_st))
-        total_comp = main_meas * (main_h * main_comp) + sub_meas * (sub_h * sub_comp)
+        total_comp = main_meas * (main_h * main_comp * main_iir) + sub_meas * (sub_h * sub_comp * sub_iir)
         st["direct_dac_sum_predicted_mags_comp"] = (
             20.0 * np.log10(np.maximum(np.abs(total_comp), 1e-12))
         ).astype(float).tolist()
 
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         logger.debug("Direct-DAC summed plot prediction injection failed", exc_info=True)
 
 def run_pipeline(
@@ -286,7 +314,7 @@ def run_pipeline(
             sub_xo_order = int(getattr(cfg, "sub_crossover_order", 4))
             try:
                 sub_lpf_hz = float(getattr(cfg, "direct_dac_sub_lpf_hz", sub_xo_hz) or sub_xo_hz)
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
                 sub_lpf_hz = sub_xo_hz
             if not np.isfinite(sub_lpf_hz) or sub_lpf_hz <= 0.0:
                 sub_lpf_hz = sub_xo_hz
@@ -373,7 +401,7 @@ def run_pipeline(
                     f"Sub pass: xo={sub_xo_hz:.0f} Hz (order {sub_xo_order}), "
                     f"HPF={sub_hpf_freq:.0f} Hz (order {sub_hpf_order})"
                 )
-        except Exception as exc:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
             warnings.append(f"sub_pass_failed: {exc}")
             logger.warning(f"Sub DSP pass failed: {exc}")
             sub_ir = None
@@ -391,11 +419,13 @@ def run_pipeline(
         l_st,
         measured_rt60=measurements.get("measured_rt60_l"),
         measured_bands=measurements.get("measured_rt60_bands_l"),
+        room_volume_m3=getattr(cfg, "room_volume_m3", 40.0),
     )
     _apply_measured_rt60_override(
         r_st,
         measured_rt60=measurements.get("measured_rt60_r"),
         measured_bands=measurements.get("measured_rt60_bands_r"),
+        room_volume_m3=getattr(cfg, "room_volume_m3", 40.0),
     )
 
     _ir_align_lr: dict = {}
@@ -417,7 +447,7 @@ def run_pipeline(
                 np.asarray(_raw_ir_r, dtype=float), _raw_ir_fs_r,
                 xo_hz=_xo_lr,
             )
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
             logger.debug("IR alignment check L/R failed", exc_info=True)
     if _raw_ir_l is not None and _raw_ir_sub is not None and _raw_ir_fs_l > 0 and _raw_ir_fs_sub > 0:
         try:
@@ -432,7 +462,7 @@ def run_pipeline(
                 np.asarray(_raw_ir_sub, dtype=float), _raw_ir_fs_sub,
                 xo_hz=_xo_sub,
             )
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
             logger.debug("IR alignment check main/sub failed", exc_info=True)
     if isinstance(l_st, dict):
         if _ir_align_lr:
@@ -454,7 +484,7 @@ def run_pipeline(
             try:
                 l_st = _make_comparison_stats(l_st, int(cfg.fs), int(cfg.num_taps))
                 r_st = _make_comparison_stats(r_st, int(cfg.fs), int(cfg.num_taps))
-            except Exception as exc:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
                 warnings.append(f"comparison_stats_failed: {exc}")
                 logger.warning(f"Comparison-mode stats failed: {exc}")
 
@@ -467,7 +497,7 @@ def run_pipeline(
             dr = r_st.get("delay_samples", None) if isinstance(r_st, dict) else None
             if dl is not None and dr is not None:
                 d_delay = int(round(float(dr))) - int(round(float(dl)))
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
             d_delay = None
 
         if d_delay is None:
@@ -485,7 +515,7 @@ def run_pipeline(
                         f"Alignment guard: delay_samples={int(d_delay)} vs peak={int(d_peak)} "
                         f"(>{guard_samples} samp) -> using peak"
                     )
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
                 logger.exception("alignment guard comparison")
 
         if d_s > 0:
@@ -510,7 +540,7 @@ def run_pipeline(
                 )
                 sub_peak = int(np.argmax(np.abs(sub_imp)))
                 d_sub = int(main_peak_ref - sub_peak)
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
                 d_sub = None
             if is_direct_dac_bi:
                 bi_meta = data.setdefault("_bass_integration_meta", {})
@@ -533,7 +563,7 @@ def run_pipeline(
             df = float(np.median(np.diff(fx[: min(int(fx.size), 4096)])))
             if np.isfinite(df) and (0.0 < df < 2.0):
                 wav_like_fft_grid = True
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         wav_like_fft_grid = False
 
     if bool(is_wav) or bool(wav_like_fft_grid):
@@ -562,7 +592,7 @@ def run_pipeline(
                     f"(zone approx {max(mc_min, mc_max - 0.95 * tr_w):.0f}-{mc_max + 1.45 * tr_w:.0f} Hz, "
                     f"is_wav={bool(is_wav)}, wav_like_fft_grid={bool(wav_like_fft_grid)})"
                 )
-            except Exception as exc:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
                 warnings.append(f"wav_postpolish_failed: {exc}")
                 logger.warning(f"WAV final IR polish failed: {exc}")
 
@@ -577,7 +607,7 @@ def run_pipeline(
                 "gain_diff_db": gain_diff,
                 "method": str(align_method),
             }
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
             logger.exception("auto_align stats inject")
 
     with profiled_section("run_pipeline.inject_filter_gd_stats"):
@@ -657,7 +687,7 @@ def run_pipeline(
                             sub_st=sub_st,
                             fs=int(cfg.fs),
                         )
-                    except Exception:
+                    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
                         logger.debug("Direct-DAC summed prediction build failed", exc_info=True)
 
             l_mode = str((l_st or {}).get("analysis_mode", "native")).lower()
@@ -753,7 +783,7 @@ def run_pipeline(
 __all__ = ['_call_generate_filter', '_call_generate_filter_pair', '_stats_level_comp_factor', '_apply_measured_rt60_override', '_inject_direct_dac_summed_prediction_for_plot', 'run_pipeline']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['engine_run_01', 'engine_run_02']:
@@ -764,4 +794,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

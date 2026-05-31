@@ -38,7 +38,19 @@ def _format_recommended_xo_hz(value: float) -> str:
 def _auto_search_space_summary(data: dict | None) -> str:
     try:
         ft = str((data or {}).get("filter_type", "") or "").strip().lower()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         ft = ""
 
     if "asym" in ft:
@@ -72,7 +84,19 @@ def _module_runtime_version(module_name: str) -> str:
         ver = str(getattr(mod, "__version__", "") or "").strip()
         if ver:
             return ver
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("module version import")
     try:
         from importlib.metadata import version
@@ -80,7 +104,19 @@ def _module_runtime_version(module_name: str) -> str:
         ver = str(version(str(module_name)) or "").strip()
         if ver:
             return ver
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("module version metadata")
     return "n/a"
 
@@ -106,13 +142,37 @@ def _append_main_speaker_xo_hpf_summary(summary_content: str, data: dict | None)
                     continue
                 try:
                     freq_hz = float(f_raw)
-                except Exception:
+                except (
+
+                    AttributeError,
+                    TypeError,
+                    ValueError,
+                    KeyError,
+                    IndexError,
+                    RuntimeError,
+                    OSError,
+                    ImportError,
+                    ModuleNotFoundError,
+                    NameError,
+                ):
                     continue
                 if freq_hz <= 0.0:
                     continue
                 try:
                     slope = int(round(float(ui_data.get(f"xo{i}_s", 12) or 12)))
-                except Exception:
+                except (
+
+                    AttributeError,
+                    TypeError,
+                    ValueError,
+                    KeyError,
+                    IndexError,
+                    RuntimeError,
+                    OSError,
+                    ImportError,
+                    ModuleNotFoundError,
+                    NameError,
+                ):
                     slope = 12
                 xo_parts.append(f"XO{i}: {freq_hz:.1f} Hz / {slope} dB/oct")
         if xo_parts:
@@ -129,21 +189,69 @@ def _append_main_speaker_xo_hpf_summary(summary_content: str, data: dict | None)
                     )
                     or 80.0
                 )
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 hpf_f = 80.0
             try:
                 hpf_s = int(round(float(ui_data.get("sub_crossover_slope", 24) or 24)))
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 hpf_s = 24
             summary_content += f"HPF: ON ({hpf_f:.1f} Hz / {hpf_s} dB/oct)\n"
         elif bool(ui_data.get("hpf_enable", False)):
             try:
                 hpf_f = float(ui_data.get("hpf_freq", 20.0) or 20.0)
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 hpf_f = 20.0
             try:
                 hpf_s = int(round(float(ui_data.get("hpf_slope", 24) or 24)))
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 hpf_s = 24
             summary_content += f"HPF: ON ({hpf_f:.1f} Hz / {hpf_s} dB/oct)\n"
         else:
@@ -151,7 +259,19 @@ def _append_main_speaker_xo_hpf_summary(summary_content: str, data: dict | None)
         summary_content += (
             "Note: this XO / HPF section models the main speaker crossover / HPF phase chain.\n"
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("XO/HPF summary section")
     return summary_content
 
@@ -159,7 +279,7 @@ def _append_main_speaker_xo_hpf_summary(summary_content: str, data: dict | None)
 __all__ = ['_polish_display_rank', '_format_recommended_xo_hz', '_auto_search_space_summary', '_module_runtime_version', '_runtime_versions_text', '_append_main_speaker_xo_hpf_summary']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['runtime', 'bass_integration', 'stereo_policy', 'dsp_effective', 'events']:
@@ -170,4 +290,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

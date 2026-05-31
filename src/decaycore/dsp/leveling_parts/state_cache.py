@@ -285,7 +285,7 @@ def _clear_level_window_cache() -> None:
 __all__ = ['StereoLinkContext', '_to_float', '_to_bool', '_remember_leveling_error', '_safe_setattr', '_normalize_optional_float', '_normalize_optional_window', '_normalize_hpf_freq', '_normalize_level_window_params', '_hash_leveling_array', '_stable_level_window_cache_key', '_leveling_cache_key', '_capture_leveling_state', '_restore_leveling_state', '_clear_leveling_cache', '_clear_level_window_cache']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['state_cache', 'tilt_helpers', 'window_scoring', 'api']:
@@ -296,4 +296,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

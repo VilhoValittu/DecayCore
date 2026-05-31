@@ -46,7 +46,19 @@ def _clean_local_path(p) -> str:
     """Normalisoi kayttajan antaman paikallisen tiedostopolun merkkijonoksi."""
     try:
         return str(p or "").strip().strip('"').strip("'")
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return ""
 
 def _get_uploaded_file(data: dict, key: str):
@@ -55,7 +67,19 @@ def _get_uploaded_file(data: dict, key: str):
         v = data.get(key)
         if isinstance(v, dict) and v.get("content") is not None:
             return v
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("uploaded file extract")
     return None
 
@@ -66,15 +90,51 @@ def _get_local_path(data: dict, key: str) -> str:
 def _get_wav_window_params(data: dict) -> tuple[float, float, int]:
     try:
         pre_ms = float(data.get("ir_window_left", 85.0) or 85.0)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         pre_ms = 10.0
     try:
         post_ms = float(data.get("ir_window_right", data.get("ir_window", 500.0)) or 500.0)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         post_ms = 500.0
     try:
         sl = int(data.get("smoothing_level", 0) or 0)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         sl = 0
     return float(pre_ms), float(post_ms), int(sl)
 
@@ -87,7 +147,19 @@ def _is_wav_upload(file_dict) -> bool:
             return True
         content = file_dict.get("content", None)
         return isinstance(content, (bytes, bytearray)) and len(content) >= 4 and content[:4] == b"RIFF"
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return False
 
 def _load_coherent_transfer_slot(
@@ -183,7 +255,19 @@ def _detect_shared_coherent_anchor_sample(data: dict, *, logger=None) -> int | N
         try:
             spread = int(max(peaks) - min(peaks))
             logger.info(f"Bass Integration shared WAV anchor sample: {shared_anchor} (spread {spread} samples)")
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("anchor spread log")
     return shared_anchor
 
@@ -191,7 +275,7 @@ def _detect_shared_coherent_anchor_sample(data: dict, *, logger=None) -> int | N
 __all__ = ['_clean_local_path', '_get_uploaded_file', '_get_local_path', '_get_wav_window_params', '_is_wav_upload', '_load_coherent_transfer_slot', '_detect_coherent_slot_anchor_sample', '_detect_shared_coherent_anchor_sample']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['measurements_loader_01', 'measurements_loader_02', 'measurements_loader_03']:
@@ -202,4 +286,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

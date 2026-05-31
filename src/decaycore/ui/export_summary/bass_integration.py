@@ -320,7 +320,7 @@ def _append_bass_integration_allpass_auto_summary(summary_content: str, data: di
 __all__ = ['_append_bass_integration_summary', '_append_bass_integration_allpass_auto_summary']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['runtime', 'bass_integration', 'stereo_policy', 'dsp_effective', 'events']:
@@ -331,4 +331,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

@@ -83,7 +83,19 @@ def _build_auto_selected_text(run_data: dict) -> str:
             )
             or "n/a"
         ).strip()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         target_name = "n/a"
     if not target_name:
         target_name = "n/a"
@@ -162,7 +174,19 @@ def _resolve_auto_hpf_seed_source(
                         "Sub HPF",
                         True,
                     )
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.debug("Direct-DAC sub HPF seed source fallback to main data", exc_info=True)
     return (
         np.asarray(f_l, dtype=float),
@@ -208,7 +232,7 @@ def _build_auto_finalize_status(
 __all__ = ['_build_auto_selected_text', '_resolve_auto_hpf_seed_source', '_auto_finalize_status_suffix', '_build_auto_finalize_status']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['progress', 'status_text', 'seed_phases', 'search']:
@@ -219,4 +243,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

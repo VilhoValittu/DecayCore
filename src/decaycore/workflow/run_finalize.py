@@ -67,7 +67,19 @@ def _finalize_run_outputs(ctx: dict, *, callbacks: ProcessRunCallbacks, support:
     optuna_storage_path = None
     try:
         mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         mode_u = "BASIC"
     if bool(mode_u == "AUTO" or data.get("camillafir_automatic_mode", False)):
         try:
@@ -79,7 +91,19 @@ def _finalize_run_outputs(ctx: dict, *, callbacks: ProcessRunCallbacks, support:
                     ),
                 )
             )
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             auto_cache_path = None
         try:
             if bool(data.get("auto_mode_optuna_persistent_study", True)):
@@ -93,7 +117,19 @@ def _finalize_run_outputs(ctx: dict, *, callbacks: ProcessRunCallbacks, support:
                 )
             else:
                 optuna_storage_path = None
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             optuna_storage_path = None
 
     l_st_f = ctx["l_st_f"]

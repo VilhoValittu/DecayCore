@@ -132,7 +132,19 @@ def _f(value: Any, default: float | None = None) -> float | None:
         out = float(value)
         if math.isfinite(out):
             return out
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return default
     return default
 
@@ -369,7 +381,7 @@ def _write_outputs(output_dir: Path, metrics_doc: dict) -> None:
 __all__ = ['_load_optional_metadata', '_f', '_pick', '_extract_rt60', '_extract_harmonics', '_build_metrics', '_write_summary', '_write_outputs']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['runner_01', 'runner_02', 'runner_03', 'runner_04']:
@@ -380,4 +392,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

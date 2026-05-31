@@ -665,7 +665,12 @@ def apply_post_limits_and_metrics(
     if not np.isfinite(trans_width_fade):
         trans_width_fade = 100.0
 
-    f_start = max(mag_c_max_fade - trans_width_fade, mag_c_min_fade)
+    band_width = max(mag_c_max_fade - mag_c_min_fade, 0.0)
+    if band_width > 0.0:
+        min_f_start = mag_c_max_fade - 0.25 * band_width
+        f_start = max(mag_c_max_fade - trans_width_fade, min_f_start, mag_c_min_fade)
+    else:
+        f_start = max(mag_c_max_fade - trans_width_fade, mag_c_min_fade)
     f_mask = (freq_axis > f_start) & (freq_axis <= mag_c_max_fade)
     fade_len = mag_c_max_fade - f_start
     _pre_transition_fade = np.asarray(gain_db, dtype=float).copy()
@@ -677,7 +682,7 @@ def apply_post_limits_and_metrics(
             if isinstance(st, dict):
                 st["mag_transition_fade_applied"] = True
                 try:
-                    band = (freq_axis >= (mag_c_max_fade - trans_width_fade)) & (freq_axis <= mag_c_max_fade)
+                    band = (freq_axis >= f_start) & (freq_axis <= mag_c_max_fade)
                     if np.count_nonzero(band) >= 8:
                         g = np.asarray(gain_db, dtype=float)
                         f = np.asarray(freq_axis, dtype=float)
@@ -778,7 +783,7 @@ def apply_post_limits_and_metrics(
 __all__ = ['apply_post_limits_and_metrics']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['low_frequency', 'authority', 'clamps', 'metrics', 'pipeline']:
@@ -789,4 +794,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

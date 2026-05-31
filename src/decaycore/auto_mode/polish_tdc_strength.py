@@ -146,7 +146,19 @@ def apply_tdc_strength_winner_polish(
                     summarize=False,
                     base_data_override=base_data_ref,
                 )
-            except Exception as exc:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ) as exc:
                 logger.warning(
                     "Automatic mode %s failed for candidate %d/%d (tdc_strength=%.1f): %s",
                     str(phase_label),

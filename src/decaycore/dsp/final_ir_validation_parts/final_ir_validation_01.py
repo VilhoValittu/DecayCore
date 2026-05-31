@@ -172,7 +172,7 @@ def _freq_mask(freq: np.ndarray, lo: float, hi: float) -> np.ndarray:
 __all__ = ['FinalIRValidationResult', '_bump_severity', '_next_pow2', '_main_peak_index', '_safe_energy', '_safe_rms', '_safe_arr', '_freq_mask']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['final_ir_validation_01', 'final_ir_validation_02', 'final_ir_validation_03']:
@@ -183,4 +183,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

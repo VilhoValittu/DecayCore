@@ -120,6 +120,65 @@ def apply_clamp_stats(
     )
 
 
+def _append_boost_disabled_reason(reasons: list[str], *, max_boost_db_cfg: float) -> None:
+    if max_boost_db_cfg <= 0.0:
+        reasons.append("max_boost_db <= 0 (boost disabled)")
+
+
+def _append_boost_candidate_reasons(
+    reasons: list[str],
+    *,
+    boost_bins_cand: int,
+    boost_bins_post: int,
+    boost_bins_cand_low: int,
+    low_hz_cfg: float,
+    exc_on: bool,
+    exc_f_cfg: float,
+    boost_bins_cand_exc: int,
+) -> None:
+    if boost_bins_cand == 0 and boost_bins_post == 0:
+        reasons.append("no boost candidates (algorithm produced only cuts in correction band)")
+        return
+    if boost_bins_cand > 0 and boost_bins_post == 0:
+        if boost_bins_cand_low == boost_bins_cand and low_hz_cfg > 0:
+            reasons.append(f"all boost candidates were <= low_bass_cut_hz ({low_hz_cfg:.1f} Hz) where cuts-only policy applies")
+        if exc_on and exc_f_cfg > 0 and boost_bins_cand_exc == boost_bins_cand:
+            reasons.append(f"all boost candidates were < exc_freq ({exc_f_cfg:.1f} Hz) while exc_prot is ON")
+        if not reasons:
+            reasons.append("boost candidates existed but were removed by limits/safety clamp (check max_boost_db, slope limits, exc/low-bass policies)")
+
+
+def _append_boost_partial_reduction_reasons(
+    reasons: list[str],
+    *,
+    boost_bins_cand: int,
+    boost_bins_post: int,
+    boost_bins_cand_low: int,
+    low_hz_cfg: float,
+    exc_on: bool,
+    exc_f_cfg: float,
+    boost_bins_cand_exc: int,
+) -> None:
+    if not (boost_bins_cand > 0 and boost_bins_post > 0 and boost_bins_post < boost_bins_cand):
+        return
+    if boost_bins_cand_low > 0:
+        reasons.append(f"some boost candidates were in low-bass restricted region (<= {low_hz_cfg:.1f} Hz)")
+    if exc_on and boost_bins_cand_exc > 0 and exc_f_cfg > 0:
+        reasons.append(f"some boost candidates were in exc_prot region (< {exc_f_cfg:.1f} Hz)")
+    reasons.append("some boost candidates were reduced by limits/safety clamp")
+
+
+def _append_boost_net_peak_reason(
+    reasons: list[str],
+    *,
+    boost_bins_post: int,
+    net_boost_peak: float,
+    do_norm: bool,
+) -> None:
+    if boost_bins_post > 0 and net_boost_peak <= 0.0:
+        reasons.append(f"net boost peak <= 0.00 dB after global gain/headroom (net_peak={net_boost_peak:.2f} dB, normalize={'ON' if do_norm else 'OFF'})")
+
+
 def apply_boost_blocked_reason(stats: dict, *, cfg) -> None:
     max_boost_db_cfg = float(getattr(cfg, "max_boost_db", 0.0) or 0.0)
     low_hz_cfg = float(getattr(cfg, "low_bass_cut_hz", 40.0) or 40.0)
@@ -136,24 +195,32 @@ def apply_boost_blocked_reason(stats: dict, *, cfg) -> None:
     net_boost_peak = boost_peak_post + g_global + float(stats.get("auto_headroom_db", 0.0) or 0.0)
     stats["net_boost_peak_db"] = float(net_boost_peak)
 
-    reasons = []
-    if max_boost_db_cfg <= 0.0:
-        reasons.append("max_boost_db <= 0 (boost disabled)")
-    if boost_bins_cand == 0 and boost_bins_post == 0:
-        reasons.append("no boost candidates (algorithm produced only cuts in correction band)")
-    if boost_bins_cand > 0 and boost_bins_post == 0:
-        if boost_bins_cand_low == boost_bins_cand and low_hz_cfg > 0:
-            reasons.append(f"all boost candidates were <= low_bass_cut_hz ({low_hz_cfg:.1f} Hz) where cuts-only policy applies")
-        if exc_on and exc_f_cfg > 0 and boost_bins_cand_exc == boost_bins_cand:
-            reasons.append(f"all boost candidates were < exc_freq ({exc_f_cfg:.1f} Hz) while exc_prot is ON")
-        if not reasons:
-            reasons.append("boost candidates existed but were removed by limits/safety clamp (check max_boost_db, slope limits, exc/low-bass policies)")
-    if boost_bins_cand > 0 and boost_bins_post > 0 and boost_bins_post < boost_bins_cand:
-        if boost_bins_cand_low > 0:
-            reasons.append(f"some boost candidates were in low-bass restricted region (<= {low_hz_cfg:.1f} Hz)")
-        if exc_on and boost_bins_cand_exc > 0 and exc_f_cfg > 0:
-            reasons.append(f"some boost candidates were in exc_prot region (< {exc_f_cfg:.1f} Hz)")
-        reasons.append("some boost candidates were reduced by limits/safety clamp")
-    if boost_bins_post > 0 and net_boost_peak <= 0.0:
-        reasons.append(f"net boost peak <= 0.00 dB after global gain/headroom (net_peak={net_boost_peak:.2f} dB, normalize={'ON' if do_norm else 'OFF'})")
+    reasons: list[str] = []
+    _append_boost_disabled_reason(reasons, max_boost_db_cfg=max_boost_db_cfg)
+    _append_boost_candidate_reasons(
+        reasons,
+        boost_bins_cand=boost_bins_cand,
+        boost_bins_post=boost_bins_post,
+        boost_bins_cand_low=boost_bins_cand_low,
+        low_hz_cfg=low_hz_cfg,
+        exc_on=exc_on,
+        exc_f_cfg=exc_f_cfg,
+        boost_bins_cand_exc=boost_bins_cand_exc,
+    )
+    _append_boost_partial_reduction_reasons(
+        reasons,
+        boost_bins_cand=boost_bins_cand,
+        boost_bins_post=boost_bins_post,
+        boost_bins_cand_low=boost_bins_cand_low,
+        low_hz_cfg=low_hz_cfg,
+        exc_on=exc_on,
+        exc_f_cfg=exc_f_cfg,
+        boost_bins_cand_exc=boost_bins_cand_exc,
+    )
+    _append_boost_net_peak_reason(
+        reasons,
+        boost_bins_post=boost_bins_post,
+        net_boost_peak=net_boost_peak,
+        do_norm=do_norm,
+    )
     stats["boost_blocked_reason"] = "; ".join(dict.fromkeys(reasons)) if reasons else "no blocking detected"

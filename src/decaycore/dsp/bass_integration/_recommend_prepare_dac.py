@@ -70,7 +70,19 @@ def _direct_dac_prepare_allpass_postpass(
                 sub_lpf_hz=float(sub_lpf_hz),
             )
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         _LOG.debug("Direct-DAC allpass post-pass failed", exc_info=True)
         result["allpass_reason"] = "Allpass post-pass failed."
         return result
@@ -176,7 +188,19 @@ def _recommend_direct_dac_prepare_builtin_core(
                 sub_combine_mode=combine_mode_norm,
             )
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         _LOG.debug("Direct-DAC builtin alignment recommendation failed; keeping baseline alignment", exc_info=True)
     best_delay = float(align_result.get("sub_delay_ms", 0.0) or 0.0)
     best_polarity = bool(align_result.get("sub_polarity_invert", False))
@@ -206,7 +230,19 @@ def _recommend_direct_dac_prepare_builtin_core(
         if np.isfinite(_rec_hz) and _rec_hz > 0.0:
             best_fc = float(_rec_hz)
             best_sub_lpf = float(_rec_lpf) if np.isfinite(_rec_lpf) and _rec_lpf >= best_fc else best_fc
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         _LOG.debug("Direct-DAC builtin crossover recommendation failed; keeping 80 Hz default", exc_info=True)
 
     optimized_metrics = _get_pkg().compute_final_bass_integration_metrics(

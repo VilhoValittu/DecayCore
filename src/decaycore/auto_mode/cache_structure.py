@@ -26,7 +26,19 @@ def _auto_compat_version(base_data: dict | None) -> str:
             (base_data or {}).get("auto_mode_compat_version", AUTO_MODE_COMPAT_VERSION)
             or AUTO_MODE_COMPAT_VERSION
         ).strip()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         raw = str(AUTO_MODE_COMPAT_VERSION)
     return str(raw or AUTO_MODE_COMPAT_VERSION)
 

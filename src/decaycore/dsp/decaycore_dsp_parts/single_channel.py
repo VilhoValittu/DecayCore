@@ -381,7 +381,19 @@ def generate_filter(
             phase_limit_hz=float(getattr(cfg, "phase_c_max", 600.0) or 600.0),
         )
         stats.update(acoustic_authority_to_stats(authority, include_arrays=True))
-    except Exception as exc:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
         logger.warning("acoustic authority map failed", exc_info=True)
         stats["acoustic_authority_error"] = str(exc)
 
@@ -551,7 +563,7 @@ def generate_filter(
 __all__ = ['_run_generate_filter_stereo_link_presolve_stats', '_normalize_impulse_if_requested', 'generate_filter']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['single_channel', 'pair']:
@@ -562,4 +574,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

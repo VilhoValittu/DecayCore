@@ -172,7 +172,19 @@ def _gd_metrics_from_fir(
         gd_peak = float(np.percentile(np.abs(gd_finite), 95))
         gd_rms = _safe_rms(gd_finite)
         return gd_peak, gd_rms, True
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return 0.0, 0.0, False
 
 def _fir_to_mag_db(
@@ -228,7 +240,19 @@ def _magnitude_metrics(
         # Compare against smoothed local baseline
         try:
             smoothed = scipy.signal.savgol_filter(corrected, window_length=min(51, corrected.size | 1), polyorder=2)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             smoothed = corrected * 0.0
         err = corrected - smoothed
 
@@ -284,7 +308,7 @@ def _stereo_metrics(
 __all__ = ['_temporal_energy_metrics', '_fir_spectrum', '_gd_metrics_from_fir', '_fir_to_mag_db', '_skip_pre_ringing', '_is_minimum_phase', '_magnitude_metrics', '_stereo_metrics']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['final_ir_validation_01', 'final_ir_validation_02', 'final_ir_validation_03']:
@@ -295,4 +319,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

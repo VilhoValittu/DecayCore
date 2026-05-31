@@ -24,11 +24,35 @@ def _cfg_value(cfg, key: str, default):
     try:
         if isinstance(cfg, dict):
             return cfg.get(key, default)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("cfg dict value read")
     try:
         return getattr(cfg, key, default)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("cfg attr value read")
         return default
 
@@ -43,7 +67,19 @@ def _collect_phase_anchor_hz(cfg) -> tuple[float, ...]:
                 continue
             if np.isfinite(fc) and fc > 0.0:
                 anchors.append(float(fc))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("crossover anchor collect")
     try:
         hs = _cfg_value(cfg, "hpf_settings", None)
@@ -125,7 +161,19 @@ def phase_confidence_profile(
         return np.asarray([], dtype=float)
     try:
         conf = np.asarray(confidence_mask, dtype=float).reshape(-1)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         conf = np.asarray([], dtype=float)
     if conf.size != f.size:
         conf = np.ones_like(f, dtype=float)

@@ -102,7 +102,19 @@ def run_headless(config_path: Path, output_dir: Path, args: argparse.Namespace) 
         if data.get("bass_integration_enable"):
             logger.info("Resolved BI main/sub: %s | %s | %s | %s", data.get("local_path_l_main"), data.get("local_path_r_main"), data.get("local_path_l_sub"), data.get("local_path_r_sub"))
         return run_batch(data, output_dir, headless=True)
-    except Exception as exc:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
         logger.error("Headless hard failure: %s", traceback.format_exc())
         return _write_failed_minimal(output_dir, config_path=Path(config_path), errors=[f"{type(exc).__name__}: {exc}"])
 

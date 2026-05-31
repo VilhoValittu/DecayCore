@@ -67,7 +67,7 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):
             x = float(v)
             if np.isfinite(x):
                 return x
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
             logger.exception("safe float parse in score summary")
         return float(default)
 
@@ -84,14 +84,14 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):
             return "n/a"
         try:
             return f"{float(rng[0]):.0f}-{float(rng[1]):.0f} Hz"
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
             return "n/a"
 
     def _report_offset_db(st: dict) -> float:
         try:
             if "cmp_offset_db" in st:
                 return _safe_float(st.get("cmp_offset_db", 0.0), 0.0)
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
             logger.exception("report offset_db fetch")
         return _safe_float(st.get("offset_db", 0.0), 0.0)
 
@@ -128,7 +128,7 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):
                 v = float(st.get(k, None))
                 if np.isfinite(v):
                     return float(v)
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
                 continue
         return None
 
@@ -158,21 +158,21 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):
             if limit_v is not None:
                 try:
                     lim_txt = f"{float(limit_v):.2f} ms/oct"
-                except Exception:
+                except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
                     lim_txt = "n/a"
 
             grad_txt = "n/a"
             try:
                 gb = float(grad_before) if grad_before is not None else None
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
                 gb = None
             try:
                 ga = float(grad_after) if grad_after is not None else None
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
                 ga = None
             try:
                 bh = float(before_hz) if before_hz is not None else None
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
                 bh = None
             if gb is not None and np.isfinite(gb) and ga is not None and np.isfinite(ga):
                 hz_txt = f" @{bh:.0f}Hz" if bh is not None and np.isfinite(bh) else ""
@@ -184,7 +184,7 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):
                 f"{side}: {'ON' if enabled else 'OFF'} "
                 f"(reason={reason}, limit={lim_txt}, GD-gradient max {grad_txt})"
             )
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
             return f"{side}: n/a"
 
     def _afdw_line(side: str, st: dict) -> str:
@@ -194,11 +194,11 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):
             bw = st.get("fdw_fixed_bw_oct", None)
             try:
                 cyc_txt = f"{float(cyc):.2f}" if cyc is not None else "n/a"
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
                 cyc_txt = "n/a"
             try:
                 bw_txt = f"{float(bw):.4f}" if bw is not None else "n/a"
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
                 bw_txt = "n/a"
             return f"{side}: FIXED | cycles={cyc_txt}, BW={bw_txt} oct (A-FDW OFF)"
 
@@ -221,7 +221,7 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):
             return "None"
         try:
             w = max(refs, key=lambda x: float(x.get("gd_error", 0.0) or 0.0))
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
             return "None"
         freq = _safe_float(w.get("freq", 0.0), 0.0)
         gd_ms = _safe_float(w.get("gd_error", 0.0), 0.0)
@@ -244,7 +244,7 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):
             if l_fs is not None and r_fs is not None and abs(l_fs - r_fs) > 5.0:
                 return f"L {l_fs:.0f} Hz | R {r_fs:.0f} Hz{ratio_str}"
             return f"{fs_repr:.0f} Hz{ratio_str}"
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
             return None
 
     def _calc_acoustic_score(conf_pct, match_pct, rt60_s=None, rt60_reliability=None):
@@ -255,7 +255,7 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):
                 rt60_s=rt60_s,
                 rt60_rel=rt60_reliability,
             )
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
             conf_pct = float(np.clip(float(conf_pct), 0.0, 100.0))
             match_pct = float(np.clip(float(match_pct), 0.0, 100.0))
             return float(np.clip(0.60 * match_pct + 0.40 * conf_pct, 0.0, 100.0))
@@ -343,7 +343,7 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):
             lines.append(f"{k}: {settings.get(k)}")
     try:
         lvl_mode_value = lvl_mode_legacy_name(settings.get("lvl_mode", LVL_MODE_AUTO))
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
         lvl_mode_value = lvl_mode_legacy_name(LVL_MODE_AUTO)
     lines.append(f"Level match mode: {lvl_mode_value}")
     if lvl_mode_value.lower() == "manual":
@@ -476,7 +476,7 @@ def format_summary_content(settings, l_stats, r_stats):
 __all__ = ['_format_summary_content_legacy', 'format_summary_content']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['quality_report', 'legacy_summary']:
@@ -487,4 +487,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

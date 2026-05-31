@@ -26,7 +26,19 @@ def _slope_db_oct(f_hz, mag_db, f_lo=None, f_hi=None) -> float:
     try:
         ff = np.asarray(f_hz, dtype=float).reshape(-1)
         mm = np.asarray(mag_db, dtype=float).reshape(-1)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return float("nan")
     m = np.isfinite(ff) & np.isfinite(mm) & (ff > 0.)
     if f_lo is not None:
@@ -42,7 +54,19 @@ def _slope_db_oct(f_hz, mag_db, f_lo=None, f_hi=None) -> float:
     try:
         p = np.polyfit(x, y, 1)
         return float(p[0] * np.log10(2.))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return float("nan")
 
 
@@ -156,7 +180,19 @@ def synthesize_target_from_measurements(
     def _to_arr(x):
         try:
             return np.asarray(x, dtype=float).reshape(-1)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             return np.array([], dtype=float)
 
     fl, ml = _to_arr(f_l), _to_arr(m_l)
@@ -195,7 +231,19 @@ def synthesize_target_from_measurements(
     # freq-dep smooth → macro spectral envelope
     try:
         m_sm = smooth_meas_freq_dep(m_avg, fg)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         m_sm = m_avg.copy()
 
     # Band averages

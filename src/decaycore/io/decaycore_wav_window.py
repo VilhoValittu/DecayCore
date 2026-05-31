@@ -19,7 +19,19 @@ scipy = None  # type: ignore
 try:
     import scipy
     import scipy.signal  # noqa: F401
-except Exception:  # pragma: no cover
+except (
+
+    AttributeError,
+    TypeError,
+    ValueError,
+    KeyError,
+    IndexError,
+    RuntimeError,
+    OSError,
+    ImportError,
+    ModuleNotFoundError,
+    NameError,
+): # pragma: no cover
     scipy = None  # type: ignore
 
 from ..dsp.dsp_utils import choose_fft_len as _next_pow2
@@ -37,7 +49,19 @@ def _tukey_window(n: int, alpha: float = 0.25) -> np.ndarray:
     if scipy is not None:
         try:
             return scipy.signal.windows.tukey(n, alpha=a).astype(np.float32)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("scipy tukey window")
 
     w = np.ones(n, dtype=np.float32)
@@ -133,7 +157,19 @@ def ir_wav_to_freq_response(
     if dt == "linear":
         try:
             seg = seg - np.linspace(float(seg[0]), float(seg[-1]), seg.size, dtype=np.float32)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("linear detrend")
     elif dt == "mean":
         seg = seg - float(np.mean(seg))
@@ -147,7 +183,19 @@ def ir_wav_to_freq_response(
         else:
             w = _tukey_window(seg.size, alpha=float(tukey_alpha))
         seg = seg * w
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("window apply in wav freq response")
 
     n_fft = int(seg.size)
@@ -162,7 +210,19 @@ def ir_wav_to_freq_response(
                 mn = _next_pow2(mn)
                 if n_fft < mn:
                     n_fft = mn
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("min_n_fft apply")
 
     spec = np.fft.rfft(seg, n=n_fft)
@@ -179,7 +239,19 @@ def ir_wav_to_freq_response(
             sl = int(smoothing_level)
             if sl > 0:
                 mag_db = _octave_smooth_loggrid(freqs, mag_db, sl)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("octave smoothing in wav freq response")
 
     if phase_hf_hold:
@@ -187,7 +259,19 @@ def ir_wav_to_freq_response(
             hf = freqs > min(0.45 * fs_i, 18000.0)
             if np.any(hf) and np.any(~hf):
                 phase_deg[hf] = phase_deg[np.where(~hf)[0][-1]]
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("phase hf hold in wav freq response")
 
     return freqs.astype(float), mag_db.astype(float), phase_deg.astype(float)
@@ -247,7 +331,19 @@ def ir_wav_to_complex_response(
     if dt == "linear":
         try:
             seg = seg - np.linspace(float(seg[0]), float(seg[-1]), seg.size, dtype=np.float32)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("linear detrend in complex response")
     elif dt == "mean":
         seg = seg - float(np.mean(seg))
@@ -261,7 +357,19 @@ def ir_wav_to_complex_response(
         else:
             w = _tukey_window(seg.size, alpha=float(tukey_alpha))
         seg = seg * w
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("window apply in complex response")
 
     n_fft = int(seg.size)
@@ -276,7 +384,19 @@ def ir_wav_to_complex_response(
                 mn = _next_pow2(mn)
                 if n_fft < mn:
                     n_fft = mn
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("min_n_fft apply in complex response")
 
     spec = np.fft.rfft(seg, n=n_fft)
@@ -291,7 +411,19 @@ def ir_wav_to_complex_response(
             sl = int(smoothing_level)
             if sl > 0:
                 mag_db = _octave_smooth_loggrid(freqs, mag_db, sl)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("octave smoothing in complex response")
 
     if phase_hf_hold:
@@ -302,7 +434,19 @@ def ir_wav_to_complex_response(
                 phase_deg[hf] = phase_hold_deg
                 phase_hold_rad = np.deg2rad(float(phase_hold_deg))
                 spec[hf] = np.maximum(np.abs(spec[hf]), 1e-12) * np.exp(1j * phase_hold_rad)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("phase hf hold in complex response")
 
     return (

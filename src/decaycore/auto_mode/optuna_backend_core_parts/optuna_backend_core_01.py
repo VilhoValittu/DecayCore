@@ -12,7 +12,9 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import logging
+from typing import Any
 
 import numpy as np
 
@@ -79,6 +81,62 @@ from ..optuna_backend_loop import (
 logger = logging.getLogger("DecayCore")
 
 
+@dataclass
+class _OptunaRunSetup:
+    total: int
+    cfg_optuna: AutoModeConfig
+    scope_eff: str
+    startup_effective: int
+    run_token: str
+    sampler_kwargs: dict
+    constraint_fn: object
+    sampler: object
+    pruner: object
+    trial_pruned_cls: object
+    pruned_state: object
+    fail_state: object
+    duplicate_guard: bool
+    cache_stats_start: dict
+    study_scan_stats_start: dict
+
+
+@dataclass
+class _OptunaDuplicateState:
+    known_records: dict[str, dict] = field(default_factory=dict)
+    reserved_signatures: set[str] = field(default_factory=set)
+    duplicate_skips: int = 0
+    duplicate_replays: int = 0
+    duplicate_reserved: int = 0
+
+
+@dataclass
+class _OptunaEvalLoopContext:
+    study: object
+    base_data: dict | None
+    study_name: str | None
+    scope_eff: str
+    phase_kind: str | None
+    run_token: str
+    phase_label: str | None
+    total: int
+    startup_effective: int
+    cache_stats_start: dict
+    study_scan_stats_start: dict
+    trial_pruned_cls: object
+    pruned_state: object
+    fail_state: object
+    pruner: object
+    seed_to_params: Any
+    build_preset: Any
+    eval_one: Any
+    consume_one: Any
+    objective_value: Any
+    duplicate_guard: bool
+    duplicate_state: _OptunaDuplicateState
+    known_records: dict[str, dict]
+    reserved_signatures: set[str]
+
+
 class _AutoOptunaPerRunStartupPruner:
     """Keep a per-run startup window when a persistent study already has trials."""
 
@@ -93,7 +151,7 @@ class _AutoOptunaPerRunStartupPruner:
     def prune(self, study, trial) -> bool:
         try:
             trial_number = int(getattr(trial, "number", -1))
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
             trial_number = -1
         if 0 <= int(trial_number) < int(self.existing_trials + self.startup_trials):
             return False
@@ -105,37 +163,25 @@ def _auto_optuna_existing_trial_count(study) -> int:
         trials = study.get_trials(deepcopy=False)
     except TypeError:
         trials = study.get_trials()
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
         trials = getattr(study, "trials", [])
     return int(len(list(trials or [])))
 
 
-def _auto_run_optuna_eval_loop_core(
+def _auto_optuna_prepare_run_setup(
     *,
     optuna_mod,
-    cfg: AutoModeConfig | None = None,
+    cfg: AutoModeConfig | None,
     n_total: int,
     seed: int,
-    startup_trials: int | None = None,
+    startup_trials: int | None,
     base_data: dict | None,
-    seed_presets: list[dict] | None,
-    build_preset,
-    eval_one,
-    consume_one,
-    objective_value,
     workers: int,
-    seed_to_params=None,
-    study_name: str | None = None,
-    study_scope: str | None = None,
-    phase_label: str | None = None,
-    phase_kind: str | None = None,
-    study_user_attrs: dict | None = None,
-) -> dict:
-    if not _auto_optuna_module_ready(optuna_mod):
-        return {}
+    study_name: str | None,
+    study_scope: str | None,
+    phase_kind: str | None,
+) -> _OptunaRunSetup:
     total = int(max(0, n_total))
-    if total <= 0:
-        return {}
     cfg_optuna = cfg if isinstance(cfg, AutoModeConfig) else AutoModeConfig.from_base_data(base_data)
     scope_eff = _auto_optuna_effective_scope(base_data, study_scope or study_name, phase_kind=phase_kind)
     startup_effective = _auto_optuna_startup_for_phase_kind(
@@ -207,7 +253,7 @@ def _auto_run_optuna_eval_loop_core(
                         pruner,
                         startup_trials=int(startup_effective),
                     )
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
                 pruner = None
     logger.info(
         "Automatic mode Optuna study %s: startup=%d total=%d pruning=%s",
@@ -236,412 +282,688 @@ def _auto_run_optuna_eval_loop_core(
             "off" if not bool(use_events) else f"{float(thr['max_events_severity']):.3f}",
             float(thr["max_net_boost_db"]),
         )
-    study = _auto_optuna_create_study(
-        optuna_mod,
+    trial_pruned_cls = getattr(optuna_mod, "TrialPruned", None)
+    trial_pruned_state = getattr(
+        getattr(optuna_mod, "trial", None),
+        "TrialState",
+        None,
+    )
+    pruned_state = getattr(trial_pruned_state, "PRUNED", None) if trial_pruned_state is not None else None
+    fail_state = optuna_mod.trial.TrialState.FAIL
+    duplicate_guard = bool(
+        _auto_safe_bool((base_data or {}).get("auto_mode_optuna_avoid_duplicates", True), True)
+    )
+    return _OptunaRunSetup(
+        total=int(total),
+        cfg_optuna=cfg_optuna,
+        scope_eff=str(scope_eff or ""),
+        startup_effective=int(startup_effective),
+        run_token=str(run_token),
+        sampler_kwargs=dict(sampler_kwargs or {}),
+        constraint_fn=constraint_fn,
         sampler=sampler,
         pruner=pruner,
+        trial_pruned_cls=trial_pruned_cls,
+        pruned_state=pruned_state,
+        fail_state=fail_state,
+        duplicate_guard=bool(duplicate_guard),
+        cache_stats_start=_auto_cache_stats_snapshot(),
+        study_scan_stats_start=_auto_optuna_study_scan_stats_snapshot(),
+    )
+
+
+def _auto_optuna_prepare_study(
+    *,
+    optuna_mod,
+    setup: _OptunaRunSetup,
+    base_data: dict | None,
+    study_name: str | None,
+    study_user_attrs: dict | None,
+) -> object:
+    study = _auto_optuna_create_study(
+        optuna_mod,
+        sampler=setup.sampler,
+        pruner=setup.pruner,
         base_data=base_data,
         study_name=study_name,
     )
-    if isinstance(pruner, _AutoOptunaPerRunStartupPruner):
+    if isinstance(setup.pruner, _AutoOptunaPerRunStartupPruner):
         existing_trials = _auto_optuna_existing_trial_count(study)
-        pruner.set_existing_trials(int(existing_trials))
+        setup.pruner.set_existing_trials(int(existing_trials))
         if int(existing_trials) > 0:
             logger.info(
                 "Automatic mode Optuna pruning startup adjusted for persistent study: existing=%d current_startup=%d",
                 int(existing_trials),
-                int(startup_effective),
+                int(setup.startup_effective),
             )
+    _auto_optuna_apply_study_user_attrs(
+        study=study,
+        study_user_attrs=study_user_attrs,
+    )
+    _auto_optuna_maybe_enqueue_cross_study_seeds(
+        study=study,
+        optuna_mod=optuna_mod,
+        setup=setup,
+        base_data=base_data,
+        study_name=study_name,
+    )
+    return study
+
+
+def _auto_optuna_apply_study_user_attrs(
+    *,
+    study,
+    study_user_attrs: dict | None,
+) -> None:
     for attr_key, attr_value in dict(study_user_attrs or {}).items():
         try:
             study.set_user_attr(str(attr_key), attr_value)
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
             logger.debug("Optuna study user_attr set failed", exc_info=True)
-    if (
+
+
+def _auto_optuna_cross_seeding_enabled(*, study, base_data: dict | None, study_name: str | None) -> bool:
+    return bool(
         _auto_safe_bool(
             (base_data or {}).get("auto_mode_optuna_cross_study_seeds", AUTO_MODE_OPTUNA_CROSS_STUDY_SEEDS),
             AUTO_MODE_OPTUNA_CROSS_STUDY_SEEDS,
         )
         and study_name
         and hasattr(study, "enqueue_trial")
-    ):
-        try:
-            _existing_complete = [
-                tr for tr in study.get_trials(deepcopy=False)
-                if getattr(tr, "value", None) is not None
-            ]
-        except Exception:
-            _existing_complete = []
-        if not _existing_complete:
-            _top_n_cross = max(
-                1,
-                _auto_safe_int(
-                    (base_data or {}).get(
-                        "auto_mode_optuna_cross_study_seeds_top_n",
-                        AUTO_MODE_OPTUNA_CROSS_STUDY_SEEDS_TOP_N,
-                    ),
-                    AUTO_MODE_OPTUNA_CROSS_STUDY_SEEDS_TOP_N,
-                ),
-            )
-            _cross_params = _auto_optuna_cross_study_best_params(
-                optuna_mod,
-                base_data=base_data,
-                scope=str(scope_eff or ""),
-                current_study_name=str(study_name),
-                top_n=int(_top_n_cross),
-            )
-            _cross_enqueued = 0
-            for _cp in _cross_params:
-                try:
-                    study.enqueue_trial(_auto_optuna_sanitize_enqueued_params(dict(_cp), base_data=base_data))
-                    _cross_enqueued += 1
-                except Exception:
-                    logger.exception("optuna cross-study trial enqueue")
-            if _cross_enqueued:
-                logger.info(
-                    "Automatic mode cross-study seeds: enqueued %d trials from sibling studies (scope=%s)",
-                    _cross_enqueued,
-                    str(scope_eff or ""),
-                )
-    _trial_pruned_cls = getattr(optuna_mod, "TrialPruned", None)
-    _trial_pruned_state = getattr(
-        getattr(optuna_mod, "trial", None),
-        "TrialState",
-        None,
     )
-    _pruned_state = getattr(_trial_pruned_state, "PRUNED", None) if _trial_pruned_state is not None else None
-    fail_state = optuna_mod.trial.TrialState.FAIL
-    duplicate_guard = bool(
-        _auto_safe_bool((base_data or {}).get("auto_mode_optuna_avoid_duplicates", True), True)
-    )
-    cache_stats_start = _auto_cache_stats_snapshot()
-    study_scan_stats_start = _auto_optuna_study_scan_stats_snapshot()
-    known_records = {}
-    if bool(duplicate_guard):
-        cached_records = _auto_optuna_cached_study_records(study_name)
-        if cached_records is not None:
-            known_records = dict(cached_records or {})
-        else:
-            known_records = _auto_optuna_study_records(study, seed_to_params=seed_to_params)
-            if study_name:
-                _OPTUNA_KNOWN_RECORDS[str(study_name)] = dict(known_records or {})
-                _OPTUNA_KNOWN_SIGNATURES_PRIMED.add(str(study_name))
-                _auto_optuna_get_known_signatures(str(study_name)).update(known_records.keys())
-    reserved_signatures: set[str] = set()
-    duplicate_skips = 0
-    duplicate_replays = 0
-    duplicate_reserved = 0
 
-    def _make_pruning_hook(trial_obj_ref):
-        """Return a hook that reports a partial score and raises TrialPruned if warranted."""
-        step_counter = [0]
-        def _hook(partial_score: float) -> None:
-            try:
-                trial_obj_ref.report(float(partial_score), step=step_counter[0])
-                step_counter[0] += 1
-                should = trial_obj_ref.should_prune()
-            except Exception:
-                return
-            if bool(should) and _trial_pruned_cls is not None:
-                raise _trial_pruned_cls()
-        return _hook
 
-    def _finalize_telemetry() -> dict:
-        if not bool(
-            _auto_safe_bool(
-                (base_data or {}).get("auto_mode_optuna_telemetry", AUTO_MODE_OPTUNA_TELEMETRY),
-                AUTO_MODE_OPTUNA_TELEMETRY,
-            )
-        ):
-            return {}
-        telemetry = _auto_optuna_build_run_telemetry(
-            study,
-            base_data=base_data,
-            study_name=study_name,
-            study_scope=scope_eff,
-            phase_kind=phase_kind,
-            run_token=run_token,
-            requested_total=int(total),
-            startup_trials=int(startup_effective),
-            duplicate_skips=int(duplicate_skips),
-            duplicate_replays=int(duplicate_replays),
-            duplicate_reserved=int(duplicate_reserved),
-        )
-        cache_stats_now = _auto_cache_stats_snapshot()
-        scan_stats_now = _auto_optuna_study_scan_stats_snapshot()
-        telemetry["cache_loads"] = int(cache_stats_now.get("loads", 0) or 0) - int(
-            cache_stats_start.get("loads", 0) or 0
-        )
-        telemetry["cache_load_hits"] = int(cache_stats_now.get("load_hits", 0) or 0) - int(
-            cache_stats_start.get("load_hits", 0) or 0
-        )
-        telemetry["cache_saves"] = int(cache_stats_now.get("saves", 0) or 0) - int(
-            cache_stats_start.get("saves", 0) or 0
-        )
-        telemetry["cache_entry_hits"] = int(cache_stats_now.get("entry_hits", 0) or 0) - int(
-            cache_stats_start.get("entry_hits", 0) or 0
-        )
-        telemetry["cache_entry_misses"] = int(cache_stats_now.get("entry_misses", 0) or 0) - int(
-            cache_stats_start.get("entry_misses", 0) or 0
-        )
-        telemetry["study_scans"] = int(scan_stats_now.get("study_scans", 0) or 0) - int(
-            study_scan_stats_start.get("study_scans", 0) or 0
-        )
-        telemetry["study_trials_scanned"] = int(scan_stats_now.get("study_trials_scanned", 0) or 0) - int(
-            study_scan_stats_start.get("study_trials_scanned", 0) or 0
-        )
-        if bool(
-            _auto_safe_bool(
-                (base_data or {}).get("auto_mode_optuna_telemetry_log_summary", AUTO_MODE_OPTUNA_TELEMETRY_LOG_SUMMARY),
-                AUTO_MODE_OPTUNA_TELEMETRY_LOG_SUMMARY,
-            )
-        ):
-            _auto_optuna_log_run_telemetry(
-                logger,
-                phase_label=str(phase_label or scope_eff or "optuna"),
-                tel=telemetry,
-            )
-        return dict(telemetry or {})
+def _auto_optuna_has_existing_completed_trials(study) -> bool:
+    try:
+        existing_complete = [
+            tr for tr in study.get_trials(deepcopy=False)
+            if getattr(tr, "value", None) is not None
+        ]
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        existing_complete = []
+    return bool(existing_complete)
 
-    def _tell(trial_obj, out: dict, *, params_sig: str = "", source: str = "optuna") -> None:
-        value = None
-        out_payload = dict(out or {})
-        if bool(out_payload.get("ok", False)):
-            try:
-                value = float(objective_value(dict(out_payload or {})))
-                if not np.isfinite(value):
-                    value = 0.0
-            except Exception:
-                value = 0.0
-        out_payload = _auto_optuna_attach_out_telemetry(
-            out_payload,
-            base_data=base_data,
-            study_name=study_name,
-            study_scope=scope_eff,
-            phase_kind=phase_kind,
-            run_token=run_token,
-            source=str(source or "optuna"),
-            objective_value_num=value,
-        )
-        try:
-            if hasattr(trial_obj, "set_user_attr"):
-                trial_obj.set_user_attr(
-                    AUTO_MODE_OPTUNA_USER_ATTR_OUT,
-                    _auto_optuna_jsonable(dict(out_payload or {})),
-                )
-        except Exception:
-            logger.exception("optuna tell_trial user attr set")
-        try:
-            if bool(dict(out_payload or {}).get("ok", False)):
-                study.tell(trial_obj, float(value))
-                if value is not None and np.isfinite(value) and hasattr(trial_obj, "intermediate_values"):
-                    _iv = dict(trial_obj.intermediate_values or {})
-                    if _iv:
-                        _proxy = _iv.get(0)
-                        if _proxy is not None:
-                            logger.debug(
-                                "optuna pruning proxy=%.3f final_obj=%.4f (proxy=-(p90+clip_pen), obj=rank_score+bass_bonus)",
-                                float(_proxy),
-                                float(value),
-                            )
-            else:
-                study.tell(trial_obj, state=fail_state)
-        except Exception:
-            logger.exception("optuna tell_trial tell")
-        if params_sig:
-            reserved_signatures.discard(str(params_sig))
-            rec = {"params_sig": str(params_sig)}
-            if bool(dict(out_payload or {}).get("ok", False)) and value is not None and np.isfinite(value):
-                rec["value"] = float(value)
-            else:
-                rec["state"] = fail_state
-            if isinstance(out_payload, dict) and out_payload:
-                rec["out"] = dict(out_payload or {})
-            known_records[str(params_sig)] = rec
-            _auto_optuna_update_known_record(study_name, str(params_sig), rec)
 
-    def _reuse_duplicate_trial(trial_obj, params_sig: str, replay_idx: int) -> None:
-        rec = dict(known_records.get(str(params_sig), {}) or {})
-        out_prev = dict(rec.get("out", {}) or {})
-        val = rec.get("value", None)
-        out_payload = _auto_optuna_attach_out_telemetry(
-            out_prev,
-            base_data=base_data,
-            study_name=study_name,
-            study_scope=scope_eff,
-            phase_kind=phase_kind,
-            run_token=run_token,
-            source="replayed",
-            objective_value_num=(
-                float(val)
-                if val is not None and np.isfinite(_auto_safe_float(val, float("nan")))
-                else None
+def _auto_optuna_maybe_enqueue_cross_study_seeds(
+    *,
+    study,
+    optuna_mod,
+    setup: _OptunaRunSetup,
+    base_data: dict | None,
+    study_name: str | None,
+) -> None:
+    if not _auto_optuna_cross_seeding_enabled(study=study, base_data=base_data, study_name=study_name):
+        return
+    if _auto_optuna_has_existing_completed_trials(study):
+        return
+    top_n_cross = max(
+        1,
+        _auto_safe_int(
+            (base_data or {}).get(
+                "auto_mode_optuna_cross_study_seeds_top_n",
+                AUTO_MODE_OPTUNA_CROSS_STUDY_SEEDS_TOP_N,
             ),
-        )
-        if out_payload and hasattr(trial_obj, "set_user_attr"):
-            try:
-                trial_obj.set_user_attr(
-                    AUTO_MODE_OPTUNA_USER_ATTR_OUT,
-                    _auto_optuna_jsonable(out_payload),
-                )
-            except Exception:
-                logger.exception("optuna duplicate trial user attr set")
+            AUTO_MODE_OPTUNA_CROSS_STUDY_SEEDS_TOP_N,
+        ),
+    )
+    cross_params = _auto_optuna_cross_study_best_params(
+        optuna_mod,
+        base_data=base_data,
+        scope=str(setup.scope_eff or ""),
+        current_study_name=str(study_name),
+        top_n=int(top_n_cross),
+    )
+    cross_enqueued = 0
+    for cp in cross_params:
         try:
-            if val is not None and np.isfinite(float(val)):
-                study.tell(trial_obj, float(val))
-            else:
-                study.tell(trial_obj, state=fail_state)
-        except Exception:
-            logger.exception("optuna duplicate trial tell")
-        # Feed replayed result into current search state so it can affect winner selection.
-        if bool(dict(out_prev or {}).get("ok", False)):
-            try:
-                consume_one(int(replay_idx), dict(out_payload or {}))
-                logger.debug(
-                    "Automatic mode Optuna duplicate replay consumed into current search state (sig=%.12s)",
-                    str(params_sig),
-                )
-            except Exception:
-                logger.debug("Automatic mode Optuna duplicate replay consume failed", exc_info=True)
+            study.enqueue_trial(_auto_optuna_sanitize_enqueued_params(dict(cp), base_data=base_data))
+            cross_enqueued += 1
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+            logger.exception("optuna cross-study trial enqueue")
+    if cross_enqueued:
+        logger.info(
+            "Automatic mode cross-study seeds: enqueued %d trials from sibling studies (scope=%s)",
+            cross_enqueued,
+            str(setup.scope_eff or ""),
+        )
 
-    def _ask_new_trial():
-        nonlocal duplicate_reserved, duplicate_replays, duplicate_skips
-        attempts = int(max(1, AUTO_MODE_OPTUNA_DUPLICATE_MAX_ATTEMPTS))
-        last_error = None
-        for _ in range(attempts):
-            try:
-                trial_obj = study.ask()
-                preset = dict(build_preset(trial_obj) or {})
-            except Exception as exc:
-                last_error = f"{type(exc).__name__}: {exc}"
-                break
-            params = _auto_optuna_sanitize_enqueued_params(
-                _auto_optuna_trial_params(
-                    trial_obj=trial_obj,
-                    preset=preset,
-                    seed_to_params=seed_to_params,
-                ),
-                base_data=base_data,
+
+def _auto_optuna_prepare_duplicate_state(
+    *,
+    setup: _OptunaRunSetup,
+    study,
+    study_name: str | None,
+    seed_to_params,
+) -> _OptunaDuplicateState:
+    state = _OptunaDuplicateState()
+    if not bool(setup.duplicate_guard):
+        return state
+    cached_records = _auto_optuna_cached_study_records(study_name)
+    if cached_records is not None:
+        state.known_records = dict(cached_records or {})
+        return state
+    state.known_records = _auto_optuna_study_records(study, seed_to_params=seed_to_params)
+    if study_name:
+        _OPTUNA_KNOWN_RECORDS[str(study_name)] = dict(state.known_records or {})
+        _OPTUNA_KNOWN_SIGNATURES_PRIMED.add(str(study_name))
+        _auto_optuna_get_known_signatures(str(study_name)).update(state.known_records.keys())
+    return state
+
+
+def _auto_optuna_make_pruning_hook(*, trial_obj_ref, trial_pruned_cls):
+    """Return a hook that reports a partial score and raises TrialPruned if warranted."""
+    step_counter = [0]
+
+    def _hook(partial_score: float) -> None:
+        try:
+            trial_obj_ref.report(float(partial_score), step=step_counter[0])
+            step_counter[0] += 1
+            should = trial_obj_ref.should_prune()
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+            return
+        if bool(should) and trial_pruned_cls is not None:
+            raise trial_pruned_cls()
+
+    return _hook
+
+
+def _auto_optuna_finalize_run_telemetry(
+    *,
+    context: _OptunaEvalLoopContext,
+) -> dict:
+    if not bool(
+        _auto_safe_bool(
+            (context.base_data or {}).get("auto_mode_optuna_telemetry", AUTO_MODE_OPTUNA_TELEMETRY),
+            AUTO_MODE_OPTUNA_TELEMETRY,
+        )
+    ):
+        return {}
+    telemetry = _auto_optuna_build_run_telemetry(
+        context.study,
+        base_data=context.base_data,
+        study_name=context.study_name,
+        study_scope=context.scope_eff,
+        phase_kind=context.phase_kind,
+        run_token=context.run_token,
+        requested_total=int(context.total),
+        startup_trials=int(context.startup_effective),
+        duplicate_skips=int(context.duplicate_state.duplicate_skips),
+        duplicate_replays=int(context.duplicate_state.duplicate_replays),
+        duplicate_reserved=int(context.duplicate_state.duplicate_reserved),
+    )
+    cache_stats_now = _auto_cache_stats_snapshot()
+    scan_stats_now = _auto_optuna_study_scan_stats_snapshot()
+    telemetry["cache_loads"] = int(cache_stats_now.get("loads", 0) or 0) - int(
+        context.cache_stats_start.get("loads", 0) or 0
+    )
+    telemetry["cache_load_hits"] = int(cache_stats_now.get("load_hits", 0) or 0) - int(
+        context.cache_stats_start.get("load_hits", 0) or 0
+    )
+    telemetry["cache_saves"] = int(cache_stats_now.get("saves", 0) or 0) - int(
+        context.cache_stats_start.get("saves", 0) or 0
+    )
+    telemetry["cache_entry_hits"] = int(cache_stats_now.get("entry_hits", 0) or 0) - int(
+        context.cache_stats_start.get("entry_hits", 0) or 0
+    )
+    telemetry["cache_entry_misses"] = int(cache_stats_now.get("entry_misses", 0) or 0) - int(
+        context.cache_stats_start.get("entry_misses", 0) or 0
+    )
+    telemetry["study_scans"] = int(scan_stats_now.get("study_scans", 0) or 0) - int(
+        context.study_scan_stats_start.get("study_scans", 0) or 0
+    )
+    telemetry["study_trials_scanned"] = int(scan_stats_now.get("study_trials_scanned", 0) or 0) - int(
+        context.study_scan_stats_start.get("study_trials_scanned", 0) or 0
+    )
+    if bool(
+        _auto_safe_bool(
+            (context.base_data or {}).get("auto_mode_optuna_telemetry_log_summary", AUTO_MODE_OPTUNA_TELEMETRY_LOG_SUMMARY),
+            AUTO_MODE_OPTUNA_TELEMETRY_LOG_SUMMARY,
+        )
+    ):
+        _auto_optuna_log_run_telemetry(
+            logger,
+            phase_label=str(context.phase_label or context.scope_eff or "optuna"),
+            tel=telemetry,
+        )
+    return dict(telemetry or {})
+
+
+def _auto_optuna_objective_value_from_out(
+    *,
+    context: _OptunaEvalLoopContext,
+    out_payload: dict,
+) -> float | None:
+    if not bool(dict(out_payload or {}).get("ok", False)):
+        return None
+    try:
+        value = float(context.objective_value(dict(out_payload or {})))
+        if not np.isfinite(value):
+            return 0.0
+        return float(value)
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        return 0.0
+
+
+def _auto_optuna_set_trial_out_payload(
+    *,
+    trial_obj,
+    out_payload: dict,
+) -> None:
+    try:
+        if hasattr(trial_obj, "set_user_attr"):
+            trial_obj.set_user_attr(
+                AUTO_MODE_OPTUNA_USER_ATTR_OUT,
+                _auto_optuna_jsonable(dict(out_payload or {})),
             )
-            params_sig = _auto_optuna_param_signature(params)
-            if (not bool(duplicate_guard)) or (not params_sig):
-                if params_sig:
-                    reserved_signatures.add(str(params_sig))
-                return trial_obj, preset, str(params_sig), None
-            if params_sig in reserved_signatures:
-                duplicate_skips += 1
-                duplicate_reserved += 1
-                reserved_out = _auto_optuna_attach_out_telemetry(
-                    {
-                        "ok": False,
-                        "error": "duplicate suggestion reserved in current batch",
-                    },
-                    base_data=base_data,
-                    study_name=study_name,
-                    study_scope=scope_eff,
-                    phase_kind=phase_kind,
-                    run_token=run_token,
-                    source="reserved",
-                    objective_value_num=None,
-                )
-                try:
-                    if hasattr(trial_obj, "set_user_attr"):
-                        trial_obj.set_user_attr(
-                            AUTO_MODE_OPTUNA_USER_ATTR_OUT,
-                            _auto_optuna_jsonable(dict(reserved_out or {})),
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        logger.exception("optuna tell_trial user attr set")
+
+
+def _auto_optuna_tell_study_trial(
+    *,
+    context: _OptunaEvalLoopContext,
+    trial_obj,
+    out_payload: dict,
+    value: float | None,
+) -> None:
+    try:
+        if bool(dict(out_payload or {}).get("ok", False)):
+            context.study.tell(trial_obj, float(value))
+            if value is not None and np.isfinite(value) and hasattr(trial_obj, "intermediate_values"):
+                _iv = dict(trial_obj.intermediate_values or {})
+                if _iv:
+                    _proxy = _iv.get(0)
+                    if _proxy is not None:
+                        logger.debug(
+                            "optuna pruning proxy=%.3f final_obj=%.4f (proxy=-(p90+clip_pen), obj=rank_score+bass_bonus)",
+                            float(_proxy),
+                            float(value),
                         )
-                    study.tell(trial_obj, state=fail_state)
-                except Exception:
-                    logger.exception("optuna reserved trial fail-tell")
-                continue
-            if params_sig in known_records:
-                duplicate_skips += 1
-                duplicate_replays += 1
-                _reuse_duplicate_trial(trial_obj, str(params_sig), int(duplicate_replays))
-                continue
-            reserved_signatures.add(str(params_sig))
+        else:
+            context.study.tell(trial_obj, state=context.fail_state)
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        logger.exception("optuna tell_trial tell")
+
+
+def _auto_optuna_store_known_record(
+    *,
+    context: _OptunaEvalLoopContext,
+    params_sig: str,
+    out_payload: dict,
+    value: float | None,
+) -> None:
+    if not params_sig:
+        return
+    context.reserved_signatures.discard(str(params_sig))
+    rec = {"params_sig": str(params_sig)}
+    if bool(dict(out_payload or {}).get("ok", False)) and value is not None and np.isfinite(value):
+        rec["value"] = float(value)
+    else:
+        rec["state"] = context.fail_state
+    if isinstance(out_payload, dict) and out_payload:
+        rec["out"] = dict(out_payload or {})
+    context.known_records[str(params_sig)] = rec
+    _auto_optuna_update_known_record(context.study_name, str(params_sig), rec)
+
+
+def _auto_optuna_tell_trial(
+    *,
+    context: _OptunaEvalLoopContext,
+    trial_obj,
+    out: dict,
+    params_sig: str = "",
+    source: str = "optuna",
+) -> None:
+    out_payload = dict(out or {})
+    value = _auto_optuna_objective_value_from_out(
+        context=context,
+        out_payload=out_payload,
+    )
+    out_payload = _auto_optuna_attach_out_telemetry(
+        out_payload,
+        base_data=context.base_data,
+        study_name=context.study_name,
+        study_scope=context.scope_eff,
+        phase_kind=context.phase_kind,
+        run_token=context.run_token,
+        source=str(source or "optuna"),
+        objective_value_num=value,
+    )
+    _auto_optuna_set_trial_out_payload(
+        trial_obj=trial_obj,
+        out_payload=out_payload,
+    )
+    _auto_optuna_tell_study_trial(
+        context=context,
+        trial_obj=trial_obj,
+        out_payload=out_payload,
+        value=value,
+    )
+    _auto_optuna_store_known_record(
+        context=context,
+        params_sig=str(params_sig or ""),
+        out_payload=out_payload,
+        value=value,
+    )
+
+
+def _auto_optuna_reuse_duplicate_trial(
+    *,
+    context: _OptunaEvalLoopContext,
+    trial_obj,
+    params_sig: str,
+    replay_idx: int,
+) -> None:
+    rec = dict(context.known_records.get(str(params_sig), {}) or {})
+    out_prev = dict(rec.get("out", {}) or {})
+    val = rec.get("value", None)
+    out_payload = _auto_optuna_attach_out_telemetry(
+        out_prev,
+        base_data=context.base_data,
+        study_name=context.study_name,
+        study_scope=context.scope_eff,
+        phase_kind=context.phase_kind,
+        run_token=context.run_token,
+        source="replayed",
+        objective_value_num=(
+            float(val)
+            if val is not None and np.isfinite(_auto_safe_float(val, float("nan")))
+            else None
+        ),
+    )
+    if out_payload and hasattr(trial_obj, "set_user_attr"):
+        try:
+            trial_obj.set_user_attr(
+                AUTO_MODE_OPTUNA_USER_ATTR_OUT,
+                _auto_optuna_jsonable(out_payload),
+            )
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+            logger.exception("optuna duplicate trial user attr set")
+    try:
+        if val is not None and np.isfinite(float(val)):
+            context.study.tell(trial_obj, float(val))
+        else:
+            context.study.tell(trial_obj, state=context.fail_state)
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        logger.exception("optuna duplicate trial tell")
+    if bool(dict(out_prev or {}).get("ok", False)):
+        try:
+            context.consume_one(int(replay_idx), dict(out_payload or {}))
+            logger.debug(
+                "Automatic mode Optuna duplicate replay consumed into current search state (sig=%.12s)",
+                str(params_sig),
+            )
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+            logger.debug("Automatic mode Optuna duplicate replay consume failed", exc_info=True)
+
+
+def _auto_optuna_ask_new_trial(
+    *,
+    context: _OptunaEvalLoopContext,
+):
+    attempts = int(max(1, AUTO_MODE_OPTUNA_DUPLICATE_MAX_ATTEMPTS))
+    last_error = None
+    for _ in range(attempts):
+        try:
+            trial_obj = context.study.ask()
+            preset = dict(context.build_preset(trial_obj) or {})
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError) as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+            break
+        params = _auto_optuna_sanitize_enqueued_params(
+            _auto_optuna_trial_params(
+                trial_obj=trial_obj,
+                preset=preset,
+                seed_to_params=context.seed_to_params,
+            ),
+            base_data=context.base_data,
+        )
+        params_sig = _auto_optuna_param_signature(params)
+        if (not bool(context.duplicate_guard)) or (not params_sig):
+            if params_sig:
+                context.reserved_signatures.add(str(params_sig))
             return trial_obj, preset, str(params_sig), None
-        return None, {}, "", str(last_error or "no unique optuna candidate available")
+        if params_sig in context.reserved_signatures:
+            context.duplicate_state.duplicate_skips += 1
+            context.duplicate_state.duplicate_reserved += 1
+            reserved_out = _auto_optuna_attach_out_telemetry(
+                {
+                    "ok": False,
+                    "error": "duplicate suggestion reserved in current batch",
+                },
+                base_data=context.base_data,
+                study_name=context.study_name,
+                study_scope=context.scope_eff,
+                phase_kind=context.phase_kind,
+                run_token=context.run_token,
+                source="reserved",
+                objective_value_num=None,
+            )
+            try:
+                if hasattr(trial_obj, "set_user_attr"):
+                    trial_obj.set_user_attr(
+                        AUTO_MODE_OPTUNA_USER_ATTR_OUT,
+                        _auto_optuna_jsonable(dict(reserved_out or {})),
+                    )
+                context.study.tell(trial_obj, state=context.fail_state)
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+                logger.exception("optuna reserved trial fail-tell")
+            continue
+        if params_sig in context.known_records:
+            context.duplicate_state.duplicate_skips += 1
+            context.duplicate_state.duplicate_replays += 1
+            _auto_optuna_reuse_duplicate_trial(
+                context=context,
+                trial_obj=trial_obj,
+                params_sig=str(params_sig),
+                replay_idx=int(context.duplicate_state.duplicate_replays),
+            )
+            continue
+        context.reserved_signatures.add(str(params_sig))
+        return trial_obj, preset, str(params_sig), None
+    return None, {}, "", str(last_error or "no unique optuna candidate available")
+
+
+def _auto_optuna_filter_and_enqueue_seed_items(
+    *,
+    context: _OptunaEvalLoopContext,
+    seed_items: list[dict],
+) -> list[dict]:
+    if not (callable(context.seed_to_params) and hasattr(context.study, "enqueue_trial")):
+        return list(seed_items or [])
+    seed_items_filtered = []
+    enqueued_signatures: set[str] = set()
+    for preset in list(seed_items):
+        try:
+            params = _auto_optuna_sanitize_enqueued_params(
+                dict(context.seed_to_params(dict(preset or {})) or {}),
+                base_data=context.base_data,
+            )
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+            params = {}
+        params_sig = _auto_optuna_param_signature(params)
+        if bool(context.duplicate_guard) and params_sig and (
+            params_sig in context.known_records or params_sig in enqueued_signatures
+        ):
+            context.duplicate_state.duplicate_skips += 1
+            continue
+        if params:
+            try:
+                context.study.enqueue_trial(dict(params))
+                if params_sig:
+                    enqueued_signatures.add(str(params_sig))
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+                logger.exception("optuna seed trial enqueue")
+        seed_items_filtered.append(dict(preset or {}))
+    return list(seed_items_filtered)
+
+
+def _auto_run_optuna_eval_loop_core(
+    *,
+    optuna_mod,
+    cfg: AutoModeConfig | None = None,
+    n_total: int,
+    seed: int,
+    startup_trials: int | None = None,
+    base_data: dict | None,
+    seed_presets: list[dict] | None,
+    build_preset,
+    eval_one,
+    consume_one,
+    objective_value,
+    workers: int,
+    seed_to_params=None,
+    study_name: str | None = None,
+    study_scope: str | None = None,
+    phase_label: str | None = None,
+    phase_kind: str | None = None,
+    study_user_attrs: dict | None = None,
+) -> dict:
+    if not _auto_optuna_module_ready(optuna_mod):
+        return {}
+    setup = _auto_optuna_prepare_run_setup(
+        optuna_mod=optuna_mod,
+        cfg=cfg,
+        n_total=int(n_total),
+        seed=int(seed),
+        startup_trials=startup_trials,
+        base_data=base_data,
+        workers=int(workers),
+        study_name=study_name,
+        study_scope=study_scope,
+        phase_kind=phase_kind,
+    )
+    total = int(setup.total)
+    if total <= 0:
+        return {}
+    cfg_optuna = setup.cfg_optuna
+    scope_eff = setup.scope_eff
+    startup_effective = setup.startup_effective
+    run_token = setup.run_token
+    pruner = setup.pruner
+    _trial_pruned_cls = setup.trial_pruned_cls
+    _pruned_state = setup.pruned_state
+    fail_state = setup.fail_state
+    duplicate_guard = setup.duplicate_guard
+    cache_stats_start = dict(setup.cache_stats_start or {})
+    study_scan_stats_start = dict(setup.study_scan_stats_start or {})
+    study = _auto_optuna_prepare_study(
+        optuna_mod=optuna_mod,
+        setup=setup,
+        base_data=base_data,
+        study_name=study_name,
+        study_user_attrs=study_user_attrs,
+    )
+    duplicate_state = _auto_optuna_prepare_duplicate_state(
+        setup=setup,
+        study=study,
+        study_name=study_name,
+        seed_to_params=seed_to_params,
+    )
+    known_records = duplicate_state.known_records
+    reserved_signatures = duplicate_state.reserved_signatures
+    context = _OptunaEvalLoopContext(
+        study=study,
+        base_data=base_data,
+        study_name=study_name,
+        scope_eff=scope_eff,
+        phase_kind=phase_kind,
+        run_token=run_token,
+        phase_label=phase_label,
+        total=int(total),
+        startup_effective=int(startup_effective),
+        cache_stats_start=dict(cache_stats_start or {}),
+        study_scan_stats_start=dict(study_scan_stats_start or {}),
+        trial_pruned_cls=_trial_pruned_cls,
+        pruned_state=_pruned_state,
+        fail_state=fail_state,
+        pruner=pruner,
+        seed_to_params=seed_to_params,
+        build_preset=build_preset,
+        eval_one=eval_one,
+        consume_one=consume_one,
+        objective_value=objective_value,
+        duplicate_guard=bool(duplicate_guard),
+        duplicate_state=duplicate_state,
+        known_records=known_records,
+        reserved_signatures=reserved_signatures,
+    )
 
     seed_items = list(seed_presets or [])[: int(total)]
-    if callable(seed_to_params) and hasattr(study, "enqueue_trial"):
-        seed_items_filtered = []
-        enqueued_signatures: set[str] = set()
-        for preset in list(seed_items):
-            try:
-                params = _auto_optuna_sanitize_enqueued_params(
-                    dict(seed_to_params(dict(preset or {})) or {}),
-                    base_data=base_data,
-                )
-            except Exception:
-                params = {}
-            params_sig = _auto_optuna_param_signature(params)
-            if bool(duplicate_guard) and params_sig and (
-                params_sig in known_records or params_sig in enqueued_signatures
-            ):
-                duplicate_skips += 1
-                continue
-            if params:
-                try:
-                    study.enqueue_trial(dict(params))
-                    if params_sig:
-                        enqueued_signatures.add(str(params_sig))
-                except Exception:
-                    logger.exception("optuna seed trial enqueue")
-            seed_items_filtered.append(dict(preset or {}))
-        seed_items = list(seed_items_filtered)
+    seed_items = _auto_optuna_filter_and_enqueue_seed_items(
+        context=context,
+        seed_items=list(seed_items or []),
+    )
 
     idx_next, seed_telemetry = _run_optuna_seed_trials(
         total=int(total),
         seed_items=list(seed_items or []),
         seed_to_params=seed_to_params,
-        ask_new_trial=_ask_new_trial,
+        ask_new_trial=lambda: _auto_optuna_ask_new_trial(context=context),
         eval_one=eval_one,
         consume_one=consume_one,
-        tell_trial=_tell,
-        finalize_telemetry=_finalize_telemetry,
+        tell_trial=lambda trial_obj, out, **kwargs: _auto_optuna_tell_trial(
+            context=context,
+            trial_obj=trial_obj,
+            out=out,
+            **kwargs,
+        ),
+        finalize_telemetry=lambda: _auto_optuna_finalize_run_telemetry(context=context),
     )
     if seed_telemetry is not None:
         _log_optuna_duplicate_summary(
-            duplicate_skips=int(duplicate_skips),
+            duplicate_skips=int(duplicate_state.duplicate_skips),
             study_name=study_name,
         )
         return dict(seed_telemetry or {})
     if idx_next > total:
         _log_optuna_duplicate_summary(
-            duplicate_skips=int(duplicate_skips),
+            duplicate_skips=int(duplicate_state.duplicate_skips),
             study_name=study_name,
         )
-        return _finalize_telemetry()
+        return _auto_optuna_finalize_run_telemetry(context=context)
 
     remaining = int(total - idx_next + 1)
     if workers <= 1 or remaining <= 1:
         serial_telemetry = _run_optuna_serial_trials(
             idx_next=int(idx_next),
             total=int(total),
-            ask_new_trial=_ask_new_trial,
+            ask_new_trial=lambda: _auto_optuna_ask_new_trial(context=context),
             eval_one=eval_one,
             consume_one=consume_one,
-            tell_trial=_tell,
-            finalize_telemetry=_finalize_telemetry,
+            tell_trial=lambda trial_obj, out, **kwargs: _auto_optuna_tell_trial(
+                context=context,
+                trial_obj=trial_obj,
+                out=out,
+                **kwargs,
+            ),
+            finalize_telemetry=lambda: _auto_optuna_finalize_run_telemetry(context=context),
             pruner=pruner,
-            make_pruning_hook=_make_pruning_hook,
+            make_pruning_hook=lambda trial_obj_ref: _auto_optuna_make_pruning_hook(
+                trial_obj_ref=trial_obj_ref,
+                trial_pruned_cls=_trial_pruned_cls,
+            ),
             trial_pruned_cls=_trial_pruned_cls,
             pruned_state=_pruned_state,
             study=study,
             reserved_signatures=reserved_signatures,
         )
         _log_optuna_duplicate_summary(
-            duplicate_skips=int(duplicate_skips),
+            duplicate_skips=int(duplicate_state.duplicate_skips),
             study_name=study_name,
         )
-        return dict(serial_telemetry or _finalize_telemetry() or {})
+        return dict(serial_telemetry or _auto_optuna_finalize_run_telemetry(context=context) or {})
 
     chunk_size = int(_auto_trial_chunk_size(workers))
 
     def _eval_with_hook(idx, preset, trial_obj_ref):
         if pruner is not None and trial_obj_ref is not None:
-            _set_pruning_hook(_make_pruning_hook(trial_obj_ref))
+            _set_pruning_hook(
+                _auto_optuna_make_pruning_hook(
+                    trial_obj_ref=trial_obj_ref,
+                    trial_pruned_cls=_trial_pruned_cls,
+                )
+            )
         try:
             return eval_one(int(idx), dict(preset))
         finally:
@@ -652,27 +974,32 @@ def _auto_run_optuna_eval_loop_core(
         total=int(total),
         workers=int(workers),
         chunk_size=int(chunk_size),
-        ask_new_trial=_ask_new_trial,
+        ask_new_trial=lambda: _auto_optuna_ask_new_trial(context=context),
         eval_with_hook=_eval_with_hook,
         consume_one=consume_one,
-        tell_trial=_tell,
-        finalize_telemetry=_finalize_telemetry,
+        tell_trial=lambda trial_obj, out, **kwargs: _auto_optuna_tell_trial(
+            context=context,
+            trial_obj=trial_obj,
+            out=out,
+            **kwargs,
+        ),
+        finalize_telemetry=lambda: _auto_optuna_finalize_run_telemetry(context=context),
         trial_pruned_cls=_trial_pruned_cls,
         pruned_state=_pruned_state,
         study=study,
         reserved_signatures=reserved_signatures,
     )
     _log_optuna_duplicate_summary(
-        duplicate_skips=int(duplicate_skips),
+        duplicate_skips=int(duplicate_state.duplicate_skips),
         study_name=study_name,
     )
-    return dict(parallel_telemetry or _finalize_telemetry() or {})
+    return dict(parallel_telemetry or _auto_optuna_finalize_run_telemetry(context=context) or {})
 
 
 __all__ = ['_auto_run_optuna_eval_loop_core']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['optuna_backend_core_01']:
@@ -683,4 +1010,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

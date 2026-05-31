@@ -37,7 +37,19 @@ def _transfer_is_effectively_silent(transfer: TransferData | None) -> bool:
         return True
     try:
         spec = np.asarray(transfer.complex_spec, dtype=np.complex128)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return True
     return spec.size == 0 or float(np.max(np.abs(spec))) <= 1e-12
 

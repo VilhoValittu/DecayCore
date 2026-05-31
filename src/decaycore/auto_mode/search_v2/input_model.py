@@ -91,7 +91,19 @@ def _jsonable(value: Any) -> Any:
     try:
         json.dumps(value, sort_keys=True, default=str)
         return value
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return str(value)
 
 
@@ -177,7 +189,19 @@ def build_auto_search_input(raw_data, measurements, context: dict | None = None)
                 )
             )
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         frequency_grid_identity = ""
     hpf = ctx.get("hpf")
     hc_mode = str(ctx.get("hc_mode", base.get("hc_mode", "")) or "").strip() or None

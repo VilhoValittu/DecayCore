@@ -209,7 +209,19 @@ def _store_phase_authority_telemetry(
                 f"min20_600={gain_lf.min():.2f} "
                 f"suppressed_bins={suppressed}"
             )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         pass
 
 

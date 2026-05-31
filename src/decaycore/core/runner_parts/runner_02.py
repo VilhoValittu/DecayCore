@@ -135,7 +135,19 @@ def _headless_hybrid_iir_biquads(result, side: str) -> list[dict]:
     st_name = "l_st" if str(side).lower().startswith("l") else "r_st"
     try:
         st = dict(getattr(result, st_name, {}) or {})
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         st = {}
     return [dict(item) for item in list(st.get("hybrid_iir_biquads", []) or []) if isinstance(item, dict)]
 
@@ -193,11 +205,35 @@ def _build_headless_export_zip(
     multi_rate_on = bool(data.get("multi_rate_opt", False))
     try:
         yaml_xo_order = int(round(float(data.get("sub_crossover_slope", 12) or 12) / 6.0))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         yaml_xo_order = 2
     try:
         yaml_sub_hpf_order = int(round(float(data.get("sub_hpf_slope", 12) or 12) / 6.0))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         yaml_sub_hpf_order = 2
     wav_fmt = str(data.get("filter_wav_format", "FLOAT32") or "FLOAT32").upper()
     if wav_fmt not in ("FLOAT32", "S32_LE", "S16_LE"):
@@ -445,7 +481,7 @@ def _normalize_headless_config(config: dict, *, config_dir: Path, output_dir: Pa
 __all__ = ['_headless_camilladsp_yaml_name', '_headless_summary_content', '_build_headless_export_zip', '_save_headless_export_bundle', '_read_json', '_resolve_path', '_first_existing', '_normalize_headless_config']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['runner_01', 'runner_02', 'runner_03', 'runner_04']:
@@ -456,4 +492,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

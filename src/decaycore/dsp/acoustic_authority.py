@@ -41,7 +41,19 @@ def _as_float_array(value) -> np.ndarray:
         return np.asarray([], dtype=float)
     try:
         return np.asarray(value, dtype=float).reshape(-1)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return np.asarray([], dtype=float)
 
 

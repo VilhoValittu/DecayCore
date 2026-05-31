@@ -90,7 +90,19 @@ def _jitter(
         return _clip(center, lo, hi)
     try:
         x = float(rng.normal(loc=float(center), scale=float(sig)))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         x = float(center)
     return _clip(x, lo, hi)
 
@@ -142,7 +154,7 @@ def _auto_sample_mag_low_pair(
 __all__ = ['_auto_is_phase_search_filter', '_auto_phase_limit_clip', '_auto_phase_limit_center', '_auto_phase_limit_prior_penalty', '_jitter', '_auto_sample_mag_low_pair']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['cache_hash', 'goal_profile', 'safe_values', 'backend', 'config', 'phase_sampling']:
@@ -153,4 +165,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

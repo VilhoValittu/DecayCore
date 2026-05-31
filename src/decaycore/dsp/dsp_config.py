@@ -54,22 +54,36 @@ def _coerce_bool(value: Any, default: bool) -> bool:
     if isinstance(value, (bool, np.bool_)):
         return bool(value)
     if isinstance(value, str):
-        text = value.strip().lower()
-        if text in _TRUE_STRINGS:
-            return True
-        if text in _FALSE_STRINGS:
-            return False
-        return bool(default)
+        return _coerce_bool_from_string(value, default)
     if isinstance(value, (int, np.integer)):
-        if int(value) in (0, 1):
-            return bool(value)
-        return bool(default)
+        return _coerce_bool_from_integer(value, default)
     if isinstance(value, (float, np.floating)):
-        if not np.isfinite(value):
-            return bool(default)
-        if float(value) in (0.0, 1.0):
-            return bool(int(value))
+        return _coerce_bool_from_float(value, default)
+    return bool(default)
+
+
+def _coerce_bool_from_string(value: str, default: bool) -> bool:
+    text = value.strip().lower()
+    if text in _TRUE_STRINGS:
+        return True
+    if text in _FALSE_STRINGS:
+        return False
+    return bool(default)
+
+
+def _coerce_bool_from_integer(value: int | np.integer, default: bool) -> bool:
+    int_value = int(value)
+    if int_value in (0, 1):
+        return bool(int_value)
+    return bool(default)
+
+
+def _coerce_bool_from_float(value: float | np.floating, default: bool) -> bool:
+    if not np.isfinite(value):
         return bool(default)
+    float_value = float(value)
+    if float_value in (0.0, 1.0):
+        return bool(int(float_value))
     return bool(default)
 
 

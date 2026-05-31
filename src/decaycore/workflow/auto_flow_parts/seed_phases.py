@@ -148,7 +148,19 @@ def _try_cached_target_pick_before_search(
             return ""
         try:
             return str(_auto_filter_cache_key({"filter_type": raw}) or "").strip()
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             low = raw.lower()
             if "asym" in low:
                 return "asym"
@@ -236,7 +248,19 @@ def _try_cached_target_pick_before_search(
             goal=goal,
             compat_version=compat_version,
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         global_entry = None
 
     if isinstance(global_entry, dict):
@@ -267,7 +291,19 @@ def _try_cached_target_pick_before_search(
             filter_key=filter_key,
             compat_version=compat_version,
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         measurement_entry = None
 
     if _entry_matches_current_filter(measurement_entry):
@@ -309,7 +345,19 @@ def _try_cached_target_pick_before_search(
             filter_key=filter_key,
             compat_version=compat_version,
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         signature_entry = None
 
     pick = _target_cache_pick_from_entry(
@@ -341,7 +389,19 @@ def _run_auto_mode_seed_phases(
             str(data.get("mode", "BASIC") or "BASIC").strip().upper() == "AUTO"
             or data.get("camillafir_automatic_mode", False)
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         auto_mode_preview = False
     auto_goal = _auto_goal_norm(str(data.get("auto_goal", "balanced") or "balanced"))
     data["auto_goal"] = str(auto_goal)
@@ -366,7 +426,19 @@ def _run_auto_mode_seed_phases(
     if auto_mode_preview:
         try:
             ft = str(data.get("filter_type", "mixed") or "mixed")
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             ft = "mixed"
         auto_status(
             "DecayCore automatic mode: init "
@@ -562,7 +634,19 @@ def _run_auto_mode_seed_phases(
                                     pre_f_l, pre_m_l = _tfl, _tml
                                 if _tfr.size >= 32 and _tmr.size == _tfr.size:
                                     pre_f_r, pre_m_r = _tfr, _tmr
-                    except Exception:
+                    except (
+
+                        AttributeError,
+                        TypeError,
+                        ValueError,
+                        KeyError,
+                        IndexError,
+                        RuntimeError,
+                        OSError,
+                        ImportError,
+                        ModuleNotFoundError,
+                        NameError,
+                    ):
                         logger.exception("bass integration pre-measurement extract")
                 pre_measurements = dict(ctx.get("measurements", {}) or {})
                 pre_measurements.update(
@@ -682,7 +766,19 @@ def _run_auto_mode_seed_phases(
                             "Automatic mode target seed preset: "
                             + ", ".join([f"{k}={v}" for k, v in target_seed_preset.items()])
                         )
-        except Exception as exc:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ) as exc:
             logger.warning(f"Automatic mode target preselect failed: {type(exc).__name__}: {exc}")
 
     ctx["auto_mode_preview"] = auto_mode_preview
@@ -693,7 +789,7 @@ def _run_auto_mode_seed_phases(
 __all__ = ['_run_auto_mode_seed_phases']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['progress', 'status_text', 'seed_phases', 'search']:
@@ -704,4 +800,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

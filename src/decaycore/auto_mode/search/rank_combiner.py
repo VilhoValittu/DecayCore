@@ -169,7 +169,19 @@ def combine_rank_score(
         else:
             m1 = _auto_get_worst_mode_hz(result)
             top_modes = [float(m1)] if m1 is not None else []
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         top_modes = []
 
     mode_hz = shared._auto_safe_float(

@@ -55,13 +55,22 @@ from .optuna_backend_storage import (
 
 logger = logging.getLogger("DecayCore")
 
+_RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS = (
+    AttributeError,
+    KeyError,
+    TypeError,
+    ValueError,
+    RuntimeError,
+    OSError,
+)
+
 
 def _auto_optuna_study_records(study, *, seed_to_params=None) -> dict[str, dict]:
     try:
         trials = study.get_trials(deepcopy=False)
     except TypeError:
         trials = study.get_trials()
-    except Exception:
+    except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
         trials = getattr(study, "trials", [])
     trials = list(trials or [])
     _auto_optuna_note_trial_scan(len(trials))
@@ -69,17 +78,17 @@ def _auto_optuna_study_records(study, *, seed_to_params=None) -> dict[str, dict]
     for tr in trials:
         try:
             user_attrs = dict(getattr(tr, "user_attrs", {}) or {})
-        except Exception:
+        except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
             user_attrs = {}
         payload_preset = _auto_optuna_trial_payload_preset(user_attrs)
         try:
             params = dict(getattr(tr, "params", {}) or {})
-        except Exception:
+        except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
             params = {}
         if callable(seed_to_params) and payload_preset:
             try:
                 canonical_params = dict(seed_to_params(dict(payload_preset)) or {})
-            except Exception:
+            except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
                 canonical_params = {}
             if canonical_params:
                 params = dict(canonical_params)
@@ -94,7 +103,7 @@ def _auto_optuna_study_records(study, *, seed_to_params=None) -> dict[str, dict]
                 val = vals[0]
         try:
             val_f = float(val)
-        except Exception:
+        except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
             val_f = float("nan")
         if np.isfinite(val_f):
             rec["value"] = float(val_f)
@@ -129,7 +138,7 @@ def _auto_optuna_remember_result(
             dict(seed_to_params(dict(preset or {})) or {}),
             base_data=base_data,
         )
-    except Exception:
+    except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
         params = {}
     params_sig = _auto_optuna_param_signature(params)
     if not params_sig:
@@ -201,7 +210,7 @@ def _auto_optuna_remember_result(
                     use_events=bool(use_events),
                 )
                 trial_system_attrs = {"constraints": list(cv)}
-            except Exception:
+            except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
                 trial_system_attrs = None
         add_trial_obj = _auto_optuna_build_completed_trial(
             optuna_mod,
@@ -224,14 +233,14 @@ def _auto_optuna_remember_result(
                     },
                 )
                 return True
-            except Exception:
+            except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
                 logger.exception("optuna add_trial")
     if not hasattr(study, "enqueue_trial") or not hasattr(study, "ask") or not hasattr(study, "tell"):
         return False
     try:
         study.enqueue_trial(dict(params))
         trial_obj = study.ask()
-    except Exception:
+    except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
         return False
     try:
         if hasattr(trial_obj, "set_user_attr"):
@@ -239,11 +248,11 @@ def _auto_optuna_remember_result(
                 AUTO_MODE_OPTUNA_USER_ATTR_OUT,
                 payload_json,
             )
-    except Exception:
+    except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
         logger.exception("optuna trial user attr set")
     try:
         study.tell(trial_obj, float(value))
-    except Exception:
+    except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
         return False
     _auto_optuna_update_known_record(
         study_name,

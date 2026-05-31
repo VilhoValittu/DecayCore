@@ -86,7 +86,19 @@ def _user_manual_path_candidates() -> list[Path]:
     if hasattr(sys, "_MEIPASS"):
         try:
             candidates.append(Path(sys._MEIPASS) / "docs" / "User_Manual.md")  # type: ignore[attr-defined]
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("Failed to resolve bundled user manual path")
     candidates.append(Path(__file__).resolve().parents[3] / "docs" / "User_Manual.md")
     return candidates
@@ -251,7 +263,19 @@ def _on_start_click() -> None:
         return
     try:
         _PROCESS_RUN()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("process_run raised")
 
 
@@ -269,7 +293,19 @@ def _build_brand_header(*, version: str, dark_mode) -> None:
         try:
             with pkgres.files("decaycore.ui.assets").joinpath(filename).open("rb") as f:
                 return base64.b64encode(f.read()).decode()
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             return ""
 
     logo_dark_b64 = _load_logo_b64("DecayCore_logo.png")

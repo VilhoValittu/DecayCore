@@ -119,6 +119,11 @@ def _modal_event_match(
     return modal_events[best_idx] if scores[best_idx] >= 0.0 else None
 
 
+def _has_rt60_data(rt60_info: Any) -> bool:
+    """True when rt60_info is not completely absent (None). Empty dict/scalar uses fallback."""
+    return rt60_info is not None
+
+
 def _rt60_at(rt60_info: Any, freq_hz: float) -> float:
     default = 0.4
     try:
@@ -354,6 +359,13 @@ def apply_smart_tdc(
         is_resonance = bool(node_type == "resonance" or (not node_type and f_res <= 200.0))
         if node_type == "reflection" and f_res > 200.0:
             skipped_high += 1
+            continue
+
+        if not _has_rt60_data(rt60_info):
+            logger.info(
+                "TDC: skipping event at %.1f Hz — no reliable RT60 data available",
+                f_res,
+            )
             continue
 
         ref_rt60 = _rt60_at(rt60_info, f_res)

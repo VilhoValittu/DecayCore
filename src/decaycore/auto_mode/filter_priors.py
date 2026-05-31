@@ -66,7 +66,19 @@ def _measurement_signature(
     try:
         from .cache_signature import _auto_get_measurement_signature
         return str(_auto_get_measurement_signature(measurements)).strip()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return ""
 
 
@@ -76,13 +88,37 @@ def _normalize_scalar(key: str, value):
     if key in _INT_KEYS:
         try:
             return int(round(float(value)))
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             return value
     if isinstance(value, float):
         try:
             if float(value).is_integer():
                 return int(round(float(value)))
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             return value
     return value
 
@@ -140,7 +176,19 @@ def _merge_filters(base: dict | None, overlay: dict | None) -> dict:
 def _read_json(path: Path) -> dict:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return {}
 
 
@@ -367,34 +415,36 @@ def _update_entry_from_winner(
     if not defaults:
         defaults = _defaults_template_from_known_keys(filter_type, best_preset, data)
 
-    updated_seed: list[str] = []
-    for key in list(seed.keys()):
-        if key in _PRIOR_SKIP_KEYS:
-            continue
-        if key in best_preset:
-            seed[key] = best_preset[key]
-            updated_seed.append(key)
-        elif key in data:
-            seed[key] = data[key]
-            updated_seed.append(key)
-
-    updated_defaults: list[str] = []
-    for key in list(defaults.keys()):
-        if key in _PRIOR_SKIP_KEYS:
-            continue
-        data_key = _DEFAULTS_KEY_TO_DATA_KEY.get(key, key)
-        if data_key in best_preset:
-            defaults[key] = best_preset[data_key]
-            updated_defaults.append(key)
-        elif data_key in data:
-            defaults[key] = data[data_key]
-            updated_defaults.append(key)
+    updated_seed = _update_prior_mapping(seed, best_preset=best_preset, data=data, map_default_key=False)
+    updated_defaults = _update_prior_mapping(defaults, best_preset=best_preset, data=data, map_default_key=True)
 
     entry["seed_preset"] = seed
     entry["auto_defaults"] = defaults
     if not str(entry.get("filter_type", "") or "").strip():
         entry["filter_type"] = str(filter_type or "")
     return entry, len(updated_seed), len(updated_defaults)
+
+
+def _update_prior_mapping(
+    payload: dict,
+    *,
+    best_preset: dict,
+    data: dict,
+    map_default_key: bool,
+) -> list[str]:
+    updated_keys: list[str] = []
+    for key in list(payload.keys()):
+        if key in _PRIOR_SKIP_KEYS:
+            continue
+        data_key = _DEFAULTS_KEY_TO_DATA_KEY.get(key, key) if bool(map_default_key) else key
+        if data_key in best_preset:
+            payload[key] = best_preset[data_key]
+            updated_keys.append(key)
+            continue
+        if data_key in data:
+            payload[key] = data[data_key]
+            updated_keys.append(key)
+    return updated_keys
 
 
 def _entry_from_known_keys(filter_type: str | None, best_preset: dict, data: dict) -> dict:
@@ -476,7 +526,19 @@ def update_auto_mode_filter_priors_from_winner(
             f"({updated_seed_count} seed keys, {updated_defaults_count} defaults keys; "
             f"{len(filters)} filter types stored)"
         )
-    except Exception as exc:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
         logging.getLogger(__name__).warning(
             f"Failed to update auto-mode filter priors: {type(exc).__name__}: {exc}"
         )

@@ -198,7 +198,19 @@ def apply_residual_peak_winner_polish(
             cand_test, variant_meta = made
             try:
                 sig = json.dumps(cand_test, sort_keys=True, separators=(",", ":"), default=str)
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 sig = str(sorted(dict(cand_test or {}).items()))
             if sig in tested_signatures:
                 continue
@@ -215,7 +227,19 @@ def apply_residual_peak_winner_polish(
                     summarize=False,
                     base_data_override=base_data_ref,
                 )
-            except Exception as exc:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ) as exc:
                 logger.warning(
                     "Automatic mode %s failed for residual-peak candidate %d (%s): %s",
                     str(phase_label),

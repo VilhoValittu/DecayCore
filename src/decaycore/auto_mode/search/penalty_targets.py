@@ -76,7 +76,19 @@ def _auto_focus_ripple_from_stats(
                 if _max_n is not None:
                     raw = raw[:_max_n]  # slice before asarray — avoids 131k copy
                 arr = np.asarray(raw, dtype=float).reshape(-1)
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 arr = np.asarray([], dtype=float)
             if arr.size:
                 return arr
@@ -157,7 +169,19 @@ def _auto_target_tracking_metrics_from_stats(st: dict | None) -> dict:
                 if _max_n is not None:
                     raw = raw[:_max_n]  # slice before asarray — avoids 131k copy
                 arr = np.asarray(raw, dtype=float).reshape(-1)
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 arr = np.asarray([], dtype=float)
             if arr.size:
                 return arr
@@ -166,7 +190,7 @@ def _auto_target_tracking_metrics_from_stats(st: dict | None) -> dict:
     # Get freq_axis first to determine the band limit, then restrict all other arrays.
     # This avoids creating 131k-element temporaries for the narrow bass bands.
     f_full = _pick_arr("freq_axis")
-    _n_band = int(np.searchsorted(f_full, 1250.0, side="right")) if f_full.size >= 8 else f_full.size
+    _n_band = int(np.searchsorted(f_full, 8000.0, side="right")) if f_full.size >= 8 else f_full.size
     _n_lim: int | None = _n_band if _n_band >= 8 else None
 
     f = f_full[:_n_lim] if _n_lim else f_full
@@ -195,6 +219,7 @@ def _auto_target_tracking_metrics_from_stats(st: dict | None) -> dict:
     for lo, hi, suffix in (
         (20.0, 200.0, "20_200"),
         (100.0, 500.0, "100_500"),
+        (500.0, 8000.0, "500_8000"),
     ):
         mask = np.isfinite(f) & np.isfinite(err) & (f >= float(lo)) & (f <= float(hi))
         if int(np.count_nonzero(mask)) < 4:
@@ -238,6 +263,8 @@ def _auto_target_tracking_penalty(metrics: dict | None) -> float:
     max_20_200 = shared._auto_safe_float(m.get("target_tracking_max_20_200_db", float("nan")), float("nan"))
     rms_100_500 = shared._auto_safe_float(m.get("target_tracking_rms_100_500_db", float("nan")), float("nan"))
     max_100_500 = shared._auto_safe_float(m.get("target_tracking_max_100_500_db", float("nan")), float("nan"))
+    rms_500_8000 = shared._auto_safe_float(m.get("target_tracking_rms_500_8000_db", float("nan")), float("nan"))
+    max_500_8000 = shared._auto_safe_float(m.get("target_tracking_max_500_8000_db", float("nan")), float("nan"))
 
     penalty = 0.0
     if np.isfinite(rms_20_200):
@@ -248,6 +275,10 @@ def _auto_target_tracking_penalty(metrics: dict | None) -> float:
         penalty += 3.00 * max(0.0, float(rms_100_500) - 1.00)
     if np.isfinite(max_100_500):
         penalty += 0.90 * max(0.0, float(max_100_500) - 3.50)
+    if np.isfinite(rms_500_8000):
+        penalty += 1.00 * max(0.0, float(rms_500_8000) - 2.00)
+    if np.isfinite(max_500_8000):
+        penalty += 0.40 * max(0.0, float(max_500_8000) - 4.50)
     return float(np.clip(float(penalty), 0.0, 12.0))
 
 
@@ -258,37 +289,17 @@ def _auto_bass_under_target_metrics_from_stats(st: dict | None) -> dict:
         "bass_under_target_max_20_200_db": float("nan"),
         "bass_under_target_penalty": 0.0,
     }
-    mode = str(st.get("analysis_mode", "native") or "native").strip().lower()
-
-    def _pick_arr(base_key: str, *fallback_keys: str, _max_n: int | None = None) -> np.ndarray:
-        keys: list[str] = []
-        if mode == "comparison":
-            keys.append(f"cmp_{str(base_key)}")
-            keys.extend([f"cmp_{str(k)}" for k in fallback_keys])
-        keys.append(str(base_key))
-        keys.extend([str(k) for k in fallback_keys])
-        for key in keys:
-            try:
-                raw = st.get(key, [])
-                if _max_n is not None:
-                    raw = raw[:_max_n]  # slice before asarray — avoids 131k copy
-                arr = np.asarray(raw, dtype=float).reshape(-1)
-            except Exception:
-                arr = np.asarray([], dtype=float)
-            if arr.size:
-                return arr
-        return np.asarray([], dtype=float)
 
     # Get freq_axis first to determine the band limit, then restrict all other arrays.
-    f_full = _pick_arr("freq_axis")
+    f_full = _auto_stats_pick_arr(st, "freq_axis")
     _n_band = int(np.searchsorted(f_full, 500.0, side="right")) if f_full.size >= 8 else f_full.size
     _n_lim: int | None = _n_band if _n_band >= 8 else None
 
     f = f_full[:_n_lim] if _n_lim else f_full
-    measured = _pick_arr("measured_mags", _max_n=_n_lim)
-    target = _pick_arr("target_mags", _max_n=_n_lim)
-    filt = _pick_arr("realized_filter_mags", "filter_mags", _max_n=_n_lim)
-    conf = _pick_arr("confidence_mask", _max_n=_n_lim)
+    measured = _auto_stats_pick_arr(st, "measured_mags", _max_n=_n_lim)
+    target = _auto_stats_pick_arr(st, "target_mags", _max_n=_n_lim)
+    filt = _auto_stats_pick_arr(st, "realized_filter_mags", "filter_mags", _max_n=_n_lim)
+    conf = _auto_stats_pick_arr(st, "confidence_mask", _max_n=_n_lim)
     n = int(min(f.size, measured.size, target.size, filt.size))
     if n < 8:
         return dict(out)
@@ -355,7 +366,19 @@ def _auto_bass_boost_metrics_from_stats(st: dict | None) -> dict:
                 if _max_n is not None:
                     raw = raw[:_max_n]
                 arr = np.asarray(raw, dtype=float).reshape(-1)
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 arr = np.asarray([], dtype=float)
             if arr.size:
                 return arr

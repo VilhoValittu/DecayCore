@@ -46,13 +46,13 @@ def is_status_dom_ready() -> bool:
 def _status_split_elapsed_suffix(msg: str) -> tuple[str, str]:
     try:
         s = str(msg or "").strip()
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         s = ""
     if not s:
         return "", ""
     try:
         match = re.match(r"^(.*?)(\|\s*\d+(?:\.\d+)?\s*s)\s*$", s, flags=re.IGNORECASE)
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         match = None
     if not match:
         return str(s), ""
@@ -62,7 +62,7 @@ def _status_split_elapsed_suffix(msg: str) -> tuple[str, str]:
 def _compact_auto_status_core(core: str) -> str:
     try:
         s = str(core or "").strip()
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         s = ""
 
     # --- Bracket format: "DecayCore automatic mode [target] (...): <phase_text>" ---
@@ -221,7 +221,7 @@ def _compact_auto_status_core(core: str) -> str:
     # Generic fallback
     try:
         clean = re.sub(r"\s*\(.*\)\s*$", "", after).strip()
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         clean = after
     return f"Auto · {clean}" if clean else "Auto · running"
 
@@ -258,7 +258,7 @@ def _humanize_auto_status_detail(msg: str) -> str:
     prefix = "DecayCore automatic mode:"
     try:
         s = str(msg or "").strip()
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         return msg
     if not s.startswith(prefix):
         return s
@@ -524,7 +524,7 @@ def _humanize_auto_status_detail(msg: str) -> str:
             )
             if m:
                 return _f("auto_detail_finalize", rank=_r(m.group(1)), avg=_r(m.group(2)), boost=_r(m.group(3)), events=m.group(4))
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         logger.exception("auto status detail parse")
     return s
 
@@ -532,7 +532,7 @@ def _humanize_auto_status_detail(msg: str) -> str:
 def _status_compact_with_detail(msg) -> tuple[str, str | None]:
     try:
         raw = str(msg or "").strip()
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         raw = ""
     if not raw:
         return "DecayCore running", None
@@ -561,7 +561,7 @@ def _status_base_from_text(msg) -> str:
 def _normalize_auto_selected_text(msg) -> str:
     try:
         txt = str(msg or "").strip()
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         txt = ""
     return txt
 
@@ -569,7 +569,7 @@ def _normalize_auto_selected_text(msg) -> str:
 def _normalize_status_notice_text(msg) -> str:
     try:
         txt = str(msg or "").strip()
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         txt = ""
     return txt
 
@@ -577,7 +577,7 @@ def _normalize_status_notice_text(msg) -> str:
 def get_status_base_message(default: str = "DecayCore running") -> str:
     try:
         value = str(_STATUS_BASE_MSG or "").strip()
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         value = ""
     return value or str(default)
 
@@ -586,14 +586,14 @@ def set_run_wall_clock_text(value) -> None:
     global _RUN_WALL_CLOCK_TEXT
     try:
         _RUN_WALL_CLOCK_TEXT = str(value or "").strip()
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         _RUN_WALL_CLOCK_TEXT = ""
 
 
 def get_run_wall_clock_text(default: str = "") -> str:
     try:
         value = str(_RUN_WALL_CLOCK_TEXT or "").strip()
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         value = ""
     return value or str(default or "")
 
@@ -619,7 +619,7 @@ def _notify_renderer(event: str) -> None:
         return
     try:
         renderer(event=str(event or ""), snapshot=get_status_snapshot())
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         logger.debug("UI status renderer update failed", exc_info=True)
 
 
@@ -655,14 +655,14 @@ def set_last_run_info(info: dict) -> None:
     global _LAST_RUN_INFO
     try:
         _LAST_RUN_INFO = dict(info) if isinstance(info, dict) else {}
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         _LAST_RUN_INFO = {}
 
 
 def get_last_run_info() -> dict:
     try:
         return dict(_LAST_RUN_INFO)
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         return {}
 
 

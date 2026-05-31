@@ -440,7 +440,19 @@ def _run_target_local_refine_trials(
                 try:
                     li, out = future.result()
                     anchor_results[li] = out
-                except Exception as exc:
+                except (
+
+                    AttributeError,
+                    TypeError,
+                    ValueError,
+                    KeyError,
+                    IndexError,
+                    RuntimeError,
+                    OSError,
+                    ImportError,
+                    ModuleNotFoundError,
+                    NameError,
+                ) as exc:
                     li = future_to_li[future]
                     logger.warning(
                         "Automatic mode target Local refine anchor %d failed: %s: %s",

@@ -127,7 +127,19 @@ def _auto_harmonic_boost_penalty(
 
         penalty = float(net_boost) * float(severity) * float(scale)
         return float(max(0.0, penalty))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return 0.0
 
 
@@ -172,7 +184,19 @@ def _auto_rt60_policy_penalty(
             1.0,
         ))
         return float(max(0.0, float(net_boost) * float(severity) * float(scale)))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return 0.0
 
 
@@ -501,11 +525,21 @@ def _auto_harmonic_local_boost_penalty(
                 eff_scale = float(scale) * 2.0
 
         return float(max(0.0, float(net_boost) * float(severity) * float(eff_scale)))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return 0.0
 
 
-
-__all__ = ["CORRECTION_SHARPNESS_SCORING_VERSION", "DIP_FILL_RISK_SCORING_VERSION", "CHANNEL_OVERFIT_SCORING_VERSION", "AUTO_TDC_DECAY_SCORING_VERSION", "_auto_dsp_quality_penalty", "_auto_exc_penalty_bins_from_dbg", "_auto_exc_zero_penalty_freq_hz_from_stats", "_auto_excursion_penalty", "_auto_bass_integration_penalty", "_auto_focus_ripple_from_stats", "_auto_target_tracking_metrics_from_stats", "_auto_merge_target_tracking_metrics", "_auto_target_tracking_penalty", "_auto_bass_under_target_metrics_from_stats", "_auto_merge_bass_under_target_metrics", "_auto_bass_boost_metrics_from_stats", "_auto_merge_bass_boost_metrics", "_auto_bass_preference_bonus", "_auto_correction_sharpness_metrics_from_stats", "_auto_merge_correction_sharpness_metrics", "_auto_dip_fill_risk_metrics_from_stats", "_auto_merge_dip_fill_risk_metrics", "_auto_channel_overfit_metrics_from_stats", "_auto_harmonic_boost_penalty", "_auto_rt60_policy_penalty", "_auto_tdc_decay_tradeoff", "_auto_harmonic_local_boost_penalty"]
 
 __all__ = ["AUTO_TDC_DECAY_SCORING_VERSION", "_auto_harmonic_boost_penalty", "_auto_rt60_policy_penalty", "_auto_tdc_decay_tradeoff", "_auto_harmonic_local_boost_penalty"]

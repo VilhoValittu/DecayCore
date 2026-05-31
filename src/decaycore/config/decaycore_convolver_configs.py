@@ -10,6 +10,8 @@
 
 import math
 
+_NUMERIC_PARSE_EXCEPTIONS = (TypeError, ValueError, OverflowError)
+
 
 def _tc_segment(target_curve_tag: str | None) -> str:
     tag = str(target_curve_tag or "").strip()
@@ -23,7 +25,7 @@ def _title_suffix(program_version: str | None = None, winner_rank_score: float |
         parts.append(ver)
     try:
         rank = float(winner_rank_score) if winner_rank_score is not None else float("nan")
-    except Exception:
+    except _NUMERIC_PARSE_EXCEPTIONS:
         rank = float("nan")
     if math.isfinite(rank):
         parts.append(f"rank {rank:.3f}")
@@ -33,7 +35,7 @@ def _title_suffix(program_version: str | None = None, winner_rank_score: float |
 def _normalize_layout(layout: str | None) -> str:
     try:
         layout_s = str(layout or "").strip().lower()
-    except Exception:
+    except (TypeError, ValueError):
         layout_s = ""
     return "Stereo" if "stereo" in layout_s else "Mono"
 
@@ -157,7 +159,7 @@ def bypass_sub_filter_wav_export_spec(
 def _camilladsp_crossover_order(value: int | float | str | None, default: int = 2) -> int:
     try:
         order = int(round(float(value))) if value is not None else int(default)
-    except Exception:
+    except _NUMERIC_PARSE_EXCEPTIONS:
         order = int(default)
     if order <= 2:
         return 2
@@ -278,35 +280,35 @@ def generate_raspberry_yaml(
     include_sub = bool(include_sub)
     try:
         ap_freq_hz = float(sub_allpass_freq_hz) if sub_allpass_freq_hz is not None else float("nan")
-    except Exception:
+    except _NUMERIC_PARSE_EXCEPTIONS:
         ap_freq_hz = float("nan")
     try:
         ap_q = float(sub_allpass_q) if sub_allpass_q is not None else float("nan")
-    except Exception:
+    except _NUMERIC_PARSE_EXCEPTIONS:
         ap_q = float("nan")
     try:
         raw_sub_delay_ms = float(sub_delay_ms) if sub_delay_ms is not None else 0.0
-    except Exception:
+    except _NUMERIC_PARSE_EXCEPTIONS:
         raw_sub_delay_ms = 0.0
     if not (raw_sub_delay_ms == raw_sub_delay_ms) or abs(raw_sub_delay_ms) == float("inf"):
         raw_sub_delay_ms = 0.0
     try:
         sub_gain_db = float(sub_gain_trim_db) if sub_gain_trim_db is not None else 0.0
-    except Exception:
+    except _NUMERIC_PARSE_EXCEPTIONS:
         sub_gain_db = 0.0
     if not (sub_gain_db == sub_gain_db) or abs(sub_gain_db) == float("inf"):
         sub_gain_db = 0.0
     try:
         main_hpf = float(main_hpf_hz) if main_hpf_hz is not None else float("nan")
-    except Exception:
+    except _NUMERIC_PARSE_EXCEPTIONS:
         main_hpf = float("nan")
     try:
         sub_hpf = float(sub_hpf_hz) if sub_hpf_hz is not None else float("nan")
-    except Exception:
+    except _NUMERIC_PARSE_EXCEPTIONS:
         sub_hpf = float("nan")
     try:
         sub_lpf = float(sub_lpf_hz) if sub_lpf_hz is not None else float("nan")
-    except Exception:
+    except _NUMERIC_PARSE_EXCEPTIONS:
         sub_lpf = float("nan")
     sub_polarity_invert = bool(sub_polarity_invert)
     use_main_hpf = bool(include_sub and main_hpf == main_hpf and abs(main_hpf) != float("inf") and main_hpf > 0.0)

@@ -95,7 +95,19 @@ def _group_delay_ms(freqs: np.ndarray, response: np.ndarray) -> np.ndarray:
     omega = 2.0 * np.pi * freqs
     try:
         gd_s = -np.gradient(phase, omega)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return np.full(freqs.shape, np.nan, dtype=float)
     return np.asarray(gd_s * 1000.0, dtype=float)
 
@@ -347,76 +359,101 @@ def _score_grid_for_xo(
     rows: list[tuple[dict[str, Any], float, float, float, bool]] = []
 
     for polarity in tuple(bool(p) for p in polarities):
-        pol = -1.0 if polarity else 1.0
-        sub_pd = delayed_sub * pol
-        phase_delta = np.angle(main_b[None, :] * np.conj(sub_pd))
-        phase_err = np.rad2deg(np.sqrt(np.mean(np.square(phase_delta), axis=1)))
-        sub_grid = sub_pd[:, None, :] * gain_linear[None, :, None]
-        summed = main_b[None, None, :] + sub_grid
-        sum_mag = _mag_db(summed)
-        branch_max_mag = np.maximum(_mag_db(main_b)[None, None, :], _mag_db(sub_grid))
-        cancellation = np.maximum(0.0, branch_max_mag - sum_mag)
-        cancellation_score = np.percentile(cancellation, 95.0, axis=2)
-        ripple = np.percentile(sum_mag, 95.0, axis=2) - np.percentile(sum_mag, 5.0, axis=2)
-
-        phase_error_score = np.maximum(0.0, phase_err)[:, None] / 90.0
-        gd_error_score = np.maximum(0.0, gd_err)[:, None] / 8.0
-        cancellation_norm = np.maximum(0.0, cancellation_score) / 12.0
-        ripple_score = np.maximum(0.0, ripple) / 12.0
-        gain_penalty = np.abs(gains)[None, :] / 12.0
-        delay_penalty = np.abs(delays)[:, None] / 15.0
-        xo_penalty = abs(xo - 80.0) / 40.0
-        polarity_tie_penalty = 1.0 if polarity else 0.0
-        score = (
-            4.0 * phase_error_score
-            + 3.0 * gd_error_score
-            + 2.0 * cancellation_norm
-            + 1.0 * ripple_score
-            + 0.75 * xo_penalty
-            + 0.25 * gain_penalty
-            + 0.15 * delay_penalty
-            + 0.05 * polarity_tie_penalty
+        row = _score_grid_polarity_row(
+            polarity=bool(polarity),
+            xo=float(xo),
+            main_b=main_b,
+            delayed_sub=delayed_sub,
+            gd_err=gd_err,
+            delays=delays,
+            gains=gains,
+            gain_linear=gain_linear,
         )
-        rejected = (cancellation_score >= 18.0) | (gd_err[:, None] >= 30.0) | (~np.isfinite(score))
-        score = np.where(rejected, score + 1_000.0, score)
-        finite_score = np.isfinite(score)
-        if not bool(np.any(finite_score)):
-            continue
-
-        eligible_score = np.where(finite_score, score, np.inf)
-        best_flat = int(np.argmin(eligible_score))
-        delay_idx, gain_idx = np.unravel_index(best_flat, eligible_score.shape)
-        rejected_best = bool(rejected[delay_idx, gain_idx])
-        reject_reason = ""
-        if rejected_best:
-            if float(cancellation_score[delay_idx, gain_idx]) >= 18.0:
-                reject_reason = "deep_cancellation_near_xo"
-            elif float(gd_err[delay_idx]) >= 30.0:
-                reject_reason = "wild_gd_mismatch_near_xo"
-            else:
-                reject_reason = "non_finite_score"
-        row = {
-            "score": float(score[delay_idx, gain_idx]),
-            "rejected": rejected_best,
-            "reject_reason": reject_reason,
-            "phase_error_deg": float(phase_err[delay_idx]),
-            "gd_mismatch_ms": float(gd_err[delay_idx]),
-            "cancellation_score": float(cancellation_score[delay_idx, gain_idx]),
-            "magnitude_ripple_db": float(ripple[delay_idx, gain_idx]),
-            "cancellation_risk": _risk_label(float(cancellation_score[delay_idx, gain_idx])),
-            "phase_error_score": float(phase_error_score[delay_idx, 0]),
-            "gd_error_score": float(gd_error_score[delay_idx, 0]),
-            "magnitude_ripple_score": float(ripple_score[delay_idx, gain_idx]),
-            "gain_penalty": float(gain_penalty[0, gain_idx]),
-            "delay_penalty": float(delay_penalty[delay_idx, 0]),
-            "xo_penalty": float(xo_penalty),
-            "polarity_tie_penalty": float(polarity_tie_penalty),
-        }
-        rows.append((row, xo, float(delays[delay_idx]), float(gains[gain_idx]), polarity))
+        if row is not None:
+            rows.append(row)
 
     if not rows:
         return None
     return _select_best(rows)
+
+
+def _score_grid_polarity_row(
+    *,
+    polarity: bool,
+    xo: float,
+    main_b: np.ndarray,
+    delayed_sub: np.ndarray,
+    gd_err: np.ndarray,
+    delays: np.ndarray,
+    gains: np.ndarray,
+    gain_linear: np.ndarray,
+) -> tuple[dict[str, Any], float, float, float, bool] | None:
+    pol = -1.0 if polarity else 1.0
+    sub_pd = delayed_sub * pol
+    phase_delta = np.angle(main_b[None, :] * np.conj(sub_pd))
+    phase_err = np.rad2deg(np.sqrt(np.mean(np.square(phase_delta), axis=1)))
+    sub_grid = sub_pd[:, None, :] * gain_linear[None, :, None]
+    summed = main_b[None, None, :] + sub_grid
+    sum_mag = _mag_db(summed)
+    branch_max_mag = np.maximum(_mag_db(main_b)[None, None, :], _mag_db(sub_grid))
+    cancellation = np.maximum(0.0, branch_max_mag - sum_mag)
+    cancellation_score = np.mean(cancellation, axis=2) + 1.5 * np.std(cancellation, axis=2)
+    ripple = np.percentile(sum_mag, 95.0, axis=2) - np.percentile(sum_mag, 5.0, axis=2)
+
+    phase_error_score = np.maximum(0.0, phase_err)[:, None] / 90.0
+    gd_error_score = np.maximum(0.0, gd_err)[:, None] / 8.0
+    cancellation_norm = np.maximum(0.0, cancellation_score) / 12.0
+    ripple_score = np.maximum(0.0, ripple) / 12.0
+    gain_penalty = np.abs(gains)[None, :] / 12.0
+    delay_penalty = np.abs(delays)[:, None] / 15.0
+    xo_penalty = abs(xo - 80.0) / 40.0
+    polarity_tie_penalty = 1.0 if polarity else 0.0
+    score = (
+        4.0 * phase_error_score
+        + 3.0 * gd_error_score
+        + 2.0 * cancellation_norm
+        + 1.0 * ripple_score
+        + 0.75 * xo_penalty
+        + 0.25 * gain_penalty
+        + 0.15 * delay_penalty
+        + 0.05 * polarity_tie_penalty
+    )
+    rejected = (cancellation_score >= 18.0) | (gd_err[:, None] >= 30.0) | (~np.isfinite(score))
+    score = np.where(rejected, score + 1_000.0, score)
+    finite_score = np.isfinite(score)
+    if not bool(np.any(finite_score)):
+        return None
+
+    eligible_score = np.where(finite_score, score, np.inf)
+    best_flat = int(np.argmin(eligible_score))
+    delay_idx, gain_idx = np.unravel_index(best_flat, eligible_score.shape)
+    rejected_best = bool(rejected[delay_idx, gain_idx])
+    reject_reason = ""
+    if rejected_best:
+        if float(cancellation_score[delay_idx, gain_idx]) >= 18.0:
+            reject_reason = "deep_cancellation_near_xo"
+        elif float(gd_err[delay_idx]) >= 30.0:
+            reject_reason = "wild_gd_mismatch_near_xo"
+        else:
+            reject_reason = "non_finite_score"
+    row = {
+        "score": float(score[delay_idx, gain_idx]),
+        "rejected": rejected_best,
+        "reject_reason": reject_reason,
+        "phase_error_deg": float(phase_err[delay_idx]),
+        "gd_mismatch_ms": float(gd_err[delay_idx]),
+        "cancellation_score": float(cancellation_score[delay_idx, gain_idx]),
+        "magnitude_ripple_db": float(ripple[delay_idx, gain_idx]),
+        "cancellation_risk": _risk_label(float(cancellation_score[delay_idx, gain_idx])),
+        "phase_error_score": float(phase_error_score[delay_idx, 0]),
+        "gd_error_score": float(gd_error_score[delay_idx, 0]),
+        "magnitude_ripple_score": float(ripple_score[delay_idx, gain_idx]),
+        "gain_penalty": float(gain_penalty[0, gain_idx]),
+        "delay_penalty": float(delay_penalty[delay_idx, 0]),
+        "xo_penalty": float(xo_penalty),
+        "polarity_tie_penalty": float(polarity_tie_penalty),
+    }
+    return (row, float(xo), float(delays[delay_idx]), float(gains[gain_idx]), bool(polarity))
 
 
 def run_direct_dac_bass_integration(

@@ -39,6 +39,19 @@ from .optuna_backend_storage import (
 
 logger = logging.getLogger("DecayCore")
 
+_RECOVERABLE_OPTUNA_PARAM_EXCEPTIONS = (
+    RuntimeError,
+    OSError,
+    ImportError,
+    TypeError,
+    ValueError,
+    AttributeError,
+    KeyError,
+    IndexError,
+    OverflowError,
+    FloatingPointError,
+)
+
 
 def _auto_optuna_cross_study_best_params(
     optuna_mod,
@@ -68,7 +81,7 @@ def _auto_optuna_cross_study_best_params(
         return []
     try:
         summaries = get_summaries(storage=storage)
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         return []
     seen_sigs: set[str] = set()
     results: list[tuple[float, dict]] = []
@@ -86,7 +99,7 @@ def _auto_optuna_cross_study_best_params(
             best_trial = getattr(summary, "best_trial", None)
             val = getattr(best_trial, "value", None)
             return float(val) if val is not None and np.isfinite(float(val)) else float("-inf")
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
             return float("-inf")
 
     sibling_summaries.sort(key=_summary_value, reverse=True)
@@ -98,7 +111,7 @@ def _auto_optuna_cross_study_best_params(
         try:
             best_params = dict(getattr(best_trial, "params", {}) or {})
             best_val_f = float(best_val)
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
             best_params = {}
             best_val_f = float("nan")
         if best_params and np.isfinite(best_val_f):
@@ -114,20 +127,20 @@ def _auto_optuna_cross_study_best_params(
         try:
             s = optuna_mod.load_study(study_name=sname, storage=storage)
             trials = list(s.get_trials(deepcopy=False) or [])
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
             continue
         _auto_optuna_note_trial_scan(len(trials))
         for tr in trials:
             val = getattr(tr, "value", None)
             try:
                 vf = float(val)
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
                 vf = float("nan")
             if not np.isfinite(vf):
                 continue
             try:
                 params = dict(getattr(tr, "params", {}) or {})
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
                 params = {}
             if not params:
                 continue
@@ -205,7 +218,7 @@ def _auto_optuna_trial_params(
     if callable(seed_to_params):
         try:
             params = dict(seed_to_params(dict(preset or {})) or {})
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
             # Seed adapters are pluggable; keep the study alive even if one returns malformed data.
             logger.debug("Optuna seed_to_params adapter failed", exc_info=True)
             params = {}
@@ -238,11 +251,11 @@ def _auto_optuna_adaptive_freq_bounds(base_data: dict | None) -> tuple[float, fl
     raw_r = data.get("harmonic_freq_hz_r")
     try:
         freq_l = list(raw_l) if raw_l is not None and len(raw_l) > 0 else []
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         freq_l = []
     try:
         freq_r = list(raw_r) if raw_r is not None and len(raw_r) > 0 else []
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         freq_r = []
     all_freqs = sorted(
         float(f)
@@ -336,13 +349,13 @@ def _auto_optuna_trial_distributions(optuna_mod, *, params: dict | None, base_da
         if key.endswith("_u"):
             try:
                 out[key] = float_dist(0.0, 1.0)
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
                 return None
             continue
         if key in categorical_choices:
             try:
                 out[key] = cat_dist(list(categorical_choices[key]))
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
                 return None
             continue
         if key in float_ranges:
@@ -352,7 +365,7 @@ def _auto_optuna_trial_distributions(optuna_mod, *, params: dict | None, base_da
                     out[key] = float_dist(float(lo), float(hi), log=True)
                 else:
                     out[key] = float_dist(float(lo), float(hi), step=float(_step))
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
                 return None
             continue
         return None
@@ -385,25 +398,28 @@ def _auto_optuna_build_completed_trial(
     }
     if system_attrs:
         trial_kwargs["system_attrs"] = dict(system_attrs)
-    try:
-        return create_trial(**trial_kwargs)
-    except TypeError:
-        trial_kwargs.pop("system_attrs", None)
-    except Exception:
-        return None
-
-    try:
-        return create_trial(**trial_kwargs)
-    except TypeError:
-        pass
-    except Exception:
-        return None
+    trial = _auto_optuna_try_create_trial(create_trial, dict(trial_kwargs), allow_type_error=True)
+    if trial is not None:
+        return trial
+    trial_kwargs.pop("system_attrs", None)
+    trial = _auto_optuna_try_create_trial(create_trial, dict(trial_kwargs), allow_type_error=True)
+    if trial is not None:
+        return trial
 
     trial_state = getattr(getattr(optuna_mod, "trial", None), "TrialState", None)
     complete_state = getattr(trial_state, "COMPLETE", None) if trial_state is not None else None
     if complete_state is None:
         return None
+    trial_kwargs["state"] = complete_state
+    return _auto_optuna_try_create_trial(create_trial, dict(trial_kwargs), allow_type_error=False)
+
+
+def _auto_optuna_try_create_trial(create_trial, trial_kwargs: dict, *, allow_type_error: bool):
     try:
-        return create_trial(state=complete_state, **trial_kwargs)
-    except Exception:
+        return create_trial(**dict(trial_kwargs))
+    except TypeError:
+        if allow_type_error:
+            return None
+    except _RECOVERABLE_OPTUNA_PARAM_EXCEPTIONS:
         return None
+    return None

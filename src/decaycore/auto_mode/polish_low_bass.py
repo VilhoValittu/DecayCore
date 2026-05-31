@@ -167,7 +167,19 @@ def apply_low_bass_cut_winner_polish(
                     separators=(",", ":"),
                 )
             )
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             return str(sorted(dict(ready or {}).items()))
 
     candidate_metrics_lookup: dict[str, dict] = {}
@@ -213,7 +225,19 @@ def apply_low_bass_cut_winner_polish(
                         summarize=False,
                         base_data_override=base_data_ref,
                     )
-                except Exception as exc:
+                except (
+
+                    AttributeError,
+                    TypeError,
+                    ValueError,
+                    KeyError,
+                    IndexError,
+                    RuntimeError,
+                    OSError,
+                    ImportError,
+                    ModuleNotFoundError,
+                    NameError,
+                ) as exc:
                     logger.warning(
                         "Automatic mode %s failed for candidate %d/%d (low_bass_cut_hz=%.1f Hz): %s",
                         str(phase_label),

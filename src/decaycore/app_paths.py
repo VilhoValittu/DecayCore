@@ -17,6 +17,8 @@ from pathlib import Path
 logger = logging.getLogger("DecayCore")
 
 PROGRAM_NAME = "DecayCore"
+_RECOVERABLE_PATH_EXCEPTIONS = (AttributeError, TypeError, ValueError, OSError, RuntimeError)
+_RECOVERABLE_STR_EXCEPTIONS = (AttributeError, TypeError, ValueError, RuntimeError)
 
 
 def decaycore_data_dir() -> Path:
@@ -34,7 +36,7 @@ def decaycore_data_dir() -> Path:
         if xdg_data_home:
             return Path(xdg_data_home) / PROGRAM_NAME
         return home / ".local" / "share" / PROGRAM_NAME
-    except Exception:
+    except _RECOVERABLE_PATH_EXCEPTIONS:
         return home / PROGRAM_NAME
 
 
@@ -55,7 +57,7 @@ def default_filters_export_base_dir() -> Path:
         else:
             base_home = home
         return base_home / "Documents" / PROGRAM_NAME / "filters"
-    except Exception:
+    except _RECOVERABLE_PATH_EXCEPTIONS:
         return home / "Documents" / PROGRAM_NAME / "filters"
 
 
@@ -69,7 +71,7 @@ def default_measurements_dir() -> Path:
         else:
             base_home = home
         return base_home / "Documents" / PROGRAM_NAME / "measurement"
-    except Exception:
+    except _RECOVERABLE_PATH_EXCEPTIONS:
         return home / "Documents" / PROGRAM_NAME / "measurement"
 
 
@@ -77,7 +79,7 @@ def program_version_token(version: str | None, *, default: str = "v0") -> str:
     """Create filesystem-safe version token for folder/file names."""
     try:
         raw = str(version or "").strip()
-    except Exception:
+    except _RECOVERABLE_STR_EXCEPTIONS:
         raw = ""
     if not raw:
         return str(default)
@@ -100,13 +102,13 @@ def safe_filters_dir(path: str | None, *, program_version: str | None = None) ->
     fallback = fallback_base / version_tag
     try:
         p_base = Path(path).expanduser() if path else fallback_base
-    except Exception:
+    except _RECOVERABLE_PATH_EXCEPTIONS:
         p_base = fallback_base
 
     try:
         if p_base.is_absolute() and len(p_base.parts) <= 2:
             p_base = fallback_base
-    except Exception:
+    except _RECOVERABLE_PATH_EXCEPTIONS:
         p_base = fallback_base
 
     try:
@@ -114,7 +116,7 @@ def safe_filters_dir(path: str | None, *, program_version: str | None = None) ->
             p = p_base / version_tag
         else:
             p = p_base
-    except Exception:
+    except _RECOVERABLE_PATH_EXCEPTIONS:
         p = fallback
 
     try:
@@ -122,16 +124,16 @@ def safe_filters_dir(path: str | None, *, program_version: str | None = None) ->
         return str(p.resolve())
     except OSError:
         p = fallback
-    except Exception:
+    except _RECOVERABLE_PATH_EXCEPTIONS:
         p = fallback
 
     try:
         p.mkdir(parents=True, exist_ok=True)
         return str(p.resolve())
-    except Exception:
+    except _RECOVERABLE_PATH_EXCEPTIONS:
         last = Path.cwd() / "filters" / version_tag
         try:
             last.mkdir(parents=True, exist_ok=True)
-        except Exception:
+        except _RECOVERABLE_PATH_EXCEPTIONS:
             logger.exception("fallback filter dir create")
         return str(last)

@@ -142,7 +142,19 @@ def _finish_search_setup(context: AutoSearchExecutionContext) -> None:
 
     try:
         target_label = str(search_base_data.get("hc_mode", "") or "").strip()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         target_label = ""
     context.winner_target_name = str(target_label or "").strip() or None
     if not target_label:
@@ -222,7 +234,19 @@ def _finish_search_setup(context: AutoSearchExecutionContext) -> None:
                 "Automatic mode: baseline seeded from cache (rank %.3f).",
                 auto_api._auto_safe_float(seed_metrics.get("rank_score"), 0.0),
             )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("cache seed baseline")
 
 

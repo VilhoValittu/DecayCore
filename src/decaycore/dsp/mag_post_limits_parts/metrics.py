@@ -125,7 +125,7 @@ def _store_realized_pre_ir_metrics(
 __all__ = ['_store_realized_pre_ir_metrics']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['low_frequency', 'authority', 'clamps', 'metrics', 'pipeline']:
@@ -136,4 +136,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

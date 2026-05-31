@@ -149,7 +149,19 @@ def _load_exact_cache_seed(
                 best_metrics=dict(best_metrics or {}),
                 seed_source=str(explicit_seed_source),
             )
-        except Exception as exc:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ) as exc:
             logger.warning(
                 "Automatic mode: target preselect seed micro-refine setup failed, "
                 f"falling back to cache/search ({type(exc).__name__}: {exc})"
@@ -181,7 +193,19 @@ def _load_exact_cache_seed(
                 compat_version=compat_version,
             ) or {}
             exact_cached_metrics = dict((exact_cached_entry or {}).get("best_metrics", {}) or {})
-        except Exception as exc:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ) as exc:
             logger.debug(
                 "Auto-mode cache read failed, disabling fast path: %s: %s",
                 type(exc).__name__,
@@ -227,7 +251,19 @@ def _load_exact_cache_seed(
                     str(study_name),
                 )
                 seed_source = "optuna_phase1_study"
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             exact_cached_preset = {}
             exact_cached_metrics = {}
         if not (isinstance(exact_cached_preset, dict) and exact_cached_preset):
@@ -258,7 +294,19 @@ def _load_exact_cache_seed(
                 include_response_arrays=False,
                 summarize=False,
             )
-    except Exception as exc:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
         logger.warning(
             "Automatic mode: exact preset cache materialization failed, "
             f"falling back to search ({type(exc).__name__}: {exc})"

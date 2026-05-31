@@ -295,7 +295,7 @@ def _authority_band_metrics(
 __all__ = ['_apply_low_frequency_policy', '_prepare_boost_caps', '_stats_array', '_authority_band_metrics']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['low_frequency', 'authority', 'clamps', 'metrics', 'pipeline']:
@@ -306,4 +306,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

@@ -18,7 +18,19 @@ logger = logging.getLogger("DecayCore")
 def _auto_thread_budget() -> tuple[int, int]:
     try:
         cores = int(os.cpu_count() or 1)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         cores = 1
     cores = max(1, int(cores))
     if sys.platform == "win32":
@@ -43,7 +55,19 @@ def _apply_auto_thread_env() -> tuple[int, int, list[str]]:
             try:
                 if int(float(cur)) > 0:
                     continue
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.exception("thread env var parse")
         os.environ[k] = str(use)
         applied.append(str(k))
@@ -80,7 +104,19 @@ def initialize_logging():
                 "Applied thread env vars: "
                 + ", ".join([f"{k}={os.environ.get(k, '')}" for k in auto_threads_env_applied])
             )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("thread budget log")
 
     return {

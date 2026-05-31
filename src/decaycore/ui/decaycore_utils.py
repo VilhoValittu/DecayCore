@@ -28,5 +28,17 @@ def scale_taps_with_fs(
         scaled = int(round(float(base_taps_i) * (float(fs_i) / float(base_fs_i))))
         scaled = max(1, scaled)
         return int(scipy.fft.next_fast_len(scaled, real=True))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return int(base_taps)

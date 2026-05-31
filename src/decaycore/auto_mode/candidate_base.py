@@ -554,7 +554,19 @@ def _build_auto_mode_candidates_optuna(
     base_data = _auto_filter_normalized_base_data(base_data)
     try:
         import optuna  # type: ignore
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None
 
     n_eff = max(1, int(n_trials))

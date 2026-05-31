@@ -74,7 +74,19 @@ def apply_hpf_winner_polish(
     base_data = dict(base_data_ref or {})
     try:
         bi_mode = str(base_data.get("bass_integration_mode", "") or "").strip().lower()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         bi_mode = ""
     if bool(base_data.get("bass_integration_enable", False)) and bi_mode == "direct_dac":
         meta["applicable"] = False
@@ -255,7 +267,19 @@ def apply_hpf_winner_polish(
                     summarize=False,
                     base_data_override=base_data_ref,
                 )
-            except Exception as exc:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ) as exc:
                 logger.warning(
                     "Automatic mode %s failed for candidate %d/%d (%s): %s",
                     str(phase_label),

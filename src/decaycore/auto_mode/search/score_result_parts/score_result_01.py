@@ -626,7 +626,7 @@ def _auto_score_result(
 __all__ = ['_auto_score_result']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['score_result_01']:
@@ -637,4 +637,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

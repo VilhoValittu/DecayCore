@@ -162,7 +162,7 @@ def _weighted_share(
 __all__ = ['_merge_minphase_and_excess', '_phase_region_profiles', '_phase_confidence_profile', '_max_abs_gd_gradient_ms_per_oct', '_gd_grad_metrics', '_gd_grad_limiter', '_weighted_mean', '_weighted_share']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['phase_ir_phase_01', 'phase_ir_phase_02', 'phase_ir_phase_03']:
@@ -173,4 +173,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

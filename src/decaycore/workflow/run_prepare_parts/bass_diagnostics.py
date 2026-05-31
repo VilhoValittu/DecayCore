@@ -60,32 +60,32 @@ def _status(callbacks, msg: str) -> None:
     if callbacks is not None:
         try:
             callbacks.status(msg)
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
             logger.exception("status callback")
 
 def _direct_dac_filter_params(data: dict) -> tuple[int, float, int]:
     try:
         xo_order = max(1, int(round(float(data.get("sub_crossover_slope", 24) or 24.0))) // 6)
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         xo_order = 4
     try:
         sub_hpf_hz = float(data.get("sub_hpf_freq", 20.0) or 20.0)
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         sub_hpf_hz = 20.0
     try:
         sub_hpf_order = max(1, int(round(float(data.get("sub_hpf_slope", 12) or 12.0))) // 6)
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         sub_hpf_order = 2
     return int(xo_order), float(sub_hpf_hz), int(sub_hpf_order)
 
 def _direct_dac_alignment_params(data: dict) -> tuple[float, bool, float]:
     try:
         delay_ms = float(data.get("bass_integration_sub_delay_ms", 0.0) or 0.0)
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         delay_ms = 0.0
     try:
         gain_trim_db = float(data.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0)
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         gain_trim_db = 0.0
     return (
         float(delay_ms if math.isfinite(delay_ms) else 0.0),
@@ -157,7 +157,7 @@ def _compute_direct_dac_prepare_recommendation(bundle: object, data: dict, callb
                     callbacks=callbacks,
                 )
             )
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
             logger.debug("Direct-DAC prepare Optuna failed, falling back to builtin", exc_info=True)
 
     try:
@@ -175,7 +175,7 @@ def _compute_direct_dac_prepare_recommendation(bundle: object, data: dict, callb
                 callbacks=callbacks,
             )
         )
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         logger.debug("Direct-DAC prepare builtin recommendation failed", exc_info=True)
         return dict(_EMPTY)
 
@@ -196,17 +196,17 @@ def _compute_selected_bass_integration_diagnostics(bundle: object, data: dict) -
         if bool(data.get("bass_integration_allpass_auto_applied", False)):
             try:
                 sub_allpass_freq_hz = float(data.get("bass_integration_allpass_freq_hz", 0.0) or 0.0)
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
                 sub_allpass_freq_hz = 0.0
             try:
                 sub_allpass_q = float(data.get("bass_integration_allpass_q", 0.707) or 0.707)
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
                 sub_allpass_q = 0.707
         try:
             _slpf: float | None = float(data.get("direct_dac_sub_lpf_hz") or fc_hz)
             if not math.isfinite(_slpf) or _slpf < fc_hz:
                 _slpf = None
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
             _slpf = None
         metrics = dict(
             compute_final_bass_integration_metrics(
@@ -245,7 +245,7 @@ def _compute_selected_bass_integration_diagnostics(bundle: object, data: dict) -
             }
         )
         return out
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         logger.debug("Bass Integration diagnostics refresh failed", exc_info=True)
         return dict(getattr(bundle, "diagnostics", {}) or {}) if bundle is not None else {}
 
@@ -253,7 +253,7 @@ def _compute_selected_bass_integration_diagnostics(bundle: object, data: dict) -
 __all__ = ['_status', '_direct_dac_filter_params', '_direct_dac_alignment_params', '_compute_direct_dac_prepare_recommendation', '_compute_selected_bass_integration_diagnostics']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['bass_diagnostics', 'measurements', 'target_context']:
@@ -264,4 +264,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

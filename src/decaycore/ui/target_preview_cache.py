@@ -55,20 +55,56 @@ def _normalize_curve(freqs, mags):
         if uniq.size < 8:
             return None, None
         return uniq, mm[idx]
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None, None
 
 
 def _clean_local_path(path_raw: Any) -> str:
     try:
         path = str(path_raw or "").strip().strip('"').strip("'")
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         path = ""
     if not path:
         return ""
     try:
         return os.path.abspath(path)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return path
 
 
@@ -132,7 +168,19 @@ def _parse_upload_curve(upload: dict[str, Any], *, pre_ms: float, post_ms: float
         else:
             ff, mm, _ = measurements_txt.parse_measurements_from_bytes(content)
         return _normalize_curve(ff, mm)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None, None
 
 
@@ -160,7 +208,19 @@ def _parse_upload_transfer(
             label=label,
             logger=None,
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None
 
 
@@ -177,7 +237,19 @@ def _parse_path_curve(path: str, *, pre_ms: float, post_ms: float, smoothing_lev
         else:
             ff, mm, _ = measurements_txt.parse_measurements_from_path(path, logger=None)
         return _normalize_curve(ff, mm)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None, None
 
 
@@ -200,7 +272,19 @@ def _parse_path_transfer(
             label=label,
             logger=None,
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None
 
 

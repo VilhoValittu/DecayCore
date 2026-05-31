@@ -265,7 +265,19 @@ def _rejection(event: RoomModeEvent, reason: str) -> dict[str, Any]:
 def _event_float(event: Any, key: str, default: float = 0.0) -> float:
     try:
         value = getattr(event, key)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         value = default
     return _safe_float(value, default)
 

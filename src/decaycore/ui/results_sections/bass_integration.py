@@ -457,7 +457,7 @@ def _render_bass_integration(*, data: dict) -> None:
 __all__ = ['_render_bass_integration']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['overview', 'bass_integration', 'quality', 'plots_export']:
@@ -468,4 +468,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

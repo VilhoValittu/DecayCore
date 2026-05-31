@@ -101,7 +101,19 @@ def render_results(
         try:
             elapsed = max(0.0, float(time.perf_counter() - float(run_started_at)))
             ui_state.update_status(f"{t('stat_plot')} | {elapsed:.1f} s")
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             ui_state.update_status(t("stat_plot"))
     else:
         ui_state.update_status(t("stat_plot"))
@@ -110,7 +122,19 @@ def render_results(
     if prog is not None:
         try:
             prog.set_value(0.96)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("progress bar set 0.96")
 
     # Clear the per-run plot cache so stale figures don't survive across runs.
@@ -172,7 +196,19 @@ def render_results(
     if saved_filters_dir:
         try:
             done_status = done_status.format(path=str(saved_filters_dir))
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             done_status = f"{done_status} {saved_filters_dir}"
 
     if run_started_at is not None:
@@ -180,7 +216,19 @@ def render_results(
             total_s = max(0.0, float(time.perf_counter() - float(run_started_at)))
             ui_state.update_status_notices(summary_text=done_msg, info_text="")
             ui_state.update_status(f"{done_status} | {total_s:.1f} s")
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             ui_state.update_status_notices(summary_text=done_msg, info_text="")
             ui_state.update_status(done_status)
     else:
@@ -190,7 +238,19 @@ def render_results(
     if prog is not None:
         try:
             prog.set_value(1.0)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("progress bar set 1.0")
     set_progress_visual_state(completed=True)
 
@@ -215,7 +275,19 @@ def render_results(
                     "conf": (l_conf + r_conf) / 2.0,
                 }
             )
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.debug("set_last_run_info failed", exc_info=True)
 
 def _esc(v: Any) -> str:
@@ -499,7 +571,19 @@ def _append_auto_polish_to_status_log(*, data: dict) -> None:
 
     try:
         mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return
     auto_enabled = bool(mode_u == "AUTO" or data.get("camillafir_automatic_mode", False))
     auto_meta = data.get("_auto_mode_meta", None)
@@ -553,7 +637,19 @@ def _build_p6_validation_block(best_metrics: dict) -> str | None:
 def _render_auto_diagnostics(*, data: dict) -> None:
     try:
         mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         mode_u = "BASIC"
     auto_enabled = bool(mode_u == "AUTO" or data.get("camillafir_automatic_mode", False))
     auto_meta = data.get("_auto_mode_meta", None)
@@ -613,14 +709,26 @@ def _update_crossover_recommendation_label(data: dict) -> None:
             label_el.set_text(f"{rec_label}: {_format_recommended_xo_hz(float(rec))}")
         else:
             label_el.set_text("")
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("bass integration recommended XO label")
 
 
 __all__ = ['_format_recommended_xo_hz', 'render_results', '_esc', '_metric_table_html', '_section', '_render_run_overview', '_build_auto_polish_lines', '_append_auto_polish_to_status_log', '_build_p6_validation_block', '_render_auto_diagnostics', '_update_crossover_recommendation_label']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['overview', 'bass_integration', 'quality', 'plots_export']:
@@ -631,4 +739,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

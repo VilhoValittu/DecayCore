@@ -30,7 +30,7 @@ def safe_float(v, default=float("nan")) -> float:
         x = float(v)
         if x == x and abs(x) != float("inf"):
             return float(x)
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         logger.exception("safe float parse in formatters")
     return float(default)
 
@@ -38,7 +38,7 @@ def safe_float(v, default=float("nan")) -> float:
 def safe_int(v, default=0) -> int:
     try:
         return int(v)
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         return int(default)
 
 
@@ -97,14 +97,14 @@ def fmt_tilt(st: dict, warn_thr: float = 1.5):
                 "</span>"
             )
         return f"{tilt:+.2f} dB/oct"
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         return "-"
 
 
 def auto_choice_text(method) -> str:
     try:
         key = str(method or "").strip().lower()
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         key = ""
     mapping = {
         "adaptive": "adaptive (synthesized from measurements)",
@@ -129,7 +129,7 @@ def fmt_freq_window(win) -> str:
             hi = float(win[1])
             if lo == lo and hi == hi and hi > lo:
                 return f"{lo:.0f}-{hi:.0f} Hz"
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         logger.exception("freq window format")
     return "n/a"
 
@@ -137,11 +137,11 @@ def fmt_freq_window(win) -> str:
 def stereo_link_mode_label(st: dict, *, stereo_link_enabled: bool) -> str:
     try:
         resolved = str(st.get("stereo_link_mode", "") or "").strip().lower()
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         resolved = ""
     try:
         requested = str(st.get("stereo_link_requested_mode", "") or "").strip().lower()
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         requested = ""
     if not resolved:
         return "Off" if not bool(stereo_link_enabled) else "On"
@@ -157,7 +157,7 @@ def stereo_link_mode_label(st: dict, *, stereo_link_enabled: bool) -> str:
 def shared_window_label(st: dict) -> str:
     try:
         resolved = str(st.get("stereo_link_mode", "") or "").strip().lower()
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         resolved = ""
     win = st.get("stereo_link_shared_window", None)
     if resolved == "hybrid":
@@ -168,11 +168,11 @@ def shared_window_label(st: dict) -> str:
 def anchor_label(st: dict, *, stereo_link_enabled: bool) -> str:
     try:
         anchor = str(st.get("stereo_link_level_anchor_channel", "") or "").strip().lower()
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         anchor = ""
     try:
         resolved = str(st.get("stereo_link_mode", "") or "").strip().lower()
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         resolved = ""
     if anchor == "left":
         if resolved in {"shared", "hybrid"}:
@@ -197,7 +197,7 @@ def phase_clamp_label(st: dict) -> str:
         if clipped:
             return f"max={bef:.1f} deg -> {lim:.1f} deg"
         return f"max={bef:.1f} deg (limit {lim:.1f} deg)"
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         return "-"
 
 
@@ -212,7 +212,7 @@ def xo_fc_wrapped_label(st: dict) -> str:
             if "Hz" in part:
                 try:
                     freqs.append(float(part.split("Hz")[0].strip()))
-                except Exception:
+                except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
                     freqs.append(None)
         items = []
         for i in range(1, 6):
@@ -221,7 +221,7 @@ def xo_fc_wrapped_label(st: dict) -> str:
                 continue
             try:
                 val = float(st.get(key))
-            except Exception:
+            except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
                 continue
             if i <= len(freqs) and freqs[i - 1] is not None:
                 label = f"{int(round(freqs[i - 1]))}Hz"
@@ -229,7 +229,7 @@ def xo_fc_wrapped_label(st: dict) -> str:
                 label = f"XO{i}"
             items.append(f"{label}:{val:+.1f} deg")
         return " | ".join(items) if items else "-"
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         return "-"
 
 
@@ -244,7 +244,7 @@ def xo_fc_gd_label(st: dict) -> str:
             if "Hz" in part:
                 try:
                     freqs.append(float(part.split("Hz")[0].strip()))
-                except Exception:
+                except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
                     freqs.append(None)
         items = []
         for i in range(1, 6):
@@ -253,7 +253,7 @@ def xo_fc_gd_label(st: dict) -> str:
                 continue
             try:
                 val = float(st.get(key))
-            except Exception:
+            except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
                 continue
             if i <= len(freqs) and freqs[i - 1] is not None:
                 label = f"{int(round(freqs[i - 1]))}Hz"
@@ -261,7 +261,7 @@ def xo_fc_gd_label(st: dict) -> str:
                 label = f"XO{i}"
             items.append(f"{label}:{val:+.2f} ms")
         return " | ".join(items) if items else "-"
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         return "-"
 
 
@@ -271,7 +271,7 @@ def xo_phase_model_label(st: dict) -> str:
         if summary is None or str(summary).strip() == "":
             return "-"
         return str(summary)
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         return "-"
 
 
@@ -297,7 +297,7 @@ def xo_diff_raw_label(st: dict) -> str:
                 + (f" (XO {float(gfc):.0f} Hz)" if gfc is not None else "")
             )
         return " | ".join(parts) if parts else "-"
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         return "-"
 
 
@@ -343,7 +343,7 @@ def xo_fc_gd_badge(st: dict) -> str:
             f"border-radius:10px; font-size:11px; font-weight:600; background:{bg}; color:{fg}; "
             f"vertical-align:middle;'>{label}</span>"
         )
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         logger.exception("XO delta GD badge render")
         return ""
 
@@ -362,7 +362,7 @@ def hpf_diff_raw_label(st: dict) -> str:
         if g is not None and gf is not None:
             parts.append(f"max delta GD {float(g):.2f} ms @ {float(gf):.0f} Hz")
         return " | ".join(parts) if parts else "-"
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         return "-"
 
 
@@ -372,7 +372,7 @@ def hpf_model_label(st: dict) -> str:
         if summary is None or str(summary).strip() == "":
             return "-"
         return str(summary)
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         return "-"
 
 
@@ -384,7 +384,7 @@ def format_ir_window(data: dict) -> str:
         try:
             if left is not None and right is not None:
                 return f"Asymmetric (Left {float(left):.1f} ms, Right {float(right):.1f} ms)"
-        except Exception:
+        except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
             logger.exception("asymmetric IR window label format")
         return "Asymmetric"
     return "Auto (adaptive)"
@@ -396,7 +396,7 @@ def mixed_blend_label(st: dict, key: str) -> str:
         if val is None:
             return "-"
         return f"{float(val):.1f} Hz"
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         return "-"
 
 
@@ -408,7 +408,7 @@ def gd_limiter_label(st: dict) -> str:
         limit = state.get("gd_limiter_limit_ms_per_oct", state.get("gd_grad_limit_ms_per_oct", None))
         limit_txt = "n/a" if limit is None else f"{float(limit):.2f}"
         return f"{'ON' if enabled else 'OFF'} (reason={reason}, limit={limit_txt} ms/oct)"
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         return "n/a"
 
 
@@ -427,10 +427,10 @@ def gd_grad_max_label(st: dict) -> str:
                 val = float(state.get(key, None))
                 if val == val and abs(val) < float("inf"):
                     return f"{val:.2f} ms/oct"
-            except Exception:
+            except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
                 continue
         return "n/a"
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         return "n/a"
 
 

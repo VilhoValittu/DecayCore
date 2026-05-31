@@ -417,7 +417,19 @@ def _execute_exact_cache_refine(
         )
         winner = _select_cache_refine_best(outcome=rounds)
         return _finalize_cache_refine_result(outcome=winner)
-    except Exception as exc:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
         logger.warning(
             "Automatic mode: exact preset cache refine failed, "
             f"falling back to search ({type(exc).__name__}: {exc})"

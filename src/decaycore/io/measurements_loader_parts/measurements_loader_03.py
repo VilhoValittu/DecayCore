@@ -43,6 +43,17 @@ from ..measurements_wav import (
     parse_measurements_from_wav_path,
 )
 
+_RECOVERABLE_WAV_LOAD_EXCEPTIONS = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    OverflowError,
+    OSError,
+    EOFError,
+    RuntimeError,
+)
+
+
 def _load_raw_wav_from_source(file_dict=None, local_path: str = "") -> tuple:
     """
     Lataa raaka WAV-data (ilman ikkunointia/tasoitusta) ylöslatauksesta tai
@@ -92,7 +103,7 @@ def _load_raw_wav_from_source(file_dict=None, local_path: str = "") -> tuple:
             x = x.astype(np.float32, copy=False)
         x = x - float(np.mean(x))
         return x, int(fs)
-    except Exception:
+    except _RECOVERABLE_WAV_LOAD_EXCEPTIONS:
         return None, 0
 
 def load_raw_irs_lr(
@@ -318,7 +329,7 @@ def load_bass_integration_measurements(data: dict, *, logger=None):
 
     try:
         fc_hz = float(data.get("avr_crossover_hz", 80.0) or 80.0)
-    except Exception:
+    except _RECOVERABLE_WAV_LOAD_EXCEPTIONS:
         fc_hz = 80.0
     profile = str(data.get("bass_integration_profile", "safe") or "safe").strip().lower()
     try:
@@ -329,7 +340,7 @@ def load_bass_integration_measurements(data: dict, *, logger=None):
             )
             or AUTO_MODE_BASS_INTEGRATION_GUARD_LO_RATIO
         )
-    except Exception:
+    except _RECOVERABLE_WAV_LOAD_EXCEPTIONS:
         guard_lo_ratio = AUTO_MODE_BASS_INTEGRATION_GUARD_LO_RATIO
     try:
         guard_hi_ratio = float(
@@ -339,7 +350,7 @@ def load_bass_integration_measurements(data: dict, *, logger=None):
             )
             or AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO
         )
-    except Exception:
+    except _RECOVERABLE_WAV_LOAD_EXCEPTIONS:
         guard_hi_ratio = AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO
 
     base_diagnostics = {
@@ -388,23 +399,23 @@ def load_bass_integration_measurements(data: dict, *, logger=None):
     if is_direct_dac:
         try:
             xo_order = max(1, int(round(float(data.get("sub_crossover_slope", 24) or 24.0))) // 6)
-        except Exception:
+        except _RECOVERABLE_WAV_LOAD_EXCEPTIONS:
             xo_order = 4
         try:
             sub_hpf_hz = float(data.get("sub_hpf_freq", 20.0) or 20.0)
-        except Exception:
+        except _RECOVERABLE_WAV_LOAD_EXCEPTIONS:
             sub_hpf_hz = 20.0
         try:
             sub_hpf_order = max(1, int(round(float(data.get("sub_hpf_slope", 12) or 12.0))) // 6)
-        except Exception:
+        except _RECOVERABLE_WAV_LOAD_EXCEPTIONS:
             sub_hpf_order = 2
         try:
             sub_delay_ms = float(data.get("bass_integration_sub_delay_ms", 0.0) or 0.0)
-        except Exception:
+        except _RECOVERABLE_WAV_LOAD_EXCEPTIONS:
             sub_delay_ms = 0.0
         try:
             sub_gain_trim_db = float(data.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0)
-        except Exception:
+        except _RECOVERABLE_WAV_LOAD_EXCEPTIONS:
             sub_gain_trim_db = 0.0
         diagnostics = compute_direct_dac_bass_integration_diagnostics(
             bundle_base,
@@ -460,7 +471,7 @@ def load_bass_integration_measurements(data: dict, *, logger=None):
 __all__ = ['_load_raw_wav_from_source', 'load_raw_irs_lr', 'load_raw_ir_sub', 'load_bass_integration_measurements']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['measurements_loader_01', 'measurements_loader_02', 'measurements_loader_03']:
@@ -471,4 +482,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

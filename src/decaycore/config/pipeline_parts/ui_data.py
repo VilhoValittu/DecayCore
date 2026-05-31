@@ -34,6 +34,12 @@ from ...ui_i18n import (
     normalize_lvl_mode_value,
     normalize_output_tilt_source_value,
 )
+from .managed_settings import (
+    _apply_auto_mode_managed_settings,
+    _effective_output_tilt_source,
+    _resolve_output_tilt_db_per_oct,
+)
+from .xo_hpf import filter_type_short
 
 logger = logging.getLogger("DecayCore")
 
@@ -192,7 +198,7 @@ def collect_ui_data(pin) -> Dict[str, Any]:
     mode_explicit = mode_raw not in (None, "")
     try:
         mode_u = str(mode_raw or "BASIC").strip().upper()
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         mode_u = "BASIC"
     if mode_u not in ("BASIC", "ADVANCED", "AUTO"):
         mode_u = "BASIC"
@@ -202,7 +208,7 @@ def collect_ui_data(pin) -> Dict[str, Any]:
     if not mode_explicit and not is_auto_mode:
         try:
             is_auto_mode = bool(data.get("camillafir_automatic_mode", False))
-        except Exception:
+        except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
             is_auto_mode = False
 
     if is_auto_mode:
@@ -223,7 +229,7 @@ def collect_ui_data(pin) -> Dict[str, Any]:
 
     try:
         atm = str(data.get("auto_target_mode", "auto") or "auto").strip().lower()
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         atm = "auto"
     if atm in ("selected", "manual", "fixed", "user"):
         atm = "selected"
@@ -251,7 +257,7 @@ def collect_ui_data(pin) -> Dict[str, Any]:
 
     try:
         sls = str(data.get("stereo_link_strategy", "") or "").strip().lower()
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         sls = ""
     if sls == "off":
         # Unified select: "off" means stereo link disabled; normalize internally.
@@ -295,16 +301,16 @@ def collect_ui_data(pin) -> Dict[str, Any]:
     for i in range(1, 6):
         try:
             data[f"xo{i}_f"] = pin[f"xo{i}_f"]
-        except Exception:
+        except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
             data[f"xo{i}_f"] = None
         try:
             data[f"xo{i}_s"] = pin[f"xo{i}_s"]
-        except Exception:
+        except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
             data[f"xo{i}_s"] = None
 
     try:
         data["max_cut_db"] = abs(float(data.get("max_cut_db", 15.0) or 15.0))
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         data["max_cut_db"] = 15.0
 
     for k, dv in [
@@ -314,49 +320,49 @@ def collect_ui_data(pin) -> Dict[str, Any]:
     ]:
         try:
             data[k] = max(0.0, float(data.get(k, dv) or dv))
-        except Exception:
+        except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
             data[k] = dv
     try:
         v = float(data.get("lvl_manual_db", 0.0) or 0.0)
         data["lvl_manual_db"] = v if math.isfinite(v) else 0.0
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         data["lvl_manual_db"] = 0.0
     try:
         v = float(data.get("manual_target_tilt_db_per_oct", 0.0) or 0.0)
         data["manual_target_tilt_db_per_oct"] = v if math.isfinite(v) else 0.0
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         data["manual_target_tilt_db_per_oct"] = 0.0
     data["output_tilt_source"] = _effective_output_tilt_source(data)
     try:
         v = float(data.get("output_tilt_db_per_oct", 0.0) or 0.0)
         data["output_tilt_db_per_oct"] = v if math.isfinite(v) else 0.0
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         data["output_tilt_db_per_oct"] = 0.0
     data["output_tilt_db_per_oct"] = _resolve_output_tilt_db_per_oct(data)
 
     try:
         data["gain"] = max(0.0, float(data.get("gain", 0.0) or 0.0))
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         data["gain"] = 0.0
     try:
         data["auto_mode_workers"] = int(float(data.get("auto_mode_workers", 0) or 0))
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         data["auto_mode_workers"] = 0
     try:
         v = float(data.get("avr_crossover_hz", 80.0) or 80.0)
         data["avr_crossover_hz"] = v if math.isfinite(v) else 80.0
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         data["avr_crossover_hz"] = 80.0
     try:
         bi_mode = str(data.get("bass_integration_mode", "direct_dac") or "direct_dac").strip().lower()
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         bi_mode = "direct_dac"
     if bi_mode != "direct_dac" or bool(data.get("bass_integration_enable", False)):
         bi_mode = "direct_dac"
     data["bass_integration_mode"] = bi_mode
     try:
         bi_profile = str(data.get("bass_integration_profile", "safe") or "safe").strip().lower()
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         bi_profile = "safe"
     data["bass_integration_profile"] = _auto_bass_integration_profile_norm(bi_profile)
     data["bass_integration_sub_combine_mode"] = normalize_sub_combine_mode(
@@ -365,13 +371,13 @@ def collect_ui_data(pin) -> Dict[str, Any]:
     try:
         v = float(data.get("bass_integration_sub_delay_ms", 0.0) or 0.0)
         data["bass_integration_sub_delay_ms"] = v if math.isfinite(v) else 0.0
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         data["bass_integration_sub_delay_ms"] = 0.0
     data["bass_integration_sub_polarity_invert"] = bool(data.get("bass_integration_sub_polarity_invert", False))
     try:
         v = float(data.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0)
         data["bass_integration_sub_gain_trim_db"] = v if math.isfinite(v) else 0.0
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         data["bass_integration_sub_gain_trim_db"] = 0.0
     data["bass_integration_alignment_auto_applied"] = bool(data.get("bass_integration_alignment_auto_applied", False))
     data["bass_integration_alignment_reason"] = str(data.get("bass_integration_alignment_reason", "") or "")
@@ -381,12 +387,12 @@ def collect_ui_data(pin) -> Dict[str, Any]:
     try:
         v = float(data.get("bass_integration_allpass_freq_hz", 0.0) or 0.0)
         data["bass_integration_allpass_freq_hz"] = v if math.isfinite(v) and v > 0.0 else 0.0
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         data["bass_integration_allpass_freq_hz"] = 0.0
     try:
         v = float(data.get("bass_integration_allpass_q", 0.707) or 0.707)
         data["bass_integration_allpass_q"] = v if math.isfinite(v) and v > 0.0 else 0.707
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         data["bass_integration_allpass_q"] = 0.707
     data["bass_integration_allpass_auto_applied"] = bool(data.get("bass_integration_allpass_auto_applied", False))
     if (
@@ -404,13 +410,13 @@ def collect_ui_data(pin) -> Dict[str, Any]:
             or data.get("avr_crossover_hz", 80.0)
             or 80.0
         )
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         main_xo_hz = 80.0
     if not math.isfinite(main_xo_hz) or main_xo_hz <= 0.0:
         main_xo_hz = 80.0
     try:
         direct_sub_lpf_hz = float(data.get("direct_dac_sub_lpf_hz", main_xo_hz) or main_xo_hz)
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         direct_sub_lpf_hz = main_xo_hz
     if not math.isfinite(direct_sub_lpf_hz) or direct_sub_lpf_hz <= 0.0:
         direct_sub_lpf_hz = main_xo_hz
@@ -434,7 +440,7 @@ def collect_ui_data(pin) -> Dict[str, Any]:
     try:
         sh_raw = data.get("ir_export_window_shape", None)
         sh = str(sh_raw or "hann").strip().lower()
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         sh = "hann"
     if sh not in ("hann", "tukey"):
         sh = "hann"
@@ -442,7 +448,7 @@ def collect_ui_data(pin) -> Dict[str, Any]:
 
     try:
         a = float(data.get("ir_export_tukey_alpha", 0.25))
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         a = 0.25
     if not math.isfinite(a):
         a = 0.25
@@ -484,17 +490,3 @@ def log_df_smoothing_toggle(source, logger) -> bool:
 
 
 __all__ = ['collect_ui_data', 'log_df_smoothing_toggle']
-
-
-def _load_sibling_symbols() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['managed_settings', 'ui_data', 'xo_hpf', 'filter_config']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_load_sibling_symbols()

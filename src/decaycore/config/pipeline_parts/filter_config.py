@@ -34,6 +34,7 @@ from ...ui_i18n import (
     normalize_lvl_mode_value,
     normalize_output_tilt_source_value,
 )
+from .managed_settings import _effective_output_tilt_source, _resolve_output_tilt_db_per_oct
 
 logger = logging.getLogger("DecayCore")
 
@@ -111,13 +112,37 @@ def build_filter_config(
         try:
             x = float(v)
             return x if x == x else float(default)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             return float(default)
 
     def _as_int(v, default=0) -> int:
         try:
             return int(float(v))
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             return int(default)
     def _as_bool_default(v, default: bool) -> bool:
         """Sisainen apufunktio: as bool with None/empty fallback."""
@@ -138,7 +163,19 @@ def build_filter_config(
                 return _as_bool_default(v[0], default)
         try:
             return bool(v)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             return bool(default)
     def _as_float_allow_zero(v, default: float) -> float:
         """Sisainen apufunktio: as float allow zero."""
@@ -158,7 +195,19 @@ def build_filter_config(
                 return default
         try:
             x = float(v)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             return default
         if not math.isfinite(x):
             return default
@@ -232,7 +281,19 @@ def build_filter_config(
         lb_hz = _as_float(lb_raw, 40.0)
     try:
         mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         mode_u = "BASIC"
     is_auto_mode = bool(mode_u == "AUTO" or data.get("camillafir_automatic_mode", False))
     df_smoothing = _as_bool_default(
@@ -544,7 +605,19 @@ def build_filter_config(
         sub_hpf_ord = max(1, int(data.get("sub_hpf_slope", 12) or 12) // 6)
         try:
             direct_sub_lpf_hz = float(data.get("direct_dac_sub_lpf_hz", sub_xo_hz) or sub_xo_hz)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             direct_sub_lpf_hz = sub_xo_hz
         if not math.isfinite(direct_sub_lpf_hz) or direct_sub_lpf_hz <= 0.0:
             direct_sub_lpf_hz = sub_xo_hz
@@ -572,17 +645,3 @@ def build_filter_config(
 
 
 __all__ = ['build_filter_config']
-
-
-def _load_sibling_symbols() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['managed_settings', 'ui_data', 'xo_hpf', 'filter_config']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_load_sibling_symbols()

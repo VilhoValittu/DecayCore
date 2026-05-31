@@ -125,7 +125,19 @@ def _auto_signature(
     )
     try:
         h.update(json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8"))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         h.update(str(sorted(payload.items())).encode("utf-8", "ignore"))
     return h.hexdigest()
 
@@ -532,26 +544,86 @@ def _auto_seed_from_signature(
         if not sig:
             raise ValueError("empty signature")
         return int(str(sig)[:8], 16) & 0xFFFFFFFF
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         try:
             msig = _auto_measurement_signature(measurements or {})
             return int(str(msig)[:8], 16) & 0xFFFFFFFF if msig else 0
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             return 0
 
 
 def _auto_apply_seed(seed: int) -> None:
     try:
         s = int(seed) & 0xFFFFFFFF
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         s = 0
     try:
         random.seed(s)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("random seed apply")
     try:
         np.random.seed(s)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("numpy random seed apply")
 
 

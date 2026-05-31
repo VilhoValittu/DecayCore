@@ -23,14 +23,38 @@ def _bool_value(value, default: bool = False) -> bool:
             return False
     try:
         return bool(value)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return bool(default)
 
 
 def _float_value(value, default: float) -> float:
     try:
         parsed = float(value)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return float(default)
     if parsed != parsed:
         return float(default)
@@ -44,7 +68,19 @@ def _float_or_none(value) -> Optional[float]:
         return None
     try:
         parsed = float(value)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None
     if parsed != parsed:
         return None
@@ -513,6 +549,7 @@ class FilterConfig:
     sub_hpf_freq: float = 20.0
     sub_hpf_order: int = 2
     low_bass_cut_hz: float = 20.0
+    room_volume_m3: float = 40.0
 
     conf_pull_floor: float = 0.15
     conf_pull_ceil: float = 0.95

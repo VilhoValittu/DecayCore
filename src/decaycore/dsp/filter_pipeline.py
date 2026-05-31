@@ -94,7 +94,19 @@ def _apply_hybrid_iir_preconditioning(
             int(getattr(cfg, "fs", 0) or 0),
             policy,
         )
-    except Exception as exc:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
         logger.warning("Hybrid IIR design failed; continuing FIR-only", exc_info=True)
         return gain_db, {
             "hybrid_iir_enabled": True,
@@ -215,7 +227,19 @@ def _run_generate_filter_pre_correction(
                 + float(getattr(corr, "over_cut", 0.0) or 0.0) * 2.0
             )
             _pruning_hook(-(_p90 + _clip_pen))
-        except Exception as exc:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ) as exc:
             if (
                 type(exc).__name__ == "TrialPruned"
                 and str(getattr(type(exc), "__module__", "")).startswith("optuna")

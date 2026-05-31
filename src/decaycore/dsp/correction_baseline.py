@@ -18,17 +18,18 @@ import numpy as np
 import scipy.signal
 
 from decaycore.auto_mode.auto_mode_profile import profiled_section
+from decaycore.common.measurement_features import estimate_schroeder_hz
 
-from .decaycore_analysis import calculate_rt60, calculate_rt60_bands
-from .decaycore_leveling import compute_leveling
+from ._measurement_ctx_local import get_measurement_ctx
 from .correction_types import (
     BaselineComparisonTelemetry,
     BaselineNativeTelemetry,
     MeasurementSideContext,
     _BaselineContext,
 )
+from .decaycore_analysis import calculate_rt60, calculate_rt60_bands
+from .decaycore_leveling import compute_leveling
 from .dsp_config import CfgReader
-from ._measurement_ctx_local import get_measurement_ctx
 from .limits import build_slope_limit_envelope
 from .phase import get_min_phase_impulse
 from .tdc import apply_smart_tdc
@@ -319,6 +320,13 @@ def _prepare_correction_baseline(
                     band_avg = float(np.median(vs))
         with _RT60_CACHE_LOCK:
             _RT60_CACHE[_rt60_key] = (float(current_rt60), dict(rt60_bands), float(band_avg))
+
+    schroeder_hz = estimate_schroeder_hz(
+        current_rt60,
+        room_volume_m3=getattr(cfg, "room_volume_m3", 40.0),
+    )
+    if schroeder_hz is not None and isinstance(st, dict):
+        st["schroeder_hz_estimate"] = float(schroeder_hz)
 
     # B) Target ja mahdollinen preview-saato (nyt no-op)
     with profiled_section("generate_filter.correction.baseline.target_curve"):

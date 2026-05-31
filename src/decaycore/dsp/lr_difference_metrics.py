@@ -88,7 +88,19 @@ def _get_mags(st: dict, key: str = "measured_mags") -> np.ndarray | None:
         return None
     try:
         arr = np.asarray(raw, dtype=float).reshape(-1)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None
     if arr.size < 8:
         return None
@@ -102,7 +114,19 @@ def _get_freq(st: dict) -> np.ndarray | None:
         return None
     try:
         arr = np.asarray(raw, dtype=float).reshape(-1)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None
     if arr.size < 8:
         return None
@@ -222,7 +246,19 @@ def compute_lr_difference_metrics(
             band_lo_hz=band_lo,
             band_hi_hz=band_hi,
         )
-    except Exception as exc:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
         logger.debug("compute_lr_difference_metrics failed: %s", exc, exc_info=True)
         return _NAN_RESULT
 
@@ -240,38 +276,55 @@ def _compute_gd_rms_band(
 ) -> float:
     """Compute GD RMS mismatch over the band; returns nan if unavailable."""
     try:
-        # Look for group-delay arrays in stats.
         gd_keys = ("group_delay_ms", "gd_ms", "gd_curve_ms")
-        l_gd = None
-        r_gd = None
-        for key in gd_keys:
-            if l_st.get(key) is not None:
-                arr = np.asarray(l_st[key], dtype=float).reshape(-1)
-                if arr.size >= 8:
-                    l_gd = arr
-                    break
-        for key in gd_keys:
-            if r_st.get(key) is not None:
-                arr = np.asarray(r_st[key], dtype=float).reshape(-1)
-                if arr.size >= 8:
-                    r_gd = arr
-                    break
-
+        l_gd = _first_valid_gd_array(l_st, gd_keys)
+        r_gd = _first_valid_gd_array(r_st, gd_keys)
         if l_gd is None or r_gd is None:
             return float("nan")
+        return _gd_rms_band_from_arrays(l_gd, r_gd, freq, band_lo, band_hi)
+    except (
 
-        # Bring to common axis length.
-        n = min(freq.size, l_gd.size, r_gd.size)
-        if n < 8:
-            return float("nan")
-        f_use = freq[:n]
-        delta_gd = l_gd[:n] - r_gd[:n]
-        mask = _band_mask(f_use, band_lo, band_hi)
-        if int(np.count_nonzero(mask)) < 4:
-            return float("nan")
-        return _safe_rms(delta_gd[mask])
-    except Exception:
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return float("nan")
+
+
+def _first_valid_gd_array(stats: dict, keys: tuple[str, ...]) -> np.ndarray | None:
+    for key in keys:
+        raw = stats.get(key)
+        if raw is None:
+            continue
+        arr = np.asarray(raw, dtype=float).reshape(-1)
+        if arr.size >= 8:
+            return arr
+    return None
+
+
+def _gd_rms_band_from_arrays(
+    left_gd: np.ndarray,
+    right_gd: np.ndarray,
+    freq: np.ndarray,
+    band_lo: float,
+    band_hi: float,
+) -> float:
+    n = min(freq.size, left_gd.size, right_gd.size)
+    if n < 8:
+        return float("nan")
+    freq_used = freq[:n]
+    gd_delta = left_gd[:n] - right_gd[:n]
+    mask = _band_mask(freq_used, band_lo, band_hi)
+    if int(np.count_nonzero(mask)) < 4:
+        return float("nan")
+    return _safe_rms(gd_delta[mask])
 
 
 __all__ = ["LRDifferenceResult", "compute_lr_difference_metrics"]

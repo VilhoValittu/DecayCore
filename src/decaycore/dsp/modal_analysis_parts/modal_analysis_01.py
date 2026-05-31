@@ -100,7 +100,19 @@ def _as_float_array(value) -> np.ndarray:
         return np.asarray([], dtype=float)
     try:
         return np.asarray(value, dtype=float).reshape(-1)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return np.asarray([], dtype=float)
 
 @numba.njit(cache=True)
@@ -166,6 +178,89 @@ def _safe_confidence(confidence_mask: np.ndarray, n: int) -> np.ndarray:
         conf = conf / 100.0
     return np.clip(np.nan_to_num(conf, nan=0.0, posinf=0.0, neginf=0.0), 0.0, 1.0)
 
+
+def _prepare_modal_series(
+    freq_axis,
+    measured_mag_db,
+    target_mag_db,
+    corrected_mag_db,
+    group_delay_ms,
+    confidence_mask,
+    left_mag_db,
+    right_mag_db,
+) -> tuple[np.ndarray, ...]:
+    f = _as_float_array(freq_axis)
+    measured = _as_float_array(measured_mag_db)
+    target = _as_float_array(target_mag_db)
+    corrected = _as_float_array(corrected_mag_db)
+    gd = _as_float_array(group_delay_ms)
+    conf = _as_float_array(confidence_mask)
+    left = _as_float_array(left_mag_db)
+    right = _as_float_array(right_mag_db)
+    return f, measured, target, corrected, gd, conf, left, right
+
+
+def _prepare_modal_truncate_size(
+    *,
+    f: np.ndarray,
+    measured: np.ndarray,
+    target: np.ndarray,
+    corrected: np.ndarray,
+    gd: np.ndarray,
+    conf: np.ndarray,
+    left: np.ndarray,
+    right: np.ndarray,
+) -> int:
+    sizes = [f.size, measured.size]
+    if target.size:
+        sizes.append(target.size)
+    if corrected.size:
+        sizes.append(corrected.size)
+    if gd.size:
+        sizes.append(gd.size)
+    if conf.size:
+        sizes.append(conf.size)
+    if left.size and right.size:
+        sizes.extend([left.size, right.size])
+    return int(min(sizes)) if sizes else 0
+
+
+def _prepare_modal_analysis_array(
+    *,
+    measured: np.ndarray,
+    target: np.ndarray,
+    corrected: np.ndarray,
+    n: int,
+    target_mag_db,
+) -> np.ndarray:
+    if corrected.size >= n:
+        return measured + corrected - target
+    if target_mag_db is not None and target.size >= n:
+        return measured - target
+    return np.asarray(measured, dtype=float)
+
+
+def _prepare_modal_valid_mask(
+    *,
+    f: np.ndarray,
+    analysis: np.ndarray,
+    conf: np.ndarray,
+    gd: np.ndarray,
+    left: np.ndarray,
+    right: np.ndarray,
+    n: int,
+    lo_hz: float,
+    hi_hz: float,
+) -> np.ndarray:
+    valid = np.isfinite(f) & np.isfinite(analysis) & np.isfinite(conf) & (f > 0.0)
+    valid &= (f >= float(lo_hz)) & (f <= float(hi_hz))
+    if gd.size >= n:
+        valid &= np.isfinite(gd)
+    if left.size >= n and right.size >= n:
+        valid &= np.isfinite(left) & np.isfinite(right)
+    return valid
+
+
 def _prepare_arrays(
     freq_axis,
     measured_mag_db,
@@ -178,27 +273,26 @@ def _prepare_arrays(
     lo_hz: float,
     hi_hz: float,
 ) -> tuple[np.ndarray, ...] | None:
-    f = _as_float_array(freq_axis)
-    measured = _as_float_array(measured_mag_db)
-    target = _as_float_array(target_mag_db)
-    corrected = _as_float_array(corrected_mag_db)
-    gd = _as_float_array(group_delay_ms)
-    conf = _as_float_array(confidence_mask)
-    left = _as_float_array(left_mag_db)
-    right = _as_float_array(right_mag_db)
-
-    sizes = [f.size, measured.size]
-    if target.size:
-        sizes.append(target.size)
-    if corrected.size:
-        sizes.append(corrected.size)
-    if gd.size:
-        sizes.append(gd.size)
-    if conf.size:
-        sizes.append(conf.size)
-    if left.size and right.size:
-        sizes.extend([left.size, right.size])
-    n = int(min(sizes)) if sizes else 0
+    f, measured, target, corrected, gd, conf, left, right = _prepare_modal_series(
+        freq_axis,
+        measured_mag_db,
+        target_mag_db,
+        corrected_mag_db,
+        group_delay_ms,
+        confidence_mask,
+        left_mag_db,
+        right_mag_db,
+    )
+    n = _prepare_modal_truncate_size(
+        f=f,
+        measured=measured,
+        target=target,
+        corrected=corrected,
+        gd=gd,
+        conf=conf,
+        left=left,
+        right=right,
+    )
     if n < 8:
         return None
 
@@ -211,19 +305,24 @@ def _prepare_arrays(
     left = np.asarray(left[:n], dtype=float) if left.size >= n and right.size >= n else np.asarray([], dtype=float)
     right = np.asarray(right[:n], dtype=float) if right.size >= n and left.size >= n else np.asarray([], dtype=float)
 
-    if corrected.size >= n:
-        analysis = measured + corrected - target
-    elif target_mag_db is not None and target.size >= n:
-        analysis = measured - target
-    else:
-        analysis = np.asarray(measured, dtype=float)
-
-    valid = np.isfinite(f) & np.isfinite(analysis) & np.isfinite(conf) & (f > 0.0)
-    valid &= (f >= float(lo_hz)) & (f <= float(hi_hz))
-    if gd.size >= n:
-        valid &= np.isfinite(gd)
-    if left.size >= n and right.size >= n:
-        valid &= np.isfinite(left) & np.isfinite(right)
+    analysis = _prepare_modal_analysis_array(
+        measured=measured,
+        target=target,
+        corrected=corrected,
+        n=n,
+        target_mag_db=target_mag_db,
+    )
+    valid = _prepare_modal_valid_mask(
+        f=f,
+        analysis=analysis,
+        conf=conf,
+        gd=gd,
+        left=left,
+        right=right,
+        n=n,
+        lo_hz=lo_hz,
+        hi_hz=hi_hz,
+    )
     if int(np.count_nonzero(valid)) < 8:
         return None
 
@@ -259,7 +358,7 @@ def _width_bounds(excess: np.ndarray, peak_idx: int, min_floor: float) -> tuple[
 __all__ = ['RoomModeEvent', 'ModalAnalysisResult', '_empty_result', '_as_float_array', '_smooth_log_box', '_safe_confidence', '_prepare_arrays', '_width_bounds']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['modal_analysis_01', 'modal_analysis_02']:
@@ -270,4 +369,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

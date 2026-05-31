@@ -409,7 +409,7 @@ def final_ir_validation_to_stats(result: FinalIRValidationResult) -> dict[str, A
 __all__ = ['_safe_missing_result', 'validate_final_fir_against_ir', 'final_ir_validation_to_stats']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['final_ir_validation_01', 'final_ir_validation_02', 'final_ir_validation_03']:
@@ -420,4 +420,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

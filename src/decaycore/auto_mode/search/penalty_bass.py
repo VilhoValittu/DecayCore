@@ -314,7 +314,19 @@ def _auto_bass_integration_penalty(
 def _auto_exc_penalty_bins_from_dbg(exc_dbg: dict | None) -> float:
     try:
         dbg = dict(exc_dbg or {})
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         dbg = {}
     v = shared._auto_safe_float(dbg.get("pen_bins", float("nan")), float("nan"))
     if np.isfinite(v):

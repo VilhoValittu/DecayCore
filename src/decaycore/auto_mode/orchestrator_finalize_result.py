@@ -74,7 +74,19 @@ def _materialize_final_search_winner(
             search_state.best_metrics = dict(best_metrics_recalc or search_state.best_metrics or {})
             search_state.best_preset = dict(best_data or final_best_preset or {})
             residual_peak_safety_override_meta = dict(residual_peak_safety_override_meta_final)
-    except Exception as exc:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
         # Materialization can fail on late-stage result packaging; keep the last known winner if available.
         logger.warning(
             "Automatic mode final materialization failed: %s",
@@ -100,7 +112,19 @@ def _p6_extract_fir_and_stats(result) -> tuple:
         st_l = dict(getattr(result, "l_st", None) or {})
         st_r = dict(getattr(result, "r_st", None) or {})
         return fir_l, fir_r, st_l, st_r
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None, None, {}, {}
 
 
@@ -113,7 +137,19 @@ def _p6_stat_arr(st: dict, key: str):
             return None
         arr = _np.asarray(v, dtype=float).reshape(-1)
         return arr if arr.size > 0 and _np.any(_np.isfinite(arr)) else None
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None
 
 
@@ -183,7 +219,19 @@ def _run_p6_final_validation(
     try:
         from ..dsp.final_ir_validation import validate_final_fir_against_ir, final_ir_validation_to_stats
         from ..dsp.dsp_config import CfgReader
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return
 
     try:
@@ -235,7 +283,19 @@ def _run_p6_final_validation(
                     config=cfg,
                 )
                 results.append((i, cand, vr, result_obj, mag_source_l, mag_source_r))
-            except Exception as exc:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ) as exc:
                 logger.debug("P6 validation failed for candidate %d: %s: %s", i, type(exc).__name__, exc)
 
         if not results:
@@ -293,7 +353,19 @@ def _run_p6_final_validation(
             str(winner_mag_source_r),
             ",".join(winner_vr.reasons) or "none",
         )
-    except Exception as exc:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
         logger.debug("P6 final IR validation raised: %s: %s", type(exc).__name__, exc)
 
 

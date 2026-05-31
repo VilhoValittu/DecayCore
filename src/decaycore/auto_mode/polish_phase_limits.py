@@ -139,7 +139,19 @@ def apply_phase_limit_winner_polish(
                     summarize=False,
                     base_data_override=base_data_ref,
                 )
-            except Exception as exc:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ) as exc:
                 logger.warning(
                     "Automatic mode %s failed for candidate %d/%d (phase_limit=%.1f Hz): %s",
                     str(phase_label),

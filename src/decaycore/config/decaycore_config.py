@@ -39,7 +39,19 @@ def _normalize_filter_type(value) -> str:
     """Normalize persisted filter type names to the UI/program canonical labels."""
     try:
         ft = str(value or "").strip()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         ft = ""
     ft_l = ft.lower()
     if "asym" in ft_l:
@@ -295,14 +307,38 @@ def load_config() -> dict:
                     _v = float(saved.get("lvl_manual_db"))
                     if 40.0 <= _v <= 110.0:
                         saved["lvl_manual_db"] = float(_v - 75.0)
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.exception("lvl_manual_db migration")
 
             try:
                 saved["filter_type"] = _normalize_filter_type(
                     saved.get("filter_type", default_conf.get("filter_type"))
                 )
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 saved["filter_type"] = str(default_conf.get("filter_type", "Asymmetric"))
 
             saved_mode_explicit = saved.get("mode", None) not in (None, "")
@@ -311,19 +347,55 @@ def load_config() -> dict:
             saved["lvl_algo"] = normalize_lvl_algo_value(saved.get("lvl_algo", default_conf.get("lvl_algo")))
 
             default_conf.update(saved)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("config load and merge")
 
     default_conf["unsafe_raw_dsp"] = False
 
     try:
         mode_u = str(default_conf.get("mode", "AUTO") or "AUTO").strip().upper()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         mode_u = "AUTO"
 
     try:
         legacy_auto = bool(default_conf.get("camillafir_automatic_mode", False))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         legacy_auto = False
 
     if legacy_auto and not saved_mode_explicit:
@@ -364,5 +436,17 @@ def save_config(data: dict) -> None:
         clean_data["output_tilt_source"] = normalize_output_tilt_source_value(clean_data.get("output_tilt_source", "off"))
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(clean_data, f, indent=4)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("config save")

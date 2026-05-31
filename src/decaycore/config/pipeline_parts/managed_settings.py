@@ -102,14 +102,38 @@ def _finite_float_or_default(value: Any, default: float = 0.0) -> float:
         parsed = float(value)
         if math.isfinite(parsed):
             return float(parsed)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("float parse in pipeline config")
     return float(default)
 
 def _advanced_manual_output_tilt_enabled(data: Dict[str, Any]) -> bool:
     try:
         mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         mode_u = "BASIC"
 
     if mode_u != "ADVANCED":
@@ -127,7 +151,19 @@ def _effective_output_tilt_source(data: Dict[str, Any]) -> str:
 def _resolve_output_tilt_db_per_oct(data: Dict[str, Any]) -> float:
     try:
         mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         mode_u = "BASIC"
 
     lvl_mode = normalize_lvl_mode_value(data.get("lvl_mode", LVL_MODE_AUTO))
@@ -136,7 +172,19 @@ def _resolve_output_tilt_db_per_oct(data: Dict[str, Any]) -> float:
     if mode_u == "AUTO":
         try:
             auto_target_mode = str(data.get("auto_target_mode", "auto") or "auto").strip().lower()
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             auto_target_mode = "auto"
         # AUTO-mode filter tilt is only allowed for the explicit adaptive-target path.
         if auto_target_mode != "adaptive":
@@ -149,7 +197,19 @@ def _resolve_output_tilt_db_per_oct(data: Dict[str, Any]) -> float:
 def _auto_mode_filter_type_or_default(value: Any) -> str:
     try:
         raw = str(value or "").strip()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         raw = ""
     low = raw.lower()
     if (
@@ -216,17 +276,3 @@ def _apply_auto_mode_managed_settings(data: Dict[str, Any]) -> None:
 
 
 __all__ = ['_finite_float_or_default', '_advanced_manual_output_tilt_enabled', '_effective_output_tilt_source', '_resolve_output_tilt_db_per_oct', '_apply_auto_mode_managed_settings']
-
-
-def _load_sibling_symbols() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['managed_settings', 'ui_data', 'xo_hpf', 'filter_config']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_load_sibling_symbols()

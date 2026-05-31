@@ -123,7 +123,19 @@ def _enrich_target_tracking_metrics(
             summarize=False,
             base_data_override=base_data_ref,
         )
-    except Exception as exc:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
         logger.warning(
             "Automatic mode target-tracking enrichment failed: %s",
             f"{type(exc).__name__}: {exc}",

@@ -244,30 +244,59 @@ def normalized_policy_divergence_score(
     right = getattr(resolved_policies, "right", None)
     if left is None or right is None:
         return 0.0
+    ratios = _normalized_policy_divergence_ratios(
+        left=left,
+        right=right,
+        shared=shared,
+        thresholds=(
+            ("conf_pull_floor", max_confidence_pull_delta),
+            ("tdc_strength", max_tdc_strength_delta),
+            ("tdc_max_reduction_db", max_tdc_max_reduction_delta_db),
+            ("bass_first_mode_max_hz", max_bass_first_mode_max_hz_delta),
+            ("low_bass_cut_strength", max_low_bass_cut_strength_delta),
+            ("excess_phase_strength", max_excess_phase_strength_delta),
+        ),
+    )
+    if not ratios:
+        return 0.0
+    return float(np.mean(np.asarray(ratios, dtype=float)))
 
-    def _effective(policy, key: str):
-        try:
-            return policy.effective_value(key, shared)
-        except Exception:
-            value = getattr(policy, key, None)
-            if value is None and shared is not None:
-                value = getattr(shared, key, None)
-            return value
 
-    ratios = []
-    for key, limit in (
-        ("conf_pull_floor", max_confidence_pull_delta),
-        ("tdc_strength", max_tdc_strength_delta),
-        ("tdc_max_reduction_db", max_tdc_max_reduction_delta_db),
-        ("bass_first_mode_max_hz", max_bass_first_mode_max_hz_delta),
-        ("low_bass_cut_strength", max_low_bass_cut_strength_delta),
-        ("excess_phase_strength", max_excess_phase_strength_delta),
+def _policy_effective_value(policy, shared, key: str):
+    try:
+        return policy.effective_value(key, shared)
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
     ):
+        value = getattr(policy, key, None)
+        if value is None and shared is not None:
+            value = getattr(shared, key, None)
+        return value
+
+
+def _normalized_policy_divergence_ratios(
+    *,
+    left,
+    right,
+    shared,
+    thresholds: tuple[tuple[str, float], ...],
+) -> list[float]:
+    ratios: list[float] = []
+    for key, limit in thresholds:
         limit_f = float(limit)
         if not np.isfinite(limit_f) or limit_f <= 0.0:
             continue
-        lv = _effective(left, key)
-        rv = _effective(right, key)
+        lv = _policy_effective_value(left, shared, key)
+        rv = _policy_effective_value(right, shared, key)
         if lv is None or rv is None:
             continue
         try:
@@ -276,9 +305,7 @@ def normalized_policy_divergence_score(
             continue
         if np.isfinite(ratio):
             ratios.append(float(max(0.0, ratio)))
-    if not ratios:
-        return 0.0
-    return float(np.mean(np.asarray(ratios, dtype=float)))
+    return ratios
 
 
 def worst_channel_relief_db(

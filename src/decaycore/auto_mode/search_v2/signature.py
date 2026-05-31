@@ -72,7 +72,19 @@ def compute_auto_search_signature_object(search_input: AutoSearchInput) -> AutoS
     h = hashlib.sha256()
     try:
         h.update(json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8"))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         h.update(str(sorted(payload.items())).encode("utf-8", "ignore"))
     return AutoSearchSignature(
         signature=str(h.hexdigest()),

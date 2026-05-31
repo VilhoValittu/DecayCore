@@ -136,7 +136,19 @@ def _finalize_cached_result(
                 fs_v=int(fs_v),
                 taps_v=int(taps_v),
             )
-        except Exception as exc:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ) as exc:
             logger.warning(
                 "Automatic mode: exact preset cache materialization failed, "
                 f"falling back to search ({type(exc).__name__}: {exc})"
@@ -380,7 +392,19 @@ def _finalize_cached_result(
             fs_v=int(fs_v),
             taps_v=int(taps_v),
         )
-    except Exception as exc:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
         # Exact-cache finalize is a best-effort fast path; search fallback remains authoritative.
         logger.warning(
             "Automatic mode: exact preset cache materialization failed, "

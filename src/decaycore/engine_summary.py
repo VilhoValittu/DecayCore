@@ -27,7 +27,19 @@ def summarize_run(result: FilterResult) -> dict:
     shift_samples = result.metrics.get("alignment_samples", l_peak_idx - r_peak_idx)
     try:
         shift_samples = int(shift_samples)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         shift_samples = int(l_peak_idx - r_peak_idx)
     shift_ms = (float(shift_samples) / float(fs) * 1000.0) if fs > 0 else 0.0
 

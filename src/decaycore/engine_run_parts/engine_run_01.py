@@ -76,7 +76,19 @@ def _build_measurement_side_ctx(measurements: dict, side: str) -> MeasurementSid
                 fundamental_freq_hz=measurements.get(f_key),
                 fundamental_mag_db=measurements.get(m_key),
             )
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             pass
 
     return MeasurementSideContext(
@@ -146,11 +158,35 @@ def _resolve_sub_measurement_for_filter(
             return None
         try:
             delay_ms = float(measurements.get("bass_integration_sub_delay_ms", 0.0) or 0.0)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             delay_ms = 0.0
         try:
             gain_trim_db = float(measurements.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             gain_trim_db = 0.0
         aligned = _apply_polarity_to_transfer(
             transfer,
@@ -183,7 +219,19 @@ def _resolve_sub_measurement_for_filter(
                 np.asarray(sub_transfer.mag_db, dtype=float),
                 np.asarray(sub_transfer.phase_deg, dtype=float),
             )
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.debug("Could not build Bass Integration sub-only transfer", exc_info=True)
 
     f_sub = (f_l + f_r) / 2.0 if f_l.size == f_r.size else f_l
@@ -226,7 +274,7 @@ def _ir_fft_on_axis(ir: np.ndarray, fs: int, f_axis: np.ndarray) -> np.ndarray:
 __all__ = ['_build_measurement_side_ctx', '_phase_from_ir', '_to_axis', '_extract_lr_measurement_axes', '_resample_to_axis', '_resolve_sub_measurement_for_filter', '_interp_complex_to_axis', '_ir_fft_on_axis']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['engine_run_01', 'engine_run_02']:
@@ -237,4 +285,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

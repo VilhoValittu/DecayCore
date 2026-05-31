@@ -67,7 +67,19 @@ def on_mode_change(*, mode: str, t: Callable) -> None:
             from nicegui import ui  # noqa: PLC0415
             with desc_container:
                 ui.markdown(f"**{t('mode_desc_title')}**\n\n{t(desc_key)}")
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.debug("mode desc update failed", exc_info=True)
 
     # Raw DSP: always visible, but control disabled and notice shown outside ADVANCED.
@@ -117,7 +129,19 @@ def update_lvl_range() -> None:
         if lo >= hi:
             ctrl.set_value("lvl_min", hi - 1.0)
             ctrl.set_value("lvl_max", lo + 1.0)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("lvl_min/lvl_max range update")
 
 
@@ -228,7 +252,19 @@ def update_engine_metrics_ui(*, t: Callable) -> None:
         metrics_el = ctrl.get("engine_metrics_label")
         if metrics_el is not None:
             metrics_el.set_text(f"{lat_str}  |  {bin_hz:.2f} Hz/bin")
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.debug("update_engine_metrics_ui failed", exc_info=True)
 
 
@@ -238,7 +274,19 @@ def update_taps_auto_info(*, t: Callable) -> None:
 
     try:
         base_taps = int(float(ctrl.value("taps", 65536) or 65536))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.debug("taps value parse failed, using default", exc_info=True)
         base_taps = 65536
 
@@ -250,7 +298,19 @@ def update_taps_auto_info(*, t: Callable) -> None:
 
     try:
         from nicegui import ui  # noqa: PLC0415
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.debug("update_taps_auto_info failed to import NiceGUI", exc_info=True)
         return
 
@@ -262,7 +322,19 @@ def update_taps_auto_info(*, t: Callable) -> None:
             container.clear()
             with container:
                 ui.markdown(markdown).classes("w-full")
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.debug("update_taps_auto_info failed for %s", scope_name, exc_info=True)
 
 
@@ -340,5 +412,17 @@ def _apply_mode_ir_window_default(*, mode_u: str) -> None:
         if v:
             ctrl.set_value("ir_export_window_mode", str(v).strip())
             update_ir_window_controls(t=lambda k: k)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.debug("_apply_mode_ir_window_default failed", exc_info=True)

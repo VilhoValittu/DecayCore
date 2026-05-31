@@ -52,6 +52,16 @@ from .. import measurement_state, ng_controls as ctrl
 from ..measurement_session_dialog import build_measurement_session_dialog
 from ..plot_common import _view_mags_for_plot
 
+_RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    KeyError,
+    IndexError,
+    RuntimeError,
+    OSError,
+)
+
 
 
 
@@ -290,7 +300,7 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
     def _safe_device_value(value, options: dict[int, str]):
         try:
             parsed = int(value)
-        except Exception:
+        except (TypeError, ValueError, OverflowError):
             return None
         return parsed if parsed in options else None
 
@@ -298,13 +308,13 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
         def _int(name: str, default: int) -> int:
             try:
                 return int(ctrl.value(name, default))
-            except Exception:
+            except (TypeError, ValueError, OverflowError):
                 return int(default)
 
         def _float_config(name: str, default: float) -> float:
             try:
                 return float(get_val(name, default))
-            except Exception:
+            except (TypeError, ValueError, OverflowError):
                 return float(default)
 
         save_dir = default_measurements_dir()
@@ -370,7 +380,7 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
                     and bundle.health.latency_reliable
                 ):
                     measurement_state.set_timing_reference(bundle.health.latency_ms)
-            except Exception as exc:
+            except _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS as exc:
                 measurement_state.set_error(str(exc))
 
         threading.Thread(target=_run, daemon=True).start()
@@ -383,7 +393,7 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
             try:
                 run_audibility_test(request)
                 measurement_state.set_status(t("measurement_audibility_test_done"))
-            except Exception as exc:
+            except _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS as exc:
                 measurement_state.set_error(str(exc))
 
         threading.Thread(target=_run, daemon=True).start()
@@ -393,17 +403,17 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
             from ..ng_tab_target import refresh_target_preview  # noqa: PLC0415
 
             refresh_target_preview()
-        except Exception:
+        except (ImportError, AttributeError, RuntimeError, OSError):
             logger.exception("target preview refresh")
 
     def _set_html_content(element, content: str) -> None:
         try:
             element.set_content(content)
-        except Exception:
+        except _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS:
             try:
                 element.content = content
                 element.update()
-            except Exception:
+            except _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS:
                 logger.exception("html element content set in measurement tab")
 
     def _current_bundle():
@@ -743,7 +753,7 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
         visible = len(options) > 1
         try:
             session_preview_channel.set_options(options)
-        except Exception:
+        except _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS:
             session_preview_channel.options = options
             session_preview_channel.update()
         selected_key = _session_preview_default_channel_key(
@@ -754,7 +764,7 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
         if selected_key != session_preview_channel.value:
             try:
                 session_preview_channel.set_value(selected_key)
-            except Exception:
+            except _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS:
                 session_preview_channel.value = selected_key
                 session_preview_channel.update()
         session_preview_selector_row.set_visibility(visible)
@@ -789,7 +799,7 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
         else:
             try:
                 plot_ref["widget"].update_figure(fig)
-            except Exception:
+            except _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS:
                 plot_scope.clear()
                 with plot_scope:
                     plot_ref["widget"] = ui.plotly(fig).classes("w-full")
@@ -837,7 +847,7 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
 __all__ = ['_session_preview_channel_options', '_session_preview_default_channel_key', '_session_preview_bundle', '_format_ms', '_measurement_summary_html', 'build_measurement_tab']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['measurement_tab_01', 'measurement_tab_02']:
@@ -848,4 +858,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

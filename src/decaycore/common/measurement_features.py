@@ -124,7 +124,19 @@ def summarize_rt60_bands(
                 v = float(np.exp(interp_lv))
                 if math.isfinite(v) and 0.05 < v < 5.0:
                     return v
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 pass
         return None
 
@@ -291,7 +303,19 @@ def build_harmonic_boost_risk_curve(
         }
         return np.asarray(freq, dtype=float), np.asarray(risk, dtype=float), summary
 
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None, None, empty_summary
 
 
@@ -503,7 +527,19 @@ def harmonic_distance_score(
 
         all_sq = np.concatenate(diffs_sq)
         return float(np.sqrt(np.mean(all_sq)))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None
 
 

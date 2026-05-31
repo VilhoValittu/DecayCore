@@ -122,7 +122,19 @@ class MeasurementSessionRunner:
                     outlier_strictness=str(outlier_strictness),
                     progress_callback=_progress_callback,
                 )
-            except Exception as exc:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ) as exc:
                 with self._lock:
                     self._result = None
                     self._error_text = str(exc or "Measurement session failed.")

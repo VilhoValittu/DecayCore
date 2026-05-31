@@ -15,6 +15,18 @@ import scipy.ndimage
 
 logger = logging.getLogger("DecayCore")
 
+_RECOVERABLE_QUALITY_EXCEPTIONS = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    KeyError,
+    IndexError,
+    RuntimeError,
+    OverflowError,
+    FloatingPointError,
+)
+_RECOVERABLE_FLOAT_PARSE_EXCEPTIONS = (TypeError, ValueError, OverflowError)
+
 from ...common.acoustic_stats import _clamp, calc_acoustic_score, calc_ai_summary_from_stats
 from ...common.comparison_stats import _make_comparison_stats
 from ...dsp.phase_ir_metrics import format_pre_energy_status
@@ -65,7 +77,7 @@ def format_band_rt60_summary(bands, *, picks=None):
         try:
             freq = float(key)
             rt60 = float(value)
-        except Exception:
+        except _RECOVERABLE_FLOAT_PARSE_EXCEPTIONS:
             continue
         if np.isfinite(freq) and np.isfinite(rt60):
             normalized.append((float(freq), float(rt60)))
@@ -90,7 +102,7 @@ def _float_allow_zero(v, default: float) -> float:
         return float(default)
     try:
         return float(v)
-    except Exception:
+    except _RECOVERABLE_QUALITY_EXCEPTIONS:
         return float(default)
 
 def _calc_target_match(stats):
@@ -106,7 +118,7 @@ def calc_target_match_from_stats(stats: dict):
     """Laskee: calc target match from stats."""
     try:
         return _calc_target_match(stats or {})
-    except Exception:
+    except _RECOVERABLE_QUALITY_EXCEPTIONS:
         return None, None
 
 def format_dsp_quality_report_block(settings, l_stats, r_stats):
@@ -130,7 +142,7 @@ def format_dsp_quality_report_block(settings, l_stats, r_stats):
     def _as_arr(v):
         try:
             a = np.asarray(v, dtype=float).reshape(-1)
-        except Exception:
+        except _RECOVERABLE_QUALITY_EXCEPTIONS:
             return np.asarray([], dtype=float)
         if a.size == 0:
             return np.asarray([], dtype=float)
@@ -220,7 +232,7 @@ def format_dsp_quality_report_block(settings, l_stats, r_stats):
         try:
             r = float(10.0 ** (float(pre_db) / 10.0))
             return r if np.isfinite(r) else None
-        except Exception:
+        except _RECOVERABLE_QUALITY_EXCEPTIONS:
             return None
 
     def _pre_metric_info(st, *, debug_report=False):
@@ -319,7 +331,7 @@ def format_dsp_quality_report_block(settings, l_stats, r_stats):
             resid = gv - trend
             idx = int(np.argmax(np.abs(resid)))
             return float(np.abs(resid[idx]) * 1000.0), float(fv[idx])
-        except Exception:
+        except _RECOVERABLE_QUALITY_EXCEPTIONS:
             return None, None
 
     def _collect(st):
@@ -500,7 +512,7 @@ def format_dsp_quality_report_block(settings, l_stats, r_stats):
                         rp = ev - ev_sm
                         rp_rms = _rms(rp)
                         res["ripple_rms"] = rp_rms if np.isfinite(rp_rms) else None
-                    except Exception:
+                    except _RECOVERABLE_QUALITY_EXCEPTIONS:
                         res["ripple_rms"] = None
 
             res["valid"] = valid
@@ -545,7 +557,7 @@ def format_dsp_quality_report_block(settings, l_stats, r_stats):
             emax = _safe_float(out.get("pred_mag_error_max_20_200", None))
             if dmax is not None and emax is not None and emax > 1e-9:
                 out["bass_adaptive_effectiveness_pct"] = float((dmax / emax) * 100.0)
-        except Exception:
+        except _RECOVERABLE_QUALITY_EXCEPTIONS:
             logger.exception("bass adaptive effectiveness compute")
         return out
 
@@ -557,7 +569,7 @@ def format_dsp_quality_report_block(settings, l_stats, r_stats):
             if not np.isfinite(x):
                 return "n/a"
             return f"{x:.{int(prec)}f}{unit}"
-        except Exception:
+        except _RECOVERABLE_FLOAT_PARSE_EXCEPTIONS:
             return "n/a"
 
     def _fmt_ratio(v):
@@ -568,7 +580,7 @@ def format_dsp_quality_report_block(settings, l_stats, r_stats):
             if not np.isfinite(x):
                 return "n/a"
             return f"{x:.4g}"
-        except Exception:
+        except _RECOVERABLE_FLOAT_PARSE_EXCEPTIONS:
             return "n/a"
 
     lq = _collect(l_stats)
@@ -645,7 +657,7 @@ def format_dsp_quality_report_block(settings, l_stats, r_stats):
 __all__ = ['format_band_rt60_summary', '_float_allow_zero', '_calc_target_match', 'calc_target_match_from_stats', 'format_dsp_quality_report_block']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['quality_report', 'legacy_summary']:
@@ -656,4 +668,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

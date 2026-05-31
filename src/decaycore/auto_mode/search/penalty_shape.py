@@ -95,7 +95,19 @@ def _auto_correction_sharpness_metrics_from_stats(
         y_s = np.asarray(smooth_gain_fractional_octave(f_use, y, 12.0), dtype=float).reshape(-1)
         if y_s.size != y.size:
             y_s = y
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         y_s = y
     integrated_correction = float(np.trapezoid(np.abs(y_s), x)) if y_s.size >= 2 else 0.0
     out["integrated_correction_db_oct"] = integrated_correction

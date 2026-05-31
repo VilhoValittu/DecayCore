@@ -18,7 +18,19 @@ def normalize_version(value: str | None, *, default: str = DEFAULT_VERSION) -> s
     """Normalize runtime/build version text to the UI/export format `v.X.Y.Z`."""
     try:
         raw = str(value or "").strip()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         raw = ""
     if not raw:
         return str(default)
@@ -44,7 +56,19 @@ def resolve_version(*, default: str = DEFAULT_VERSION) -> str:
         from .build_version import VERSION as build_version
 
         return normalize_version(build_version, default=default)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return normalize_version(default, default=default)
 
 

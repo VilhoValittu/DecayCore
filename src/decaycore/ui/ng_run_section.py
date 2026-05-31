@@ -76,7 +76,19 @@ def _drain_pending_result_render() -> None:
         from .ng_results_sections import render_results  # noqa: PLC0415
 
         render_results(*args, **kwargs)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("queued results render failed")
 
 
@@ -86,7 +98,19 @@ def _set_progress_overlay_text_dark(enabled: bool) -> None:
     for label in list(_progress_overlay_refs):
         try:
             label.classes(add=add_class, remove=remove_class)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.debug("Failed to update progress overlay text color", exc_info=True)
 
 
@@ -95,7 +119,19 @@ def set_progress_visual_state(*, completed: bool) -> None:
     if progress is not None:
         try:
             progress.set_text_color("light-green-4" if completed else "primary")
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.debug("Failed to update progress bar color", exc_info=True)
     _set_progress_overlay_text_dark(enabled=completed)
 
@@ -103,7 +139,19 @@ def set_progress_visual_state(*, completed: bool) -> None:
 def _format_progress_percent(value) -> str:
     try:
         pct = int(round(max(0.0, min(1.0, float(value))) * 100.0))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         pct = 0
     return f"{pct}%"
 
@@ -111,7 +159,19 @@ def _format_progress_percent(value) -> str:
 def _format_elapsed_clock(value) -> str:
     try:
         elapsed = max(0.0, float(value))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return ""
     total_s = int(elapsed)
     hours, rem = divmod(total_s, 3600)
@@ -134,10 +194,13 @@ def _build_measurement_status_line(*, bass_integration_enabled, value_getter, tr
         l_ok = _has_meas("file_l", "local_path_l")
         r_ok = _has_meas("file_r", "local_path_r")
 
+    mark_ok = "\u2713"
+    mark_missing = "\u2013"
+
     parts = [
         tr("info_panel_meas"),
-        f"L {'\u2713' if l_ok else '\u2013'}",
-        f"R {'\u2713' if r_ok else '\u2013'}",
+        f"L {mark_ok if l_ok else mark_missing}",
+        f"R {mark_ok if r_ok else mark_missing}",
     ]
     if _has_meas("file_l_sub", "local_path_l_sub"):
         parts.append(f"{tr('info_panel_sub1')} \u2713")
@@ -199,7 +262,19 @@ def build_global_progress_bar() -> None:
         if pending_progress is not None:
             try:
                 progress.set_value(float(pending_progress))
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.exception("progress bar queued update")
 
         _drain_pending_result_render()
@@ -208,7 +283,19 @@ def build_global_progress_bar() -> None:
         if pending_start_btn is not None:
             try:
                 pending_start_btn.enable()
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.exception("start button queued re-enable")
 
         phase_txt = snap.get("status_base_message", "") or ""
@@ -265,6 +352,40 @@ def build_info_panel() -> None:
         except (TypeError, ValueError, ZeroDivisionError):
             return "\u2014"
 
+    def _set_measurement_line_style(meas_severity: str) -> None:
+        if meas_severity == "ok":
+            line_meas.classes(add="cf-info-line-ok", remove="cf-info-line-dim cf-info-line-warn")
+            return
+        if meas_severity == "warn":
+            line_meas.classes(add="cf-info-line-warn", remove="cf-info-line-dim cf-info-line-ok")
+            return
+        line_meas.classes(add="cf-info-line-dim", remove="cf-info-line-ok cf-info-line-warn")
+
+    def _render_last_run_info() -> None:
+        info = ui_state.get_last_run_info()
+        if not info:
+            line3.set_visibility(False)
+            return
+        score = info.get("score")
+        match = info.get("match")
+        conf = info.get("conf")
+        parts = []
+        parts.append(
+            t("run_info_score").format(score=score)
+            if score is not None else
+            t("run_info_score_missing")
+        )
+        parts.append(
+            t("run_info_match").format(match=match)
+            if match is not None else
+            t("run_info_match_missing")
+        )
+        if conf is not None:
+            parts.append(t("run_info_conf").format(conf=conf))
+        line3.set_text(" \u00b7 ".join(parts))
+        line3.classes(add="cf-info-line-score", remove="cf-info-line-dim")
+        line3.set_visibility(True)
+
     def _refresh_info() -> None:
         mode = ng_controls.value("mode") or "\u2014"
         fs_raw = ng_controls.value("fs")
@@ -286,36 +407,8 @@ def build_info_panel() -> None:
             tr=t,
         )
         line_meas.set_text(meas_text)
-        if meas_severity == "ok":
-            line_meas.classes(add="cf-info-line-ok", remove="cf-info-line-dim cf-info-line-warn")
-        elif meas_severity == "warn":
-            line_meas.classes(add="cf-info-line-warn", remove="cf-info-line-dim cf-info-line-ok")
-        else:
-            line_meas.classes(add="cf-info-line-dim", remove="cf-info-line-ok cf-info-line-warn")
-
-        info = ui_state.get_last_run_info()
-        if info:
-            score = info.get("score")
-            match = info.get("match")
-            conf = info.get("conf")
-            parts = []
-            parts.append(
-                t("run_info_score").format(score=score)
-                if score is not None else
-                t("run_info_score_missing")
-            )
-            parts.append(
-                t("run_info_match").format(match=match)
-                if match is not None else
-                t("run_info_match_missing")
-            )
-            if conf is not None:
-                parts.append(t("run_info_conf").format(conf=conf))
-            line3.set_text(" \u00b7 ".join(parts))
-            line3.classes(add="cf-info-line-score", remove="cf-info-line-dim")
-            line3.set_visibility(True)
-        else:
-            line3.set_visibility(False)
+        _set_measurement_line_style(str(meas_severity))
+        _render_last_run_info()
 
     ui.timer(1.0, _refresh_info)
 
@@ -347,7 +440,19 @@ def _clear_previous_run_output() -> None:
         return
     try:
         container.clear()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.debug("Failed to clear previous run output", exc_info=True)
 
 
@@ -371,16 +476,52 @@ def _handle_start(on_start_click, start_btn, run_clock) -> None:
     def _run() -> None:
         try:
             on_start_click()
-        except Exception as exc:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ) as exc:
             logger.exception("DSP run failed")
             try:
                 ui_state.update_status(t("stat_failed").format(error=f"{type(exc).__name__}: {exc}"))
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.exception("run failure status update")
         finally:
             try:
                 run_clock["elapsed_s"] = max(0.0, float(time.perf_counter() - float(run_clock["started_at"])))
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.exception("run clock update")
             run_clock["active"] = False
             _queue_start_button_enable(start_btn)

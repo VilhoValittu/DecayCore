@@ -110,12 +110,12 @@ def _sync_auto_hpf_runtime_fields(
     out = dict(final_data or {})
     try:
         mode_u = str(out.get("mode", "BASIC") or "BASIC").strip().upper()
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         mode_u = "BASIC"
     auto_mode_active = bool(mode_u == "AUTO" or out.get("camillafir_automatic_mode", False))
     try:
         bi_mode = str(out.get("bass_integration_mode", "") or "").strip().lower()
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         bi_mode = ""
     if bool(out.get("bass_integration_enable", False)) and bi_mode == "direct_dac":
         return out
@@ -183,7 +183,7 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
             return None
         try:
             value = getter()
-        except Exception as exc:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
             logger.debug("Exact cached metrics getter failed: %s: %s", type(exc).__name__, exc)
             return None
         return dict(value or {}) if isinstance(value, dict) else None
@@ -262,7 +262,7 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
                 sort_keys=True,
                 separators=(",", ":"),
             )
-        except Exception as exc:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
             logger.debug(
                 "JSON serialization failed for materialize cache key, using str fallback: %s: %s",
                 type(exc).__name__,
@@ -351,7 +351,7 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
                     )
                     if synth_result is not None:
                         trial_hc_f, trial_hc_m = synth_result
-                except Exception:
+                except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
                     pass  # Fallback to context target
 
         with profiled_section("materialize.build_config"):
@@ -368,7 +368,7 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
         try:
             setattr(cfg_final, "bass_smooth_w_gamma", float(final_data.get("bass_smooth_w_gamma", 2.40)))
             setattr(cfg_final, "bass_smooth_w_max", float(final_data.get("bass_smooth_w_max", 0.45)))
-        except Exception as exc:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
             logger.debug("Could not set bass_smooth attrs on cfg: %s: %s", type(exc).__name__, exc)
 
         with profiled_section("materialize.run_pipeline"):
@@ -394,15 +394,15 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
                     bi_mode = "direct_dac"
                     try:
                         xo_order = max(1, int(round(float(final_data.get("sub_crossover_slope", 24) or 24.0))) // 6)
-                    except Exception:
+                    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
                         xo_order = 4
                     try:
                         sub_hpf_hz = float(final_data.get("sub_hpf_freq", 20.0) or 20.0)
-                    except Exception:
+                    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
                         sub_hpf_hz = 20.0
                     try:
                         sub_hpf_order = max(1, int(round(float(final_data.get("sub_hpf_slope", 12) or 12.0))) // 6)
-                    except Exception:
+                    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
                         sub_hpf_order = 2
                     sub_allpass_freq_hz = None
                     sub_allpass_q = None
@@ -419,7 +419,7 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
                         _m_slpf: float | None = float(final_data.get("direct_dac_sub_lpf_hz") or fc_hz)
                         if not (_m_slpf and _m_slpf >= fc_hz):
                             _m_slpf = None
-                    except Exception:
+                    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
                         _m_slpf = None
                     metrics_update = compute_bass_integration_metric_payload(
                         bundle,
@@ -449,7 +449,7 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
                     metrics_obj = getattr(result, "metrics", None)
                     if isinstance(metrics_obj, dict):
                         metrics_obj.update(dict(metrics_update or {}))
-        except Exception as exc:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
             logger.debug("Bass integration materialize metrics failed: %s: %s", type(exc).__name__, exc)
         if bool(summarize):
             with profiled_section("materialize.summarize_run"):
@@ -467,7 +467,7 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
             metrics_obj = getattr(result, "metrics", None)
             if isinstance(metrics_obj, dict):
                 metrics_obj.update(dict(metrics or {}))
-        except Exception as exc:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
             logger.debug("Could not write score metrics back to result: %s: %s", type(exc).__name__, exc)
         if bool(use_score_only_cache) and score_only_cache_key is not None:
             score_only_cache_stats["stores"] = int(score_only_cache_stats.get("stores", 0) or 0) + 1
@@ -497,7 +497,7 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
                 sort_keys=True,
                 separators=(",", ":"),
             )
-        except Exception as exc:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
             logger.debug("JSON serialization failed for preset signature, using str fallback: %s: %s", type(exc).__name__, exc)
             payload = str(sorted(base_preset.items()))
         return str(payload)
@@ -584,7 +584,7 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
                         summarize=False,
                         base_data_override=base_data_ref,
                     )
-                except Exception as exc:
+                except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
                     logger.warning(
                         "Automatic mode residual tie-break failed for finalist %d/%d (%s): %s",
                         int(idx),
@@ -669,7 +669,7 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
 __all__ = ['AutoModeMaterializeContext', '_sync_auto_hpf_runtime_fields', 'build_materialize_helpers']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['materialize_01']:
@@ -680,4 +680,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

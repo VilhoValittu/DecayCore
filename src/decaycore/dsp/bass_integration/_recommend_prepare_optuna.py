@@ -33,6 +33,20 @@ from ._recommend_prepare_dac import (
 )
 from ._utils import _LOG, _get_bass_integration_pkg, _safe_float, _status_callback, normalize_sub_combine_mode
 
+_RECOVERABLE_PREPARE_EXCEPTIONS = (
+    AttributeError,
+    KeyError,
+    TypeError,
+    ValueError,
+    RuntimeError,
+    FloatingPointError,
+)
+_RECOVERABLE_OPTUNA_EXCEPTIONS = _RECOVERABLE_PREPARE_EXCEPTIONS + (
+    ImportError,
+    ModuleNotFoundError,
+    OSError,
+)
+
 
 def _get_pkg():
     """Return the bass_integration package module for patchable attribute lookup."""
@@ -149,7 +163,7 @@ def recommend_direct_dac_prepare_optuna(
     try:
         import optuna as _optuna  # type: ignore
         _optuna.logging.set_verbosity(_optuna.logging.WARNING)
-    except Exception:
+    except _RECOVERABLE_OPTUNA_EXCEPTIONS:
         _LOG.debug("Optuna unavailable for Direct-DAC prepare; falling back to builtin", exc_info=True)
         return _recommend_direct_dac_prepare_builtin_core(
             bundle,
@@ -191,7 +205,7 @@ def recommend_direct_dac_prepare_optuna(
             "fc_hz": 80.0, "overlap_ratio": MIN_DIRECT_DAC_OVERLAP_RATIO,
             "sub_delay_ms": _align_delay, "sub_polarity_invert": _align_polarity, "sub_gain_trim_db": _align_gain,
         })
-    except Exception:
+    except _RECOVERABLE_PREPARE_EXCEPTIONS:
         _LOG.debug("Direct-DAC Optuna alignment seed failed; continuing with baseline seed", exc_info=True)
 
     try:
@@ -216,7 +230,7 @@ def recommend_direct_dac_prepare_optuna(
             "fc_hz": _xo_hz, "overlap_ratio": _xo_ratio,
             "sub_delay_ms": _align_delay, "sub_polarity_invert": _align_polarity, "sub_gain_trim_db": _align_gain,
         })
-    except Exception:
+    except _RECOVERABLE_PREPARE_EXCEPTIONS:
         _LOG.debug("Direct-DAC Optuna crossover seed failed; continuing without crossover seed", exc_info=True)
 
     # --- Global Optuna search ---
@@ -232,7 +246,7 @@ def recommend_direct_dac_prepare_optuna(
                 "sub_polarity_invert": bool(_s["sub_polarity_invert"]),
                 "sub_gain_trim_db": float(np.clip(_s["sub_gain_trim_db"], _GAIN_LO, _GAIN_HI)),
             })
-        except Exception:
+        except _RECOVERABLE_OPTUNA_EXCEPTIONS:
             _LOG.debug("Direct-DAC Optuna seed enqueue failed; skipping seed", exc_info=True)
 
     _best_global = [float("-inf")]
@@ -261,7 +275,7 @@ def recommend_direct_dac_prepare_optuna(
 
     try:
         study.optimize(_objective, n_trials=int(trials))
-    except Exception:
+    except _RECOVERABLE_OPTUNA_EXCEPTIONS:
         _LOG.debug("Direct-DAC Optuna global search failed; using best available seed/default", exc_info=True)
 
     # Extract global best params
@@ -277,7 +291,7 @@ def recommend_direct_dac_prepare_optuna(
         best_delay = float(np.clip(_gb.params.get("sub_delay_ms", 0.0), _DELAY_LO, _DELAY_HI))
         best_polarity = bool(_gb.params.get("sub_polarity_invert", False))
         best_gain = float(np.clip(_gb.params.get("sub_gain_trim_db", 0.0), _GAIN_LO, _GAIN_HI))
-    except Exception:
+    except _RECOVERABLE_OPTUNA_EXCEPTIONS:
         _LOG.debug("Direct-DAC Optuna global best extraction failed; using default candidate", exc_info=True)
 
     # --- Local refine around best ---
@@ -299,7 +313,7 @@ def recommend_direct_dac_prepare_optuna(
             np.isfinite(_opp_obj) and np.isfinite(_cur_obj)
             and abs(_opp_obj - _cur_obj) < 0.05
         )
-    except Exception:
+    except _RECOVERABLE_PREPARE_EXCEPTIONS:
         _LOG.debug("Direct-DAC Optuna polarity tie check failed; locking current polarity", exc_info=True)
     local_polarity_choices = [False, True] if _polarity_tie else [best_polarity]
 
@@ -327,7 +341,7 @@ def recommend_direct_dac_prepare_optuna(
             "sub_polarity_invert": best_polarity,
             "sub_gain_trim_db": best_gain,
         })
-    except Exception:
+    except _RECOVERABLE_OPTUNA_EXCEPTIONS:
         _LOG.debug("Direct-DAC Optuna local seed enqueue failed", exc_info=True)
 
     def _local_objective(trial) -> float:
@@ -341,7 +355,7 @@ def recommend_direct_dac_prepare_optuna(
 
     try:
         local_study.optimize(_local_objective, n_trials=int(local_trials))
-    except Exception:
+    except _RECOVERABLE_OPTUNA_EXCEPTIONS:
         _LOG.debug("Direct-DAC Optuna local refine failed; keeping global best", exc_info=True)
 
     # Pick best of global + local
@@ -354,7 +368,7 @@ def recommend_direct_dac_prepare_optuna(
             best_delay = float(np.clip(_lb.params.get("sub_delay_ms", best_delay), _DELAY_LO, _DELAY_HI))
             best_polarity = bool(_lb.params.get("sub_polarity_invert", best_polarity))
             best_gain = float(np.clip(_lb.params.get("sub_gain_trim_db", best_gain), _GAIN_LO, _GAIN_HI))
-    except Exception:
+    except _RECOVERABLE_OPTUNA_EXCEPTIONS:
         _LOG.debug("Direct-DAC Optuna local best extraction failed; keeping global best", exc_info=True)
 
     # Final evaluation of chosen params
@@ -429,7 +443,7 @@ def recommend_direct_dac_prepare_optuna(
     _study_trials = len(getattr(study, "trials", []))
     try:
         _study_trials += len(local_study.trials)
-    except Exception:
+    except _RECOVERABLE_OPTUNA_EXCEPTIONS:
         _LOG.debug("Direct-DAC Optuna local trial count unavailable", exc_info=True)
 
     # Memoization telemetry

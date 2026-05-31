@@ -62,9 +62,16 @@ def _apply_confidence_logic(
     }
 
 
+_DEADBAND_DB = 0.35
+_DEADBAND_RISE = 0.40
+
+
 def _error_to_correction_mag(err_db_final: np.ndarray) -> np.ndarray:
-    """Muuntaa virhekayran korjausmagnitudiksi (nykytilassa suora lapivienti)."""
-    return np.asarray(err_db_final, dtype=float)
+    """Muuntaa virhekayran korjausmagnitudiksi soft-knee dead-bandilla."""
+    e = np.asarray(err_db_final, dtype=float)
+    abs_e = np.abs(e)
+    scale = np.clip((abs_e - _DEADBAND_DB) / _DEADBAND_RISE, 0.0, 1.0)
+    return np.where(abs_e < _DEADBAND_DB, 0.0, e * scale)
 
 
 def _resolve_filter_smooth(cfg: Any) -> float:

@@ -115,7 +115,19 @@ def apply_excess_phase_strength_winner_polish(
                     summarize=False,
                     base_data_override=base_data_ref,
                 )
-            except Exception as exc:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ) as exc:
                 logger.warning(
                     "Automatic mode %s failed for candidate %d/%d (excess_phase_strength=%.4f): %s",
                     str(phase_label),

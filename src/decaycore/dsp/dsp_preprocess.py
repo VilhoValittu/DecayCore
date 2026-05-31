@@ -107,6 +107,7 @@ def _preprocess_cache_key(freqs, meas_mags, raw_phases, cfg, stereo_link_ctx, pr
 
 def clear_preprocess_cache() -> None:
     _PREPROCESS_CACHE.clear()
+    _MEAS_FIXED_CACHE.clear()
 
 
 def clear_meas_fixed_cache() -> None:

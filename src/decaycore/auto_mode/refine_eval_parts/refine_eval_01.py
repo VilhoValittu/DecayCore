@@ -226,7 +226,19 @@ def evaluate_search_candidate(
             "bass_smooth_w_max",
             float(trial_data.get("bass_smooth_w_max", 0.45)),
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         # Trial-only tuning attributes are optional across config variants.
         pass
     result = ctx.runtime.run_pipeline(
@@ -251,15 +263,51 @@ def evaluate_search_candidate(
                 bi_mode = "direct_dac"
                 try:
                     xo_order = max(1, int(round(float(trial_data.get("sub_crossover_slope", 24) or 24.0))) // 6)
-                except Exception:
+                except (
+
+                    AttributeError,
+                    TypeError,
+                    ValueError,
+                    KeyError,
+                    IndexError,
+                    RuntimeError,
+                    OSError,
+                    ImportError,
+                    ModuleNotFoundError,
+                    NameError,
+                ):
                     xo_order = 4
                 try:
                     sub_hpf_hz = float(trial_data.get("sub_hpf_freq", 20.0) or 20.0)
-                except Exception:
+                except (
+
+                    AttributeError,
+                    TypeError,
+                    ValueError,
+                    KeyError,
+                    IndexError,
+                    RuntimeError,
+                    OSError,
+                    ImportError,
+                    ModuleNotFoundError,
+                    NameError,
+                ):
                     sub_hpf_hz = 20.0
                 try:
                     sub_hpf_order = max(1, int(round(float(trial_data.get("sub_hpf_slope", 12) or 12.0))) // 6)
-                except Exception:
+                except (
+
+                    AttributeError,
+                    TypeError,
+                    ValueError,
+                    KeyError,
+                    IndexError,
+                    RuntimeError,
+                    OSError,
+                    ImportError,
+                    ModuleNotFoundError,
+                    NameError,
+                ):
                     sub_hpf_order = 2
                 sub_allpass_freq_hz = None
                 sub_allpass_q = None
@@ -276,7 +324,19 @@ def evaluate_search_candidate(
                     _r_slpf: float | None = float(trial_data.get("direct_dac_sub_lpf_hz") or fc_hz)
                     if not (_r_slpf and _r_slpf >= fc_hz):
                         _r_slpf = None
-                except Exception:
+                except (
+
+                    AttributeError,
+                    TypeError,
+                    ValueError,
+                    KeyError,
+                    IndexError,
+                    RuntimeError,
+                    OSError,
+                    ImportError,
+                    ModuleNotFoundError,
+                    NameError,
+                ):
                     _r_slpf = None
                 metrics_update = compute_bass_integration_metric_payload(
                     bundle,
@@ -306,7 +366,19 @@ def evaluate_search_candidate(
                 metrics_obj = getattr(result, "metrics", None)
                 if isinstance(metrics_obj, dict):
                     metrics_obj.update(dict(metrics_update or {}))
-    except Exception as exc:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
         logger.debug("Bass integration trial metrics failed: %s: %s", type(exc).__name__, exc)
     metrics = ctx.runtime.auto_score_result(
         result,
@@ -707,7 +779,19 @@ def run_candidate_phase(
         for idx, preset in idx_presets:
             try:
                 out = _eval_one(int(idx), dict(preset or {}))
-            except Exception as exc:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ) as exc:
                 out = {
                     "idx": int(idx),
                     "ok": False,
@@ -736,7 +820,19 @@ def run_candidate_phase(
                                 "ok": False,
                                 "error": "invalid worker result",
                             }
-                    except Exception as exc:
+                    except (
+
+                        AttributeError,
+                        TypeError,
+                        ValueError,
+                        KeyError,
+                        IndexError,
+                        RuntimeError,
+                        OSError,
+                        ImportError,
+                        ModuleNotFoundError,
+                        NameError,
+                    ) as exc:
                         out = {
                             "idx": int(idx),
                             "ok": False,
@@ -775,7 +871,7 @@ def run_candidate_phase(
 __all__ = ['RefineEvalContext', 'apply_refine_mode_soft_penalty', 'normalize_trial_preset', 'build_phase2_rollup_telemetry', 'evaluate_search_candidate', '_consume_phase_result', 'run_candidate_phase']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['refine_eval_01']:
@@ -786,4 +882,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

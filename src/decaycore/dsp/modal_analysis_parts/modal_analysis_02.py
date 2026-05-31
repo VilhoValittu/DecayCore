@@ -244,7 +244,19 @@ def _decay_severity_at(rt60_by_band, center_hz: float) -> float:
             v = float(value)
             if np.isfinite(f) and np.isfinite(v) and f > 0.0 and 0.05 <= v <= 5.0:
                 pairs.append((float(f), float(v)))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return 0.0
     if not pairs:
         return 0.0
@@ -254,7 +266,19 @@ def _decay_severity_at(rt60_by_band, center_hz: float) -> float:
     try:
         x = float(np.log2(max(float(center_hz), 1e-9)))
         rt = float(np.interp(x, np.log2(freq), rt60))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return 0.0
     target = 0.45 if float(center_hz) <= 120.0 else 0.38
     return float(np.clip((rt - target) / 0.55, 0.0, 1.0))
@@ -467,14 +491,26 @@ def detect_room_modes(
             modal_area_db_oct=float(modal_area),
             voice_band_modal_risk=float(voice_risk),
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return _empty_result()
 
 
 __all__ = ['_modal_candidate_geometry', '_voice_weight', 'modal_support_for_band', '_lr_consistency_at', '_decay_severity_at', '_classify_event', 'detect_room_modes']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['modal_analysis_01', 'modal_analysis_02']:
@@ -485,4 +521,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

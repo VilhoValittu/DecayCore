@@ -36,6 +36,89 @@ from ..mag_telemetry import (
 from ..phase_ir_utils import _cosine_fade_out_01
 from ..smoothing import smooth_gain_fractional_octave
 
+def _authority_metrics_payload(
+    *,
+    st,
+    freq_axis: np.ndarray,
+    mask_c: np.ndarray,
+    base_boost_cap: np.ndarray,
+    base_cut_cap: np.ndarray,
+    boost_out: np.ndarray,
+    cut_out: np.ndarray,
+    enabled: bool,
+    source: str,
+) -> dict[str, object]:
+    boost_reduction = np.maximum(0.0, base_boost_cap - boost_out)
+    cut_reduction = np.maximum(0.0, base_cut_cap - cut_out)
+    boost_max, boost_mean, boost_min = _authority_band_metrics(
+        freq_axis=freq_axis,
+        mask_c=mask_c,
+        reduction_db=boost_reduction,
+        cap_db=boost_out,
+    )
+    cut_max, cut_mean, cut_min = _authority_band_metrics(
+        freq_axis=freq_axis,
+        mask_c=mask_c,
+        reduction_db=cut_reduction,
+        cap_db=cut_out,
+    )
+    try:
+        m_bins = np.asarray(mask_c, dtype=bool)
+        if m_bins.shape != boost_reduction.shape:
+            m_bins = np.ones_like(boost_reduction, dtype=bool)
+        boost_bins = int(np.count_nonzero(m_bins & (boost_reduction > 1e-9)))
+        cut_bins = int(np.count_nonzero(m_bins & (cut_reduction > 1e-9)))
+    except (TypeError, ValueError):
+        boost_bins = 0
+        cut_bins = 0
+    try:
+        if isinstance(st, dict):
+            safe_put_many(
+                st,
+                {
+                    "acoustic_authority_limits_enabled": bool(enabled),
+                    "acoustic_authority_limits_source": str(source),
+                    "authority_boost_cap_reduction_max_db": float(boost_max),
+                    "authority_boost_cap_reduction_mean_db_20_300": float(boost_mean),
+                    "authority_cut_cap_reduction_max_db": float(cut_max),
+                    "authority_cut_cap_reduction_mean_db_20_300": float(cut_mean),
+                    "authority_boost_cap_min_db_20_300": float(boost_min),
+                    "authority_cut_cap_min_db_20_300": float(cut_min),
+                    "authority_boost_cap_reduced_bins": int(boost_bins),
+                    "authority_cut_cap_reduced_bins": int(cut_bins),
+                },
+            )
+    except (TypeError, ValueError):
+        pass
+    return {
+        "boost_cap_db": np.asarray(boost_out, dtype=float),
+        "cut_cap_db": np.asarray(cut_out, dtype=float),
+        "enabled": bool(enabled),
+        "source": str(source),
+        "boost_reduction_max_db": float(boost_max),
+        "boost_reduction_mean_db_20_300": float(boost_mean),
+        "cut_reduction_max_db": float(cut_max),
+        "cut_reduction_mean_db_20_300": float(cut_mean),
+        "boost_reduced_bins": int(boost_bins),
+        "cut_reduced_bins": int(cut_bins),
+    }
+
+
+def _authority_limits_from_stats(
+    *,
+    cfg_reader: CfgReader,
+    st,
+    source: str,
+    base_cut_cap: np.ndarray,
+) -> tuple[np.ndarray | None, np.ndarray | None, str]:
+    boost_authority, boost_source = _stats_array(st, ("authority_boost", "boost_authority"), base_cut_cap.shape)
+    cut_authority, cut_source = _stats_array(st, ("authority_cut", "cut_authority"), base_cut_cap.shape)
+    if boost_authority is None or cut_authority is None:
+        return None, None, "missing"
+    resolved_source = "stats" if boost_source == "stats" and cut_source == "stats" else str(source)
+    return np.asarray(boost_authority, dtype=float), np.asarray(cut_authority, dtype=float), resolved_source
+
+
 def _apply_acoustic_authority_caps(
     *,
     cfg,
@@ -54,75 +137,51 @@ def _apply_acoustic_authority_caps(
     boost_out = base_boost_cap.copy()
     cut_out = base_cut_cap.copy()
 
-    def _store_metrics() -> dict[str, object]:
-        boost_reduction = np.maximum(0.0, base_boost_cap - boost_out)
-        cut_reduction = np.maximum(0.0, base_cut_cap - cut_out)
-        boost_max, boost_mean, boost_min = _authority_band_metrics(
-            freq_axis=freq_axis,
-            mask_c=mask_c,
-            reduction_db=boost_reduction,
-            cap_db=boost_out,
-        )
-        cut_max, cut_mean, cut_min = _authority_band_metrics(
-            freq_axis=freq_axis,
-            mask_c=mask_c,
-            reduction_db=cut_reduction,
-            cap_db=cut_out,
-        )
-        try:
-            m_bins = np.asarray(mask_c, dtype=bool)
-            if m_bins.shape != boost_reduction.shape:
-                m_bins = np.ones_like(boost_reduction, dtype=bool)
-            boost_bins = int(np.count_nonzero(m_bins & (boost_reduction > 1e-9)))
-            cut_bins = int(np.count_nonzero(m_bins & (cut_reduction > 1e-9)))
-        except (TypeError, ValueError):
-            boost_bins = 0
-            cut_bins = 0
-        try:
-            if isinstance(st, dict):
-                safe_put_many(
-                    st,
-                    {
-                        "acoustic_authority_limits_enabled": bool(enabled),
-                        "acoustic_authority_limits_source": str(source),
-                        "authority_boost_cap_reduction_max_db": float(boost_max),
-                        "authority_boost_cap_reduction_mean_db_20_300": float(boost_mean),
-                        "authority_cut_cap_reduction_max_db": float(cut_max),
-                        "authority_cut_cap_reduction_mean_db_20_300": float(cut_mean),
-                        "authority_boost_cap_min_db_20_300": float(boost_min),
-                        "authority_cut_cap_min_db_20_300": float(cut_min),
-                        "authority_boost_cap_reduced_bins": int(boost_bins),
-                        "authority_cut_cap_reduced_bins": int(cut_bins),
-                    },
-                )
-        except (TypeError, ValueError):
-            pass
-        return {
-            "boost_cap_db": np.asarray(boost_out, dtype=float),
-            "cut_cap_db": np.asarray(cut_out, dtype=float),
-            "enabled": bool(enabled),
-            "source": str(source),
-            "boost_reduction_max_db": float(boost_max),
-            "boost_reduction_mean_db_20_300": float(boost_mean),
-            "cut_reduction_max_db": float(cut_max),
-            "cut_reduction_mean_db_20_300": float(cut_mean),
-            "boost_reduced_bins": int(boost_bins),
-            "cut_reduced_bins": int(cut_bins),
-        }
-
     try:
         if base_boost_cap.shape != base_cut_cap.shape or np.asarray(mask_c, dtype=bool).shape != base_cut_cap.shape:
-            return _store_metrics()
+            return _authority_metrics_payload(
+                st=st,
+                freq_axis=freq_axis,
+                mask_c=mask_c,
+                base_boost_cap=base_boost_cap,
+                base_cut_cap=base_cut_cap,
+                boost_out=boost_out,
+                cut_out=cut_out,
+                enabled=enabled,
+                source=source,
+            )
         if not cfg_reader.bool("acoustic_authority_limits_enable", True):
             source = "disabled"
-            return _store_metrics()
+            return _authority_metrics_payload(
+                st=st,
+                freq_axis=freq_axis,
+                mask_c=mask_c,
+                base_boost_cap=base_boost_cap,
+                base_cut_cap=base_cut_cap,
+                boost_out=boost_out,
+                cut_out=cut_out,
+                enabled=enabled,
+                source=source,
+            )
 
-        boost_authority, boost_source = _stats_array(st, ("authority_boost", "boost_authority"), base_cut_cap.shape)
-        cut_authority, cut_source = _stats_array(st, ("authority_cut", "cut_authority"), base_cut_cap.shape)
+        boost_authority, cut_authority, source = _authority_limits_from_stats(
+            cfg_reader=cfg_reader,
+            st=st,
+            source="missing",
+            base_cut_cap=base_cut_cap,
+        )
         if boost_authority is None or cut_authority is None:
-            source = "missing"
-            return _store_metrics()
-        source = "stats" if boost_source == "stats" and cut_source == "stats" else "missing"
+            return _authority_metrics_payload(
+                st=st,
+                freq_axis=freq_axis,
+                mask_c=mask_c,
+                base_boost_cap=base_boost_cap,
+                base_cut_cap=base_cut_cap,
+                boost_out=boost_out,
+                cut_out=cut_out,
+                enabled=enabled,
+                source=source,
+            )
 
         boost_gamma = float(max(0.0, cfg_reader.float_allow_zero("authority_boost_gamma", 1.35)))
         boost_min_frac = float(np.clip(cfg_reader.float_allow_zero("authority_boost_min_frac", 0.05), 0.0, 1.0))
@@ -154,7 +213,17 @@ def _apply_acoustic_authority_caps(
         boost_out = base_boost_cap.copy()
         cut_out = base_cut_cap.copy()
 
-    result = _store_metrics()
+    result = _authority_metrics_payload(
+        st=st,
+        freq_axis=freq_axis,
+        mask_c=mask_c,
+        base_boost_cap=base_boost_cap,
+        base_cut_cap=base_cut_cap,
+        boost_out=boost_out,
+        cut_out=cut_out,
+        enabled=enabled,
+        source=source,
+    )
     if bool(result["enabled"]):
         try:
             logger.info(
@@ -198,7 +267,7 @@ def _apply_candidate_metrics(
 __all__ = ['_apply_acoustic_authority_caps', '_apply_candidate_metrics']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['low_frequency', 'authority', 'clamps', 'metrics', 'pipeline']:
@@ -209,4 +278,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

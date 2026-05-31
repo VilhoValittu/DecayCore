@@ -23,7 +23,19 @@ def _auto_safe_float(value, default=0.0) -> float:
             return float(x)
     except (TypeError, ValueError):
         return float(default)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("safe float parse")
     return float(default)
 
@@ -34,7 +46,19 @@ def _auto_safe_bool(value, default=False) -> bool:
         return bool(value)
     try:
         s = str(value or "").strip().lower()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return bool(default)
     if s in ("1", "true", "yes", "y", "on"):
         return True
@@ -45,7 +69,19 @@ def _auto_safe_bool(value, default=False) -> bool:
 def _auto_safe_int(value, default: int = 0) -> int:
     try:
         return int(float(value))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return int(default)
 
 def _auto_output_tilt_bounds(base_data: dict | None) -> tuple[float, float]:
@@ -53,7 +89,19 @@ def _auto_output_tilt_bounds(base_data: dict | None) -> tuple[float, float]:
         auto_target_mode = (
             str((base_data or {}).get("auto_target_mode", "") or "").strip().lower()
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         auto_target_mode = ""
     if auto_target_mode == "adaptive":
         return 0.0, 2.0
@@ -70,7 +118,7 @@ def _clip(v, lo, hi):
 __all__ = ['_auto_safe_float', '_auto_safe_bool', '_auto_safe_int', '_auto_output_tilt_bounds', '_clip']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['cache_hash', 'goal_profile', 'safe_values', 'backend', 'config', 'phase_sampling']:
@@ -81,4 +129,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

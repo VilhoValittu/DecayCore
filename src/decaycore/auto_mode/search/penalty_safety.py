@@ -339,7 +339,19 @@ def _auto_excursion_penalty(st: dict | None) -> tuple[float, dict]:
 
     try:
         exc_bins = int(float(st.get("boost_candidate_bins_excprot", 0) or 0))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         exc_bins = 0
     lf_boost_max = shared._auto_safe_float(st.get("lf_boost_max_db", 0.0), 0.0)
     pen_exc_off = 0.0

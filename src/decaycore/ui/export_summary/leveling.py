@@ -12,49 +12,94 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+_RECOVERABLE_LEVELING_EXCEPTIONS = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    KeyError,
+    IndexError,
+    RuntimeError,
+    OSError,
+    ImportError,
+    ModuleNotFoundError,
+    NameError,
+)
+
+
+def _append_leveling_numeric_line(
+    lines: list[str],
+    *,
+    label: str,
+    value,
+    fmt: str,
+    log_msg: str,
+) -> None:
+    try:
+        lines.append(f"{label}: {format(float(value or 0.0), fmt)}\n")
+    except _RECOVERABLE_LEVELING_EXCEPTIONS:
+        logger.exception(log_msg)
+
+
+def _append_leveling_window_line(lines: list[str], window_value) -> None:
+    if not (isinstance(window_value, (list, tuple)) and len(window_value) >= 2):
+        return
+    try:
+        lo = float(window_value[0])
+        hi = float(window_value[1])
+        lines.append(f"Window: {lo:.0f}-{hi:.0f} Hz\n")
+    except _RECOVERABLE_LEVELING_EXCEPTIONS:
+        logger.exception("leveling window range format")
+
+
+def _append_leveling_tilt_lines(lines: list[str], tilt_value) -> None:
+    if tilt_value is None:
+        return
+    try:
+        tilt_f = float(tilt_value)
+    except _RECOVERABLE_LEVELING_EXCEPTIONS:
+        logger.exception("leveling tilt slope format")
+        return
+    lines.append(f"Tilt slope: {tilt_f:+.2f} dB/oct\n")
+    if abs(tilt_f) > 1.5:
+        lines.append(
+            "Warning: Large broadband tilt detected. "
+            "May indicate measurement/target mismatch or strong room tilt.\n"
+        )
+
+
+def _append_leveling_side(lines: list[str], side: str, state: dict | None) -> None:
+    if not isinstance(state, dict):
+        return
+    lines.append(f"[{side}]\n")
+    lines.append(f"Method: {state.get('offset_method', 'n/a')}\n")
+    _append_leveling_window_line(lines, state.get("smart_scan_range", None))
+    _append_leveling_numeric_line(
+        lines,
+        label="Offset to measurement",
+        value=state.get("offset_db", 0.0),
+        fmt="+.2f",
+        log_msg="leveling offset_db format",
+    )
+    _append_leveling_numeric_line(
+        lines,
+        label="Effective target level",
+        value=state.get("eff_target_db", 0.0),
+        fmt=".2f",
+        log_msg="leveling eff_target_db format",
+    )
+    _append_leveling_tilt_lines(lines, state.get("tilt_slope_db_per_oct", None))
+    lines.append("\n")
+
 
 def _append_leveling_summary(
     summary_content: str,
     l_st: dict | None,
     r_st: dict | None,
 ) -> str:
-    try:
-        summary_content += "\n=== LEVELING ===\n"
-        for side, st in [("LEFT", l_st), ("RIGHT", r_st)]:
-            if not isinstance(st, dict):
-                continue
-            summary_content += f"[{side}]\n"
-            summary_content += f"Method: {st.get('offset_method', 'n/a')}\n"
-            win = st.get("smart_scan_range", None)
-            if isinstance(win, (list, tuple)) and len(win) >= 2:
-                try:
-                    summary_content += f"Window: {float(win[0]):.0f}-{float(win[1]):.0f} Hz\n"
-                except Exception:
-                    logger.exception("leveling window range format")
-            try:
-                summary_content += f"Offset to measurement: {float(st.get('offset_db', 0.0) or 0.0):+.2f} dB\n"
-            except Exception:
-                logger.exception("leveling offset_db format")
-            try:
-                summary_content += f"Effective target level: {float(st.get('eff_target_db', 0.0) or 0.0):.2f} dB\n"
-            except Exception:
-                logger.exception("leveling eff_target_db format")
-            tilt = st.get("tilt_slope_db_per_oct", None)
-            if tilt is not None:
-                try:
-                    tilt_f = float(tilt)
-                    summary_content += f"Tilt slope: {tilt_f:+.2f} dB/oct\n"
-                    if abs(tilt_f) > 1.5:
-                        summary_content += (
-                            "Warning: Large broadband tilt detected. "
-                            "May indicate measurement/target mismatch or strong room tilt.\n"
-                        )
-                except Exception:
-                    logger.exception("leveling tilt slope format")
-            summary_content += "\n"
-    except Exception:
-        logger.exception("leveling summary section")
-    return summary_content
+    lines: list[str] = [summary_content, "\n=== LEVELING ===\n"]
+    _append_leveling_side(lines, "LEFT", l_st)
+    _append_leveling_side(lines, "RIGHT", r_st)
+    return "".join(lines)
 
 
 __all__ = ['_append_leveling_summary']

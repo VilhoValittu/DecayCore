@@ -115,7 +115,7 @@ def _linear_to_minphase_blend_mask(
 __all__ = ['_PhaseComponents', '_unwrap_phases', '_compute_excess_phase', '_apply_mixed_excess_mask', '_linear_excess_weight', '_smooth_linear_boundary', '_enforce_linear_tail_decay', '_linear_to_minphase_blend_mask']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['phase_ir_phase_01', 'phase_ir_phase_02', 'phase_ir_phase_03']:
@@ -126,4 +126,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

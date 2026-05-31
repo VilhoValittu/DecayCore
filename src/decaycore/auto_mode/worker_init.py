@@ -20,6 +20,23 @@ def _auto_worker_init() -> None:
     latency from the first trial executed in each worker.
     """
     import numpy as np
+    try:
+        from numba.core.errors import NumbaError as _NumbaError
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        ArithmeticError,
+        ZeroDivisionError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        _NumbaError = RuntimeError
 
     try:
         from ..dsp.smoothing import _smooth_mag_core
@@ -28,7 +45,22 @@ def _auto_worker_init() -> None:
         _m = np.zeros(64, dtype=np.float64)
         _w = np.hanning(8)
         _smooth_mag_core(_f, _m, _f, _w, 4)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        ArithmeticError,
+        ZeroDivisionError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+        _NumbaError,
+    ):
         pass
 
     try:
@@ -37,7 +69,22 @@ def _auto_worker_init() -> None:
         _m2 = np.zeros(64, dtype=np.float64)
         _slope_passes(_m2, 6.0, 6.0)
         _slope_passes_asym(_m2, 6.0, 12.0)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        ArithmeticError,
+        ZeroDivisionError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+        _NumbaError,
+    ):
         pass
 
     try:
@@ -46,5 +93,20 @@ def _auto_worker_init() -> None:
         _f2 = np.linspace(20.0, 20000.0, 64, dtype=np.float64)
         _g = np.zeros(64, dtype=np.float64)
         _gradient1d(_f2, _g)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        ArithmeticError,
+        ZeroDivisionError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+        _NumbaError,
+    ):
         pass

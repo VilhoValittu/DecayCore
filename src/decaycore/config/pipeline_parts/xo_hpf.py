@@ -37,6 +37,14 @@ from ...ui_i18n import (
 
 logger = logging.getLogger("DecayCore")
 
+_RECOVERABLE_XO_EXCEPTIONS = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    OverflowError,
+    RuntimeError,
+)
+
 
 _AUTO_MODE_DEFAULT_CFG_TO_UI = {
     "global_gain_db": "gain",
@@ -93,23 +101,93 @@ _AUTO_MODE_DEFAULT_CFG_TO_UI = {
     "low_bass_cut_enable": "low_bass_cut_enable",
 }
 
+
+def _safe_mode_upper(data: Dict[str, Any], *, key: str, default: str) -> str:
+    try:
+        return str(data.get(key, default) or default).strip().upper()
+    except _RECOVERABLE_XO_EXCEPTIONS:
+        return str(default)
+
+
+def _safe_mode_lower(data: Dict[str, Any], *, key: str, default: str = "") -> str:
+    try:
+        return str(data.get(key, default) or default).strip().lower()
+    except _RECOVERABLE_XO_EXCEPTIONS:
+        return str(default)
+
+
+def _safe_positive_frequency(value: Any, *, default: float) -> float:
+    try:
+        freq_hz = float(value or default)
+    except _RECOVERABLE_XO_EXCEPTIONS:
+        freq_hz = float(default)
+    if not math.isfinite(freq_hz) or freq_hz <= 0.0:
+        return float(default)
+    return float(freq_hz)
+
+
+def _safe_positive_order(value: Any, *, default: int) -> int:
+    try:
+        order = int(round(float(value or default)))
+    except _RECOVERABLE_XO_EXCEPTIONS:
+        order = int(default)
+    return max(1, int(order))
+
+
+def _safe_slope_db_oct(data: Dict[str, Any], key: str, *, default: int) -> int:
+    try:
+        slope_db_oct = int(round(float(data.get(key, default) or float(default))))
+    except _RECOVERABLE_XO_EXCEPTIONS:
+        slope_db_oct = int(default)
+    if slope_db_oct <= 0:
+        slope_db_oct = int(default)
+    return int(slope_db_oct)
+
+
+def _slope_to_order(slope_db_oct: int) -> int:
+    return max(1, int(round(float(slope_db_oct) / 6.0)))
+
+
+def _auto_mode_active(data: Dict[str, Any]) -> bool:
+    mode_u = _safe_mode_upper(data, key="mode", default="BASIC")
+    return bool(mode_u == "AUTO" or data.get("camillafir_automatic_mode", False))
+
+
+def _is_direct_dac_bass_integration(data: Dict[str, Any]) -> bool:
+    bi_mode = _safe_mode_lower(data, key="bass_integration_mode", default="")
+    return bool(data.get("bass_integration_enable", False)) and bi_mode == "direct_dac"
+
+
+def _collect_xo_entries(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    xos: List[Dict[str, Any]] = []
+    for i in range(1, 6):
+        f_raw = data.get(f"xo{i}_f", None)
+        if f_raw in (None, "", 0):
+            continue
+        freq_hz = _safe_positive_frequency(f_raw, default=-1.0)
+        if freq_hz <= 0.0:
+            continue
+        slope_db_oct = _safe_slope_db_oct(data, f"xo{i}_s", default=12)
+        xos.append(
+            {
+                "freq": float(freq_hz),
+                "order": _slope_to_order(slope_db_oct),
+                "slope": int(slope_db_oct),
+                "idx": i,
+            }
+        )
+    xos.sort(key=lambda d: float(d.get("freq", 0.0)))
+    return xos
+
+
 def _apply_auto_hpf_runtime_override(
     data: Dict[str, Any],
     hpf: Optional[Dict[str, Any]],
 ) -> Optional[Dict[str, Any]]:
-    try:
-        mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
-    except Exception:
-        mode_u = "BASIC"
-    auto_mode_active = bool(mode_u == "AUTO" or data.get("camillafir_automatic_mode", False))
-    if not bool(auto_mode_active):
+    if not _auto_mode_active(data):
         return hpf
 
-    try:
-        bi_mode = str(data.get("bass_integration_mode", "") or "").strip().lower()
-    except Exception:
-        bi_mode = ""
-    if bool(data.get("bass_integration_enable", False)) and bi_mode == "direct_dac":
+    if _is_direct_dac_bass_integration(data):
         return hpf
 
     override = data.get("_auto_hpf_runtime_override", None)
@@ -118,41 +196,14 @@ def _apply_auto_hpf_runtime_override(
 
     base_hpf = dict(hpf or {}) if isinstance(hpf, dict) else {}
     enabled = bool(override.get("enabled", False))
-    try:
-        auto_goal = str(data.get("auto_goal", "") or "").strip().lower().replace("_", "-")
-    except Exception:
-        auto_goal = ""
+    auto_goal = _safe_mode_lower(data, key="auto_goal", default="").replace("_", "-")
     if auto_goal in {"flat", "prefer bass", "prefer-bass", "bass"}:
         enabled = True
 
-    try:
-        freq_hz = float(
-            override.get(
-                "freq",
-                base_hpf.get("freq", data.get("hpf_freq", 20.0)),
-            )
-            or 20.0
-        )
-    except Exception:
-        freq_hz = 20.0
-    if not math.isfinite(freq_hz) or freq_hz <= 0.0:
-        freq_hz = 20.0
-
-    try:
-        order = int(
-            round(
-                float(
-                    override.get(
-                        "order",
-                        base_hpf.get("order", round(float(data.get("hpf_slope", 24) or 24.0) / 6.0)),
-                    )
-                    or 4
-                )
-            )
-        )
-    except Exception:
-        order = 4
-    order = max(1, int(order))
+    freq_fallback = base_hpf.get("freq", data.get("hpf_freq", 20.0))
+    freq_hz = _safe_positive_frequency(override.get("freq", freq_fallback), default=20.0)
+    order_fallback = base_hpf.get("order", _slope_to_order(_safe_slope_db_oct(data, "hpf_slope", default=24)))
+    order = _safe_positive_order(override.get("order", order_fallback), default=4)
 
     return {
         "enabled": bool(enabled),
@@ -161,49 +212,20 @@ def _apply_auto_hpf_runtime_override(
     }
 
 def build_xos_hpf(data: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    auto_mode_active = _auto_mode_active(data)
+    is_direct_dac_bi = _is_direct_dac_bass_integration(data)
     xos: List[Dict[str, Any]] = []
-    try:
-        mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
-    except Exception:
-        mode_u = "BASIC"
-    auto_mode_active = bool(mode_u == "AUTO" or data.get("camillafir_automatic_mode", False))
-    is_direct_dac_bi = bool(
-        data.get("bass_integration_enable", False)
-        and str(data.get("bass_integration_mode", "") or "").strip().lower() == "direct_dac"
-    )
     if filter_type_supports_xo_phase_model(data.get("filter_type", "")):
-        for i in range(1, 6):
-            f_raw = data.get(f"xo{i}_f", None)
-            if f_raw in (None, "", 0):
-                continue
-            try:
-                f_hz = float(f_raw)
-            except Exception:
-                continue
-            if not math.isfinite(f_hz) or f_hz <= 0:
-                continue
-            s_raw = data.get(f"xo{i}_s", 12)
-            try:
-                slope_db_oct = int(round(float(s_raw)))
-            except Exception:
-                slope_db_oct = 12
-            if slope_db_oct <= 0:
-                slope_db_oct = 12
-            order = max(1, int(round(slope_db_oct / 6.0)))
-            xos.append({"freq": f_hz, "order": order, "slope": slope_db_oct, "idx": i})
-    xos.sort(key=lambda d: float(d.get("freq", 0.0)))
+        xos = _collect_xo_entries(data)
 
     hpf_enabled = bool(data.get("hpf_enable")) or bool(auto_mode_active and not is_direct_dac_bi)
-    try:
-        hpf_slope_db_oct = int(round(float(data.get("hpf_slope", 12) or 12.0)))
-    except Exception:
-        hpf_slope_db_oct = 12
-    if hpf_slope_db_oct <= 0:
-        hpf_slope_db_oct = 12
+    hpf_slope_db_oct = _safe_slope_db_oct(data, "hpf_slope", default=12)
     hpf = (
-        {"enabled": bool(hpf_enabled),
-         "freq": data.get("hpf_freq"),
-         "order": max(1, int(round(hpf_slope_db_oct / 6.0)))}
+        {
+            "enabled": bool(hpf_enabled),
+            "freq": data.get("hpf_freq"),
+            "order": _slope_to_order(hpf_slope_db_oct),
+        }
         if bool(hpf_enabled)
         else None
     )
@@ -277,7 +299,7 @@ def detect_is_wav_source(data: Dict[str, Any]) -> bool:
         ):
             if isinstance(data.get(key), dict):
                 upload_names.append(str(data[key].get("filename", "") or "").lower())
-    except Exception:
+    except (AttributeError, TypeError, ValueError, KeyError, IndexError):
         upload_names = []
 
     return bool(
@@ -287,17 +309,3 @@ def detect_is_wav_source(data: Dict[str, Any]) -> bool:
 
 
 __all__ = ['_apply_auto_hpf_runtime_override', 'build_xos_hpf', 'filter_type_short', 'filter_type_supports_xo_phase_model', 'choose_target_rates', 'choose_dash_fs', 'detect_is_wav_source']
-
-
-def _load_sibling_symbols() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['managed_settings', 'ui_data', 'xo_hpf', 'filter_config']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_load_sibling_symbols()

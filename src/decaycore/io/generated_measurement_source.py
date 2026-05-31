@@ -117,7 +117,19 @@ def parse_generated_source(
                 phase_deg = np.interp(preferred_freq, base_freq, base_phase, left=base_phase[0], right=base_phase[-1])
                 f_hz = preferred_freq
                 mag_db = preferred_mag
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             if logger:
                 logger.warning("Generated measurement analysis magnitude apply failed", exc_info=True)
 
@@ -131,7 +143,19 @@ def parse_generated_source(
                 np.asarray(f_hz, dtype=float),
             )
             mag_db = _apply_mic_calibration_to_magnitude(np.asarray(mag_db, dtype=float), interpolated)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             if logger:
                 logger.warning("Generated measurement calibration apply failed", exc_info=True)
 

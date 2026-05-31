@@ -16,7 +16,19 @@ from ..dsp.target_match import target_match_from_stats as _target_match_ssot
 def _clamp(x: float, lo: float, hi: float) -> float:
     try:
         return float(max(lo, min(hi, float(x))))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return float(lo)
 
 
@@ -27,6 +39,7 @@ def calc_acoustic_score(conf_pct: float, match_pct: float, rt60_s: float | None 
     base = 0.55 * match + 0.35 * conf
 
     rt_bonus_eff = 0.0
+    rt_penalty_eff = 0.0
     try:
         if rt60_s is not None:
             rt60 = float(rt60_s)
@@ -34,10 +47,26 @@ def calc_acoustic_score(conf_pct: float, match_pct: float, rt60_s: float | None 
                 rel = 1.0 if rt60_rel is None else _clamp(float(rt60_rel), 0.0, 1.0)
                 rt_bonus = 15.0 * _clamp((0.35 - rt60) / 0.25, 0.0, 1.0)
                 rt_bonus_eff = rt_bonus * rel
-    except Exception:
-        rt_bonus_eff = 0.0
+                if rt60 > 0.60:
+                    rt_penalty = 10.0 * _clamp((rt60 - 0.60) / 0.90, 0.0, 1.0)
+                    rt_penalty_eff = rt_penalty * rel
+    except (
 
-    return _clamp(base + rt_bonus_eff, 0.0, 100.0)
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        rt_bonus_eff = 0.0
+        rt_penalty_eff = 0.0
+
+    return _clamp(base + rt_bonus_eff - rt_penalty_eff, 0.0, 100.0)
 
 
 def calc_ai_summary_from_stats(
@@ -55,7 +84,19 @@ def calc_ai_summary_from_stats(
             use_smart_scan_range=(scoring_range is None),
             freq_range=scoring_range,
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         rms, match = None, None
     if match is None:
         return {"conf": conf, "rms": None, "match": None, "score": None}

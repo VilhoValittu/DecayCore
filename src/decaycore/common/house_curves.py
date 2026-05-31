@@ -15,7 +15,19 @@ def _normalize_hc_mode_key(v) -> str:
     """Sisainen apufunktio: normalize hc mode key."""
     try:
         s = str(v or "")
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         s = ""
 
     known = {
@@ -207,3 +219,86 @@ def get_house_curve_by_name(name):
             -4.0, -5.5, -6.0
         ])
     return freqs, mags
+
+
+def make_parametric_house_curve(
+    bass_shelf_db: float,
+    mid_lean_db_per_oct: float = 0.0,
+    treble_rolloff_db_per_oct: float = 0.0,
+    freqs: np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    full_freqs = np.array([
+        0.0,
+        20.0, 25.0, 31.5, 40.0, 50.0, 63.0, 80.0, 100.0, 125.0,
+        160.0, 200.0, 250.0, 400.0, 1000.0, 2000.0, 4000.0,
+        8000.0, 16000.0, 20000.0
+    ])
+
+    if freqs is None:
+        freqs = full_freqs
+    else:
+        freqs = np.asarray(freqs, dtype=float)
+
+    mags = np.zeros_like(freqs, dtype=float)
+
+    bass_start_hz = 20.0
+    bass_end_hz = 250.0
+    mid_end_hz = 2000.0
+    treble_start_hz = 2000.0
+
+    for i, f in enumerate(freqs):
+        if f <= 0.0:
+            continue
+
+        bass_contrib = 0.0
+        if f <= bass_end_hz:
+            if f < bass_start_hz:
+                bass_contrib = bass_shelf_db
+            else:
+                frac = (f - bass_start_hz) / (bass_end_hz - bass_start_hz)
+                bass_contrib = bass_shelf_db * (1.0 - frac)
+
+        mid_contrib = 0.0
+        if bass_end_hz < f < mid_end_hz:
+            octaves_from_pivot = np.log2(f / bass_end_hz)
+            mid_contrib = mid_lean_db_per_oct * octaves_from_pivot
+
+        treble_contrib = 0.0
+        if f > treble_start_hz:
+            octaves_from_pivot = np.log2(f / treble_start_hz)
+            treble_contrib = treble_rolloff_db_per_oct * octaves_from_pivot
+
+        mags[i] = bass_contrib + mid_contrib + treble_contrib
+
+    return freqs, mags
+
+
+def adapt_house_curve_to_rt60(
+    hc_f: np.ndarray,
+    hc_m: np.ndarray,
+    rt60_lf_s: float,
+) -> np.ndarray:
+    hc_m = np.asarray(hc_m, dtype=float).copy()
+
+    if not np.isfinite(rt60_lf_s) or rt60_lf_s <= 0.0:
+        return hc_m
+
+    bass_reduction_db = float(np.clip((rt60_lf_s - 0.6) / 0.4, 0.0, 1.0) * 1.5)
+
+    if bass_reduction_db < 0.01:
+        return hc_m
+
+    bass_floor_hz = 80.0
+    bass_transition_hz = 250.0
+
+    reduction_mask = np.ones_like(hc_f, dtype=float)
+    reduction_mask[hc_f >= bass_transition_hz] = 0.0
+
+    for i, f in enumerate(hc_f):
+        if bass_floor_hz < f < bass_transition_hz:
+            frac = (f - bass_floor_hz) / (bass_transition_hz - bass_floor_hz)
+            cos_fade = 0.5 - 0.5 * np.cos(np.pi * frac)
+            reduction_mask[i] = cos_fade
+
+    hc_m = hc_m - bass_reduction_db * reduction_mask
+    return hc_m

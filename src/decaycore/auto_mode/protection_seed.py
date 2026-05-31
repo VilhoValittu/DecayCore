@@ -32,7 +32,19 @@ def _estimate_auto_mag_c_min_hz(
         try:
             ff = np.asarray(f, dtype=float).reshape(-1)
             yy = np.asarray(y, dtype=float).reshape(-1)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             return np.asarray([], dtype=float), np.asarray([], dtype=float)
         if ff.size != yy.size or ff.size < 16:
             return np.asarray([], dtype=float), np.asarray([], dtype=float)
@@ -57,7 +69,19 @@ def _estimate_auto_mag_c_min_hz(
                 float(shared.AUTO_MODE_MAG_C_MIN_SMOOTH_OCT),
             )
             mm_use = np.asarray(mm_sm, dtype=float)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             mm_use = np.asarray(mm, dtype=float)
 
         ref_mask = (
@@ -94,7 +118,19 @@ def _estimate_auto_mag_c_min_hz(
 
         try:
             df = float(np.median(np.diff(f_lo))) if f_lo.size > 2 else float("nan")
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             df = float("nan")
         if np.isfinite(df) and df > 0.0:
             n_cons = int(max(3, round(3.0 / df)))
@@ -177,14 +213,38 @@ def _estimate_auto_hpf_from_response(
     def _nearest_slope(v: float) -> int:
         try:
             x = float(v)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             x = float(default_slope_db_oct)
         return int(min(allowed_slopes, key=lambda s: abs(float(s) - x)))
 
     def _floor_slope(v: float) -> int:
         try:
             x = float(v)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             x = float(default_slope_db_oct)
         below = [s for s in allowed_slopes if float(s) <= x]
         return int(below[-1]) if below else int(allowed_slopes[0])
@@ -193,7 +253,19 @@ def _estimate_auto_hpf_from_response(
         try:
             ff = np.asarray(f, dtype=float).reshape(-1)
             yy = np.asarray(y, dtype=float).reshape(-1)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             return np.asarray([], dtype=float), np.asarray([], dtype=float)
         if ff.size != yy.size or ff.size < 16:
             return np.asarray([], dtype=float), np.asarray([], dtype=float)
@@ -215,7 +287,19 @@ def _estimate_auto_hpf_from_response(
             return None
         try:
             df = float(np.median(np.diff(fx))) if fx.size > 2 else float("nan")
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             df = float("nan")
         if np.isfinite(df) and df > 0.0:
             n_cons = int(max(3, round(3.0 / df)))
@@ -256,7 +340,19 @@ def _estimate_auto_hpf_from_response(
                 float(shared.AUTO_MODE_HPF_SMOOTH_OCT),
             )
             mm_use = np.asarray(mm_sm, dtype=float)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             mm_use = np.asarray(mm, dtype=float)
 
         ref_mask = (ff >= ref_min) & (ff <= ref_max)
@@ -296,14 +392,38 @@ def _estimate_auto_hpf_from_response(
             den6 = float(np.log(float(f3) / float(f6)))
             if np.isfinite(den6) and den6 > 1e-9:
                 n_estimates.append(float(np.log(c6) / (2.0 * den6)))
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("f3/f6 slope order estimate")
         if f12 is not None and np.isfinite(f12) and float(f12) < float(f3):
             try:
                 den12 = float(np.log(float(f3) / float(f12)))
                 if np.isfinite(den12) and den12 > 1e-9:
                     n_estimates.append(float(np.log(c12) / (2.0 * den12)))
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.exception("f3/f12 slope order estimate")
         if n_estimates:
             n_est = float(np.median(np.asarray(n_estimates, dtype=float)))
@@ -320,7 +440,19 @@ def _estimate_auto_hpf_from_response(
                     p = np.polyfit(x, y, 1)
                     slope_db_oct = abs(float(p[0]))
                     n_est = float(np.clip(slope_db_oct / 6.0, 1.0, 8.0))
-                except Exception:
+                except (
+
+                    AttributeError,
+                    TypeError,
+                    ValueError,
+                    KeyError,
+                    IndexError,
+                    RuntimeError,
+                    OSError,
+                    ImportError,
+                    ModuleNotFoundError,
+                    NameError,
+                ):
                     n_est = float(default_slope_db_oct) / 6.0
             else:
                 n_est = float(default_slope_db_oct) / 6.0
@@ -382,7 +514,19 @@ def _estimate_auto_hpf_from_response(
             obs_ratio = float(max(1e-9, float(f3)) / max(1e-9, float(f6)))
             ratio_err = abs(np.log2(max(1e-9, obs_ratio / expected_ratio)))
             conf *= float(np.clip(1.0 - ratio_err / 1.5, 0.45, 1.0))
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("slope confidence ratio check")
         conf = float(np.clip(conf, 0.0, 1.0))
 

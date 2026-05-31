@@ -88,15 +88,7 @@ def recommend_direct_dac_allpass(
             "reason": "No meaningful improvement found.",
         }
 
-    # Early-exit: if baseline is already good enough, skip candidate search
-    _bl_cancel = _safe_float(baseline_metrics.get("bass_cancellation_risk", float("nan")), float("nan"))
-    _bl_ripple = _safe_float(baseline_metrics.get("bass_overlap_ripple", float("nan")), float("nan"))
-    _bl_gd = _safe_float(baseline_metrics.get("bass_xo_gd_mismatch_ms", float("nan")), float("nan"))
-    if (
-        np.isfinite(_bl_cancel) and _bl_cancel < 0.05
-        and np.isfinite(_bl_ripple) and _bl_ripple < 1.5
-        and np.isfinite(_bl_gd) and _bl_gd < 0.6
-    ):
+    if _allpass_baseline_good_enough(baseline_metrics):
         return {
             "enabled": False,
             "freq_hz": 0.0,
@@ -132,32 +124,11 @@ def recommend_direct_dac_allpass(
         out["score"] = float(score)
         return out
 
-    coarse_freqs = _normalize_candidate_frequencies(float(fc) * mul for mul in DIRECT_DAC_ALLPASS_FREQ_MULTIPLIERS)
-    coarse_qs = _normalize_candidate_q_values(DIRECT_DAC_ALLPASS_Q_CANDIDATES)
-    best_candidate: dict[str, Any] | None = None
-
-    def _consider_candidates(
-        freqs: tuple[float, ...],
-        qs: tuple[float, ...],
-        current_best: dict[str, Any] | None,
-    ) -> dict[str, Any] | None:
-        best = current_best
-        best_score = _safe_float((best or {}).get("score", float("nan")), float("nan"))
-        for freq_hz in freqs:
-            freq_v = _safe_float(freq_hz, float("nan"))
-            if (not np.isfinite(freq_v)) or freq_v <= (sub_hp + 1.0):
-                continue
-            for q in qs:
-                cand = _evaluate(freq_v, q)
-                if cand is None:
-                    continue
-                cand_score = _safe_float(cand.get("score", float("nan")), float("nan"))
-                if (best is None) or (not np.isfinite(best_score)) or cand_score > best_score:
-                    best = cand
-                    best_score = cand_score
-        return best
-
-    best_candidate = _consider_candidates(coarse_freqs, coarse_qs, None)
+    best_candidate = _run_allpass_candidate_search(
+        fc=float(fc),
+        sub_hp=float(sub_hp),
+        evaluate=_evaluate,
+    )
     if best_candidate is None:
         return {
             "enabled": False,
@@ -169,6 +140,42 @@ def recommend_direct_dac_allpass(
             "reason": "No meaningful improvement found.",
         }
 
+    optimized = _final_metric_snapshot(best_candidate or baseline_metrics)
+    improvement = _allpass_improvement_metrics(
+        baseline=baseline,
+        optimized=optimized,
+        baseline_score=baseline_score,
+        optimized_score=_safe_float((best_candidate or {}).get("score", float("nan")), float("nan")),
+    )
+    enabled = _allpass_candidate_enabled(improvement)
+    return {
+        "enabled": bool(enabled),
+        "freq_hz": float((best_candidate or {}).get("bass_allpass_freq_hz", 0.0)) if enabled else 0.0,
+        "q": float((best_candidate or {}).get("bass_allpass_q", 0.707)) if enabled else 0.707,
+        "baseline": baseline,
+        "optimized": optimized,
+        "improvement_score": float(improvement.get("improvement_score", 0.0) or 0.0),
+        "reason": "Applied shared mono-sub allpass." if enabled else "No meaningful improvement found.",
+    }
+
+
+def _run_allpass_candidate_search(
+    *,
+    fc: float,
+    sub_hp: float,
+    evaluate,
+) -> dict[str, Any] | None:
+    coarse_freqs = _normalize_candidate_frequencies(float(fc) * mul for mul in DIRECT_DAC_ALLPASS_FREQ_MULTIPLIERS)
+    coarse_qs = _normalize_candidate_q_values(DIRECT_DAC_ALLPASS_Q_CANDIDATES)
+    best_candidate = _consider_allpass_candidates(
+        freqs=coarse_freqs,
+        qs=coarse_qs,
+        current_best=None,
+        evaluate=evaluate,
+        sub_hp=float(sub_hp),
+    )
+    if best_candidate is None:
+        return None
     refine_freqs = _normalize_candidate_frequencies(
         float(best_candidate.get("bass_allpass_freq_hz", fc)) * factor
         for factor in DIRECT_DAC_ALLPASS_REFINE_FREQ_FACTORS
@@ -183,44 +190,109 @@ def recommend_direct_dac_allpass(
         )
         for factor in DIRECT_DAC_ALLPASS_REFINE_Q_FACTORS
     )
-    best_candidate = _consider_candidates(refine_freqs, refine_qs, best_candidate)
+    best_candidate = _consider_allpass_candidates(
+        freqs=refine_freqs,
+        qs=refine_qs,
+        current_best=best_candidate,
+        evaluate=evaluate,
+        sub_hp=float(sub_hp),
+    )
+    if best_candidate is None:
+        return None
+    freq_v = _safe_float(best_candidate.get("bass_allpass_freq_hz", float("nan")), float("nan"))
+    if (not np.isfinite(freq_v)) or freq_v <= (float(sub_hp) + 1.0):
+        return None
+    return dict(best_candidate)
 
-    optimized = _final_metric_snapshot(best_candidate or baseline_metrics)
-    optimized_score = _safe_float((best_candidate or {}).get("score", float("nan")), float("nan"))
+
+def _consider_allpass_candidates(
+    *,
+    freqs: tuple[float, ...],
+    qs: tuple[float, ...],
+    current_best: dict[str, Any] | None,
+    evaluate,
+    sub_hp: float,
+) -> dict[str, Any] | None:
+    best = current_best
+    best_score = _safe_float((best or {}).get("score", float("nan")), float("nan"))
+    for freq_hz in freqs:
+        freq_v = _safe_float(freq_hz, float("nan"))
+        if (not np.isfinite(freq_v)) or freq_v <= (float(sub_hp) + 1.0):
+            continue
+        for q in qs:
+            cand = evaluate(freq_v, q)
+            if cand is None:
+                continue
+            cand_score = _safe_float(cand.get("score", float("nan")), float("nan"))
+            if (best is None) or (not np.isfinite(best_score)) or cand_score > best_score:
+                best = cand
+                best_score = cand_score
+    return best
+
+
+def _allpass_baseline_good_enough(baseline_metrics: dict) -> bool:
+    baseline_cancel = _safe_float(baseline_metrics.get("bass_cancellation_risk", float("nan")), float("nan"))
+    baseline_ripple = _safe_float(baseline_metrics.get("bass_overlap_ripple", float("nan")), float("nan"))
+    baseline_gd = _safe_float(baseline_metrics.get("bass_xo_gd_mismatch_ms", float("nan")), float("nan"))
+    return bool(
+        np.isfinite(baseline_cancel) and baseline_cancel < 0.05
+        and np.isfinite(baseline_ripple) and baseline_ripple < 1.5
+        and np.isfinite(baseline_gd) and baseline_gd < 0.6
+    )
+
+
+def _allpass_metric_delta(lhs, rhs) -> float:
+    left = _safe_float(lhs, float("nan"))
+    right = _safe_float(rhs, float("nan"))
+    if np.isfinite(left) and np.isfinite(right):
+        return float(left - right)
+    return float("nan")
+
+
+def _allpass_improvement_metrics(
+    *,
+    baseline: dict[str, Any],
+    optimized: dict[str, Any],
+    baseline_score: float,
+    optimized_score: float,
+) -> dict[str, float]:
     improvement_score = (
         float(optimized_score - baseline_score)
         if np.isfinite(optimized_score) and np.isfinite(baseline_score)
         else float("nan")
     )
-    baseline_cancel = _safe_float(baseline.get("cancellation_risk", float("nan")), float("nan"))
-    optimized_cancel = _safe_float(optimized.get("cancellation_risk", float("nan")), float("nan"))
-    baseline_ripple = _safe_float(baseline.get("overlap_ripple_db", float("nan")), float("nan"))
-    optimized_ripple = _safe_float(optimized.get("overlap_ripple_db", float("nan")), float("nan"))
-    baseline_gd = _safe_float(baseline.get("xo_gd_mismatch_ms", float("nan")), float("nan"))
-    optimized_gd = _safe_float(optimized.get("xo_gd_mismatch_ms", float("nan")), float("nan"))
-    baseline_null = _safe_float(baseline.get("null_severity", float("nan")), float("nan"))
-    optimized_null = _safe_float(optimized.get("null_severity", float("nan")), float("nan"))
-    cancel_improvement = (
-        float(baseline_cancel - optimized_cancel)
-        if np.isfinite(baseline_cancel) and np.isfinite(optimized_cancel)
-        else float("nan")
+    cancel_improvement = _allpass_metric_delta(
+        baseline.get("cancellation_risk", float("nan")),
+        optimized.get("cancellation_risk", float("nan")),
     )
-    ripple_improvement = (
-        float(baseline_ripple - optimized_ripple)
-        if np.isfinite(baseline_ripple) and np.isfinite(optimized_ripple)
-        else float("nan")
+    ripple_improvement = _allpass_metric_delta(
+        baseline.get("overlap_ripple_db", float("nan")),
+        optimized.get("overlap_ripple_db", float("nan")),
     )
-    gd_improvement = (
-        float(baseline_gd - optimized_gd)
-        if np.isfinite(baseline_gd) and np.isfinite(optimized_gd)
-        else float("nan")
+    gd_improvement = _allpass_metric_delta(
+        baseline.get("xo_gd_mismatch_ms", float("nan")),
+        optimized.get("xo_gd_mismatch_ms", float("nan")),
     )
-    null_improvement = (
-        float(baseline_null - optimized_null)
-        if np.isfinite(baseline_null) and np.isfinite(optimized_null)
-        else float("nan")
+    null_improvement = _allpass_metric_delta(
+        baseline.get("null_severity", float("nan")),
+        optimized.get("null_severity", float("nan")),
     )
-    enabled = bool(
+    return {
+        "improvement_score": float(improvement_score) if np.isfinite(improvement_score) else 0.0,
+        "cancel_improvement": float(cancel_improvement),
+        "ripple_improvement": float(ripple_improvement),
+        "gd_improvement": float(gd_improvement),
+        "null_improvement": float(null_improvement),
+    }
+
+
+def _allpass_candidate_enabled(improvement: dict[str, float]) -> bool:
+    improvement_score = _safe_float(improvement.get("improvement_score", float("nan")), float("nan"))
+    cancel_improvement = _safe_float(improvement.get("cancel_improvement", float("nan")), float("nan"))
+    ripple_improvement = _safe_float(improvement.get("ripple_improvement", float("nan")), float("nan"))
+    gd_improvement = _safe_float(improvement.get("gd_improvement", float("nan")), float("nan"))
+    null_improvement = _safe_float(improvement.get("null_improvement", float("nan")), float("nan"))
+    return bool(
         np.isfinite(improvement_score)
         and improvement_score >= float(DIRECT_DAC_ALLPASS_MIN_IMPROVEMENT_SCORE)
         and (
@@ -230,12 +302,3 @@ def recommend_direct_dac_allpass(
             or (np.isfinite(null_improvement) and null_improvement >= 0.25)
         )
     )
-    return {
-        "enabled": bool(enabled),
-        "freq_hz": float((best_candidate or {}).get("bass_allpass_freq_hz", 0.0)) if enabled else 0.0,
-        "q": float((best_candidate or {}).get("bass_allpass_q", 0.707)) if enabled else 0.707,
-        "baseline": baseline,
-        "optimized": optimized,
-        "improvement_score": float(improvement_score) if np.isfinite(improvement_score) else 0.0,
-        "reason": "Applied shared mono-sub allpass." if enabled else "No meaningful improvement found.",
-    }

@@ -70,7 +70,19 @@ def _auto_optuna_prime_known_signatures_from_study(
         sigs = _auto_optuna_get_known_signatures(study_name)
         sigs.update(records.keys())
         _OPTUNA_KNOWN_RECORDS[study_name] = dict(records or {})
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("optuna study signature prime")
     _OPTUNA_KNOWN_SIGNATURES_PRIMED.add(study_name)
 
@@ -111,7 +123,19 @@ def _auto_optuna_note_trial_scan(count: int) -> None:
 def _auto_import_optuna():
     try:
         import optuna  # type: ignore
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         # Optional dependency: fall back to builtin search if Optuna is absent or unusable.
         logger.debug("Optuna not available; automatic mode will use builtin backend", exc_info=True)
         return None
@@ -120,7 +144,19 @@ def _auto_import_optuna():
         import warnings as _warnings
         from optuna.exceptions import ExperimentalWarning as _EW
         _warnings.filterwarnings("ignore", category=_EW)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         pass
     return optuna
 
@@ -304,7 +340,19 @@ def _auto_optuna_create_storage(optuna_mod, *, base_data: dict | None):
             if callable(open_lock_cls):
                 return storage_cls(backend_cls(path, lock_obj=open_lock_cls(path)))
             return storage_cls(backend_cls(path))
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             # Third-party Optuna journal backends differ across versions; try the next compatible variant.
             logger.debug("Optuna journal storage candidate initialization failed", exc_info=True)
             continue
@@ -332,7 +380,19 @@ def _auto_optuna_create_study(
             )
         except TypeError as exc:
             logger.debug("Optuna create_study kwarg mismatch (API version?), retrying without storage: %s", exc)
-        except Exception as exc:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ) as exc:
             logger.warning(
                 "Automatic mode Optuna storage unavailable for study %s (%s: %s). "
                 "Falling back to in-memory study.",

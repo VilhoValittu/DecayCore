@@ -127,7 +127,19 @@ def tr_options(t: Callable[[str], str], spec: dict[str, str]) -> dict[str, str]:
 def _as_text(value: Any) -> str:
     try:
         return str(value or "").strip()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return ""
 
 
@@ -137,7 +149,19 @@ def _translation_variants(label_key: str, t: Callable[[str], str] | None = None)
     if callable(t):
         try:
             translated = _as_text(t(label_key))
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             translated = ""
         if translated and translated != label_key:
             variants.add(translated)
@@ -145,7 +169,19 @@ def _translation_variants(label_key: str, t: Callable[[str], str] | None = None)
     for catalog in TRANSLATIONS.values():
         try:
             translated = _as_text((catalog or {}).get(label_key))
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             translated = ""
         if translated and translated != label_key:
             variants.add(translated)

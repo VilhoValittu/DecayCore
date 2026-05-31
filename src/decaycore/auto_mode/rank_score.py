@@ -199,7 +199,6 @@ def compute_rank_score_components(
     rt60_policy_penalty: Any = 0.0,
     harmonic_local_boost_penalty: Any = 0.0,
     shared_preference_penalty: Any = 0.0,
-    iacc_early: Any = float("nan"),  # kept for call-site compatibility, ignored
     gain: Any = 1.0,
     bias: Any = 0.0,
     score_min: Any = 0.0,

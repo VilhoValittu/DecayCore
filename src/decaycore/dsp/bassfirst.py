@@ -8,9 +8,12 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
+import logging
 import numpy as np
 import scipy.signal
 import scipy.ndimage
+
+_LOGGER = logging.getLogger(__name__)
 
 def _clamp01(x):
     return np.clip(x, 0.0, 1.0)
@@ -35,6 +38,35 @@ def _freq_prior(freqs, f1=120.0, f2=200.0):
     mid = (freqs >= f1) & (freqs < f2)
     p[mid] = 1.0 - (freqs[mid] - f1) / (f2 - f1)
     return p
+
+def _adaptive_mode_weights(rt60_lf_s: float | None, peak_q_values: list[float]) -> tuple[float, float, float]:
+    w_gd, w_mag, w_q = 0.45, 0.35, 0.20
+
+    if rt60_lf_s is not None and np.isfinite(float(rt60_lf_s)) and float(rt60_lf_s) > 0.05:
+        _rt60 = float(rt60_lf_s)
+        if _rt60 <= 0.4:
+            w_gd, w_mag, w_q = 0.35, 0.45, 0.20
+        elif _rt60 >= 1.2:
+            w_gd, w_mag, w_q = 0.60, 0.25, 0.15
+        else:
+            t = (_rt60 - 0.4) / (1.2 - 0.4)
+            w_gd = 0.45 + t * (0.60 - 0.45)
+            w_mag = 0.35 + t * (0.25 - 0.35)
+            w_q = 0.20 + t * (0.15 - 0.20)
+
+    if len(peak_q_values) > 0:
+        mean_q = float(np.mean(peak_q_values))
+        if mean_q > 7.0:
+            delta = 0.05 * min(1.0, (mean_q - 7.0) / 3.0)
+            w_mag -= delta
+            w_q += delta
+            total = w_gd + w_mag + w_q + 1e-12
+            w_gd /= total
+            w_mag /= total
+            w_q /= total
+
+    _LOGGER.debug(f"room_mode_weights: gd={w_gd:.3f} mag={w_mag:.3f} q={w_q:.3f} (rt60={rt60_lf_s}, mean_q={np.mean(peak_q_values) if peak_q_values else 'none'})")
+    return w_gd, w_mag, w_q
 
 def build_bassfirst_masks(freq_axis, m_raw_db, phase_rad_unwrapped, gd_ms, gd_diff,
                           is_wav_source=False, mode_f1=120.0, mode_f2=200.0,
@@ -82,6 +114,7 @@ def build_bassfirst_masks(freq_axis, m_raw_db, phase_rad_unwrapped, gd_ms, gd_di
     mag_norm = _clamp01((mag_peak - mag_a0) / (mag_a1 - mag_a0 + 1e-12))
 
     q_norm = np.zeros_like(f)
+    peak_q_values: list[float] = []
     try:
         peaks, props = scipy.signal.find_peaks(mag_peak, prominence=1.0, distance=max(3, int(0.02*len(f))))
         if len(peaks) > 0:
@@ -92,12 +125,14 @@ def build_bassfirst_masks(freq_axis, m_raw_db, phase_rad_unwrapped, gd_ms, gd_di
                 hi = min(len(f)-1, int(pi + wb/2))
                 bw_hz = max(1e-6, f[hi] - f[lo])
                 Q = f[pi] / bw_hz if bw_hz > 0 else 0.0
+                peak_q_values.append(Q)
                 q_norm[pi] = _clamp01((Q - q0) / (q1 - q0 + 1e-12))
             q_norm = scipy.ndimage.gaussian_filter1d(q_norm, sigma=6)
     except (TypeError, ValueError, FloatingPointError, IndexError):
         pass
 
-    mode_score = prior * (0.45*gd_norm + 0.35*mag_norm + 0.20*q_norm)
+    w_gd, w_mag, w_q = _adaptive_mode_weights(rt60_lf_s, peak_q_values)
+    mode_score = prior * (w_gd*gd_norm + w_mag*mag_norm + w_q*q_norm)
     room_mode_mask = scipy.ndimage.gaussian_filter1d(_clamp01(mode_score), sigma=4)
 
     if bool(is_wav_source):

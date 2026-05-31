@@ -104,46 +104,107 @@ def _apply_peak_priority_error_shaping(
     if not np.any(pos):
         return e
 
-    # Preserve boosts up to the cap; soften only the excess over the cap.
-    cap = float(max_boost)
-    e_pos = e[pos]
-    over = np.maximum(0.0, e_pos - cap)
-    e_sat = np.where(
-        e_pos <= cap,
-        e_pos,
-        cap + cap * np.tanh(over / (cap + 1e-12)),
+    e = _apply_peak_priority_pos_soft_cap(
+        e,
+        pos_mask=pos,
+        max_boost=float(max_boost),
+        strength=float(strength),
     )
-    e[pos] = (1.0 - strength) * e_pos + strength * e_sat
 
     # Optional (small) cut emphasis if you want even more peak-first behavior.
     cut_emph = cfg_reader.float_allow_zero("peak_priority_cut_emphasis", 0.0)
-    if np.isfinite(cut_emph) and cut_emph > 0.0:
-        cut_emph = float(np.clip(cut_emph, 0.0, 2.0))
-        neg = m & (e < 0.0)
-        if np.any(neg):
-            e[neg] *= (1.0 + cut_emph * strength)
+    e = _apply_peak_priority_optional_cut_emphasis(
+        e,
+        band_mask=m,
+        cut_emphasis=cut_emph,
+        strength=float(strength),
+    )
 
     # Stats (safe)
-    try:
-        if isinstance(st, dict):
-            st["peak_priority_enable"] = True
-            st["peak_priority_strength"] = float(strength)
-            st["peak_priority_max_boost_db"] = float(max_boost)
-            st["peak_priority_pos_err_peak_before_db"] = float(np.max(np.asarray(err_db, dtype=float)[pos]))
-            st["peak_priority_pos_err_peak_after_db"] = float(np.max(e[pos]))
-    except (TypeError, ValueError):
-        pass
+    _record_peak_priority_stats(st, err_db=err_db, shaped_error=e, pos_mask=pos, strength=float(strength), max_boost=float(max_boost))
 
+    _log_peak_priority_summary(logger, err_db=err_db, shaped_error=e, pos_mask=pos, strength=float(strength), max_boost=float(max_boost))
+
+    return e
+
+
+def _apply_peak_priority_pos_soft_cap(
+    error_db: np.ndarray,
+    *,
+    pos_mask: np.ndarray,
+    max_boost: float,
+    strength: float,
+) -> np.ndarray:
+    cap = float(max_boost)
+    pos_values = error_db[pos_mask]
+    over = np.maximum(0.0, pos_values - cap)
+    saturated = np.where(
+        pos_values <= cap,
+        pos_values,
+        cap + cap * np.tanh(over / (cap + 1e-12)),
+    )
+    out = np.asarray(error_db, dtype=float).copy()
+    out[pos_mask] = (1.0 - float(strength)) * pos_values + float(strength) * saturated
+    return out
+
+
+def _apply_peak_priority_optional_cut_emphasis(
+    error_db: np.ndarray,
+    *,
+    band_mask: np.ndarray,
+    cut_emphasis: float,
+    strength: float,
+) -> np.ndarray:
+    if not np.isfinite(cut_emphasis) or cut_emphasis <= 0.0:
+        return error_db
+    clipped = float(np.clip(cut_emphasis, 0.0, 2.0))
+    neg = np.asarray(band_mask, dtype=bool) & (np.asarray(error_db, dtype=float) < 0.0)
+    if not np.any(neg):
+        return error_db
+    out = np.asarray(error_db, dtype=float).copy()
+    out[neg] *= (1.0 + clipped * float(strength))
+    return out
+
+
+def _record_peak_priority_stats(
+    stats: Any,
+    *,
+    err_db: np.ndarray,
+    shaped_error: np.ndarray,
+    pos_mask: np.ndarray,
+    strength: float,
+    max_boost: float,
+) -> None:
+    try:
+        if not isinstance(stats, dict):
+            return
+        stats["peak_priority_enable"] = True
+        stats["peak_priority_strength"] = float(strength)
+        stats["peak_priority_max_boost_db"] = float(max_boost)
+        stats["peak_priority_pos_err_peak_before_db"] = float(np.max(np.asarray(err_db, dtype=float)[pos_mask]))
+        stats["peak_priority_pos_err_peak_after_db"] = float(np.max(np.asarray(shaped_error, dtype=float)[pos_mask]))
+    except (TypeError, ValueError):
+        return
+
+
+def _log_peak_priority_summary(
+    logger: Any,
+    *,
+    err_db: np.ndarray,
+    shaped_error: np.ndarray,
+    pos_mask: np.ndarray,
+    strength: float,
+    max_boost: float,
+) -> None:
     try:
         logger.info(
             "PeakPriority: "
             f"enable=ON, strength={strength:.2f}, max_boost={max_boost:.2f} dB, "
-            f"pos_err_peak: {float(np.max(np.asarray(err_db, dtype=float)[pos])):.2f} -> {float(np.max(e[pos])):.2f} dB"
+            f"pos_err_peak: {float(np.max(np.asarray(err_db, dtype=float)[pos_mask])):.2f} -> "
+            f"{float(np.max(np.asarray(shaped_error, dtype=float)[pos_mask])):.2f} dB"
         )
     except (AttributeError, TypeError, ValueError):
-        pass
-
-    return e
+        return
 
 def _apply_smoothing(
     err_db: np.ndarray,
@@ -718,7 +779,7 @@ def _apply_post_limits_and_metrics(inputs: _MagPostProcessInputs) -> _MagPostPro
 __all__ = ['_apply_peak_priority_error_shaping', '_apply_smoothing', '_apply_confidence_adaptive_bass_smoothing', '_select_bass_adaptive_conf_mask', '_apply_mid_refit_pre_slope', '_apply_bass_boost_post_restore', '_apply_confpull_post_slope', '_apply_post_limits_and_metrics']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['correction_mag_01', 'correction_mag_02']:
@@ -729,4 +790,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

@@ -23,6 +23,19 @@ import unicodedata
 
 logger = logging.getLogger("DecayCore")
 
+_RECOVERABLE_PROCESS_SUPPORT_EXCEPTIONS = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    KeyError,
+    IndexError,
+    RuntimeError,
+    OSError,
+    ImportError,
+    ModuleNotFoundError,
+    NameError,
+)
+
 
 def auto_target_mode_norm(mode: typing.Any) -> str:
     """
@@ -66,14 +79,38 @@ def slugify_filename_token(value: typing.Any, *, default: str = "target", max_le
     """Muuntaa tekstin turvalliseksi tiedostonimiosaksi."""
     try:
         raw = str(value or "").strip()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         raw = ""
     if not raw:
         return default
 
     try:
         txt = unicodedata.normalize("NFKD", raw).encode("ascii", "ignore").decode("ascii")
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         txt = raw
     txt = re.sub(r"[^A-Za-z0-9]+", "-", txt).strip("-").lower()
     if not txt:
@@ -83,38 +120,63 @@ def slugify_filename_token(value: typing.Any, *, default: str = "target", max_le
     return txt or default
 
 
+def _safe_data_str(data: dict, key: str) -> str:
+    try:
+        return str(data.get(key) or "").strip()
+    except _RECOVERABLE_PROCESS_SUPPORT_EXCEPTIONS:
+        return ""
+
+
+def _target_label_from_upload(data: dict) -> str:
+    try:
+        uploaded = data.get("hc_custom_file")
+    except _RECOVERABLE_PROCESS_SUPPORT_EXCEPTIONS:
+        logger.exception("target curve label from upload")
+        return ""
+    if not isinstance(uploaded, dict):
+        return ""
+    for key in ("filename", "name", "file_name"):
+        value = uploaded.get(key)
+        if isinstance(value, str) and value.strip():
+            return os.path.splitext(os.path.basename(value.strip()))[0]
+    return ""
+
+
+def _uploaded_file_has_name(uploaded: dict) -> bool:
+    for key in ("filename", "name", "file_name"):
+        value = _safe_data_str(uploaded, key)
+        if value:
+            return True
+    return False
+
+
+def _is_uploaded_file_obj(value: typing.Any) -> bool:
+    if not isinstance(value, dict):
+        return False
+    try:
+        content = value.get("content", None)
+    except _RECOVERABLE_PROCESS_SUPPORT_EXCEPTIONS:
+        logger.exception("uploaded file content check")
+        content = None
+    if isinstance(content, (bytes, bytearray)) and len(content) > 0:
+        return True
+    return _uploaded_file_has_name(value)
+
+
 def pick_target_curve_label(data: dict) -> str:
     """Valitsee target curven nimen vientitiedostonimiin."""
-    try:
-        up = data.get("hc_custom_file")
-        if isinstance(up, dict):
-            for k in ("filename", "name", "file_name"):
-                v = up.get(k)
-                if isinstance(v, str) and v.strip():
-                    return os.path.splitext(os.path.basename(v.strip()))[0]
-    except Exception:
-        logger.exception("target curve label from upload")
+    uploaded_label = _target_label_from_upload(data)
+    if uploaded_label:
+        return uploaded_label
 
-    try:
-        p = str(data.get("local_path_house") or "").strip()
-    except Exception:
-        p = ""
-    if p:
-        return os.path.splitext(os.path.basename(p))[0]
+    local_path = _safe_data_str(data, "local_path_house")
+    if local_path:
+        return os.path.splitext(os.path.basename(local_path))[0]
 
-    try:
-        hc_mode = str(data.get("hc_mode") or "").strip()
-    except Exception:
-        hc_mode = ""
-    if hc_mode:
-        return hc_mode
-
-    try:
-        src = str(data.get("hc_source") or "").strip()
-    except Exception:
-        src = ""
-    if src:
-        return src
+    for key in ("hc_mode", "hc_source"):
+        value = _safe_data_str(data, key)
+        if value:
+            return value
     return "Target"
 
 
@@ -122,26 +184,8 @@ def has_uploaded_target_file(data: dict) -> bool:
     """Checks if UI data contains an uploaded custom target file."""
     try:
         up = data.get("hc_custom_file", None)
-    except Exception:
+    except _RECOVERABLE_PROCESS_SUPPORT_EXCEPTIONS:
         up = None
-
-    def _is_uploaded_file_obj(v: typing.Any) -> bool:
-        if not isinstance(v, dict):
-            return False
-        try:
-            content = v.get("content", None)
-            if isinstance(content, (bytes, bytearray)) and len(content) > 0:
-                return True
-        except Exception:
-            logger.exception("uploaded file content check")
-        for k in ("filename", "name", "file_name"):
-            try:
-                s = str(v.get(k, "") or "").strip()
-            except Exception:
-                s = ""
-            if s:
-                return True
-        return False
 
     if _is_uploaded_file_obj(up):
         return True

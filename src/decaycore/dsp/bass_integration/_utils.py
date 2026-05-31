@@ -32,7 +32,19 @@ def _status_callback(callbacks: Any, message: str) -> None:
         return
     try:
         callbacks.status(str(message))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         _LOG.debug("Bass-integration status callback failed", exc_info=True)
 
 
@@ -49,7 +61,19 @@ def _safe_float(value: Any, default: float = float("nan")) -> float:
 def _band_mask(freqs_hz: np.ndarray, lo_hz: float, hi_hz: float) -> np.ndarray:
     try:
         f = np.asarray(freqs_hz, dtype=float)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return np.zeros(0, dtype=bool)
     lo = _safe_float(lo_hz, float("nan"))
     hi = _safe_float(hi_hz, float("nan"))

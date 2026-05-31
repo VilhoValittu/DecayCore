@@ -148,7 +148,19 @@ def apply_direct_dac_bass_integration_result(
             ",".join(metrics.reject_reasons) if metrics.reject_reasons else "none",
         )
         return dict(result_dict)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.debug("Direct-DAC final candidate verification failed", exc_info=True)
         return {}
 

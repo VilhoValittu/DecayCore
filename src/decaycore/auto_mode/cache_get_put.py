@@ -140,32 +140,18 @@ def _auto_cache_get_target_for_measurements_global(
     return dict(direct)
 
 
-@_auto_cache_guard
-def _auto_cache_put_target_for_measurements_global(
+def _auto_cache_build_global_target_entry(
     *,
-    measurements: dict,
-    best_hc_mode: str | None,
-    goal: str = AUTO_MODE_GOAL_DEFAULT,
-    compat_version: str | None = None,
-    target_selection_meta: dict | None = None,
-    filter_seed_preset: dict | None = None,
-    filter_seed_metrics: dict | None = None,
-    filter_key: str | None = None,
-) -> None:
-    hc_val = str(best_hc_mode or "").strip()
-    if not hc_val:
-        return
-    key = _auto_target_measurement_cache_key(measurements, goal)
-    msig = _auto_get_measurement_signature(measurements or {})
-    if not key or not msig:
-        return
-    cache = _auto_cache_load(compat_version=compat_version)
-    target_map = cache.get("target_by_measurement_global", {})
-    if not isinstance(target_map, dict):
-        target_map = {}
-
-    old = target_map.get(key)
-    entry = dict(old or {}) if isinstance(old, dict) else {}
+    old_entry: dict | None,
+    msig: str,
+    goal: str,
+    hc_val: str,
+    target_selection_meta: dict | None,
+    filter_seed_preset: dict | None,
+    filter_seed_metrics: dict | None,
+    filter_key: str | None,
+) -> dict:
+    entry = dict(old_entry or {}) if isinstance(old_entry, dict) else {}
     entry.update(
         {
             "t": int(time.time()),
@@ -197,18 +183,71 @@ def _auto_cache_put_target_for_measurements_global(
         entry["filter_seed_presets"] = seed_map
     if metric_map:
         entry["filter_seed_metrics"] = metric_map
+    return entry
+
+
+def _auto_cache_prune_global_target_map(target_map: dict) -> dict:
+    try:
+        if len(target_map) <= int(AUTO_MODE_CACHE_MAX_ITEMS):
+            return target_map
+        sorted_items = sorted(
+            target_map.items(),
+            key=lambda kv: int((kv[1] or {}).get("t", 0) or 0),
+            reverse=True,
+        )
+        return dict(sorted_items[: int(AUTO_MODE_CACHE_MAX_ITEMS)])
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        logger.exception("global target_map eviction")
+        return target_map
+
+
+@_auto_cache_guard
+def _auto_cache_put_target_for_measurements_global(
+    *,
+    measurements: dict,
+    best_hc_mode: str | None,
+    goal: str = AUTO_MODE_GOAL_DEFAULT,
+    compat_version: str | None = None,
+    target_selection_meta: dict | None = None,
+    filter_seed_preset: dict | None = None,
+    filter_seed_metrics: dict | None = None,
+    filter_key: str | None = None,
+) -> None:
+    hc_val = str(best_hc_mode or "").strip()
+    if not hc_val:
+        return
+    key = _auto_target_measurement_cache_key(measurements, goal)
+    msig = _auto_get_measurement_signature(measurements or {})
+    if not key or not msig:
+        return
+    cache = _auto_cache_load(compat_version=compat_version)
+    target_map = cache.get("target_by_measurement_global", {})
+    if not isinstance(target_map, dict):
+        target_map = {}
+    entry = _auto_cache_build_global_target_entry(
+        old_entry=target_map.get(key),
+        msig=str(msig),
+        goal=goal,
+        hc_val=hc_val,
+        target_selection_meta=target_selection_meta,
+        filter_seed_preset=filter_seed_preset,
+        filter_seed_metrics=filter_seed_metrics,
+        filter_key=filter_key,
+    )
 
     target_map[str(key)] = entry
-    try:
-        if len(target_map) > int(AUTO_MODE_CACHE_MAX_ITEMS):
-            sorted_items = sorted(
-                target_map.items(),
-                key=lambda kv: int((kv[1] or {}).get("t", 0) or 0),
-                reverse=True,
-            )
-            target_map = dict(sorted_items[: int(AUTO_MODE_CACHE_MAX_ITEMS)])
-    except Exception:
-        logger.exception("global target_map eviction")
+    target_map = _auto_cache_prune_global_target_map(target_map)
     cache["target_by_measurement_global"] = target_map
     cache["v"] = int(AUTO_MODE_CACHE_SCHEMA_VERSION)
     cache["schema_version"] = int(AUTO_MODE_CACHE_SCHEMA_VERSION)
@@ -279,7 +318,19 @@ def _auto_cache_get_target_for_measurements(
             continue
         try:
             t = int(entry.get("t", 0) or 0)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             t = 0
         if t >= best_t:
             best_t = int(t)
@@ -338,7 +389,19 @@ def _auto_cache_put_target_for_measurements(
                 reverse=True,
             )
             target_map = dict(sorted_items[: int(AUTO_MODE_CACHE_MAX_ITEMS)])
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("cache target_map eviction")
     bucket["target_by_measurement"] = target_map
     cache["v"] = int(AUTO_MODE_CACHE_SCHEMA_VERSION)
@@ -406,7 +469,19 @@ def _auto_cache_put_best(
                 reverse=True,
             )
             items = dict(sorted_items[: int(AUTO_MODE_CACHE_MAX_ITEMS)])
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("cache items eviction")
     bucket["items"] = items
     cache["v"] = int(AUTO_MODE_CACHE_SCHEMA_VERSION)

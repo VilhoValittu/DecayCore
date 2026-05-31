@@ -127,7 +127,19 @@ def _apply_legacy_opportunistic_seeds(context: AutoSearchExecutionContext) -> No
                 if isinstance(cached_metrics_seed, dict) and cached_metrics_seed:
                     search_base_data["_auto_target_seed_metrics"] = dict(cached_metrics_seed)
                 logger.info("Automatic mode: loaded cached best preset seed.")
-        except Exception as exc:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ) as exc:
             record_auto_search_fallback(
                 search_base_data,
                 f"cache seed skipped: {type(exc).__name__}",
@@ -177,7 +189,19 @@ def _apply_legacy_opportunistic_seeds(context: AutoSearchExecutionContext) -> No
                     "Automatic mode: loaded Optuna phase1 study preset seed for "
                     "canonical Phase 1 -> Phase 2 -> Micro refine search."
                 )
-        except Exception as exc:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ) as exc:
             record_auto_search_fallback(
                 search_base_data,
                 f"optuna study seed skipped: {type(exc).__name__}",
@@ -208,7 +232,19 @@ def _apply_legacy_opportunistic_seeds(context: AutoSearchExecutionContext) -> No
                 logger.info(
                     "Automatic mode: loaded filter-specific last-used preset seed."
                 )
-        except Exception as exc:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ) as exc:
             record_auto_search_fallback(
                 search_base_data,
                 f"last-best seed skipped: {type(exc).__name__}",

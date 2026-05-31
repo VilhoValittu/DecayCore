@@ -50,19 +50,67 @@ def recommend_direct_dac_crossover(
 
     try:
         hpf_order_i = max(1, int(main_hpf_order))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         hpf_order_i = 4
     try:
         lpf_order_i = max(1, int(sub_lpf_order))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         lpf_order_i = hpf_order_i
     try:
         sub_hpf_hz_f = max(0.0, float(sub_hpf_hz))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         sub_hpf_hz_f = 20.0
     try:
         sub_hpf_order_i = max(1, int(sub_hpf_order))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         sub_hpf_order_i = 2
 
     combine_mode_norm = normalize_sub_combine_mode(sub_combine_mode)

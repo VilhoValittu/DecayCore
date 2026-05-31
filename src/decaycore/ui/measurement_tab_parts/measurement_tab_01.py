@@ -121,7 +121,19 @@ def _preview_magnitude_for_plot(freq_hz, magnitude_db):
             mag,
             plot_smoothing_level="Psychoacoustic",
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return mag
 
 def _build_preview_figure(bundle: MeasurementBundle):
@@ -251,7 +263,7 @@ def _session_preview_bundles(session: MeasurementSessionAggregate) -> dict[str, 
 __all__ = ['_build_upload_payload', '_device_option_label', '_measurement_use_wasapi_value', '_filter_measurement_devices_for_wasapi', '_measurement_audio_backend_message', '_preview_magnitude_for_plot', '_build_preview_figure', '_session_preview_bundles']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['measurement_tab_01', 'measurement_tab_02']:
@@ -262,4 +274,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

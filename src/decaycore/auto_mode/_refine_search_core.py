@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import logging
 
 import numpy as np
@@ -41,6 +42,27 @@ from .shared import AUTO_MODE_ADAPTIVE_SHRINK_MIN, AUTO_MODE_OPTUNA_CONSTRAINTS_
 from ._refine_types import _SearchPhase1State, _SearchPhase2State
 
 logger = logging.getLogger("DecayCore")
+
+
+@dataclass
+class _Phase1TopSelection:
+    phase1_top: list[dict]
+    phase1_safe_entries: list[dict]
+    hard_gate_diag_count: int
+
+
+@dataclass
+class _Phase2CenterPlan:
+    index: int
+    center: dict
+    local_detail: str | None
+    local_seed: int
+    local_shrink: float
+    local_candidates: list[dict]
+    local_seed_presets: list[dict]
+    local_total: int
+    local_optuna_base_data: dict | None
+    study_scope: str
 
 
 def _build_search_refine_eval_context(
@@ -92,6 +114,241 @@ def _build_search_refine_eval_context(
     )
 
 
+def _build_phase1_seed_presets(
+    *,
+    search_base_data: dict,
+    prior_seed_preset: dict | None,
+    filter_key: str,
+    seed: int,
+) -> list[dict]:
+    phase1_seed_presets: list[dict] = []
+    if isinstance(prior_seed_preset, dict) and prior_seed_preset:
+        phase1_seed_presets.append(dict(prior_seed_preset))
+        logger.info(
+            "Automatic mode: loaded built-in prior seed preset for %s filter.",
+            str(filter_key),
+        )
+    phase1_seed_presets.extend(
+        _build_auto_mode_candidates(
+            search_base_data,
+            n_trials=1,
+            seed=int(seed),
+        )
+    )
+    return list(phase1_seed_presets or [])
+
+
+def _build_phase1_top_selection(
+    *,
+    search_state,
+    goal: str,
+    local_refine_top_k: int,
+) -> _Phase1TopSelection:
+    phase1_entries = [
+        dict(it)
+        for it in list(search_state.scored)
+        if str(dict(it.get("metrics", {}) or {}).get("phase", "")) == "phase 1/2"
+    ]
+    finite_phase1_entries = [
+        dict(it)
+        for it in list(phase1_entries or [])
+        if np.isfinite(_auto_rank_value(dict(it.get("metrics", {}) or {}), default=float("nan")))
+    ]
+    phase1_safe_entries, phase1_hard_gate_diag = filter_hard_failed_candidates(
+        finite_phase1_entries or phase1_entries,
+        goal=goal,
+    )
+    if phase1_safe_entries:
+        phase1_anchor_pool = list(phase1_safe_entries)
+    else:
+        phase1_anchor_pool = list(finite_phase1_entries or phase1_entries)
+        if phase1_anchor_pool:
+            logger.warning(
+                "Automatic mode Phase1 top anchor fallback: no non-hard-gated candidates "
+                "(pool=%d, diagnostics=%d); using ranked fallback pool.",
+                int(len(finite_phase1_entries or phase1_entries)),
+                int(len(phase1_hard_gate_diag or [])),
+            )
+    phase1_top = sorted(
+        phase1_anchor_pool,
+        key=lambda x: _auto_rank_key(x.get("metrics", {})),
+    )[: int(max(1, local_refine_top_k))]
+    return _Phase1TopSelection(
+        phase1_top=list(phase1_top or []),
+        phase1_safe_entries=list(phase1_safe_entries or []),
+        hard_gate_diag_count=int(len(phase1_hard_gate_diag or [])),
+    )
+
+
+def _local_refine_center_detail(
+    *,
+    center: dict,
+    search_base_data: dict,
+    filter_key: str,
+) -> str | None:
+    c_mixed = _auto_safe_float(center.get("mixed_freq", search_base_data.get("mixed_freq", float("nan"))), float("nan"))
+    c_phase = _auto_safe_float(center.get("phase_limit", search_base_data.get("phase_limit", float("nan"))), float("nan"))
+    if str(filter_key) == "mixed":
+        return f"mixed_freq={c_mixed:.1f} Hz"
+    if str(filter_key) in ("linear", "asym"):
+        return (
+            f"phase refine phase_limit={c_phase:.1f} Hz"
+            if np.isfinite(c_phase)
+            else "phase refine phase_limit=n/a"
+        )
+    return None
+
+
+def _build_phase2_center_plan(
+    *,
+    ci: int,
+    center: dict,
+    cfg,
+    search_base_data: dict,
+    search_state,
+    seed: int,
+    use_optuna_trials: bool,
+    runtime,
+    phase1: _SearchPhase1State,
+    filter_key: str,
+    winner_target_name: str | None,
+) -> _Phase2CenterPlan:
+    local_shrink = float(
+        _auto_adaptive_shrink_factor(
+            phase1.phase1_top,
+            base_shrink=float(cfg.local_refine_shrink),
+            plateau_hit=bool(phase1.phase1_plateau_hit),
+        )
+    )
+    local_seed = int(seed + 7919 + ci * 100003)
+    local_seed_presets = _build_auto_mode_candidates_local(
+        search_base_data,
+        center,
+        1,
+        int(local_seed),
+        shrink=float(local_shrink),
+    )
+    local_candidates = []
+    if not bool(use_optuna_trials):
+        local_candidates = _build_auto_mode_candidates_local(
+            search_base_data,
+            center,
+            int(cfg.local_refine_trials_per_top),
+            int(local_seed),
+            shrink=float(local_shrink),
+        )
+    local_total = int(cfg.local_refine_trials_per_top)
+    if bool(use_optuna_trials):
+        local_total = int(
+            max(
+                int(local_total),
+                int(len(local_seed_presets or []))
+                + int(max(1, getattr(cfg, "optuna_startup_local", 4)))
+                + 3,
+            )
+        )
+    return _Phase2CenterPlan(
+        index=int(ci),
+        center=dict(center or {}),
+        local_detail=_local_refine_center_detail(
+            center=dict(center or {}),
+            search_base_data=search_base_data,
+            filter_key=str(filter_key),
+        ),
+        local_seed=int(local_seed),
+        local_shrink=float(local_shrink),
+        local_candidates=list(local_candidates or []),
+        local_seed_presets=list(local_seed_presets or []),
+        local_total=int(local_total),
+        local_optuna_base_data=_build_refine_optuna_base_data(search_base_data, search_state),
+        study_scope=runtime.auto_optuna_scope_with_context(
+            f"phase2-local-center-{int(ci)}-u1",
+            center=dict(center or {}),
+            shrink=float(local_shrink),
+            extra={
+                "filter_key": str(filter_key),
+                "target": str(winner_target_name or ""),
+            },
+        ),
+    )
+
+
+def _emit_local_refine_center_status(
+    *,
+    status_cb,
+    ci: int,
+    local_detail: str | None,
+) -> None:
+    if local_detail is None:
+        return
+    logger.info("Automatic mode Local refine: center #%d %s", int(ci), str(local_detail))
+    if callable(status_cb):
+        status_cb(
+            "DecayCore automatic mode: Local refine "
+            f"center #{ci} {local_detail}"
+        )
+
+
+def _append_phase2_optuna_telemetry(
+    *,
+    phase2: _SearchPhase2State,
+    ci: int,
+    stats: dict,
+) -> None:
+    local_tel = dict(stats.get("optuna_telemetry", {}) or {})
+    if local_tel:
+        phase2.phase2_local_optuna_tels.append(
+            {
+                "center_index": int(ci),
+                "phase_label": f"phase 2/2 local center#{ci}",
+                "telemetry": dict(local_tel),
+            }
+        )
+
+
+def _emit_local_refine_summary(
+    *,
+    runtime,
+    status_cb,
+    ci: int,
+    stats: dict,
+    search_state,
+) -> None:
+    local_tel = dict(stats.get("optuna_telemetry", {}) or {})
+    local_tel_txt = runtime.auto_optuna_telemetry_text(local_tel)
+    local_rescue_suffix = ", zero-feasible fallback used" if bool(stats.get("optuna_zero_feasible_fallback_used", False)) else ""
+    local_fallback_txt = runtime.auto_optuna_fallback_summary_text(local_tel) if bool(stats.get("optuna_zero_feasible_fallback_used", False)) else ""
+    local_best_metrics = dict(search_state.best_metrics or {})
+    local_rank_txt = runtime.auto_optuna_fmt_value(official_rank_score(local_best_metrics), 3)
+    local_avg_txt = runtime.auto_optuna_fmt_value(local_best_metrics.get("avg_score"), 3)
+    logger.info(
+        "Automatic mode Local refine summary: center #%d, current_best_rank=%s, avg=%s%s%s",
+        int(ci),
+        str(local_rank_txt),
+        str(local_avg_txt),
+        "" if not local_tel_txt else f", {local_tel_txt}",
+        str(local_rescue_suffix),
+    )
+    if callable(status_cb):
+        status_cb(
+            "DecayCore automatic mode: Local refine summary "
+            f"center #{int(ci)}, current_best_rank={local_rank_txt}, avg_score={local_avg_txt}"
+            f"{'' if not local_tel_txt else f', {local_tel_txt}'}"
+            f"{local_rescue_suffix}"
+        )
+    if local_fallback_txt:
+        logger.info(
+            "Automatic mode Local refine fallback detail: center #%d, %s",
+            int(ci),
+            str(local_fallback_txt),
+        )
+        if callable(status_cb):
+            status_cb(
+                "DecayCore automatic mode: Local refine fallback "
+                f"center #{int(ci)}, {local_fallback_txt}"
+            )
+
+
 def _run_search_refine_phase1_core(
     *,
     search_base_data: dict,
@@ -106,19 +363,11 @@ def _run_search_refine_phase1_core(
     status_cb,
     ctx: RefineEvalContext,
 ) -> _SearchPhase1State:
-    phase1_seed_presets = []
-    if isinstance(prior_seed_preset, dict) and prior_seed_preset:
-        phase1_seed_presets.append(dict(prior_seed_preset))
-        logger.info(
-            "Automatic mode: loaded built-in prior seed preset for %s filter.",
-            str(filter_key),
-        )
-    phase1_seed_presets.extend(
-        _build_auto_mode_candidates(
-            search_base_data,
-            n_trials=1,
-            seed=int(seed),
-        )
+    phase1_seed_presets = _build_phase1_seed_presets(
+        search_base_data=search_base_data,
+        prior_seed_preset=prior_seed_preset,
+        filter_key=str(filter_key),
+        seed=int(seed),
     )
     # Clear target-search seed baseline so phase 1 evaluates the seed preset in its own
     # scoring context. The target-search score (from a different evaluation context) is
@@ -164,35 +413,12 @@ def _run_search_refine_phase1_core(
         ),
         study_scope="phase1",
     )
-    phase1_entries = [
-        dict(it)
-        for it in list(ctx.search_state.scored)
-        if str(dict(it.get("metrics", {}) or {}).get("phase", "")) == "phase 1/2"
-    ]
-    finite_phase1_entries = [
-        dict(it)
-        for it in list(phase1_entries or [])
-        if np.isfinite(_auto_rank_value(dict(it.get("metrics", {}) or {}), default=float("nan")))
-    ]
-    phase1_safe_entries, phase1_hard_gate_diag = filter_hard_failed_candidates(
-        finite_phase1_entries or phase1_entries,
+    phase1_selection = _build_phase1_top_selection(
+        search_state=ctx.search_state,
         goal=ctx.goal,
+        local_refine_top_k=int(max(1, cfg.local_refine_top_k)),
     )
-    if phase1_safe_entries:
-        phase1_anchor_pool = list(phase1_safe_entries)
-    else:
-        phase1_anchor_pool = list(finite_phase1_entries or phase1_entries)
-        if phase1_anchor_pool:
-            logger.warning(
-                "Automatic mode Phase1 top anchor fallback: no non-hard-gated candidates "
-                "(pool=%d, diagnostics=%d); using ranked fallback pool.",
-                int(len(finite_phase1_entries or phase1_entries)),
-                int(len(phase1_hard_gate_diag or [])),
-            )
-    phase1_top = sorted(
-        phase1_anchor_pool,
-        key=lambda x: _auto_rank_key(x.get("metrics", {})),
-    )[: int(max(1, cfg.local_refine_top_k))]
+    phase1_top = list(phase1_selection.phase1_top or [])
     if bool(phase1_stats.get("plateau_hit", False)):
         logger.info(
             "Automatic mode Phase1 plateau detail: tried=%d ok=%d no_improve_streak=%d "
@@ -201,7 +427,7 @@ def _run_search_refine_phase1_core(
             int(phase1_stats.get("ok", 0) or 0),
             int(cfg.phase1_plateau_rounds),
             int(phase1_plateau_min_trials),
-            int(len(phase1_safe_entries or [])),
+            int(len(phase1_selection.phase1_safe_entries or [])),
             int(max(1, cfg.local_refine_top_k)),
         )
     if phase1_top:
@@ -398,77 +624,42 @@ def _run_search_refine_phase2_local_core(
     phase2.phase2_focus_hi = float(_auto_safe_float(ref_profile.get("focus_hi", float("nan")), float("nan")))
     for ci, item in enumerate(phase1.phase1_top, start=1):
         center = dict(item.get("preset", {}) or {})
-        c_mixed = _auto_safe_float(center.get("mixed_freq", search_base_data.get("mixed_freq", float("nan"))), float("nan"))
-        c_phase = _auto_safe_float(center.get("phase_limit", search_base_data.get("phase_limit", float("nan"))), float("nan"))
-        local_detail = None
-        if str(filter_key) == "mixed":
-            local_detail = f"mixed_freq={c_mixed:.1f} Hz"
-        elif str(filter_key) in ("linear", "asym"):
-            local_detail = (
-                f"phase refine phase_limit={c_phase:.1f} Hz"
-                if np.isfinite(c_phase)
-                else "phase refine phase_limit=n/a"
-            )
-        if local_detail is not None:
-            logger.info("Automatic mode Local refine: center #%d %s", int(ci), str(local_detail))
-            if callable(status_cb):
-                status_cb(
-                    "DecayCore automatic mode: Local refine "
-                    f"center #{ci} {local_detail}"
-                )
-        local_seed = int(seed + 7919 + ci * 100003)
-        local_shrink = float(
-            _auto_adaptive_shrink_factor(
-                phase1.phase1_top,
-                base_shrink=float(cfg.local_refine_shrink),
-                plateau_hit=bool(phase1.phase1_plateau_hit),
-            )
+        plan = _build_phase2_center_plan(
+            ci=int(ci),
+            center=dict(center or {}),
+            cfg=cfg,
+            search_base_data=search_base_data,
+            search_state=search_state,
+            seed=int(seed),
+            use_optuna_trials=bool(use_optuna_trials),
+            runtime=runtime,
+            phase1=phase1,
+            filter_key=str(filter_key),
+            winner_target_name=winner_target_name,
         )
-        local_candidates = []
-        local_seed_presets = _build_auto_mode_candidates_local(
-            search_base_data,
-            center,
-            1,
-            int(local_seed),
-            shrink=float(local_shrink),
+        _emit_local_refine_center_status(
+            status_cb=status_cb,
+            ci=int(ci),
+            local_detail=plan.local_detail,
         )
-        if not bool(use_optuna_trials):
-            local_candidates = _build_auto_mode_candidates_local(
-                search_base_data,
-                center,
-                int(cfg.local_refine_trials_per_top),
-                int(local_seed),
-                shrink=float(local_shrink),
-            )
         before = dict(search_state.best_metrics or {})
-        local_optuna_base_data = _build_refine_optuna_base_data(search_base_data, search_state)
-        local_total = int(cfg.local_refine_trials_per_top)
-        if bool(use_optuna_trials):
-            local_total = int(
-                max(
-                    int(local_total),
-                    int(len(local_seed_presets or []))
-                    + int(max(1, getattr(cfg, "optuna_startup_local", 4)))
-                    + 3,
-                )
-            )
         stats = run_candidate_phase(
             phase1.ctx,
-            local_candidates,
+            plan.local_candidates,
             phase_label=f"phase 2/2 local center#{ci}",
             phase_kind="local",
             plateau_after_no_improve=0,
             use_refine_tiebreak=True,
             focus_lo_hz=float(phase2.phase2_focus_lo) if np.isfinite(phase2.phase2_focus_lo) else None,
             focus_hi_hz=float(phase2.phase2_focus_hi) if np.isfinite(phase2.phase2_focus_hi) else None,
-            n_total_override=int(local_total),
-            seed_presets=list(local_seed_presets or []),
+            n_total_override=int(plan.local_total),
+            seed_presets=list(plan.local_seed_presets or []),
             optuna_builder=(
                 (
                     lambda tr,
                     _base=dict(search_base_data),
-                    _center=dict(center),
-                    _shrink=float(local_shrink): _suggest_auto_mode_candidate_local_optuna(
+                    _center=dict(plan.center),
+                    _shrink=float(plan.local_shrink): _suggest_auto_mode_candidate_local_optuna(
                         _base,
                         _center,
                         tr,
@@ -482,8 +673,8 @@ def _run_search_refine_phase2_local_core(
                 (
                     lambda preset,
                     _base=dict(search_base_data),
-                    _center=dict(center),
-                    _shrink=float(local_shrink): _seed_auto_mode_candidate_local_optuna_params(
+                    _center=dict(plan.center),
+                    _shrink=float(plan.local_shrink): _seed_auto_mode_candidate_local_optuna_params(
                         _base,
                         _center,
                         preset,
@@ -493,60 +684,23 @@ def _run_search_refine_phase2_local_core(
                 if bool(use_optuna_trials)
                 else None
             ),
-            study_scope=runtime.auto_optuna_scope_with_context(
-                f"phase2-local-center-{int(ci)}-u1",
-                center=dict(center or {}),
-                shrink=float(local_shrink),
-                extra={
-                    "filter_key": str(filter_key),
-                    "target": str(winner_target_name or ""),
-                },
-            ),
-            optuna_base_data_override=local_optuna_base_data,
+            study_scope=plan.study_scope,
+            optuna_base_data_override=plan.local_optuna_base_data,
         )
         phase2.phase2_ok += int(stats.get("ok", 0) or 0)
         phase2.phase2_tried += int(stats.get("tried", 0) or 0)
-        local_tel = dict(stats.get("optuna_telemetry", {}) or {})
-        if local_tel:
-            phase2.phase2_local_optuna_tels.append(
-                {
-                    "center_index": int(ci),
-                    "phase_label": f"phase 2/2 local center#{ci}",
-                    "telemetry": dict(local_tel),
-                }
-            )
-        local_tel_txt = runtime.auto_optuna_telemetry_text(local_tel)
-        local_rescue_suffix = ", zero-feasible fallback used" if bool(stats.get("optuna_zero_feasible_fallback_used", False)) else ""
-        local_fallback_txt = runtime.auto_optuna_fallback_summary_text(local_tel) if bool(stats.get("optuna_zero_feasible_fallback_used", False)) else ""
-        local_best_metrics = dict(search_state.best_metrics or {})
-        local_rank_txt = runtime.auto_optuna_fmt_value(official_rank_score(local_best_metrics), 3)
-        local_avg_txt = runtime.auto_optuna_fmt_value(local_best_metrics.get("avg_score"), 3)
-        logger.info(
-            "Automatic mode Local refine summary: center #%d, current_best_rank=%s, avg=%s%s%s",
-            int(ci),
-            str(local_rank_txt),
-            str(local_avg_txt),
-            "" if not local_tel_txt else f", {local_tel_txt}",
-            str(local_rescue_suffix),
+        _append_phase2_optuna_telemetry(
+            phase2=phase2,
+            ci=int(ci),
+            stats=dict(stats or {}),
         )
-        if callable(status_cb):
-            status_cb(
-                "DecayCore automatic mode: Local refine summary "
-                f"center #{int(ci)}, current_best_rank={local_rank_txt}, avg_score={local_avg_txt}"
-                f"{'' if not local_tel_txt else f', {local_tel_txt}'}"
-                f"{local_rescue_suffix}"
-            )
-        if local_fallback_txt:
-            logger.info(
-                "Automatic mode Local refine fallback detail: center #%d, %s",
-                int(ci),
-                str(local_fallback_txt),
-            )
-            if callable(status_cb):
-                status_cb(
-                    "DecayCore automatic mode: Local refine fallback "
-                    f"center #{int(ci)}, {local_fallback_txt}"
-                )
+        _emit_local_refine_summary(
+            runtime=runtime,
+            status_cb=status_cb,
+            ci=int(ci),
+            stats=dict(stats or {}),
+            search_state=search_state,
+        )
         center_improved = bool(stats.get("improved_any", False))
         phase2.phase2_improved_any |= center_improved
         if center_improved:

@@ -132,7 +132,19 @@ class ProgressSink:
     def progress(self, value: float, msg: str = "") -> None:
         try:
             self.progress_value = float(np.clip(float(value), 0.0, 1.0))
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             self.progress_value = 0.0
         if msg:
             self.info(msg)
@@ -169,7 +181,19 @@ class _HeadlessBridge:
         blocked = False
         try:
             blocked = bool(getattr(hr, "blocked", False) or getattr(hr, "should_block", False))
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             blocked = False
         if blocked:
             self.sink.error(f"Health gate blocked {mode} run: {hr}")
@@ -203,7 +227,19 @@ def _git_commit() -> str | None:
         if proc.returncode == 0:
             out = proc.stdout.strip()
             return out or None
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None
     return None
 
@@ -221,14 +257,26 @@ def _headless_winner_rank_score(data: dict | None) -> float:
         auto_meta = dict((data or {}).get("_auto_mode_meta", {}) or {})
         best_metrics = attach_official_rank_score(auto_meta.get("best_metrics", {}))
         return float(official_rank_score(best_metrics))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return float("nan")
 
 
 __all__ = ['ProgressSink', 'ConsoleProgressSink', '_HeadlessCallbacks', '_HeadlessBridge', '_utc_now', '_git_commit', '_safe_filename_token', '_headless_winner_rank_score']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['runner_01', 'runner_02', 'runner_03', 'runner_04']:
@@ -239,4 +287,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

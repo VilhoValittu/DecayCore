@@ -43,6 +43,53 @@ from ._measurement_ctx_local import get_measurement_ctx
 from ..common.measurement_features import estimate_schroeder_hz
 
 
+def _manual_target_bias_db(cfg, stats: dict) -> float:
+    try:
+        lvl_mode_s = str(getattr(cfg, "lvl_mode", "Auto") or "Auto").strip().lower()
+    except (AttributeError, TypeError, ValueError):
+        return 0.0
+    if "manual" not in lvl_mode_s:
+        return 0.0
+    st_shift = stats.get("target_shift_db", None) if isinstance(stats, dict) else None
+    if st_shift is None:
+        st_shift = getattr(cfg, "lvl_manual_db", 0.0)
+    try:
+        manual_bias = float(st_shift or 0.0)
+    except (AttributeError, TypeError, ValueError):
+        manual_bias = 0.0
+    if not np.isfinite(manual_bias):
+        manual_bias = 0.0
+    if isinstance(stats, dict):
+        stats["manual_target_bias_db"] = float(manual_bias)
+    return float(manual_bias)
+
+
+def _correction_band_mask(freq_axis, cfg) -> np.ndarray:
+    try:
+        f = np.asarray(freq_axis, dtype=float).reshape(-1)
+        try:
+            fmin = float(getattr(cfg, "mag_c_min", 20.0) or 20.0)
+            fmax = float(getattr(cfg, "mag_c_max", 200.0) or 200.0)
+        except (AttributeError, TypeError, ValueError):
+            fmin, fmax = 20.0, 200.0
+        return (f >= float(fmin)) & (f <= float(fmax))
+    except (TypeError, ValueError):
+        return np.zeros_like(np.asarray(freq_axis, dtype=float), dtype=bool)
+
+
+def _log_raw_mask_stats(logger, raw_g: np.ndarray, freq_axis: np.ndarray) -> None:
+    try:
+        mask = np.zeros_like(freq_axis, dtype=bool)
+        if not np.any(mask):
+            return
+        dv = raw_g[mask]
+        logger.info(
+            f"RAW_G(mask): max={float(np.max(dv)):.3f} min={float(np.min(dv)):.3f} rms={float(np.sqrt(np.mean(dv*dv))):.3f}"
+        )
+    except (TypeError, ValueError, FloatingPointError, IndexError):
+        return
+
+
 def run_mag_raw_stage(
     inputs: _MagPipelineInputs,
     *,
@@ -90,33 +137,11 @@ def run_mag_raw_stage(
     afdw_base = float(getattr(cfg, "fdw_cycles", 15.0))
     afdw_min = max(3.0, afdw_base / 3.0)
 
-    manual_target_bias_db = 0.0
-    try:
-        lvl_mode_s = str(getattr(cfg, "lvl_mode", "Auto") or "Auto").strip().lower()
-        if "manual" in lvl_mode_s:
-            st_shift = st.get("target_shift_db", None) if isinstance(st, dict) else None
-            if st_shift is None:
-                st_shift = getattr(cfg, "lvl_manual_db", 0.0)
-            manual_target_bias_db = float(st_shift or 0.0)
-            if not np.isfinite(manual_target_bias_db):
-                manual_target_bias_db = 0.0
-            if isinstance(st, dict):
-                st["manual_target_bias_db"] = float(manual_target_bias_db)
-    except (AttributeError, TypeError, ValueError):
-        manual_target_bias_db = 0.0
+    manual_target_bias_db = _manual_target_bias_db(cfg, st)
 
     _m_pre = _smooth_meas_freq_dep(m_anal - calc_offset_db, freq_axis)
     err_db = _compute_error_db(_m_pre, target_mags)
-    try:
-        f = np.asarray(freq_axis, dtype=float).reshape(-1)
-        try:
-            fmin = float(getattr(cfg, "mag_c_min", 20.0) or 20.0)
-            fmax = float(getattr(cfg, "mag_c_max", 200.0) or 200.0)
-        except (AttributeError, TypeError, ValueError):
-            fmin, fmax = 20.0, 200.0
-        mask_c_raw = (f >= float(fmin)) & (f <= float(fmax))
-    except (TypeError, ValueError):
-        mask_c_raw = np.zeros_like(np.asarray(freq_axis, dtype=float), dtype=bool)
+    mask_c_raw = _correction_band_mask(freq_axis, cfg)
 
     err_db = apply_peak_priority_error_shaping(
         err_db,
@@ -127,15 +152,7 @@ def run_mag_raw_stage(
         logger=logger,
     )
     raw_g = _error_to_correction_mag(err_db + float(manual_target_bias_db))
-    try:
-        mm = np.zeros_like(freq_axis, dtype=bool)
-        if np.any(mm):
-            dv = raw_g[mm]
-            logger.info(
-                f"RAW_G(mask): max={float(np.max(dv)):.3f} min={float(np.min(dv)):.3f} rms={float(np.sqrt(np.mean(dv*dv))):.3f}"
-            )
-    except (TypeError, ValueError, FloatingPointError, IndexError):
-        pass
+    _log_raw_mask_stats(logger, raw_g, freq_axis)
     _log_stage_stats("raw_g_pre_confpull", raw_g, np.zeros_like(freq_axis, dtype=bool), logger=logger, enabled=debug_stage_stats)
 
     base_sigma = 60 // (filter_smooth / 12 if filter_smooth > 0 else 1)
@@ -281,7 +298,10 @@ def run_mag_bassfirst_afdw_conf_stage(
                 if _rt60_for_schroeder is None and isinstance(_mctx.measured_rt60_bands, dict):
                     _all_rt60 = [float(v) for v in _mctx.measured_rt60_bands.values() if float(v) > 0.05]
                     _rt60_for_schroeder = float(np.median(_all_rt60)) if _all_rt60 else None
-                _fs_hz = estimate_schroeder_hz(_rt60_for_schroeder)
+                _fs_hz = estimate_schroeder_hz(
+                    _rt60_for_schroeder,
+                    room_volume_m3=float(getattr(cfg, "room_volume_m3", 40.0) or 40.0),
+                )
                 if _fs_hz is not None:
                     if isinstance(st, dict):
                         st["schroeder_hz_estimate"] = float(_fs_hz)

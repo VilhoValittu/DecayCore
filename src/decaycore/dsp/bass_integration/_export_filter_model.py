@@ -23,7 +23,19 @@ _EXPORT_BIQUAD_Q = 0.707107
 def _camilladsp_crossover_order_model(value: int | float | str | None, default: int = 2) -> int:
     try:
         order = int(round(float(value))) if value is not None else int(default)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         order = int(default)
     if order <= 2:
         return 2

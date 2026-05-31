@@ -96,7 +96,19 @@ def parse_measurements_from_upload(
                 logger=logger,
             )
         return parse_txt_bytes(content)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None, None, None
 
 def _try_load_harmonic_sidecar(
@@ -134,7 +146,19 @@ def _try_load_harmonic_sidecar(
         if freq_hz.size == 0 or not mags:
             return None, None
         return freq_hz, mags
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None, None
 
 def _measurement_sidecar_stems(path: str) -> tuple[str, ...]:
@@ -164,7 +188,19 @@ def _try_load_measurement_metadata_sidecar(wav_path: str) -> dict[str, object] |
         with open(metadata_path, "r", encoding="utf-8") as fh:
             payload = json.load(fh)
         return payload if isinstance(payload, dict) else None
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None
 
 def _try_load_rt60_sidecar(wav_path: str) -> tuple[float | None, dict[float, float] | None]:
@@ -219,7 +255,7 @@ def load_measurements_lr(data: dict, *, logger=None):
 __all__ = ['_silent_transfer_like', 'parse_measurements_from_upload', '_try_load_harmonic_sidecar', '_measurement_sidecar_stems', '_measurement_sidecar_candidates', '_try_load_measurement_metadata_sidecar', '_try_load_rt60_sidecar', 'load_measurements_lr']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['measurements_loader_01', 'measurements_loader_02', 'measurements_loader_03']:
@@ -230,4 +266,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

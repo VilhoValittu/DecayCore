@@ -138,7 +138,19 @@ def read_exact_cache_with_reason(
             filter_key=filter_key,
             compat_version=compat_version,
         )
-    except Exception as exc:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
         reason = f"exact cache read failed: {type(exc).__name__}"
         logger.info("Automatic mode search v2: %s", reason, exc_info=True)
         return None, reason
@@ -173,7 +185,19 @@ def read_exact_cache_seed_with_reason(
             filter_key=filter_key,
             compat_version=compat_version,
         )
-    except Exception as exc:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
         reason = f"exact cache seed read failed: {type(exc).__name__}"
         logger.info("Automatic mode search v2: %s", reason, exc_info=True)
         return None, reason
@@ -220,7 +244,19 @@ def read_last_used_best_with_reason(
             filter_key=filter_key,
             compat_version=compat_version,
         )
-    except Exception as exc:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
         reason = f"last-best cache read failed: {type(exc).__name__}"
         logger.info("Automatic mode search v2: %s", reason, exc_info=True)
         return None, reason

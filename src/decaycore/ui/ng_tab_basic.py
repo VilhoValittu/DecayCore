@@ -247,7 +247,19 @@ def _apply_mode_defaults(*, t: Callable, get_val: Callable) -> None:
                 ctrl.set_value(ui_key, v)
 
         toast_mode_defaults_applied(mode)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         import logging
         logging.getLogger("DecayCore").debug("_apply_mode_defaults failed", exc_info=True)
 

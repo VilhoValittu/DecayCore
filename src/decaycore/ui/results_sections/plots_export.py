@@ -180,7 +180,19 @@ def _render_plots_and_export(
                     y_mag_range_db=20.0 if is_sub else None,
                 )
                 fig = result[1] if isinstance(result, tuple) else None
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.debug("Plot generation failed", exc_info=True)
                 fig = None
             if fig is not None:
@@ -249,7 +261,19 @@ def _render_plots_and_export(
                                 title=t("results_combined_channel"),
                                 target_db=l_st_f.get("target_mags"),
                             )
-                        except Exception:
+                        except (
+
+                            AttributeError,
+                            TypeError,
+                            ValueError,
+                            KeyError,
+                            IndexError,
+                            RuntimeError,
+                            OSError,
+                            ImportError,
+                            ModuleNotFoundError,
+                            NameError,
+                        ):
                             logger.debug("Combined plot generation failed", exc_info=True)
                             fig = None
                         if fig is not None:
@@ -267,7 +291,19 @@ def _render_plots_and_export(
                     t("results_download_zip").format(fname=fname),
                     on_click=lambda: ui.download(zip_bytes, filename=fname),
                 ).props('color="primary" unelevated').classes("font-bold")
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.debug("ZIP download button failed", exc_info=True)
 
         if saved_filters_dir:
@@ -277,7 +313,7 @@ def _render_plots_and_export(
 __all__ = ['_render_plots_and_export']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['overview', 'bass_integration', 'quality', 'plots_export']:
@@ -288,4 +324,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

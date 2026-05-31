@@ -87,7 +87,19 @@ def _auto_measurement_metadata_identity(measurements: dict) -> str:
             payload[key] = value
     try:
         h.update(json.dumps(payload, sort_keys=True, default=str, separators=(",", ":")).encode("utf-8", "ignore"))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("measurement metadata payload signature hash update")
         h.update(str(sorted(payload.items())).encode("utf-8", "ignore"))
 
@@ -107,7 +119,19 @@ def _auto_measurement_metadata_identity(measurements: dict) -> str:
                     if arr is not None:
                         h.update(str(order).encode("utf-8", "ignore"))
                         h.update(_auto_hash_array_full(np.asarray(arr, dtype=float)).encode("ascii", "ignore"))
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.exception("measurement harmonic metadata identity hash update")
 
     return h.hexdigest()
@@ -127,7 +151,19 @@ def _auto_get_measurement_signature(measurements: dict) -> str:
         sig = _auto_measurement_signature(measurements)
         try:
             measurements[_MEMO_KEY] = sig
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("measurement signature memo store")
         return sig
 
@@ -158,7 +194,19 @@ def _auto_measurement_signature(measurements: dict) -> str:
         if isinstance(_rt60_summary, dict) and _rt60_summary:
             try:
                 h.update(json.dumps(_rt60_summary, sort_keys=True, default=str).encode("utf-8", "ignore"))
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.exception("rt60 summary signature hash update")
 
     for _rt60_key in ("measured_rt60_bands_l", "measured_rt60_bands_r"):
@@ -174,7 +222,19 @@ def _auto_measurement_signature(measurements: dict) -> str:
                     key=lambda kv: kv[0],
                 )
                 h.update(json.dumps(_rt60_sorted).encode("utf-8", "ignore"))
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.exception("rt60 bands signature hash update")
 
     for _hf_key in ("harmonic_freq_hz_l", "harmonic_freq_hz_r"):
@@ -190,7 +250,19 @@ def _auto_measurement_signature(measurements: dict) -> str:
                     _arr = _hm.get(_order)
                     if _arr is not None:
                         h.update(_auto_hash_array_full(np.asarray(_arr, dtype=float)).encode("ascii", "ignore"))
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.exception("harmonic magnitudes signature hash update")
 
     for _hr_key in ("harmonic_risk_summary_l", "harmonic_risk_summary_r"):
@@ -198,7 +270,19 @@ def _auto_measurement_signature(measurements: dict) -> str:
         if isinstance(_hr, dict) and _hr:
             try:
                 h.update(json.dumps(_hr, sort_keys=True, default=str).encode("utf-8", "ignore"))
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.exception("harmonic risk summary signature hash update")
 
     if bool(measurements.get("bass_integration_enabled", False)):
@@ -233,7 +317,19 @@ def _auto_measurement_signature(measurements: dict) -> str:
                     sort_keys=True,
                 ).encode("utf-8", "ignore")
             )
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("bass integration signature hash update")
     return h.hexdigest()
 

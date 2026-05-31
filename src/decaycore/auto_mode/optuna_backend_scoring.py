@@ -287,7 +287,19 @@ def _auto_optuna_build_run_telemetry(
             if hasattr(study, "get_trials")
             else getattr(study, "trials", [])
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         trials = []
     _auto_optuna_note_trial_scan(len(trials))
 
@@ -295,7 +307,19 @@ def _auto_optuna_build_run_telemetry(
     for tr in list(trials or []):
         try:
             user_attrs = dict(getattr(tr, "user_attrs", {}) or {})
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             user_attrs = {}
         out = dict(user_attrs.get(AUTO_MODE_OPTUNA_USER_ATTR_OUT, {}) or {})
         opt_meta = dict(out.get("optuna", {}) or {})
@@ -387,7 +411,19 @@ def _auto_optuna_build_run_telemetry(
             "max_mode_ripple_db": float(thr["max_mode_ripple_db"]),
             "max_net_boost_db": float(thr["max_net_boost_db"]),
         }
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         constraint_thresholds = {}
 
     return {

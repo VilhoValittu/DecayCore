@@ -237,7 +237,7 @@ def _return_cached_result(
 __all__ = ['_materialize_cached_result', '_return_cached_result']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['orchestrator_finalize_cache_01', 'orchestrator_finalize_cache_02', 'orchestrator_finalize_cache_03']:
@@ -248,4 +248,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

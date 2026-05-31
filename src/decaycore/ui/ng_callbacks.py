@@ -69,7 +69,19 @@ def _register_target_callbacks(*, t: Callable) -> None:
             return
         try:
             upload_col.set_visibility(str(v or "").strip().lower() == "upload")
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.debug("hc custom upload visibility update failed", exc_info=True)
 
     _preview_fields = [
@@ -312,7 +324,19 @@ def _initial_state_sync(*, t: Callable, get_val: Callable) -> None:
         update_xo_ui()
         update_advanced_guidance_ui(t=t)
         _update_target_preview()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.warning("_initial_state_sync failed — UI may show incorrect initial state", exc_info=True)
 
 
@@ -326,7 +350,19 @@ def _update_target_preview() -> None:
         from .ng_tab_target import refresh_target_preview  # noqa: PLC0415
 
         refresh_target_preview()
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("target preview refresh")
 
 
@@ -348,7 +384,19 @@ def _sync_bass_integration_visibility() -> None:
             continue
         try:
             scope.set_visibility(bool(visible))
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.debug("bass integration visibility update failed: %s", scope_name, exc_info=True)
     ctrl.set_enabled("sub_crossover_hz", False)
     ctrl.set_enabled("sub_crossover_slope", False)

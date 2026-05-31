@@ -227,7 +227,19 @@ def compute_broad_residual_peak_metrics(
             ),
             dtype=float,
         ).reshape(-1)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         detect = np.asarray(err_use, dtype=float)
     if detect.size != err_use.size:
         detect = np.asarray(err_use, dtype=float)
@@ -241,7 +253,19 @@ def compute_broad_residual_peak_metrics(
             ),
             dtype=float,
         ).reshape(-1)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         baseline = np.full_like(err_use, float(np.nanmedian(err_use)))
     if baseline.size != err_use.size:
         baseline = np.full_like(err_use, float(np.nanmedian(err_use)))

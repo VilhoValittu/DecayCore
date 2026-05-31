@@ -24,7 +24,7 @@ import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    # _section is loaded at runtime by _load_sibling_symbols() from overview.py.
+    # _section is loaded at runtime by _link_sibling_exports() from overview.py.
     # This import is only for static analysis; it is never executed at runtime.
     from .overview import _section  # noqa: F401
 
@@ -78,7 +78,19 @@ def _render_ir_alignment(*, l_st_f: dict) -> None:
             x = float(v)
             if math.isfinite(x):
                 return f"{x:+.2f} ms"
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("ir align ms format")
         return "-"
 
@@ -87,7 +99,19 @@ def _render_ir_alignment(*, l_st_f: dict) -> None:
             x = float(v)
             if math.isfinite(x):
                 return f"{x:+.1f} dB"
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("ir align dB format")
         return "-"
 
@@ -96,7 +120,19 @@ def _render_ir_alignment(*, l_st_f: dict) -> None:
             x = float(v)
             if math.isfinite(x):
                 return f"{x:+.1f}°"
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("ir align deg format")
         return "-"
 
@@ -105,7 +141,19 @@ def _render_ir_alignment(*, l_st_f: dict) -> None:
             x = float(v)
             if math.isfinite(x):
                 return f"{x * 100.0:.0f}%"
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("ir align pct format")
         return "-"
 
@@ -114,7 +162,19 @@ def _render_ir_alignment(*, l_st_f: dict) -> None:
             x = float(v)
             if math.isfinite(x):
                 return f"{x:.1f} dBFS"
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("ir align dBFS format")
         return "-"
 
@@ -310,7 +370,19 @@ def _render_lr_difference(*, l_st_f: dict, r_st_f: dict) -> None:
             rows,
             summary_lines=["Computed from measured left-right response data. Lower = more symmetric."],
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.debug("_render_lr_difference failed", exc_info=True)
 
 
@@ -379,7 +451,7 @@ __all__ = ['_render_ir_alignment', '_render_dsp_quality', '_render_lr_difference
            '_render_hybrid_iir_cuts', '_fmt_biquad', '_rejected_reasons']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['overview', 'bass_integration', 'quality', 'plots_export']:
@@ -390,4 +462,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

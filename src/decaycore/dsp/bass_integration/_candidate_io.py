@@ -34,7 +34,19 @@ def _data_get(data: dict | None, cfg: Any | None, key: str, default: Any) -> Any
 def _order_from_slope(value: Any, default_order: int) -> int:
     try:
         return max(1, int(round(float(value) / 6.0)))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return int(default_order)
 
 

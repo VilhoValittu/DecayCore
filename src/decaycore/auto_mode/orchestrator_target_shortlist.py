@@ -520,7 +520,19 @@ def _evaluate_target_shortlist_core(
                 improved = False
                 try:
                     item = future.result()
-                except Exception as exc:
+                except (
+
+                    AttributeError,
+                    TypeError,
+                    ValueError,
+                    KeyError,
+                    IndexError,
+                    RuntimeError,
+                    OSError,
+                    ImportError,
+                    ModuleNotFoundError,
+                    NameError,
+                ) as exc:
                     logger.warning(
                         "Automatic mode target curve failed: target=%s (%s)",
                         str(hc_name),

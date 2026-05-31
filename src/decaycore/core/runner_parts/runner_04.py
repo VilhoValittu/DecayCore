@@ -213,7 +213,7 @@ def prepare_headless_config(config_path: Path, output_dir: Path, *, no_plots: bo
 __all__ = ['_copy_export_artifacts', 'run_batch', 'prepare_headless_config']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['runner_01', 'runner_02', 'runner_03', 'runner_04']:
@@ -224,4 +224,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

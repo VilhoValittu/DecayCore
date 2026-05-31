@@ -238,7 +238,19 @@ def _save_final_search_cache(
             canonical_signature=canonical_signature,
         )
         logger.info("Automatic mode: saved best preset to cache.")
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         # Cache persistence must not change the selected winner when the cache backend misbehaves.
         pass
 
@@ -284,7 +296,19 @@ def _save_final_search_cache(
                 "Automatic mode: saved best preset to cache under post-polish HPF "
                 f"({orig_hpf_freq:.1f} -> {polished_hpf_freq:.1f} Hz)."
             )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         pass
 
 

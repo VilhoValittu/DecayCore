@@ -187,13 +187,37 @@ def _prepare_target_curve_and_run_context(
                 )
         try:
             _current_main_hpf = float(data.get("sub_crossover_hz", 80.0) or 80.0)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             _current_main_hpf = 80.0
         if not math.isfinite(_current_main_hpf) or _current_main_hpf <= 0.0:
             _current_main_hpf = 80.0
         try:
             _current_sub_lpf = float(data.get("direct_dac_sub_lpf_hz", _current_main_hpf) or _current_main_hpf)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             _current_sub_lpf = _current_main_hpf
         if not math.isfinite(_current_sub_lpf) or _current_sub_lpf <= 0.0:
             _current_sub_lpf = _current_main_hpf
@@ -233,7 +257,19 @@ def _prepare_target_curve_and_run_context(
             _cache_hits = object.__getattribute__(bundle, "_camillafir_metrics_cache_hits") if bundle is not None else 0
             _cache_misses = object.__getattribute__(bundle, "_camillafir_metrics_cache_misses") if bundle is not None else 0
             _cache_str = f", cache hits {_cache_hits}, misses {_cache_misses}"
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             _cache_str = ""
         _align_str = "alignment applied" if bool(data.get("bass_integration_alignment_auto_applied", False)) else "alignment skipped"
         _xo_val = float(data.get("avr_crossover_hz", 0.0) or 0.0)
@@ -260,7 +296,19 @@ def _prepare_target_curve_and_run_context(
                 f"HC: n={len(hc_f)} f=[{hc_f[0]:.2f}..{hc_f[-1]:.2f}] "
                 f"m=[{float(np.min(hc_m)):.2f}..{float(np.max(hc_m)):.2f}] mean={float(np.mean(hc_m)):.2f}"
             )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("house curve info log")
     xos, hpf = build_xos_hpf(data)
     try:
@@ -280,7 +328,19 @@ def _prepare_target_curve_and_run_context(
             logger.info(f"HPF (UI->CFG): {hf:.1f}Hz/{int(ho * 6)}dB/oct")
         else:
             logger.info("HPF (UI->CFG): off")
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         logger.exception("XO/HPF info log")
     log_df_smoothing_toggle(data, logger)
 
@@ -485,7 +545,7 @@ def _prepare_target_curve_and_run_context(
 __all__ = ['_prepare_target_curve_and_run_context']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['bass_diagnostics', 'measurements', 'target_context']:
@@ -496,4 +556,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

@@ -33,6 +33,43 @@ from ..ui_i18n import layout_legacy_name
 logger = logging.getLogger("DecayCore")
 
 _PROGRAM_NAME = "DecayCore"
+_RECOVERABLE_JSON_SAFE_EXCEPTIONS = (
+    TypeError,
+    ValueError,
+    AttributeError,
+    KeyError,
+    IndexError,
+    OverflowError,
+    ImportError,
+    ModuleNotFoundError,
+    RecursionError,
+)
+
+
+def _json_safe_numpy(obj):
+    try:
+        import numpy as _np
+    except _RECOVERABLE_JSON_SAFE_EXCEPTIONS:
+        return None
+    try:
+        if isinstance(obj, _np.generic):
+            return obj.item()
+        if isinstance(obj, _np.ndarray):
+            return obj.tolist()
+    except _RECOVERABLE_JSON_SAFE_EXCEPTIONS:
+        logger.exception("numpy json conversion")
+    return None
+
+
+def _json_safe_dict(obj, *, depth: int, max_depth: int):
+    out = {}
+    for key, value in obj.items():
+        try:
+            key_str = str(key)
+        except _RECOVERABLE_JSON_SAFE_EXCEPTIONS:
+            key_str = "key"
+        out[key_str] = _json_safe(value, _depth=depth + 1, _max_depth=max_depth)
+    return out
 
 
 def _json_safe(obj, *, _depth=0, _max_depth=12):
@@ -41,32 +78,20 @@ def _json_safe(obj, *, _depth=0, _max_depth=12):
             return str(obj)
         if obj is None or isinstance(obj, (str, bool, int, float)):
             return obj
-        try:
-            import numpy as _np
-            if isinstance(obj, _np.generic):
-                return obj.item()
-            if isinstance(obj, _np.ndarray):
-                return obj.tolist()
-        except Exception:
-            logger.exception("numpy json conversion")
+        numpy_value = _json_safe_numpy(obj)
+        if numpy_value is not None:
+            return numpy_value
         if isinstance(obj, dict):
-            out = {}
-            for k, v in obj.items():
-                try:
-                    ks = str(k)
-                except Exception:
-                    ks = "key"
-                out[ks] = _json_safe(v, _depth=_depth + 1, _max_depth=_max_depth)
-            return out
+            return _json_safe_dict(obj, depth=_depth, max_depth=_max_depth)
         if isinstance(obj, (list, tuple)):
             return [_json_safe(v, _depth=_depth + 1, _max_depth=_max_depth) for v in obj]
         if isinstance(obj, (bytes, bytearray)):
             try:
                 return obj.decode("utf-8", errors="replace")
-            except Exception:
+            except _RECOVERABLE_JSON_SAFE_EXCEPTIONS:
                 return str(obj)
         return str(obj)
-    except Exception:
+    except _RECOVERABLE_JSON_SAFE_EXCEPTIONS:
         return str(obj)
 
 
@@ -82,7 +107,7 @@ def _build_diagnostics_dict(data, fs_v, l_st, r_st):
                 win = [float(win[0]), float(win[1])]
             else:
                 win = None
-        except Exception:
+        except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
             win = None
         return {
             "method": st.get("offset_method", None),
@@ -124,7 +149,7 @@ def _export_version_tag(data: dict | None, *, program_version: str | None = None
     if raw_version is None:
         try:
             raw_version = str((data or {}).get("program_version", "") or "").strip()
-        except Exception:
+        except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
             raw_version = ""
     return str(program_version_token(raw_version, default="v0"))
 
@@ -132,7 +157,7 @@ def _export_version_tag(data: dict | None, *, program_version: str | None = None
 def _export_winner_rank_score(data: dict | None) -> float:
     try:
         auto_used = bool((data or {}).get("camillafir_automatic_mode", False))
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
         auto_used = False
     if not auto_used:
         return float("nan")
@@ -140,7 +165,7 @@ def _export_winner_rank_score(data: dict | None) -> float:
     try:
         auto_meta = dict((data or {}).get("_auto_mode_meta", {}) or {})
         best_metrics = attach_official_rank_score(auto_meta.get("best_metrics", {}))
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
         return float("nan")
 
     return float(official_rank_score(best_metrics))
@@ -214,26 +239,26 @@ def _direct_dac_yaml_export_settings(data: dict | None, *, include_sub: bool) ->
     settings["include_sub"] = True
     try:
         sub_delay_ms = float((data or {}).get("bass_integration_sub_delay_ms", 0.0) or 0.0)
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
         sub_delay_ms = 0.0
     try:
         sub_gain_trim_db = float((data or {}).get("bass_integration_sub_gain_trim_db", 0.0) or 0.0)
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
         sub_gain_trim_db = 0.0
     settings["sub_delay_ms"] = float(sub_delay_ms if math.isfinite(sub_delay_ms) else 0.0)
     settings["sub_polarity_invert"] = bool((data or {}).get("bass_integration_sub_polarity_invert", False))
     settings["sub_gain_trim_db"] = float(sub_gain_trim_db if math.isfinite(sub_gain_trim_db) else 0.0)
     try:
         main_hpf_hz = float((data or {}).get("sub_crossover_hz", (data or {}).get("avr_crossover_hz", 80.0)) or 80.0)
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
         main_hpf_hz = 80.0
     try:
         sub_hpf_hz = float((data or {}).get("sub_hpf_freq", 20.0) or 20.0)
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
         sub_hpf_hz = 20.0
     try:
         sub_lpf_hz = float((data or {}).get("direct_dac_sub_lpf_hz", main_hpf_hz + 20.0) or main_hpf_hz + 20.0)
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
         sub_lpf_hz = main_hpf_hz + 20.0
     if not math.isfinite(main_hpf_hz) or main_hpf_hz <= 0.0:
         main_hpf_hz = 80.0
@@ -246,11 +271,11 @@ def _direct_dac_yaml_export_settings(data: dict | None, *, include_sub: bool) ->
     settings["sub_lpf_hz"] = float(max(main_hpf_hz, sub_lpf_hz))
     try:
         xo_order = int(round(float((data or {}).get("sub_crossover_slope", 12) or 12) / 6.0))
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
         xo_order = 2
     try:
         sub_hpf_order = int(round(float((data or {}).get("sub_hpf_slope", 12) or 12) / 6.0))
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
         sub_hpf_order = 2
     settings["main_hpf_order"] = int(xo_order)
     settings["sub_lpf_order"] = int(xo_order)
@@ -260,11 +285,11 @@ def _direct_dac_yaml_export_settings(data: dict | None, *, include_sub: bool) ->
 
     try:
         freq_hz = float((data or {}).get("bass_integration_allpass_freq_hz", 0.0) or 0.0)
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
         freq_hz = float("nan")
     try:
         q = float((data or {}).get("bass_integration_allpass_q", 0.707) or 0.707)
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
         q = float("nan")
 
     if math.isfinite(freq_hz) and math.isfinite(q) and freq_hz > 0.0 and q > 0.0:
@@ -277,7 +302,7 @@ def _hybrid_iir_biquads_from_result(result: Any, side: str) -> list[dict]:
     st_name = "l_st" if str(side).lower().startswith("l") else "r_st"
     try:
         st = dict(getattr(result, st_name, {}) or {})
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
         st = {}
     return [dict(item) for item in list(st.get("hybrid_iir_biquads", []) or []) if isinstance(item, dict)]
 
@@ -298,7 +323,7 @@ def _build_summary_text(
         hc_src = str(data.get("hc_source", "") or "").strip()
         if hc_src:
             summary_content = f"House curve: {hc_src}\n" + summary_content
-    except Exception:
+    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
         logger.exception("house curve summary prefix")
     summary_content = _append_dsp_effective_params(summary_content, data, fs_v)
     summary_content = _append_realized_phase_limit(summary_content, data, l_st, r_st)
@@ -312,7 +337,7 @@ def _build_summary_text(
             summary_content += "\n\n--- DIAGNOSTICS_JSON_BEGIN ---\n"
             summary_content += json.dumps(_json_safe(diag), indent=2)
             summary_content += "\n--- DIAGNOSTICS_JSON_END ---\n"
-        except Exception as e:
+        except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError) as e:
             summary_content += "\n\n--- DIAGNOSTICS_JSON_BEGIN ---\n"
             summary_content += json.dumps(
                 {

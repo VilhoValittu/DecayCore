@@ -59,7 +59,19 @@ def parse_measurements_from_bytes(file_content):
 
         return np.array(freqs), np.array(mags), np.array(phases)
 
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None, None, None
 
 
@@ -85,7 +97,19 @@ def parse_measurements_from_path(path, *, logger=None):
 
         return parse_measurements_from_bytes(content)
 
-    except Exception as e:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as e:
         if logger:
             logger.error(f"Kriittinen virhe polun luvussa ({path}): {e}")
         return None, None, None

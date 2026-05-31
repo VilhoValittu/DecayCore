@@ -153,7 +153,19 @@ def compute_filter_similarity_metric(
             all=float(iacc_all),
             tau_ms=float(tau_ms),
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return _IACC_NAN
 
 

@@ -172,7 +172,19 @@ def _auto_optuna_constraint_thresholds(base_data: dict | None, scope: str | None
 def _auto_optuna_trial_out_payload(trial) -> dict:
     try:
         user_attrs = dict(getattr(trial, "user_attrs", {}) or {})
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         user_attrs = {}
     out = user_attrs.get(AUTO_MODE_OPTUNA_USER_ATTR_OUT, {})
     if isinstance(out, dict):

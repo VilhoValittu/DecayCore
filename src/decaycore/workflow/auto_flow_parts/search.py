@@ -177,7 +177,19 @@ def _run_auto_mode_search_if_needed(
                         data,
                         measurements=measurements,
                     )
-                except Exception as _upd_exc:
+                except (
+
+                    AttributeError,
+                    TypeError,
+                    ValueError,
+                    KeyError,
+                    IndexError,
+                    RuntimeError,
+                    OSError,
+                    ImportError,
+                    ModuleNotFoundError,
+                    NameError,
+                ) as _upd_exc:
                     logger.warning(f"Filter priors update skipped: {type(_upd_exc).__name__}: {_upd_exc}")
             reported_best_auto_exc_hz = _auto_safe_float(
                 auto_res.get(
@@ -312,7 +324,19 @@ def _run_auto_mode_search_if_needed(
         else:
             logger.warning("Automatic mode could not produce a valid best preset; using current settings.")
         _set_auto_progress(ctx, support=support, value=_AUTO_PROGRESS_FINALIZE)
-    except Exception as exc:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
         logger.exception("Automatic mode failed: %s: %s", type(exc).__name__, exc)
         auto_status(f"Automatic mode failed: {type(exc).__name__}: {exc}")
         _set_auto_progress(ctx, support=support, value=_AUTO_PROGRESS_FINALIZE)
@@ -321,7 +345,7 @@ def _run_auto_mode_search_if_needed(
 __all__ = ['_run_auto_mode_search_if_needed']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['progress', 'status_text', 'seed_phases', 'search']:
@@ -332,4 +356,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

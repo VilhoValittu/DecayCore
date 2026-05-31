@@ -299,45 +299,53 @@ def _auto_adaptive_shrink_factor(
         return float(base_shrink)
     base = float(np.clip(_auto_safe_float(base_shrink, 0.35), 0.05, 1.0))
     if not isinstance(phase1_top, list) or len(phase1_top) < 2:
-        if bool(plateau_hit):
-            return float(np.clip(base * 0.85, AUTO_MODE_ADAPTIVE_SHRINK_MIN, AUTO_MODE_ADAPTIVE_SHRINK_MAX))
-        return float(np.clip(base, AUTO_MODE_ADAPTIVE_SHRINK_MIN, AUTO_MODE_ADAPTIVE_SHRINK_MAX))
-
-    mixed = []
-    tdc = []
-    fdw = []
-    reg = []
-    for it in phase1_top[:4]:
-        p = dict((it or {}).get("preset", {}) or {})
-        mixed.append(_auto_safe_float(p.get("mixed_freq", float("nan")), float("nan")))
-        tdc.append(_auto_safe_float(p.get("tdc_strength", float("nan")), float("nan")))
-        fdw.append(_auto_safe_float(p.get("fdw_cycles", float("nan")), float("nan")))
-        reg.append(_auto_safe_float(p.get("reg_strength", float("nan")), float("nan")))
-
-    def _spread(vals: list[float]) -> float:
-        vv = [float(v) for v in vals if np.isfinite(v)]
-        if len(vv) < 2:
-            return 0.0
-        vv = sorted(vv)
-        return float(vv[-1] - vv[0])
-
-    spread_score = 0.0
-    spread_score += _spread(mixed) / 80.0
-    spread_score += _spread(tdc) / 15.0
-    spread_score += _spread(fdw) / 3.0
-    spread_score += _spread(reg) / 20.0
-    if spread_score <= 0.35:
-        mul = 0.75
-    elif spread_score <= 0.70:
-        mul = 0.85
-    elif spread_score <= 1.10:
-        mul = 0.95
-    else:
-        mul = 1.05
+        return _auto_clip_adaptive_shrink(base * (0.85 if bool(plateau_hit) else 1.0))
+    spread_score = _auto_adaptive_spread_score(phase1_top)
+    mul = _auto_adaptive_shrink_multiplier(spread_score)
     if bool(plateau_hit):
         mul *= 0.90
-    out = float(base * mul)
-    return float(np.clip(out, AUTO_MODE_ADAPTIVE_SHRINK_MIN, AUTO_MODE_ADAPTIVE_SHRINK_MAX))
+    return _auto_clip_adaptive_shrink(float(base * mul))
+
+
+def _auto_clip_adaptive_shrink(value: float) -> float:
+    return float(np.clip(float(value), AUTO_MODE_ADAPTIVE_SHRINK_MIN, AUTO_MODE_ADAPTIVE_SHRINK_MAX))
+
+
+def _auto_adaptive_spread_score(phase1_top: list[dict]) -> float:
+    mixed: list[float] = []
+    tdc: list[float] = []
+    fdw: list[float] = []
+    reg: list[float] = []
+    for item in phase1_top[:4]:
+        preset = dict((item or {}).get("preset", {}) or {})
+        mixed.append(_auto_safe_float(preset.get("mixed_freq", float("nan")), float("nan")))
+        tdc.append(_auto_safe_float(preset.get("tdc_strength", float("nan")), float("nan")))
+        fdw.append(_auto_safe_float(preset.get("fdw_cycles", float("nan")), float("nan")))
+        reg.append(_auto_safe_float(preset.get("reg_strength", float("nan")), float("nan")))
+    return float(
+        (_auto_spread(mixed) / 80.0)
+        + (_auto_spread(tdc) / 15.0)
+        + (_auto_spread(fdw) / 3.0)
+        + (_auto_spread(reg) / 20.0)
+    )
+
+
+def _auto_spread(values: list[float]) -> float:
+    finite_values = [float(v) for v in values if np.isfinite(v)]
+    if len(finite_values) < 2:
+        return 0.0
+    finite_values = sorted(finite_values)
+    return float(finite_values[-1] - finite_values[0])
+
+
+def _auto_adaptive_shrink_multiplier(spread_score: float) -> float:
+    if spread_score <= 0.35:
+        return 0.75
+    if spread_score <= 0.70:
+        return 0.85
+    if spread_score <= 1.10:
+        return 0.95
+    return 1.05
 
 
 

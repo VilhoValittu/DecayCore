@@ -41,7 +41,19 @@ def _append_acoustic_events(summary_content, l_st, r_st):
                 dist = float(rev.get("dist", 0) or 0)
                 try:
                     et = ev_type.strip().lower()
-                except Exception:
+                except (
+
+                    AttributeError,
+                    TypeError,
+                    ValueError,
+                    KeyError,
+                    IndexError,
+                    RuntimeError,
+                    OSError,
+                    ImportError,
+                    ModuleNotFoundError,
+                    NameError,
+                ):
                     et = ""
                 if "reson" in et:
                     summary_content += f"{freq:<10} {ev_type:<12} {gd_error:<12} {'n/a':<14}\n"
@@ -273,7 +285,19 @@ def _append_lr_difference_summary(summary_content: str, l_st: dict, r_st: dict) 
             "Computed from measured/analyzed left-right response data. "
             "Lower values indicate more symmetric channel behavior.\n"
         )
-    except Exception as exc:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
         logger.debug("_append_lr_difference_summary failed: %s", exc, exc_info=True)
     return summary_content
 
@@ -281,7 +305,7 @@ def _append_lr_difference_summary(summary_content: str, l_st: dict, r_st: dict) 
 __all__ = ['_append_acoustic_events', '_append_lr_difference_summary']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['runtime', 'bass_integration', 'stereo_policy', 'dsp_effective', 'events']:
@@ -292,4 +316,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

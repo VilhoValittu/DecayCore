@@ -213,7 +213,7 @@ def _override_candidates(search_state) -> list[dict]:
 __all__ = ['_fmt_status_metric', '_build_phase2_pareto_status', '_build_modal_intelligence_debug', '_stereo_refine_materialize_base_data', '_public_stereo_policy_refine_meta', '_cache_refine_winner_phase_label', '_cache_refine_winner_summary', '_override_candidates']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['orchestrator_finalize_cache_01', 'orchestrator_finalize_cache_02', 'orchestrator_finalize_cache_03']:
@@ -224,4 +224,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

@@ -44,7 +44,19 @@ def build_measurement_session_dialog(
     def _safe_int(value: Any, default: int, *, minimum: int = 1, maximum: int | None = None) -> int:
         try:
             parsed = int(round(float(value)))
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             parsed = int(default)
         parsed = max(int(minimum), parsed)
         if maximum is not None:
@@ -54,11 +66,35 @@ def build_measurement_session_dialog(
     def _set_html_content(element, content: str) -> None:
         try:
             element.set_content(content)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             try:
                 element.content = content
                 element.update()
-            except Exception:
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
                 logger.exception("html element content set")
 
     def _role_label(role: str) -> str:
@@ -174,17 +210,31 @@ def build_measurement_session_dialog(
                     lines.append(f"<div>{escape(str(item))}</div>")
         return "".join(lines)
 
-    def _event_to_log_line(event: dict[str, Any]) -> str:
-        stage = str(event.get("stage", "") or "")
+    def _event_progress_values(event: dict[str, Any]) -> tuple[int, int, str]:
         position_index = int(event.get("position_index", 0) or 0)
         position_count = int(event.get("position_count", state.position_count) or 0)
         role = _role_label(str(event.get("role", "") or ""))
+        return position_index, position_count, role
+
+    def _event_to_log_line(event: dict[str, Any]) -> str:
+        stage = str(event.get("stage", "") or "")
+        position_index, position_count, role = _event_progress_values(event)
+        fixed_messages = {
+            "saving_session": "Saving measurement session to disk...",
+            "session_complete": "Measurement session complete.",
+        }
+        if stage in fixed_messages:
+            return fixed_messages[stage]
+        if stage == "session_error":
+            return str(event.get("error_text", "") or "Measurement session failed.")
+        if stage == "building_final_average":
+            return f"Building final spatial average - {role}"
+        if stage == "analyzing_repeats":
+            return f"Position {position_index}/{position_count} - {role} - analyzing repeats"
         if stage == "capture_take":
             take_index = int(event.get("take_index", 0) or 0)
             repeats = int(event.get("repeats_per_channel", state.repeats_per_channel) or 0)
             return f"Position {position_index}/{position_count} - {role} - Take {take_index}/{repeats}"
-        if stage == "analyzing_repeats":
-            return f"Position {position_index}/{position_count} - {role} - analyzing repeats"
         if stage == "position_ready":
             kept = int(event.get("take_count_used", 0) or 0)
             total = int(event.get("take_count_total", 0) or 0)
@@ -198,14 +248,6 @@ def build_measurement_session_dialog(
         if stage == "switch_subwoofer":
             next_role = _role_label(str(event.get("next_role", event.get("role", "sub2")) or "sub2"))
             return f"Position {position_index}/{position_count} - switch system to {next_role}"
-        if stage == "building_final_average":
-            return f"Building final spatial average - {role}"
-        if stage == "saving_session":
-            return "Saving measurement session to disk..."
-        if stage == "session_complete":
-            return "Measurement session complete."
-        if stage == "session_error":
-            return str(event.get("error_text", "") or "Measurement session failed.")
         return stage.replace("_", " ").strip().title() or "Measurement event"
 
     def _reset_state() -> None:
@@ -242,7 +284,19 @@ def build_measurement_session_dialog(
         primary_value = _safe_int(primary_input.value, 1, minimum=1, maximum=max_primary)
         try:
             raw_primary = int(round(float(primary_input.value)))
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             raw_primary = primary_value
         if primary_value != raw_primary:
             primary_input.set_value(primary_value)
@@ -259,7 +313,19 @@ def build_measurement_session_dialog(
             progress_value = min(1.0, max(0.0, float(state.completed_steps) / float(state.total_steps)))
         try:
             progress_bar.set_value(progress_value)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             progress_bar.value = progress_value
             progress_bar.update()
         log_label.set_text("\n".join(state.event_log[-12:]) if state.event_log else "No events yet.")
@@ -453,7 +519,19 @@ def build_measurement_session_dialog(
                 outlier_rejection_enabled=bool(outlier_checkbox.value),
                 outlier_strictness=str(strictness_select.value or "normal"),
             )
-        except Exception as exc:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ) as exc:
             state.phase = "summary"
             state.is_running = False
             state.error_text = str(exc)
@@ -627,7 +705,7 @@ def build_measurement_session_dialog(
 __all__ = ['_format_session_progress_percent', 'build_measurement_session_dialog']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['measurement_session_dialog_01']:
@@ -638,4 +716,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

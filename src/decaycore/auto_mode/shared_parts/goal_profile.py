@@ -89,7 +89,19 @@ def _auto_metric_text(metrics: dict | None, goal: str) -> str:
 def _m(metrics: dict | None, key: str, default=float("nan")) -> float:
     try:
         v = float((metrics or {}).get(key, default))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         v = float(default)
     return float(v)
 
@@ -97,7 +109,7 @@ def _m(metrics: dict | None, key: str, default=float("nan")) -> float:
 __all__ = ['_auto_goal_norm', '_auto_bass_integration_profile_norm', '_auto_bass_integration_profile_weights', '_auto_goal_forced_level_window', '_auto_builtin_target_name', '_auto_goal', '_auto_goal_basis_text', '_auto_metric_text', '_m']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['cache_hash', 'goal_profile', 'safe_values', 'backend', 'config', 'phase_sampling']:
@@ -108,4 +120,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

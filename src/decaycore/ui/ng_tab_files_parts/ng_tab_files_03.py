@@ -334,7 +334,19 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:
             from ..ng_tab_target import refresh_target_preview  # noqa: PLC0415
 
             refresh_target_preview()
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("target preview refresh from files tab")
 
     def _render_measurement_slots(upload_key: str) -> None:
@@ -358,14 +370,38 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:
     def _set_input_value(input_control: Any, value: Any) -> None:
         try:
             input_control.set_value(value)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             input_control.value = value
             input_control.update()
 
     def _set_options(control: Any, options: dict[str, str]) -> None:
         try:
             control.set_options(options)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             control.options = options
             control.update()
 
@@ -777,7 +813,7 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:
 __all__ = ['_score_measurement_tokens', '_score_measurement_candidate', '_scan_measurement_library', '_build_measurement_library_options', '_entry_passes_slot_filter', '_build_slot_options', '_suggest_measurement_library_matches', 'build_files_tab']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['ng_tab_files_01', 'ng_tab_files_02', 'ng_tab_files_03']:
@@ -788,4 +824,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

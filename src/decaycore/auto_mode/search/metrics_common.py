@@ -65,7 +65,19 @@ def _auto_stats_pick_arr(st: dict | None, base_key: str, *fallback_keys: str, _m
             if _max_n is not None and raw is not None:
                 raw = raw[:_max_n]
             arr = np.asarray(raw, dtype=float).reshape(-1)
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             arr = np.asarray([], dtype=float)
         if arr.size:
             return np.asarray(arr, dtype=float)
@@ -91,7 +103,19 @@ def _auto_stats_band_n(st: dict | None, hi_guard: float, key: str = "freq_axis")
         else:
             n = bisect.bisect_right(raw, hi_guard)
         return n if n >= 8 else None
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None
 
 
@@ -177,7 +201,19 @@ def _ai_score_with_fallback(st: dict, ai: dict, *, scoring_range) -> float:
             calc_acoustic_score(conf, float(match_fb), rt60_s=rt60, rt60_rel=rt_rel),
             0.0,
         )
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return 0.0
 
 

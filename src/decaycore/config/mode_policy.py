@@ -20,7 +20,19 @@ logger = logging.getLogger("DecayCore")
 def _clamp_float(v, lo: float, hi: float) -> float:
     try:
         x = float(v)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return float(lo)
     if x < lo:
         return float(lo)
@@ -53,7 +65,19 @@ def _apply_clamps(cfg: FilterConfig, clamps: Dict[str, Tuple[Any, Any]]) -> None
         try:
             cur = getattr(cfg, k)
             setattr(cfg, k, _clamp_float(cur, float(lo), float(hi)))
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             logger.exception("mode clamp apply")
 
 

@@ -14,6 +14,7 @@ import scipy.fft
 import scipy.ndimage
 from plotly.subplots import make_subplots
 
+from ...dsp.hybrid_iir import peaking_eq_response
 from ...resources.i8n.decaycore_i18n import t
 from ..plot_common import (
     GD_SMOOTH_OCT,
@@ -38,6 +39,17 @@ _PLOT_PANEL_BORDER = "rgba(255,255,255,0.14)"
 _PLOT_MUTED_LINE   = "rgba(255,255,255,0.30)"
 _PLOT_ACTIVE_BTN_FILL   = "rgba(107,168,240,0.22)"
 _PLOT_ACTIVE_BTN_STROKE = "#6ba8f0"
+
+def _build_hybrid_iir_response(biquads: list[dict], f_lin: np.ndarray, fs: float) -> np.ndarray:
+    """Return complex IIR response on f_lin from stored biquad dicts. Returns ones if no biquads."""
+    h = np.ones(len(f_lin), dtype=complex)
+    for b in biquads or []:
+        try:
+            h *= peaking_eq_response(f_lin, fs, float(b["freq"]), float(b["q"]), float(b["gain"]))
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+            pass
+    return h
+
 
 def _prediction_plot_fft_context(*, filt_ir, fs, target_stats) -> dict:
     min_fft_size = 131072
@@ -77,7 +89,7 @@ def _resolve_magnitude_display_offset_db(
     for key in ("target_level_db_window", "eff_target_db"):
         try:
             value = float(target_stats.get(key, np.nan))
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
             continue
         if np.isfinite(value):
             refs.append(float(value))
@@ -87,7 +99,7 @@ def _resolve_magnitude_display_offset_db(
         target_abs = target_abs[np.isfinite(target_abs)]
         if target_abs.size >= 4:
             refs.append(float(np.nanmedian(target_abs)))
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
         pass
 
     for ref_db in refs:
@@ -123,6 +135,9 @@ def generate_prediction_plot(
         h_filt_display = fft_ctx["h_filt_display"]
         filt_delay_ms = float(fft_ctx["filt_delay_ms"])
 
+        iir_biquads = target_stats.get("hybrid_iir_biquads", []) if target_stats else []
+        h_iir = _build_hybrid_iir_response(iir_biquads, f_lin, float(fs))
+
         avg_t = target_stats.get("eff_target_db", 75) if target_stats else 75
         if target_stats and "smart_scan_range" in target_stats:
             match_range = target_stats.get("smart_scan_range", [500, 2000])
@@ -131,7 +146,7 @@ def generate_prediction_plot(
         try:
             f_win_min = float(match_range[0])
             f_win_max = float(match_range[1])
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
             f_win_min, f_win_max = 500.0, 2000.0
         f_target = np.asarray(target_stats.get("freq_axis", []), dtype=float) if target_stats else np.asarray([], dtype=float)
         target_curve = target_stats.get("target_mags", None) if target_stats else None
@@ -228,7 +243,7 @@ def generate_prediction_plot(
             )
 
         p_lin = np.interp(f_lin, orig_freqs, orig_phases)
-        total_spec = 10 ** (np.asarray(m_lin_clean, dtype=float) / 20.0) * np.exp(1j * np.deg2rad(p_lin)) * h_filt
+        total_spec = 10 ** (np.asarray(m_lin_clean, dtype=float) / 20.0) * np.exp(1j * np.deg2rad(p_lin)) * h_filt * h_iir
 
         plot_level_comp_db = 0.0
         ag_db = 0.0
@@ -241,7 +256,7 @@ def generate_prediction_plot(
                     plot_level_comp_db = -(ag_db + ah_db)
                 elif np.isfinite(ag_db):
                     plot_level_comp_db = -ag_db
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
             plot_level_comp_db = 0.0
             ag_db = 0.0
             ah_db = 0.0
@@ -304,7 +319,7 @@ def generate_prediction_plot(
                     c_max = float(target_stats.get("mag_c_max", 0.0) or 0.0)
                     if np.isfinite(c_min) and np.isfinite(c_max) and c_min > 0 and c_max > c_min:
                         conf_vis[(f_vis < c_min) | (f_vis > c_max)] = np.nan
-                except Exception:
+                except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
                     pass
 
         lf_guard_hz = 0.0
@@ -478,7 +493,7 @@ def generate_prediction_plot(
                         bordercolor=_PLOT_PANEL_BORDER,
                         borderwidth=1,
                     )
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
             pass
 
         try:
@@ -538,7 +553,7 @@ def generate_prediction_plot(
                     )
                 ],
             )
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
             pass
 
         try:
@@ -555,7 +570,7 @@ def generate_prediction_plot(
                     borderwidth=1,
                 )
             )
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
             pass
 
         if target_stats:
@@ -577,7 +592,7 @@ def generate_prediction_plot(
                         row=4,
                         col=1,
                     )
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
                 pass
 
         if target_stats:
@@ -610,7 +625,7 @@ def generate_prediction_plot(
                         row=1,
                         col=1,
                     )
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
                 pass
 
         bw_vis = None
@@ -661,7 +676,7 @@ def generate_prediction_plot(
                         bw_dbg = "missing afdw bw data"
                 else:
                     bw_dbg = "target_stats is None"
-            except Exception as e:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError) as e:
                 bw_dbg = f"{type(e).__name__}: {e}"
 
             if bw_vis is None:
@@ -821,7 +836,7 @@ def generate_prediction_plot(
             return html, fig
         return html
 
-    except Exception as e:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError) as e:
         msg = f"Visual Engine Error: {str(e)}"
         if bool(return_fig):
             return msg, None
@@ -831,7 +846,7 @@ def generate_prediction_plot(
 __all__ = ['_prediction_plot_fft_context', '_resolve_magnitude_display_offset_db', 'generate_prediction_plot']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['plot_prediction_01']:
@@ -842,4 +857,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

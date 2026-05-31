@@ -248,6 +248,18 @@ def save_export_bundle(
         with open(out_path, "wb") as f:
             f.write(zip_buffer.getvalue())
         save_msg = f"Saved: {os.path.abspath(out_path)}"
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         save_msg = "Zip saving failed."
     return fname, os.path.abspath(filters_dir), save_msg

@@ -36,21 +36,57 @@ _PREVIEW_MARKER_LINE = "rgba(15,23,42,0.35)"
 def round_manual_target_tilt_db_per_oct(value: float) -> float:
     try:
         return round(float(value) * 10.0) / 10.0
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return 0.0
 
 
 def round_manual_target_db(value: float) -> float:
     try:
         return round(float(value) * 10.0) / 10.0
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return 0.0
 
 
 def clamp_manual_target_db(value: float, y_min: float = -10.0, y_max: float = 20.0) -> float:
     try:
         v = float(value)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         v = 0.0
     lo = float(y_min)
     hi = float(y_max)
@@ -224,7 +260,19 @@ def extract_target_tilt_from_shape_relayout(
 
     try:
         pivot = float(pivot_hz)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         pivot = MANUAL_TARGET_TILT_PIVOT_HZ
     if not math.isfinite(pivot) or pivot <= 0.0:
         pivot = MANUAL_TARGET_TILT_PIVOT_HZ
@@ -262,7 +310,19 @@ def parse_svg_path_points(path: str) -> list[tuple[float, float]]:
         try:
             x = float(tokens[idx])
             y = float(tokens[idx + 1])
-        except Exception:
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
             return []
         points.append((x, y))
         idx += 2
@@ -299,7 +359,19 @@ def _current_manual_target_db() -> float:
 
     try:
         value = float(ctrl.value("lvl_manual_db", 0.0) or 0.0)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         value = 0.0
     if not math.isfinite(value):
         return 0.0
@@ -311,7 +383,19 @@ def _current_manual_target_tilt_db_per_oct() -> float:
 
     try:
         value = float(ctrl.value("manual_target_tilt_db_per_oct", 0.0) or 0.0)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         value = 0.0
     if not math.isfinite(value):
         return 0.0
@@ -347,7 +431,19 @@ def _path_center_frequency_hz(points: list[tuple[float, float]]) -> float | None
         return None
     try:
         return float(math.exp(statistics.mean(math.log(x) for x in x_values)))
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return None
 
 

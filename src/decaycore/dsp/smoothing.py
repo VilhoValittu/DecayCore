@@ -177,8 +177,9 @@ def smooth_meas_freq_dep(m_db: np.ndarray, freq_axis: np.ndarray) -> np.ndarray:
 # ---------------------------------------------------------------------------
 
 # Module-level cache for adaptive FDW bandwidth stacks.
-# Key: (n_freqs, f0, f_last, bw_tuple) → sm_stack array
-_AFDW_STACK_CACHE: dict = {}
+# Key: (n_freqs, f0, f_last, full_magnitude_hash) -> sm_stack array
+_AFDW_STACK_CACHE: OrderedDict = OrderedDict()
+_AFDW_STACK_CACHE_MAX = 64
 
 
 def apply_adaptive_fdw(freqs, mags, confidence_mask, base_cycles=15.0, min_cycles=5.0):
@@ -227,18 +228,19 @@ def _apply_adaptive_fdw_impl(freqs, mags, confidence_mask, base_cycles=15.0, min
     ], dtype=float)
 
     n = f.size
-    step = max(1, n // 8)
-    _m_sub = np.ascontiguousarray(m[::step], dtype=np.float64)
-    _m_hash = hashlib.blake2b(_m_sub.view(np.uint8), digest_size=8).hexdigest()
+    _m_full = np.ascontiguousarray(m, dtype=np.float64)
+    _m_hash = hashlib.blake2b(_m_full.view(np.uint8), digest_size=8).hexdigest()
     _stack_key = (n, round(float(f[0]), 4), round(float(f[-1]), 4), _m_hash)
     sm_stack = _AFDW_STACK_CACHE.get(_stack_key)
     if sm_stack is None:
         sm_stack = np.empty((len(bw_list), n), dtype=float)
         for i, bw in enumerate(bw_list):
             sm_stack[i] = _apply_smoothing_mag_only(f, m, float(bw))
-        if len(_AFDW_STACK_CACHE) >= 32:
-            _AFDW_STACK_CACHE.pop(next(iter(_AFDW_STACK_CACHE)))
+        if len(_AFDW_STACK_CACHE) >= _AFDW_STACK_CACHE_MAX:
+            _AFDW_STACK_CACHE.popitem(last=False)
         _AFDW_STACK_CACHE[_stack_key] = sm_stack
+    else:
+        _AFDW_STACK_CACHE.move_to_end(_stack_key)
 
     hi = np.searchsorted(bw_list, t, side='right')
     hi = np.clip(hi, 1, len(bw_list) - 1)
@@ -345,43 +347,25 @@ def _apply_smoothing_mag_only(freqs: np.ndarray, mags: np.ndarray, octave_fracti
 def apply_smoothing_std(freqs, mags, phases, octave_fraction=1.0):
     """Soveltaa tai paivittaa: apply smoothing std."""
     if octave_fraction <= 0: return mags, phases
-    freqs = np.asarray(freqs, dtype=float).ravel()
-    mags = np.asarray(mags, dtype=float).ravel()
-    phases = np.asarray(phases, dtype=float).ravel()
+    freqs = np.asarray(freqs, dtype=np.float64).ravel()
+    mags = np.asarray(mags, dtype=np.float64).ravel()
+    phases = np.asarray(phases, dtype=np.float64).ravel()
     if not np.all(np.diff(freqs) > 0):
         raise ValueError("frequency axis must be strictly monotonically increasing")
-    f_min = max(freqs[0], 1.0)
-    f_max = freqs[-1]
-
-
-    points_per_octave = 384
-
-    num_points = int(np.log2(f_max / f_min) * points_per_octave)
-    num_points = max(num_points, 10)
-
-    log_freqs = np.geomspace(f_min, f_max, num_points)
-    log_mags = np.interp(log_freqs, freqs, mags)
     phase_unwrap = np.unwrap(np.deg2rad(phases))
-    log_phases = np.interp(log_freqs, freqs, phase_unwrap)
-
-    window_size = int(points_per_octave * octave_fraction)
-    window_size = max(window_size, 1)
-    window = np.hanning(window_size)
-    w_sum = window.sum()
-    if w_sum > 0:
-        window = window / w_sum
-    else:
-        window = np.ones(window_size) / window_size
-
-    pad_len = window_size // 2
-    m_padded = np.pad(log_mags, (pad_len, pad_len), mode='edge')
-    p_padded = np.pad(log_phases, (pad_len, pad_len), mode='edge')
-
-    if pad_len > 0:
-        sm_mags = np.convolve(m_padded, window, mode='same')[pad_len:-pad_len]
-        sm_phases = np.convolve(p_padded, window, mode='same')[pad_len:-pad_len]
-    else:
-        sm_mags = np.convolve(m_padded, window, mode='same')
-        sm_phases = np.convolve(p_padded, window, mode='same')
-
-    return np.interp(freqs, log_freqs, sm_mags), np.rad2deg(np.interp(freqs, log_freqs, sm_phases))
+    plan = _get_smoothing_plan(freqs, float(octave_fraction))
+    sm_mags = _smooth_mag_core(
+        freqs,
+        mags,
+        plan["log_freqs"],
+        plan["window"],
+        plan["pad_len"],
+    )
+    sm_phases = _smooth_mag_core(
+        freqs,
+        phase_unwrap,
+        plan["log_freqs"],
+        plan["window"],
+        plan["pad_len"],
+    )
+    return sm_mags, np.rad2deg(sm_phases)

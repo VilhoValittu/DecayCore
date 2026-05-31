@@ -11,7 +11,7 @@
 """Application-level house-curve loading helpers."""
 
 import numpy as np
-from ..common.house_curves import _normalize_hc_mode_key, get_house_curve_by_name
+from ..common.house_curves import _normalize_hc_mode_key, get_house_curve_by_name, adapt_house_curve_to_rt60
 
 MANUAL_TARGET_TILT_PIVOT_HZ = 1000.0
 
@@ -19,7 +19,7 @@ MANUAL_TARGET_TILT_PIVOT_HZ = 1000.0
 def _auto_goal_uses_hpf_limited_bass_boost(data: dict) -> bool:
     try:
         goal = str(data.get("auto_goal", "") or "").strip().lower().replace("_", "-")
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         goal = ""
     return goal in {"flat", "prefer bass", "prefer-bass", "bass"}
 
@@ -32,13 +32,13 @@ def _prefer_bass_hpf_freq_hz(data: dict) -> float:
     else:
         try:
             mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
             mode_u = "BASIC"
         auto_mode_active = bool(mode_u == "AUTO" or data.get("camillafir_automatic_mode", False))
         enabled = bool(data.get("hpf_enable", False)) or bool(auto_mode_active)
         try:
             bi_mode = str(data.get("bass_integration_mode", "") or "").strip().lower()
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
             bi_mode = ""
         if bool(data.get("bass_integration_enable", False)) and bi_mode == "direct_dac":
             freq_raw = data.get("sub_crossover_hz", data.get("avr_crossover_hz", 80.0))
@@ -49,7 +49,7 @@ def _prefer_bass_hpf_freq_hz(data: dict) -> float:
         return 0.0
     try:
         freq_hz = float(freq_raw or 0.0)
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         return 0.0
     if not np.isfinite(freq_hz) or freq_hz <= 0.0:
         return 0.0
@@ -62,7 +62,7 @@ def limit_prefer_bass_boost_to_hpf(freqs, mags, hpf_freq_hz: float):
         f = np.asarray(freqs, dtype=float).reshape(-1)
         m = np.asarray(mags, dtype=float).reshape(-1)
         hpf_hz = float(hpf_freq_hz)
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         return freqs, mags
     if f.size < 2 or m.size != f.size or not np.isfinite(hpf_hz) or hpf_hz <= 0.0:
         return freqs, mags
@@ -101,7 +101,7 @@ def apply_manual_target_curve_tilt(
     target_arr = np.asarray(target_curve, dtype=float)
     try:
         freq_arr = np.asarray(freq_axis, dtype=float)
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         return target_arr
 
     if target_arr.shape != freq_arr.shape:
@@ -109,14 +109,14 @@ def apply_manual_target_curve_tilt(
 
     try:
         slope = float(tilt_db_per_oct)
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         slope = 0.0
     if not np.isfinite(slope) or abs(slope) <= 1e-9:
         return target_arr
 
     try:
         pivot = float(pivot_hz)
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         pivot = MANUAL_TARGET_TILT_PIVOT_HZ
     if not np.isfinite(pivot) or pivot <= 0.0:
         pivot = MANUAL_TARGET_TILT_PIVOT_HZ
@@ -128,6 +128,32 @@ def apply_manual_target_curve_tilt(
         floor_hz = float(pivot)
     safe_freqs = np.where(np.isfinite(freq_arr) & (freq_arr > 0.0), freq_arr, floor_hz)
     return target_arr + (float(slope) * np.log2(float(pivot) / safe_freqs))
+
+
+def _extract_rt60_lf(data: dict) -> float | None:
+    """Extract low-frequency RT60 from measured_rt60_bands_l/r."""
+    try:
+        bands_l = data.get("measured_rt60_bands_l", {})
+        bands_r = data.get("measured_rt60_bands_r", {})
+
+        rt60_vals = []
+        for bands in [bands_l, bands_r]:
+            if isinstance(bands, dict):
+                for f_hz, rt_s in bands.items():
+                    try:
+                        f = float(f_hz)
+                        rt = float(rt_s)
+                        if 20.0 <= f <= 150.0 and rt > 0.05:
+                            rt60_vals.append(rt)
+                    except (TypeError, ValueError):
+                        continue
+
+        if len(rt60_vals) >= 1:
+            return float(np.median(rt60_vals))
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        pass
+
+    return None
 
 
 def load_target_curve(file_content: bytes):
@@ -161,7 +187,7 @@ def load_target_curve(file_content: bytes):
 
         sort_idx = np.argsort(freqs)
         return freqs[sort_idx], mags[sort_idx]
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         return None, None
 
 
@@ -180,7 +206,7 @@ def load_house_curve(data: dict, *, parse_measurements_from_path=None):
                 hc_f = synth_f
                 hc_m = synth_m
                 hc_source = "Adaptive"
-        except Exception:
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
             pass
 
     want_upload = (mode_key == "Upload")
@@ -192,7 +218,7 @@ def load_house_curve(data: dict, *, parse_measurements_from_path=None):
             hc_f, hc_m = load_target_curve(up["content"])
             if hc_f is not None and hc_m is not None:
                 hc_source = "Upload"
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         pass
 
     if hc_f is None and data.get("local_path_house"):
@@ -203,7 +229,7 @@ def load_house_curve(data: dict, *, parse_measurements_from_path=None):
                     s_idx = np.argsort(hc_f)
                     hc_f, hc_m = hc_f[s_idx], hc_m[s_idx]
                     hc_source = "LocalFile"
-            except Exception:
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
                 hc_f, hc_m = None, None
 
     if hc_f is None:
@@ -221,9 +247,14 @@ def load_house_curve(data: dict, *, parse_measurements_from_path=None):
             hc_source = f"Preset ({preset_key})"
 
 
+    if hc_f is not None and hc_m is not None and hc_source.startswith("Preset"):
+        rt60_lf_s = _extract_rt60_lf(data)
+        if rt60_lf_s is not None and rt60_lf_s > 0.3:
+            hc_m = adapt_house_curve_to_rt60(hc_f, hc_m, rt60_lf_s)
+
     try:
         lvl_mode = str(data.get("lvl_mode", "Auto") or "Auto").strip().lower()
-    except Exception:
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         lvl_mode = "auto"
     if hc_f is not None and hc_m is not None and "manual" in lvl_mode:
         hc_m = apply_manual_target_curve_tilt(

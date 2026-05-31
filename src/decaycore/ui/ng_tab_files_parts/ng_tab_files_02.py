@@ -86,7 +86,19 @@ _SUB_FILENAME_PREFIXES = ("sub", "lfe", "sw")
 def _measurement_hint_tokens(value: Any) -> list[str]:
     try:
         text = str(value or "").strip().lower().replace("\\", "/")
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return []
     if not text:
         return []
@@ -95,7 +107,19 @@ def _measurement_hint_tokens(value: Any) -> list[str]:
 def _measurement_entry_mtime_ns(entry: dict[str, Any]) -> int:
     try:
         return int(entry.get("mtime_ns") or 0)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return 0
 
 def _token_has_numeric_suffix(token: str, prefix: str) -> bool:
@@ -143,7 +167,7 @@ def _token_is_sub2ish(token: str) -> bool:
 __all__ = ['_measurement_hint_tokens', '_measurement_entry_mtime_ns', '_token_has_numeric_suffix', '_token_is_leftish', '_token_is_rightish', '_token_is_subish', '_token_is_sub1ish', '_token_is_sub2ish']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['ng_tab_files_01', 'ng_tab_files_02', 'ng_tab_files_03']:
@@ -154,4 +178,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

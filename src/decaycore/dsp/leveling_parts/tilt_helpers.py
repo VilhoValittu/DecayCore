@@ -55,6 +55,59 @@ _LEVELING_CACHE_ATTRS = (
     "_lvl_window_debug",
 )
 
+def _resample_series_inputs(
+    freq_axis: np.ndarray,
+    series: tuple[np.ndarray, ...],
+) -> tuple[np.ndarray, list[np.ndarray], np.ndarray]:
+    f = np.asarray(freq_axis, dtype=float).reshape(-1)
+    prepared: list[np.ndarray] = []
+    if f.size == 0:
+        return f, prepared, np.zeros_like(f, dtype=bool)
+    mask = np.isfinite(f) & (f > 0.0)
+    for s in series:
+        values = np.asarray(s, dtype=float).reshape(-1)
+        if values.size != f.size:
+            return f[:0], [], np.zeros((0,), dtype=bool)
+        prepared.append(values)
+        mask &= np.isfinite(values)
+    return f, prepared, mask
+
+
+def _sort_unique_resample_series(freq: np.ndarray, series: list[np.ndarray]) -> tuple[np.ndarray, list[np.ndarray]]:
+    if freq.size == 0:
+        return freq, series
+    order = np.argsort(freq, kind="mergesort")
+    freq_sorted = freq[order]
+    series_sorted = [values[order] for values in series]
+    if freq_sorted.size > 1:
+        uniq = np.concatenate(([True], np.diff(freq_sorted) > 0.0))
+        freq_sorted = freq_sorted[uniq]
+        series_sorted = [values[uniq] for values in series_sorted]
+    return freq_sorted, series_sorted
+
+
+def _log_resample_axis(
+    freq: np.ndarray,
+    *,
+    points_per_octave: float,
+    min_points: int,
+) -> np.ndarray | None:
+    if freq.size < 2:
+        return None
+    f_lo = float(freq[0])
+    f_hi = float(freq[-1])
+    if (not np.isfinite(f_lo)) or (not np.isfinite(f_hi)) or (f_hi <= f_lo):
+        return None
+    octaves = float(np.log2(f_hi / f_lo))
+    if not np.isfinite(octaves) or octaves <= 0.0:
+        return None
+    ppo = float(points_per_octave)
+    if (not np.isfinite(ppo)) or (ppo <= 0.0):
+        ppo = 48.0
+    n_points = max(int(np.ceil(octaves * ppo)) + 1, int(min_points))
+    return np.geomspace(f_lo, f_hi, n_points)
+
+
 def _resample_log_axis(
     freq_axis: np.ndarray,
     *series: np.ndarray,
@@ -62,51 +115,23 @@ def _resample_log_axis(
     min_points: int = 32,
 ):
     try:
-        f = np.asarray(freq_axis, dtype=float).reshape(-1)
+        f, prepared, mask = _resample_series_inputs(freq_axis, series)
         if f.size == 0:
             return f, tuple(np.asarray(s, dtype=float).reshape(-1)[:0] for s in series)
-
-        mask = np.isfinite(f) & (f > 0.0)
-        prepared = []
-        for s in series:
-            v = np.asarray(s, dtype=float).reshape(-1)
-            if v.size != f.size:
-                return f[:0], tuple(np.asarray(v[:0], dtype=float) for v in prepared)
-            prepared.append(v)
-            mask &= np.isfinite(v)
 
         f = f[mask]
         prepared = [v[mask] for v in prepared]
         if f.size == 0:
-            return f, tuple(v for v in prepared)
+            return f, tuple(prepared)
 
-        order = np.argsort(f, kind="mergesort")
-        f = f[order]
-        prepared = [v[order] for v in prepared]
-
-        if f.size > 1:
-            uniq = np.concatenate(([True], np.diff(f) > 0.0))
-            f = f[uniq]
-            prepared = [v[uniq] for v in prepared]
-
+        f, prepared = _sort_unique_resample_series(f, prepared)
         if f.size < 2:
             return f, tuple(prepared)
 
-        f_lo = float(f[0])
-        f_hi = float(f[-1])
-        if (not np.isfinite(f_lo)) or (not np.isfinite(f_hi)) or (f_hi <= f_lo):
+        f_log = _log_resample_axis(f, points_per_octave=points_per_octave, min_points=min_points)
+        if f_log is None:
             return f, tuple(prepared)
-
-        octaves = float(np.log2(f_hi / f_lo))
-        if not np.isfinite(octaves) or octaves <= 0.0:
-            return f, tuple(prepared)
-
-        ppo = float(points_per_octave)
-        if (not np.isfinite(ppo)) or (ppo <= 0.0):
-            ppo = 48.0
-        n_points = max(int(np.ceil(octaves * ppo)) + 1, int(min_points))
-        f_log = np.geomspace(f_lo, f_hi, n_points)
-        prepared_log = [np.interp(f_log, f, v) for v in prepared]
+        prepared_log = [np.interp(f_log, f, values) for values in prepared]
         return f_log, tuple(prepared_log)
     except (TypeError, ValueError, FloatingPointError, OverflowError):
         f = np.asarray(freq_axis, dtype=float).reshape(-1)
@@ -329,22 +354,8 @@ def _window_offset_consistency_score(
     3) absoluuttinen tilt (dB/okt)
     """
     try:
-        f = np.asarray(freq_axis, dtype=float).reshape(-1)
-        m = np.asarray(measured_db, dtype=float).reshape(-1)
-        if target_db is None:
-            t = np.zeros_like(m, dtype=float)
-        else:
-            t = np.asarray(target_db, dtype=float).reshape(-1)
-        if f.size < 24 or m.size != f.size or t.size != f.size:
-            return float("inf"), float("inf"), float("inf")
-
-        valid = np.isfinite(f) & np.isfinite(m) & np.isfinite(t) & (f > 0.0)
-        if int(np.count_nonzero(valid)) < 24:
-            return float("inf"), float("inf"), float("inf")
-
-        f = f[valid]
-        diff = np.asarray(m[valid] - t[valid], dtype=float)
-        if f.size < 24:
+        f, diff = _window_consistency_prepare_inputs(freq_axis, measured_db, target_db)
+        if f.size < 24 or diff.size < 24:
             return float("inf"), float("inf"), float("inf")
 
         if tilt_comp:
@@ -362,35 +373,13 @@ def _window_offset_consistency_score(
         shape_resid = diff - float(off_full) - (float(slope_full) * xc)
         shape_rms = _centered_rms(shape_resid)
 
-        log_f = np.log2(np.clip(f, 1e-9, None))
-        log_f_lo = float(log_f[0])
-        log_f_span = float(log_f[-1]) - log_f_lo
-
-        parts: list[tuple[float, float]] = [
-            (0.0, 0.5), (0.5, 1.0),
-            (0.0, 2.0 / 3.0), (1.0 / 3.0, 1.0),
-            (0.2, 0.8),
-        ]
-
-        offsets = [float(off_full)]
-        for start_frac, end_frac in parts:
-            f_lo_sub = 2.0 ** (log_f_lo + start_frac * log_f_span)
-            f_hi_sub = 2.0 ** (log_f_lo + end_frac * log_f_span)
-            sub_mask = (f >= f_lo_sub) & (f <= f_hi_sub)
-            if int(np.count_nonzero(sub_mask)) < 10:
-                continue
-            f_sub = f[sub_mask]
-            d_sub = diff[sub_mask]
-            if tilt_comp:
-                off_sub, _ = _tilt_fit_offset_and_slope_db_per_oct(
-                    f_sub,
-                    d_sub,
-                    max_db_per_oct=float(tilt_max_db_per_oct),
-                )
-            else:
-                off_sub = _log_median(f_sub, d_sub)
-            if np.isfinite(off_sub):
-                offsets.append(float(off_sub))
+        offsets = _window_offset_candidates(
+            f,
+            diff,
+            tilt_comp=bool(tilt_comp),
+            tilt_max_db_per_oct=float(tilt_max_db_per_oct),
+            full_offset=float(off_full),
+        )
 
         if len(offsets) >= 3:
             offset_spread = float(np.std(np.asarray(offsets, dtype=float)))
@@ -400,6 +389,67 @@ def _window_offset_consistency_score(
         return float(offset_spread), float(shape_rms), float(abs(slope_full))
     except (TypeError, ValueError, FloatingPointError, IndexError):
         return float("inf"), float("inf"), float("inf")
+
+
+def _window_consistency_prepare_inputs(
+    freq_axis: np.ndarray,
+    measured_db: np.ndarray,
+    target_db: np.ndarray | None,
+) -> tuple[np.ndarray, np.ndarray]:
+    f = np.asarray(freq_axis, dtype=float).reshape(-1)
+    m = np.asarray(measured_db, dtype=float).reshape(-1)
+    if target_db is None:
+        t = np.zeros_like(m, dtype=float)
+    else:
+        t = np.asarray(target_db, dtype=float).reshape(-1)
+    if f.size < 24 or m.size != f.size or t.size != f.size:
+        return np.asarray([], dtype=float), np.asarray([], dtype=float)
+    valid = np.isfinite(f) & np.isfinite(m) & np.isfinite(t) & (f > 0.0)
+    if int(np.count_nonzero(valid)) < 24:
+        return np.asarray([], dtype=float), np.asarray([], dtype=float)
+    f_valid = f[valid]
+    diff = np.asarray(m[valid] - t[valid], dtype=float)
+    return f_valid, diff
+
+
+def _window_offset_candidates(
+    freq: np.ndarray,
+    diff: np.ndarray,
+    *,
+    tilt_comp: bool,
+    tilt_max_db_per_oct: float,
+    full_offset: float,
+) -> list[float]:
+    log_f = np.log2(np.clip(freq, 1e-9, None))
+    log_f_lo = float(log_f[0])
+    log_f_span = float(log_f[-1]) - log_f_lo
+    parts: list[tuple[float, float]] = [
+        (0.0, 0.5),
+        (0.5, 1.0),
+        (0.0, 2.0 / 3.0),
+        (1.0 / 3.0, 1.0),
+        (0.2, 0.8),
+    ]
+    offsets = [float(full_offset)]
+    for start_frac, end_frac in parts:
+        f_lo_sub = 2.0 ** (log_f_lo + start_frac * log_f_span)
+        f_hi_sub = 2.0 ** (log_f_lo + end_frac * log_f_span)
+        sub_mask = (freq >= f_lo_sub) & (freq <= f_hi_sub)
+        if int(np.count_nonzero(sub_mask)) < 10:
+            continue
+        f_sub = freq[sub_mask]
+        d_sub = diff[sub_mask]
+        if tilt_comp:
+            off_sub, _ = _tilt_fit_offset_and_slope_db_per_oct(
+                f_sub,
+                d_sub,
+                max_db_per_oct=float(tilt_max_db_per_oct),
+            )
+        else:
+            off_sub = _log_median(f_sub, d_sub)
+        if np.isfinite(off_sub):
+            offsets.append(float(off_sub))
+    return offsets
 
 def _tilt_aware_offset_db(
     freq_axis: np.ndarray,
@@ -484,7 +534,7 @@ def _tilt_fit_offset_and_slope_db_per_oct(
 __all__ = ['_resample_log_axis', '_log_median', '_lower_tail_robust_std_db', '_centered_rms', '_tilt_fit_linear_log_axis', '_smooth_tilt_fit_series', '_tilt_fit_lf_piecewise_log_axis', '_window_offset_consistency_score', '_tilt_aware_offset_db', '_tilt_fit_offset_and_slope_db_per_oct']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['state_cache', 'tilt_helpers', 'window_scoring', 'api']:
@@ -495,4 +545,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

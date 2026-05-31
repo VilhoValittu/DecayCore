@@ -224,7 +224,7 @@ def _run_mag_correction_pipeline(inputs: _MagPipelineInputs) -> _MagCorrectionCo
 __all__ = ['_run_mag_raw_stage', '_run_mag_bassfirst_afdw_conf_stage', '_run_mag_core_stage', '_run_mag_correction_pipeline']
 
 
-def _load_sibling_symbols() -> None:
+def _link_sibling_exports() -> None:
     import importlib
     package = __package__
     for module_name in ['correction_mag_01', 'correction_mag_02']:
@@ -235,4 +235,4 @@ def _load_sibling_symbols() -> None:
             globals().setdefault(symbol, getattr(module, symbol))
 
 
-_load_sibling_symbols()
+_link_sibling_exports()

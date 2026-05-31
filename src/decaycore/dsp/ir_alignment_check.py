@@ -238,5 +238,17 @@ def run_ir_alignment_check(
             "ir_align_gd_b_ms": phase["gd_b_ms"],
             "ir_align_gd_diff_ms": phase["gd_diff_ms"],
         }
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return {}

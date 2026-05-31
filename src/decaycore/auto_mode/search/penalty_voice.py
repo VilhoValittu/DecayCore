@@ -40,7 +40,19 @@ def _slice_optional(arr, idx: np.ndarray):
         a = np.asarray(arr, dtype=float).reshape(-1)
         if a.size >= int(idx[-1]) + 1:
             return a[idx]
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         pass
     return None
 
@@ -50,7 +62,19 @@ def _as_float_array(value) -> np.ndarray:
         return np.asarray([], dtype=float)
     try:
         return np.asarray(value, dtype=float).reshape(-1)
-    except Exception:
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
         return np.asarray([], dtype=float)
 
 
