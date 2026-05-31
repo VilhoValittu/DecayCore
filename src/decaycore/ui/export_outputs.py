@@ -21,6 +21,7 @@ from .export_summary_text import (
     _append_dsp_effective_params,
     _append_lr_difference_summary,
     _append_realized_phase_limit,
+    _append_leveling_summary,
 )
 from ..app_paths import program_version_token
 from ..common.result_postprocess import _irwin_tag
@@ -281,6 +282,50 @@ def _hybrid_iir_biquads_from_result(result: Any, side: str) -> list[dict]:
     return [dict(item) for item in list(st.get("hybrid_iir_biquads", []) or []) if isinstance(item, dict)]
 
 
+def _build_summary_text(
+    data: dict,
+    fs_v: int,
+    ft_short: str,
+    file_ts: str,
+    l_st: dict | None,
+    r_st: dict | None,
+    *,
+    ranking_context: dict | None = None,
+) -> str:
+    summary_content = plots.format_summary_content(data, l_st, r_st)
+    summary_content = _append_export_ranking(summary_content, int(fs_v), ranking_context)
+    try:
+        hc_src = str(data.get("hc_source", "") or "").strip()
+        if hc_src:
+            summary_content = f"House curve: {hc_src}\n" + summary_content
+    except Exception:
+        logger.exception("house curve summary prefix")
+    summary_content = _append_dsp_effective_params(summary_content, data, fs_v)
+    summary_content = _append_realized_phase_limit(summary_content, data, l_st, r_st)
+    summary_content = _append_leveling_summary(summary_content, l_st, r_st)
+    summary_content = _append_acoustic_events(summary_content, l_st, r_st)
+    summary_content = _append_lr_difference_summary(summary_content, l_st, r_st)
+
+    if TEST_MODE:
+        try:
+            diag = _build_diagnostics_dict(data, fs_v, l_st, r_st)
+            summary_content += "\n\n--- DIAGNOSTICS_JSON_BEGIN ---\n"
+            summary_content += json.dumps(_json_safe(diag), indent=2)
+            summary_content += "\n--- DIAGNOSTICS_JSON_END ---\n"
+        except Exception as e:
+            summary_content += "\n\n--- DIAGNOSTICS_JSON_BEGIN ---\n"
+            summary_content += json.dumps(
+                {
+                    "schema_version": 1,
+                    "error": f"diagnostics_json_failed: {type(e).__name__}: {e}",
+                },
+                indent=2,
+            )
+            summary_content += "\n--- DIAGNOSTICS_JSON_END ---\n"
+
+    return summary_content
+
+
 def _write_fs_outputs(
     zf,
     data,
@@ -320,79 +365,12 @@ def _write_fs_outputs(
         ) = _extract_result_payload(result)
 
     sum_name = f"Summary_{ft_short}_{fs_v}Hz_{file_ts}.txt"
-
-    summary_content = plots.format_summary_content(data, l_st, r_st)
-    summary_content = _append_export_ranking(summary_content, int(fs_v), ranking_context)
-    try:
-        hc_src = str(data.get("hc_source", "") or "").strip()
-        if hc_src:
-            summary_content = f"House curve: {hc_src}\n" + summary_content
-    except Exception:
-        logger.exception("house curve summary prefix")
-    summary_content = _append_dsp_effective_params(summary_content, data, fs_v)
-    summary_content = _append_realized_phase_limit(summary_content, data, l_st, r_st)
-    try:
-        summary_content += "\n=== LEVELING ===\n"
-        for side, st in [("LEFT", l_st), ("RIGHT", r_st)]:
-            if not isinstance(st, dict):
-                continue
-            summary_content += f"[{side}]\n"
-            summary_content += f"Method: {st.get('offset_method', 'n/a')}\n"
-            win = st.get("smart_scan_range", None)
-            if isinstance(win, (list, tuple)) and len(win) >= 2:
-                try:
-                    summary_content += f"Window: {float(win[0]):.0f}-{float(win[1]):.0f} Hz\n"
-                except Exception:
-                    logger.exception("leveling window range format")
-            try:
-                summary_content += f"Offset to measurement: {float(st.get('offset_db', 0.0) or 0.0):+.2f} dB\n"
-            except Exception:
-                logger.exception("leveling offset_db format")
-            try:
-                summary_content += f"Effective target level: {float(st.get('eff_target_db', 0.0) or 0.0):.2f} dB\n"
-            except Exception:
-                logger.exception("leveling eff_target_db format")
-            tilt = st.get("tilt_slope_db_per_oct", None)
-            if tilt is not None:
-                try:
-                    tilt_f = float(tilt)
-                    summary_content += f"Tilt slope: {tilt_f:+.2f} dB/oct\n"
-                    if abs(tilt_f) > 1.5:
-                        summary_content += (
-                            "Warning: Large broadband tilt detected. "
-                            "May indicate measurement/target mismatch or strong room tilt.\n"
-                        )
-                except Exception:
-                    logger.exception("leveling tilt slope format")
-            summary_content += "\n"
-    except Exception:
-        logger.exception("leveling summary section")
-
-    summary_content = _append_acoustic_events(summary_content, l_st, r_st)
-
-    summary_content = _append_lr_difference_summary(summary_content, l_st, r_st)
-
-    if TEST_MODE:
-        try:
-            diag = _build_diagnostics_dict(data, fs_v, l_st, r_st)
-            summary_content += "\n\n--- DIAGNOSTICS_JSON_BEGIN ---\n"
-            summary_content += json.dumps(_json_safe(diag), indent=2)
-            summary_content += "\n--- DIAGNOSTICS_JSON_END ---\n"
-        except Exception as e:
-            summary_content += "\n\n--- DIAGNOSTICS_JSON_BEGIN ---\n"
-            summary_content += json.dumps(
-                {
-                    "schema_version": 1,
-                    "error": f"diagnostics_json_failed: {type(e).__name__}: {e}",
-                },
-                indent=2,
-            )
-            summary_content += "\n--- DIAGNOSTICS_JSON_END ---\n"
-
+    summary_content = _build_summary_text(data, fs_v, ft_short, file_ts, l_st, r_st, ranking_context=ranking_context)
     zf.writestr(sum_name, summary_content)
 
     if bool(write_dashboards):
         psl = data.get("plot_smoothing_level", "Psychoacoustic")
+        mixed_freq = data.get("mixed_freq")
 
         html_l = plots.generate_prediction_plot(
             f_l,
@@ -403,7 +381,7 @@ def _write_fs_outputs(
             "Left",
             None,
             l_st,
-            data["mixed_freq"],
+            mixed_freq,
             "low",
             create_full_html=False,
             plot_smoothing_level=psl,
@@ -421,7 +399,7 @@ def _write_fs_outputs(
             "Right",
             None,
             r_st,
-            data["mixed_freq"],
+            mixed_freq,
             "low",
             create_full_html=False,
             plot_smoothing_level=psl,

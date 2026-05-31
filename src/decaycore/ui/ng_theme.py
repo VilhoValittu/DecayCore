@@ -159,6 +159,64 @@ body { background: var(--cf-bg) !important; color: var(--cf-text) !important; }
 .q-field--disabled .q-field__input   { color: var(--cf-text) !important; opacity: 0.72 !important; }
 .q-field--disabled .q-select__dropdown-icon { opacity: 0.45 !important; }
 
+/* ── Micro-interactions: base transitions ─────────────────────────────────── */
+.q-btn         { transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease !important; }
+.q-card        { transition: box-shadow 0.2s ease, border-color 0.2s ease !important; }
+.q-field__control { transition: border-color 0.18s ease, box-shadow 0.18s ease !important; }
+.q-tab         { transition: color 0.18s ease !important; }
+.q-expansion-item__header { transition: background 0.18s ease !important; }
+
+/* Hover effects */
+.q-btn:not([disabled]):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(107,168,240,0.18) !important;
+}
+.q-card:hover {
+    border-color: var(--cf-border-2) !important;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.50) !important;
+}
+.q-tab:not(.q-tab--active):hover { color: var(--cf-text) !important; }
+.q-expansion-item__header:hover  { background: var(--cf-surface-3) !important; }
+
+/* Input focus glow */
+.q-field--focused .q-field__control {
+    border-color: var(--cf-accent) !important;
+    box-shadow: 0 0 0 2px var(--cf-focus) !important;
+}
+
+/* ── Modal backdrop blur ──────────────────────────────────────────────────── */
+.q-dialog__backdrop { backdrop-filter: blur(4px) !important; }
+
+/* ── Header gradient ─────────────────────────────────────────────────────── */
+.cf-brand-shell {
+    background: linear-gradient(180deg, rgba(107,168,240,0.07) 0%, var(--cf-bg) 100%);
+}
+
+/* ── Progress bar shimmer ────────────────────────────────────────────────── */
+@keyframes cf-shimmer {
+    0%   { background-position: -400px 0; }
+    100% { background-position: calc(400px + 100%) 0; }
+}
+.q-linear-progress__track {
+    background: linear-gradient(
+        90deg,
+        var(--cf-surface-3) 25%,
+        rgba(107,168,240,0.12) 50%,
+        var(--cf-surface-3) 75%
+    ) !important;
+    background-size: 400px 100% !important;
+    animation: cf-shimmer 1.8s linear infinite !important;
+}
+
+/* ── Status bars: fade-in when appearing ─────────────────────────────────── */
+@keyframes cf-fadein {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: none; }
+}
+.cf-status-summary, .cf-status-info, .cf-auto-bar {
+    animation: cf-fadein 0.22s ease both;
+}
+
 /* Light mode overrides (activated by body.cf-light) */
 body.cf-light {
     --cf-bg:        #eef1f5;
@@ -179,6 +237,9 @@ body.cf-light .cf-brand-title { color: #1c2028 !important; }
 body.cf-light .cf-modal-card { background: #ffffff !important; }
 body.cf-light .cf-tabs-shell { box-shadow: 0 4px 10px rgba(0,0,0,0.10); }
 body.cf-light .cf-adv-summary .text-gray-300 { color: var(--cf-text) !important; }
+body.cf-light .q-btn:not([disabled]):hover { box-shadow: 0 4px 14px rgba(16,72,160,0.16) !important; }
+body.cf-light .q-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.15) !important; }
+body.cf-light .cf-brand-shell { background: linear-gradient(180deg, rgba(16,72,160,0.06) 0%, var(--cf-bg) 100%); }
 """
 
 

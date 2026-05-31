@@ -314,6 +314,8 @@ def load_config() -> dict:
         except Exception:
             logger.exception("config load and merge")
 
+    default_conf["unsafe_raw_dsp"] = False
+
     try:
         mode_u = str(default_conf.get("mode", "AUTO") or "AUTO").strip().upper()
     except Exception:
@@ -349,6 +351,7 @@ def save_config(data: dict) -> None:
                 not str(k).startswith("file_")
                 and not str(k).startswith("generated_measurement_")
                 and str(k) != "auto_mode_compat_version"
+                and str(k) != "unsafe_raw_dsp"
                 and v is not None
             )
         }

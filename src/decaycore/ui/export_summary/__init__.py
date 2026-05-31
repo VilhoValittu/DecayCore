@@ -10,7 +10,7 @@
 
 import importlib as _importlib
 
-_MODULE_NAMES = ['events', 'runtime', 'bass_integration', 'stereo_policy', 'dsp_effective']
+_MODULE_NAMES = ['events', 'runtime', 'bass_integration', 'stereo_policy', 'dsp_effective', 'leveling']
 for _module_name in _MODULE_NAMES:
     _module = _importlib.import_module(f"{__name__}.{_module_name}")
     for _symbol in dir(_module):
