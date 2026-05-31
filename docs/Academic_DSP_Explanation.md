@@ -1,5 +1,5 @@
 # DecayCore: Time-Domain-First FIR Room Correction
-## Academic DSP Rationale and Mathematical Foundations (v1.0.6)
+## Academic DSP Rationale and Mathematical Foundations (v1.0.7)
 
 ### Abstract
 DecayCore is a FIR room-correction framework that separates:
@@ -8,7 +8,7 @@ DecayCore is a FIR room-correction framework that separates:
 - magnitude-domain target tracking,
 - temporal decay behavior (TDC).
 
-The current engine (v1.0.6) uses confidence-aware and safety-bounded processing in both magnitude and phase paths, with optional fixed-grid comparison analysis for reproducible scoring.
+The current engine (v1.0.7) uses confidence-aware and safety-bounded processing in both magnitude and phase paths, with optional fixed-grid comparison analysis for reproducible scoring.
 
 ---
 

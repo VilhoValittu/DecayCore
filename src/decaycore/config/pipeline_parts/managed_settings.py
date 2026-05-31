@@ -200,6 +200,9 @@ def _apply_auto_mode_managed_settings(data: Dict[str, Any]) -> None:
             if ui_key == "enable_afdw" and data.get("enable_afdw", None) is not None:
                 forced[ui_key] = bool(data.get("enable_afdw", False))
                 continue
+            if ui_key in ("mag_c_min", "mag_c_max") and data.get(ui_key) is not None:
+                forced[ui_key] = float(data[ui_key])
+                continue
             forced[ui_key] = merged_defaults[cfg_key]
     forced["gain"] = 0.10
 

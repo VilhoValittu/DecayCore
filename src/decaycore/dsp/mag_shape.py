@@ -24,7 +24,7 @@ _smooth_meas_freq_dep = smooth_meas_freq_dep
 
 def _select_active_band(freq_axis: np.ndarray, cfg: Any) -> tuple[np.ndarray, tuple[float, float]]:
     """Laskee nykylogiikkaa vastaavan aktiivisen korjauskaistan."""
-    fmin = 0.0 if cfg.hpf_settings else float(cfg.mag_c_min)
+    fmin = float(cfg.mag_c_min)
     fmax = float(cfg.mag_c_max)
     mask = (freq_axis >= fmin) & (freq_axis <= fmax)
     return mask, (fmin, fmax)

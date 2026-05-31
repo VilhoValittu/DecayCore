@@ -8,6 +8,22 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
+## [1.0.7] - 31-5-2026
+
+### Results — Hybrid IIR/FIR cuts now shown in overview
+
+When using Hybrid IIR + FIR mode, the designed modal cuts are now listed in the results overview. Each applied biquad cut is shown along with rejection reasons for any candidates that were ruled out, making it easy to see exactly what was corrected and why some cuts were skipped.
+
+### Plots — updated colors and contrast
+
+The color palette for prediction and results plots has been revised. Curves are now easier to distinguish from each other on both light and dark backgrounds.
+
+### Fixes and minor improvements
+
+- `mag_c_min` and `mag_c_max` are now handled correctly in managed settings; active band selection logic updated accordingly.
+
+---
+
 ## [1.0.6] - 26-5-2026
 
 ### Hybrid IIR + FIR bass correction — new feature
