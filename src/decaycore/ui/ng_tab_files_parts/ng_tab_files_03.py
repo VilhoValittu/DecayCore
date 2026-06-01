@@ -92,6 +92,124 @@ _SLOT_FILTER_THRESHOLD = -50.0
 _SUB_SLOT_KEYS = frozenset({"local_path_l_sub", "local_path_r_sub"})
 _SUB_FILENAME_PREFIXES = ("sub", "lfe", "sw")
 
+def _score_left_slot(
+    tokens: list[str],
+    *,
+    slot_key: str,
+    scale: float,
+    first: str,
+    last: str,
+    has_main: bool,
+    has_rightish: bool,
+    has_subish: bool,
+) -> float:
+    score = 0.0
+    if "left" in tokens:
+        score += 180.0 * scale
+    if any(token in {"fl", "frontleft", "frontl"} or _token_has_numeric_suffix(token, "fl") for token in tokens):
+        score += 140.0 * scale
+    if "lmain" in tokens:
+        score += 120.0 * scale
+    if first == "l" or last == "l":
+        score += 90.0 * scale
+    if slot_key == "local_path_l_main" and has_main:
+        score += 45.0 * scale
+    if slot_key == "local_path_l" and has_main:
+        score -= 10.0 * scale
+    if has_rightish:
+        score -= 160.0 * scale
+    if has_subish:
+        score -= 150.0 * scale
+    return score
+
+
+def _score_right_slot(
+    tokens: list[str],
+    *,
+    slot_key: str,
+    scale: float,
+    first: str,
+    last: str,
+    has_main: bool,
+    has_leftish: bool,
+    has_subish: bool,
+) -> float:
+    score = 0.0
+    if "right" in tokens:
+        score += 180.0 * scale
+    if any(token in {"fr", "frontright", "frontr"} or _token_has_numeric_suffix(token, "fr") for token in tokens):
+        score += 140.0 * scale
+    if "rmain" in tokens:
+        score += 120.0 * scale
+    if first == "r" or last == "r":
+        score += 90.0 * scale
+    if slot_key == "local_path_r_main" and has_main:
+        score += 45.0 * scale
+    if slot_key == "local_path_r" and has_main:
+        score -= 10.0 * scale
+    if has_leftish:
+        score -= 160.0 * scale
+    if has_subish:
+        score -= 150.0 * scale
+    return score
+
+
+def _score_left_sub_slot(
+    *,
+    scale: float,
+    first: str,
+    last: str,
+    has_main: bool,
+    has_subish: bool,
+    has_sub1ish: bool,
+    has_sub2ish: bool,
+    has_left_token: bool,
+    has_right_token: bool,
+) -> float:
+    score = 0.0
+    if has_subish:
+        score += 140.0 * scale
+    if has_sub1ish:
+        score += 120.0 * scale
+    if has_left_token or first == "l" or last == "l":
+        score += 35.0 * scale
+    if has_sub2ish and not has_sub1ish:
+        score -= 200.0 * scale
+    if has_right_token or first == "r" or last == "r":
+        score -= 30.0 * scale
+    if has_main:
+        score -= 110.0 * scale
+    return score
+
+
+def _score_right_sub_slot(
+    *,
+    scale: float,
+    first: str,
+    last: str,
+    has_main: bool,
+    has_subish: bool,
+    has_sub1ish: bool,
+    has_sub2ish: bool,
+    has_left_token: bool,
+    has_right_token: bool,
+) -> float:
+    score = 0.0
+    if has_subish:
+        score += 140.0 * scale
+    if has_sub2ish:
+        score += 120.0 * scale
+    if has_right_token or first == "r" or last == "r":
+        score += 35.0 * scale
+    if has_sub1ish and not has_sub2ish:
+        score -= 200.0 * scale
+    if has_left_token or first == "l" or last == "l":
+        score -= 30.0 * scale
+    if has_main:
+        score -= 110.0 * scale
+    return score
+
+
 def _score_measurement_tokens(tokens: list[str], slot_key: str, *, scale: float) -> float:
     if not tokens:
         return 0.0
@@ -104,77 +222,60 @@ def _score_measurement_tokens(tokens: list[str], slot_key: str, *, scale: float)
     has_subish = any(_token_is_subish(token) for token in tokens)
     has_sub1ish = any(_token_is_sub1ish(token) for token in tokens)
     has_sub2ish = any(_token_is_sub2ish(token) for token in tokens)
+    has_left_token = "left" in tokens
+    has_right_token = "right" in tokens
 
-    score = 0.0
     if slot_key in {"local_path_l", "local_path_l_main"}:
-        if "left" in tokens:
-            score += 180.0 * scale
-        if any(token in {"fl", "frontleft", "frontl"} or _token_has_numeric_suffix(token, "fl") for token in tokens):
-            score += 140.0 * scale
-        if "lmain" in tokens:
-            score += 120.0 * scale
-        if first == "l" or last == "l":
-            score += 90.0 * scale
-        if slot_key == "local_path_l_main" and has_main:
-            score += 45.0 * scale
-        if slot_key == "local_path_l" and has_main:
-            score -= 10.0 * scale
-        if has_rightish:
-            score -= 160.0 * scale
-        if has_subish:
-            score -= 150.0 * scale
-        return score
+        return _score_left_slot(
+            tokens,
+            slot_key=slot_key,
+            scale=scale,
+            first=first,
+            last=last,
+            has_main=has_main,
+            has_rightish=has_rightish,
+            has_subish=has_subish,
+        )
 
     if slot_key in {"local_path_r", "local_path_r_main"}:
-        if "right" in tokens:
-            score += 180.0 * scale
-        if any(token in {"fr", "frontright", "frontr"} or _token_has_numeric_suffix(token, "fr") for token in tokens):
-            score += 140.0 * scale
-        if "rmain" in tokens:
-            score += 120.0 * scale
-        if first == "r" or last == "r":
-            score += 90.0 * scale
-        if slot_key == "local_path_r_main" and has_main:
-            score += 45.0 * scale
-        if slot_key == "local_path_r" and has_main:
-            score -= 10.0 * scale
-        if has_leftish:
-            score -= 160.0 * scale
-        if has_subish:
-            score -= 150.0 * scale
-        return score
+        return _score_right_slot(
+            tokens,
+            slot_key=slot_key,
+            scale=scale,
+            first=first,
+            last=last,
+            has_main=has_main,
+            has_leftish=has_leftish,
+            has_subish=has_subish,
+        )
 
     if slot_key == "local_path_l_sub":
-        if has_subish:
-            score += 140.0 * scale
-        if has_sub1ish:
-            score += 120.0 * scale
-        if "left" in tokens or first == "l" or last == "l":
-            score += 35.0 * scale
-        if has_sub2ish and not has_sub1ish:
-            score -= 200.0 * scale
-        if "right" in tokens or first == "r" or last == "r":
-            score -= 30.0 * scale
-        if has_main:
-            score -= 110.0 * scale
-        return score
+        return _score_left_sub_slot(
+            scale=scale,
+            first=first,
+            last=last,
+            has_main=has_main,
+            has_subish=has_subish,
+            has_sub1ish=has_sub1ish,
+            has_sub2ish=has_sub2ish,
+            has_left_token=has_left_token,
+            has_right_token=has_right_token,
+        )
 
     if slot_key == "local_path_r_sub":
-        if has_subish:
-            score += 140.0 * scale
-        if has_sub2ish:
-            score += 120.0 * scale
-        if "right" in tokens or first == "r" or last == "r":
-            score += 35.0 * scale
-        if has_sub1ish and not has_sub2ish:
-            score -= 200.0 * scale
-        if "left" in tokens or first == "l" or last == "l":
-            score -= 30.0 * scale
-        if has_main:
-            score -= 110.0 * scale
-        return score
+        return _score_right_sub_slot(
+            scale=scale,
+            first=first,
+            last=last,
+            has_main=has_main,
+            has_subish=has_subish,
+            has_sub1ish=has_sub1ish,
+            has_sub2ish=has_sub2ish,
+            has_left_token=has_left_token,
+            has_right_token=has_right_token,
+        )
 
-    return score
+    return 0.0
 
 def _score_measurement_candidate(entry: dict[str, Any], slot_key: str) -> float:
     name_tokens = list(entry.get("name_tokens") or [])
@@ -547,6 +648,56 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:
 
     measurement_library_input.on_value_change(lambda _e: _refresh_measurement_library())
 
+    def _render_uploaded_file_status(
+        *,
+        file_data: dict,
+        upload_key: str,
+        holder,
+    ) -> None:
+        upload_format = _guess_upload_format(file_data)
+        if upload_format == "Unknown":
+            upload_format = t("file_status_unknown")
+        upload_size_bytes = int(file_data.get("size_bytes") or len(file_data.get("content", b"") or b""))
+        filename = str(file_data.get("filename", "") or "")
+
+        def _clear_uploaded_file() -> None:
+            holder.set_value(None)
+            _render_measurement_slots(upload_key)
+            _refresh_target_preview()
+
+        with ui.row().classes("items-center gap-2 text-xs overflow-hidden"):
+            ui.label("●").classes("text-green-500 shrink-0")
+            ui.label(filename).classes("truncate")
+            ui.label(f"· {upload_format} · {_format_upload_size(upload_size_bytes)}").classes("text-gray-400 shrink-0")
+        ui.button(
+            t("file_status_clear"),
+            on_click=_clear_uploaded_file,
+        ).props('color="secondary" flat size="xs"').classes("shrink-0")
+
+    def _render_local_path_status(*, local_path_info: dict) -> None:
+        path_format = str(local_path_info["format"] or "Unknown")
+        if path_format == "Unknown":
+            path_format = t("file_status_unknown")
+        filename = local_path_info["filename"]
+        if local_path_info["exists"]:
+            size_text = _format_upload_size(local_path_info["size_bytes"])
+            with ui.row().classes("items-center gap-2 text-xs overflow-hidden"):
+                ui.label("●").classes("text-green-500 shrink-0")
+                ui.label(filename).classes("truncate")
+                ui.label(f"· {path_format} · {size_text}").classes("text-gray-400 shrink-0")
+                if bool(local_path_info.get("has_harmonics", False)):
+                    ui.label("· H2–H5").classes("text-green-500 shrink-0")
+                if local_path_info.get("rt60_val", None) is not None:
+                    ui.label(f"· RT60 {float(local_path_info['rt60_val']):.2f}s").classes("text-green-500 shrink-0")
+            return
+        with ui.row().classes("items-center gap-2 text-xs overflow-hidden"):
+            ui.label("⚠").classes("text-yellow-500 shrink-0")
+            ui.label(filename).classes("truncate text-yellow-600")
+            ui.label(f"· {t('file_status_path_missing')}").classes("text-yellow-500 shrink-0")
+
+    def _render_empty_file_status() -> None:
+        ui.label("○  " + t("file_status_not_loaded")).classes("text-xs text-gray-400")
+
     def _render_file_status(
         *,
         channel_label: str,
@@ -570,50 +721,15 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:
             preview_source_text = t("file_status_preview_none")
         header_loaded = bool(upload_loaded or local_path_info["exists"])
 
-        def _clear_uploaded_file() -> None:
-            holder.set_value(None)
-            _render_measurement_slots(upload_key)
-            _refresh_target_preview()
-
         scope.clear()
         with scope:
             with ui.row().classes("w-full items-center justify-between gap-2 min-h-6"):
                 if upload_loaded:
-                    upload_format = _guess_upload_format(file_data)
-                    if upload_format == "Unknown":
-                        upload_format = t("file_status_unknown")
-                    upload_size_bytes = int(file_data.get("size_bytes") or len(file_data.get("content", b"") or b""))
-                    filename = str(file_data.get("filename", "") or "")
-                    with ui.row().classes("items-center gap-2 text-xs overflow-hidden"):
-                        ui.label("●").classes("text-green-500 shrink-0")
-                        ui.label(filename).classes("truncate")
-                        ui.label(f"· {upload_format} · {_format_upload_size(upload_size_bytes)}").classes("text-gray-400 shrink-0")
-                    ui.button(
-                        t("file_status_clear"),
-                        on_click=_clear_uploaded_file,
-                    ).props('color="secondary" flat size="xs"').classes("shrink-0")
+                    _render_uploaded_file_status(file_data=file_data or {}, upload_key=upload_key, holder=holder)
                 elif local_path_info["entered"]:
-                    path_format = str(local_path_info["format"] or "Unknown")
-                    if path_format == "Unknown":
-                        path_format = t("file_status_unknown")
-                    filename = local_path_info["filename"]
-                    if local_path_info["exists"]:
-                        size_text = _format_upload_size(local_path_info["size_bytes"])
-                        with ui.row().classes("items-center gap-2 text-xs overflow-hidden"):
-                            ui.label("●").classes("text-green-500 shrink-0")
-                            ui.label(filename).classes("truncate")
-                            ui.label(f"· {path_format} · {size_text}").classes("text-gray-400 shrink-0")
-                            if bool(local_path_info.get("has_harmonics", False)):
-                                ui.label("· H2–H5").classes("text-green-500 shrink-0")
-                            if local_path_info.get("rt60_val", None) is not None:
-                                ui.label(f"· RT60 {float(local_path_info['rt60_val']):.2f}s").classes("text-green-500 shrink-0")
-                    else:
-                        with ui.row().classes("items-center gap-2 text-xs overflow-hidden"):
-                            ui.label("⚠").classes("text-yellow-500 shrink-0")
-                            ui.label(filename).classes("truncate text-yellow-600")
-                            ui.label(f"· {t('file_status_path_missing')}").classes("text-yellow-500 shrink-0")
+                    _render_local_path_status(local_path_info=local_path_info)
                 else:
-                    ui.label("○  " + t("file_status_not_loaded")).classes("text-xs text-gray-400")
+                    _render_empty_file_status()
 
     async def _handle_upload(e, *, upload_key: str) -> None:
         file_holders[upload_key].set_value(_build_upload_payload(

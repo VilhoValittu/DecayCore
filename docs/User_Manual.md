@@ -36,10 +36,12 @@ DecayCore can work in several styles:
 
 Before you start, you need:
 
-- the built-in DecayCore measurement tool, recommended for new measurements, or existing compatible external measurements, including REW-style exports
+- a measurement source: either the built-in DecayCore measurement tool or compatible external measurements, including REW-style exports
 - a calibrated measurement microphone
 - separate left and right channel measurements or equivalent generated IR sources
 - a playback system that supports FIR convolution
+
+**Note on built-in measurement:** Measurement has been verified to work on Windows. Linux has been verified to work at least on Ubuntu 22.04. macOS could not be tested due to unavailable test hardware. Subwoofer measurement on Windows requires the playback device to be configured for 5.1 or 7.1 multichannel output in Windows Sound settings. Users on platforms without measurement support can use compatible external measurements.
 
 Common deployment targets:
 

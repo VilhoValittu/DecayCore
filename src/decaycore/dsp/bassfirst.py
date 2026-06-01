@@ -68,6 +68,95 @@ def _adaptive_mode_weights(rt60_lf_s: float | None, peak_q_values: list[float]) 
     _LOGGER.debug(f"room_mode_weights: gd={w_gd:.3f} mag={w_mag:.3f} q={w_q:.3f} (rt60={rt60_lf_s}, mean_q={np.mean(peak_q_values) if peak_q_values else 'none'})")
     return w_gd, w_mag, w_q
 
+def _wav_source_relaxed_thresholds(
+    *,
+    is_wav_source: bool,
+    rough_r0: float,
+    rough_r1: float,
+    pj_p0: float,
+    pj_p1: float,
+    gd_t0: float,
+    gd_t1: float,
+) -> tuple[float, float, float, float, float, float]:
+    if not bool(is_wav_source):
+        return float(rough_r0), float(rough_r1), float(pj_p0), float(pj_p1), float(gd_t0), float(gd_t1)
+    try:
+        return (
+            float(rough_r0) * 1.5,
+            float(rough_r1) * 1.5,
+            float(pj_p0) * 2.0,
+            float(pj_p1) * 2.0,
+            float(gd_t0) * 1.2,
+            float(gd_t1) * 1.2,
+        )
+    except (TypeError, ValueError):
+        return float(rough_r0), float(rough_r1), float(pj_p0), float(pj_p1), float(gd_t0), float(gd_t1)
+
+
+def _rt60_tightened_gd_thresholds(*, rt60_lf_s: float | None, gd_t0: float, gd_t1: float) -> tuple[float, float]:
+    if rt60_lf_s is None:
+        return float(gd_t0), float(gd_t1)
+    try:
+        rt60 = float(rt60_lf_s)
+        if np.isfinite(rt60) and rt60 > 0.05:
+            tighten = float(np.clip(1.0 - 0.375 * min(1.0, max(0.0, (rt60 - 0.4) / 0.8)), 0.7, 1.0))
+            if tighten < 0.999:
+                return float(gd_t0) * tighten, float(gd_t1) * tighten
+    except (TypeError, ValueError, FloatingPointError):
+        pass
+    return float(gd_t0), float(gd_t1)
+
+
+def _mode_q_norm(f: np.ndarray, mag_peak: np.ndarray, *, q0: float, q1: float) -> tuple[np.ndarray, list[float]]:
+    q_norm = np.zeros_like(f)
+    peak_q_values: list[float] = []
+    try:
+        peaks, _props = scipy.signal.find_peaks(mag_peak, prominence=1.0, distance=max(3, int(0.02 * len(f))))
+        if len(peaks) > 0:
+            results_half = scipy.signal.peak_widths(mag_peak, peaks, rel_height=0.5)
+            widths_bins = results_half[0]
+            for peak_idx, width_bins in zip(peaks, widths_bins):
+                lo = max(0, int(peak_idx - width_bins / 2))
+                hi = min(len(f) - 1, int(peak_idx + width_bins / 2))
+                bw_hz = max(1e-6, f[hi] - f[lo])
+                q_value = f[peak_idx] / bw_hz if bw_hz > 0 else 0.0
+                peak_q_values.append(q_value)
+                q_norm[peak_idx] = _clamp01((q_value - q0) / (q1 - q0 + 1e-12))
+            q_norm = scipy.ndimage.gaussian_filter1d(q_norm, sigma=6)
+    except (TypeError, ValueError, FloatingPointError, IndexError):
+        pass
+    return np.asarray(q_norm, dtype=float), list(peak_q_values)
+
+
+def _apply_room_mode_taper(
+    *,
+    f: np.ndarray,
+    room_mode_mask: np.ndarray,
+    rew_asym: bool,
+    left_ms: float,
+) -> np.ndarray:
+    try:
+        rew_asym_flag = bool(rew_asym)
+        try:
+            left_ms_val = float(left_ms)
+        except (TypeError, ValueError):
+            left_ms_val = 0.0
+        if not np.isfinite(left_ms_val):
+            left_ms_val = 0.0
+
+        if rew_asym_flag and (left_ms_val < 15.0):
+            f1, f2 = 60.0, 80.0
+        else:
+            f1, f2 = 20.0, 30.0
+        taper = np.ones_like(f, dtype=float)
+        taper[f <= f1] = 0.0
+        mid = (f > f1) & (f < f2)
+        taper[mid] = 0.5 - 0.5 * np.cos(np.pi * (f[mid] - f1) / (f2 - f1))
+        return np.asarray(room_mode_mask, dtype=float) * taper
+    except (TypeError, ValueError, FloatingPointError):
+        return np.asarray(room_mode_mask, dtype=float)
+
+
 def build_bassfirst_masks(freq_axis, m_raw_db, phase_rad_unwrapped, gd_ms, gd_diff,
                           is_wav_source=False, mode_f1=120.0, mode_f2=200.0,
                           rew_asym: bool = False, left_ms: float = 0.0,
@@ -81,30 +170,20 @@ def build_bassfirst_masks(freq_axis, m_raw_db, phase_rad_unwrapped, gd_ms, gd_di
     f = np.asarray(freq_axis, dtype=float)
     m = np.asarray(m_raw_db, dtype=float)
     ph = np.asarray(phase_rad_unwrapped, dtype=float)
-
-    if bool(is_wav_source):
-        try:
-            rough_r0 = float(rough_r0) * 1.5
-            rough_r1 = float(rough_r1) * 1.5
-            pj_p0 = float(pj_p0) * 2.0
-            pj_p1 = float(pj_p1) * 2.0
-            gd_t0 = float(gd_t0) * 1.2
-            gd_t1 = float(gd_t1) * 1.2
-        except (TypeError, ValueError):
-            pass
-
-    if rt60_lf_s is not None:
-        try:
-            _rt60 = float(rt60_lf_s)
-            if np.isfinite(_rt60) and _rt60 > 0.05:
-                # Long LF decay → tighten GD detection thresholds → more room-mode flags → conservative.
-                # RT60 ≤ 0.4 s: no change; RT60 ≥ 1.2 s: 0.7× (maximum tightening).
-                _tighten = float(np.clip(1.0 - 0.375 * min(1.0, max(0.0, (_rt60 - 0.4) / 0.8)), 0.7, 1.0))
-                if _tighten < 0.999:
-                    gd_t0 = float(gd_t0) * _tighten
-                    gd_t1 = float(gd_t1) * _tighten
-        except (TypeError, ValueError, FloatingPointError):
-            pass
+    rough_r0, rough_r1, pj_p0, pj_p1, gd_t0, gd_t1 = _wav_source_relaxed_thresholds(
+        is_wav_source=bool(is_wav_source),
+        rough_r0=float(rough_r0),
+        rough_r1=float(rough_r1),
+        pj_p0=float(pj_p0),
+        pj_p1=float(pj_p1),
+        gd_t0=float(gd_t0),
+        gd_t1=float(gd_t1),
+    )
+    gd_t0, gd_t1 = _rt60_tightened_gd_thresholds(
+        rt60_lf_s=rt60_lf_s,
+        gd_t0=float(gd_t0),
+        gd_t1=float(gd_t1),
+    )
 
     prior = _freq_prior(f, f1=mode_f1, f2=mode_f2)
     gd_norm = _clamp01((gd_diff - gd_t0) / (gd_t1 - gd_t0 + 1e-12))
@@ -113,23 +192,12 @@ def build_bassfirst_masks(freq_axis, m_raw_db, phase_rad_unwrapped, gd_ms, gd_di
     mag_peak = np.maximum(0.0, m - base)
     mag_norm = _clamp01((mag_peak - mag_a0) / (mag_a1 - mag_a0 + 1e-12))
 
-    q_norm = np.zeros_like(f)
-    peak_q_values: list[float] = []
-    try:
-        peaks, props = scipy.signal.find_peaks(mag_peak, prominence=1.0, distance=max(3, int(0.02*len(f))))
-        if len(peaks) > 0:
-            results_half = scipy.signal.peak_widths(mag_peak, peaks, rel_height=0.5)
-            widths_bins = results_half[0]
-            for pi, wb in zip(peaks, widths_bins):
-                lo = max(0, int(pi - wb/2))
-                hi = min(len(f)-1, int(pi + wb/2))
-                bw_hz = max(1e-6, f[hi] - f[lo])
-                Q = f[pi] / bw_hz if bw_hz > 0 else 0.0
-                peak_q_values.append(Q)
-                q_norm[pi] = _clamp01((Q - q0) / (q1 - q0 + 1e-12))
-            q_norm = scipy.ndimage.gaussian_filter1d(q_norm, sigma=6)
-    except (TypeError, ValueError, FloatingPointError, IndexError):
-        pass
+    q_norm, peak_q_values = _mode_q_norm(
+        f,
+        mag_peak,
+        q0=float(q0),
+        q1=float(q1),
+    )
 
     w_gd, w_mag, w_q = _adaptive_mode_weights(rt60_lf_s, peak_q_values)
     mode_score = prior * (w_gd*gd_norm + w_mag*mag_norm + w_q*q_norm)
@@ -139,27 +207,12 @@ def build_bassfirst_masks(freq_axis, m_raw_db, phase_rad_unwrapped, gd_ms, gd_di
         mag_only_mode = scipy.ndimage.gaussian_filter1d(_clamp01(mag_norm * prior), sigma=4)
         room_mode_mask = np.maximum(room_mode_mask, mag_only_mode)
 
-
-    try:
-        _rew_asym = bool(rew_asym)
-        try:
-            _left_ms = float(left_ms)
-        except (TypeError, ValueError):
-            _left_ms = 0.0
-        if not np.isfinite(_left_ms):
-            _left_ms = 0.0
-
-        if _rew_asym and (_left_ms < 15.0):
-            f1, f2 = 60.0, 80.0
-        else:
-            f1, f2 = 20.0, 30.0
-        taper = np.ones_like(f, dtype=float)
-        taper[f <= f1] = 0.0
-        mid = (f > f1) & (f < f2)
-        taper[mid] = 0.5 - 0.5*np.cos(np.pi * (f[mid] - f1) / (f2 - f1))
-        room_mode_mask = room_mode_mask * taper
-    except (TypeError, ValueError, FloatingPointError):
-        pass
+    room_mode_mask = _apply_room_mode_taper(
+        f=f,
+        room_mode_mask=room_mode_mask,
+        rew_asym=bool(rew_asym),
+        left_ms=float(left_ms),
+    )
 
     g = np.abs(_log_grad(m, f))
     rough = scipy.ndimage.gaussian_filter1d(g, sigma=6)

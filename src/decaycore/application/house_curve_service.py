@@ -191,71 +191,94 @@ def load_target_curve(file_content: bytes):
         return None, None
 
 
-def load_house_curve(data: dict, *, parse_measurements_from_path=None):
-    """Lataa tai lukee: load house curve."""
-    hc_f, hc_m = None, None
-    hc_source = "Preset"
-    mode_key = _normalize_hc_mode_key(data.get("hc_mode"))
-
-    # Synthesized adaptive target: arrays are stored in data by the pipeline
-    if mode_key == "Adaptive" and data.get("_synth_hc_f") is not None:
-        try:
-            synth_f = np.asarray(data["_synth_hc_f"], dtype=float)
-            synth_m = np.asarray(data["_synth_hc_m"], dtype=float)
-            if synth_f.size >= 4 and synth_m.size == synth_f.size:
-                hc_f = synth_f
-                hc_m = synth_m
-                hc_source = "Adaptive"
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-            pass
-
-    want_upload = (mode_key == "Upload")
+def _load_adaptive_house_curve(data: dict, *, mode_key: str):
+    if mode_key != "Adaptive" or data.get("_synth_hc_f") is None:
+        return None, None, "Preset"
+    try:
+        synth_f = np.asarray(data["_synth_hc_f"], dtype=float)
+        synth_m = np.asarray(data["_synth_hc_m"], dtype=float)
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        return None, None, "Preset"
+    if synth_f.size < 4 or synth_m.size != synth_f.size:
+        return None, None, "Preset"
+    return synth_f, synth_m, "Adaptive"
 
 
+def _load_upload_house_curve(data: dict, *, mode_key: str):
+    if mode_key != "Upload":
+        return None, None, "Preset"
     try:
         up = data.get("hc_custom_file", None) if isinstance(data, dict) else None
-        if want_upload and up and isinstance(up, dict) and up.get("content"):
+        if up and isinstance(up, dict) and up.get("content"):
             hc_f, hc_m = load_target_curve(up["content"])
             if hc_f is not None and hc_m is not None:
-                hc_source = "Upload"
+                return hc_f, hc_m, "Upload"
     except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-        pass
-
-    if hc_f is None and data.get("local_path_house"):
-        if callable(parse_measurements_from_path):
-            try:
-                hc_f, hc_m, _ = parse_measurements_from_path(data["local_path_house"])
-                if hc_f is not None:
-                    s_idx = np.argsort(hc_f)
-                    hc_f, hc_m = hc_f[s_idx], hc_m[s_idx]
-                    hc_source = "LocalFile"
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-                hc_f, hc_m = None, None
-
-    if hc_f is None:
-        preset_key = mode_key
-        if preset_key == "Upload":
-            preset_key = "Flat"
-            hc_source = "Upload (no file)"
-
-        if preset_key in ("Custom", "Upload"):
-            hc_f, hc_m = get_house_curve_by_name("Flat")
-            hc_source = "Upload (no file)"
-        else:
-            hc_f, hc_m = get_house_curve_by_name(preset_key)
-        if hc_source == "Preset":
-            hc_source = f"Preset ({preset_key})"
+        return None, None, "Preset"
+    return None, None, "Preset"
 
 
-    if hc_f is not None and hc_m is not None and hc_source.startswith("Preset"):
-        rt60_lf_s = _extract_rt60_lf(data)
-        if rt60_lf_s is not None and rt60_lf_s > 0.3:
-            hc_m = adapt_house_curve_to_rt60(hc_f, hc_m, rt60_lf_s)
-
+def _load_local_house_curve(data: dict, *, parse_measurements_from_path=None):
+    if not data.get("local_path_house") or not callable(parse_measurements_from_path):
+        return None, None, "Preset"
     try:
-        lvl_mode = str(data.get("lvl_mode", "Auto") or "Auto").strip().lower()
+        hc_f, hc_m, _ = parse_measurements_from_path(data["local_path_house"])
+        if hc_f is not None:
+            s_idx = np.argsort(hc_f)
+            return hc_f[s_idx], hc_m[s_idx], "LocalFile"
     except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-        lvl_mode = "auto"
+        return None, None, "Preset"
+    return None, None, "Preset"
+
+
+def _load_preset_house_curve(*, mode_key: str):
+    preset_key = mode_key
+    hc_source = "Preset"
+    if preset_key == "Upload":
+        preset_key = "Flat"
+        hc_source = "Upload (no file)"
+    if preset_key in ("Custom", "Upload"):
+        hc_f, hc_m = get_house_curve_by_name("Flat")
+        return hc_f, hc_m, "Upload (no file)"
+    hc_f, hc_m = get_house_curve_by_name(preset_key)
+    return hc_f, hc_m, f"Preset ({preset_key})"
+
+
+def _apply_rt60_preset_adaptation(*, hc_f, hc_m, hc_source: str, data: dict):
+    if hc_f is None or hc_m is None or not str(hc_source).startswith("Preset"):
+        return hc_m
+    rt60_lf_s = _extract_rt60_lf(data)
+    if rt60_lf_s is None or rt60_lf_s <= 0.3:
+        return hc_m
+    return adapt_house_curve_to_rt60(hc_f, hc_m, rt60_lf_s)
+
+
+def _level_mode_lower(data: dict) -> str:
+    try:
+        return str(data.get("lvl_mode", "Auto") or "Auto").strip().lower()
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        return "auto"
+
+
+def load_house_curve(data: dict, *, parse_measurements_from_path=None):
+    """Lataa tai lukee: load house curve."""
+    mode_key = _normalize_hc_mode_key(data.get("hc_mode"))
+    hc_f, hc_m, hc_source = _load_adaptive_house_curve(data, mode_key=mode_key)
+    if hc_f is None:
+        hc_f, hc_m, hc_source = _load_upload_house_curve(data, mode_key=mode_key)
+    if hc_f is None:
+        hc_f, hc_m, hc_source = _load_local_house_curve(data, parse_measurements_from_path=parse_measurements_from_path)
+    if hc_f is None:
+        hc_f, hc_m, hc_source = _load_preset_house_curve(mode_key=mode_key)
+
+    hc_m = _apply_rt60_preset_adaptation(
+        hc_f=hc_f,
+        hc_m=hc_m,
+        hc_source=str(hc_source),
+        data=data,
+    )
+
+    lvl_mode = _level_mode_lower(data)
     if hc_f is not None and hc_m is not None and "manual" in lvl_mode:
         hc_m = apply_manual_target_curve_tilt(
             hc_f,

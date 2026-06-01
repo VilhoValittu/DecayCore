@@ -293,59 +293,70 @@ def smooth_linear_boundary(freq_axis: np.ndarray, extra_phase: np.ndarray, phase
     return out
 
 
-def enforce_linear_tail_decay(freq_axis: np.ndarray, extra_phase: np.ndarray, phase_lim_hz: float, cfg, st) -> np.ndarray:
-    f = np.asarray(freq_axis, dtype=float)
-    x = np.asarray(extra_phase, dtype=float)
-    if f.size < 16 or x.size != f.size:
-        return x
+def _phase_tail_limit_hz(phase_lim_hz: float) -> float:
     try:
         f_lim = float(phase_lim_hz)
     except (TypeError, ValueError, OverflowError):
-        f_lim = 0.0
+        return 0.0
     if (not np.isfinite(f_lim)) or (f_lim <= 30.0):
-        return x
+        return 0.0
+    return float(f_lim)
+
+
+def _phase_tail_is_enabled(cfg) -> bool:
     try:
-        enabled = bool(getattr(cfg, "phase_tail_monotonic_enable", True))
+        return bool(getattr(cfg, "phase_tail_monotonic_enable", True))
     except (AttributeError, TypeError, ValueError):
-        enabled = True
-    if not enabled:
-        return x
+        return True
+
+
+def _phase_tail_start_ratio(cfg) -> float:
     try:
-        f_start_ratio = float(getattr(cfg, "phase_tail_start_ratio", 0.72) or 0.72)
+        value = float(getattr(cfg, "phase_tail_start_ratio", 0.72) or 0.72)
     except (AttributeError, TypeError, ValueError):
-        f_start_ratio = 0.72
-    f_start_ratio = float(np.clip(f_start_ratio if np.isfinite(f_start_ratio) else 0.72, 0.50, 0.92))
-    f_start = float(max(30.0, f_start_ratio * f_lim))
-    idx = np.flatnonzero(np.isfinite(f) & (f >= f_start) & (f <= f_lim))
-    if idx.size < 8:
-        return x
+        value = 0.72
+    return float(np.clip(value if np.isfinite(value) else 0.72, 0.50, 0.92))
+
+
+def _phase_tail_sigma_abs(cfg) -> float:
     try:
-        sigma_abs = float(getattr(cfg, "phase_tail_abs_smooth_sigma_bins", 2.5) or 2.5)
+        value = float(getattr(cfg, "phase_tail_abs_smooth_sigma_bins", 2.5) or 2.5)
     except (AttributeError, TypeError, ValueError):
-        sigma_abs = 2.5
-    sigma_abs = float(np.clip(sigma_abs if np.isfinite(sigma_abs) else 2.5, 0.0, 8.0))
+        value = 2.5
+    return float(np.clip(value if np.isfinite(value) else 2.5, 0.0, 8.0))
+
+
+def _phase_tail_cosine_strength(cfg) -> float:
     try:
-        cosine_strength = float(getattr(cfg, "phase_tail_cosine_strength", 0.85) or 0.85)
+        value = float(getattr(cfg, "phase_tail_cosine_strength", 0.85) or 0.85)
     except (AttributeError, TypeError, ValueError):
-        cosine_strength = 0.85
-    cosine_strength = float(np.clip(cosine_strength if np.isfinite(cosine_strength) else 0.85, 0.0, 1.0))
-    out = x.copy()
-    x_tail = out[idx]
-    abs_tail = np.abs(x_tail)
+        value = 0.85
+    return float(np.clip(value if np.isfinite(value) else 0.85, 0.0, 1.0))
+
+
+def _phase_tail_profile(x_tail: np.ndarray, *, sigma_abs: float, cosine_strength: float) -> tuple[np.ndarray, float]:
+    abs_tail = np.abs(np.asarray(x_tail, dtype=float))
     if sigma_abs > 1e-9:
-        abs_tail = scipy.ndimage.gaussian_filter1d(abs_tail, sigma=sigma_abs, mode="nearest")
+        abs_tail = scipy.ndimage.gaussian_filter1d(abs_tail, sigma=float(sigma_abs), mode="nearest")
     mono = np.minimum.accumulate(abs_tail)
     if mono.size >= 2 and cosine_strength > 1e-6:
         t = np.linspace(0.0, 1.0, mono.size, endpoint=True, dtype=float)
         cos_env = float(max(mono[0], 0.0)) * (0.5 + 0.5 * np.cos(np.pi * t))
-        mono = np.maximum((1.0 - cosine_strength) * mono + cosine_strength * np.minimum(mono, cos_env), 0.0)
+        mono = np.maximum(
+            (1.0 - float(cosine_strength)) * mono + float(cosine_strength) * np.minimum(mono, cos_env),
+            0.0,
+        )
     head_n = int(max(3, mono.size // 6))
     sign0 = float(np.sign(np.median(x_tail[:head_n]))) or float(np.sign(x_tail[0])) or 1.0
-    # Apply final cosine fade-to-zero at phase_limit boundary. This compounds with the
-    # cosine_strength-weighted envelope from lines 288-291, creating a more aggressive
-    # boundary taper than cosine_strength alone would suggest.
-    mono *= np.clip(0.5 + 0.5 * np.cos(np.pi * np.linspace(0.0, 1.0, mono.size, endpoint=True, dtype=float)), 0.0, 1.0)
-    out[idx] = sign0 * mono
+    fade = np.clip(
+        0.5 + 0.5 * np.cos(np.pi * np.linspace(0.0, 1.0, mono.size, endpoint=True, dtype=float)),
+        0.0,
+        1.0,
+    )
+    return np.asarray(mono * fade, dtype=float), float(sign0)
+
+
+def _phase_tail_write_stats(st, *, f_start: float, f_lim: float, sigma_abs: float, f_start_ratio: float, cosine_strength: float) -> None:
     try:
         if isinstance(st, dict):
             st["phase_tail_monotonic_enabled"] = True
@@ -356,6 +367,40 @@ def enforce_linear_tail_decay(freq_axis: np.ndarray, extra_phase: np.ndarray, ph
             st["phase_tail_cosine_strength"] = float(cosine_strength)
     except (TypeError, ValueError):
         pass
+
+
+def enforce_linear_tail_decay(freq_axis: np.ndarray, extra_phase: np.ndarray, phase_lim_hz: float, cfg, st) -> np.ndarray:
+    f = np.asarray(freq_axis, dtype=float)
+    x = np.asarray(extra_phase, dtype=float)
+    if f.size < 16 or x.size != f.size:
+        return x
+    f_lim = _phase_tail_limit_hz(phase_lim_hz)
+    if f_lim <= 0.0:
+        return x
+    if not _phase_tail_is_enabled(cfg):
+        return x
+    f_start_ratio = _phase_tail_start_ratio(cfg)
+    f_start = float(max(30.0, f_start_ratio * f_lim))
+    idx = np.flatnonzero(np.isfinite(f) & (f >= f_start) & (f <= f_lim))
+    if idx.size < 8:
+        return x
+    sigma_abs = _phase_tail_sigma_abs(cfg)
+    cosine_strength = _phase_tail_cosine_strength(cfg)
+    out = x.copy()
+    mono, sign0 = _phase_tail_profile(
+        np.asarray(out[idx], dtype=float),
+        sigma_abs=float(sigma_abs),
+        cosine_strength=float(cosine_strength),
+    )
+    out[idx] = float(sign0) * np.asarray(mono, dtype=float)
+    _phase_tail_write_stats(
+        st,
+        f_start=float(f_start),
+        f_lim=float(f_lim),
+        sigma_abs=float(sigma_abs),
+        f_start_ratio=float(f_start_ratio),
+        cosine_strength=float(cosine_strength),
+    )
     return out
 
 

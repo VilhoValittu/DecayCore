@@ -218,8 +218,8 @@ def _validated_device_format(data: dict | None) -> str:
     return fmt if fmt in ("S32_LE", "S16_LE") else "S32_LE"
 
 
-def _direct_dac_yaml_export_settings(data: dict | None, *, include_sub: bool) -> dict[str, Any]:
-    settings: dict[str, Any] = {
+def _direct_dac_default_settings() -> dict[str, Any]:
+    return {
         "include_sub": False,
         "sub_allpass_freq_hz": None,
         "sub_allpass_q": None,
@@ -233,68 +233,61 @@ def _direct_dac_yaml_export_settings(data: dict | None, *, include_sub: bool) ->
         "sub_hpf_order": 2,
         "sub_lpf_order": 2,
     }
+
+
+def _safe_export_float(data: dict | None, key: str, default: float) -> float:
+    try:
+        value = float((data or {}).get(key, default) or default)
+    except _RECOVERABLE_JSON_SAFE_EXCEPTIONS:
+        return float(default)
+    return float(value) if math.isfinite(value) else float(default)
+
+
+def _safe_export_xo_order(data: dict | None, key: str, default_slope: float = 12.0) -> int:
+    try:
+        slope = float((data or {}).get(key, default_slope) or default_slope)
+    except _RECOVERABLE_JSON_SAFE_EXCEPTIONS:
+        return 2
+    return int(round(float(slope) / 6.0))
+
+
+def _apply_direct_dac_sub_xo_settings(settings: dict[str, Any], data: dict | None) -> None:
+    main_hpf_hz = _safe_export_float(data, "sub_crossover_hz", _safe_export_float(data, "avr_crossover_hz", 80.0))
+    sub_hpf_hz = _safe_export_float(data, "sub_hpf_freq", 20.0)
+    sub_lpf_hz = _safe_export_float(data, "direct_dac_sub_lpf_hz", float(main_hpf_hz) + 20.0)
+    settings["main_hpf_hz"] = float(main_hpf_hz if main_hpf_hz > 0.0 else 80.0)
+    settings["sub_hpf_hz"] = float(sub_hpf_hz if sub_hpf_hz > 0.0 else 20.0)
+    if sub_lpf_hz <= 0.0:
+        sub_lpf_hz = float(settings["main_hpf_hz"]) + 20.0
+    settings["sub_lpf_hz"] = float(max(float(settings["main_hpf_hz"]), float(sub_lpf_hz)))
+    xo_order = _safe_export_xo_order(data, "sub_crossover_slope", 12.0)
+    sub_hpf_order = _safe_export_xo_order(data, "sub_hpf_slope", 12.0)
+    settings["main_hpf_order"] = int(xo_order)
+    settings["sub_lpf_order"] = int(xo_order)
+    settings["sub_hpf_order"] = int(sub_hpf_order)
+
+
+def _apply_direct_dac_sub_allpass_settings(settings: dict[str, Any], data: dict | None) -> None:
+    if not bool((data or {}).get("bass_integration_allpass_auto_applied", False)):
+        return
+    freq_hz = _safe_export_float(data, "bass_integration_allpass_freq_hz", float("nan"))
+    q = _safe_export_float(data, "bass_integration_allpass_q", float("nan"))
+    if math.isfinite(freq_hz) and math.isfinite(q) and freq_hz > 0.0 and q > 0.0:
+        settings["sub_allpass_freq_hz"] = float(freq_hz)
+        settings["sub_allpass_q"] = float(q)
+
+
+def _direct_dac_yaml_export_settings(data: dict | None, *, include_sub: bool) -> dict[str, Any]:
+    settings = _direct_dac_default_settings()
     if not bool(include_sub):
         return settings
 
     settings["include_sub"] = True
-    try:
-        sub_delay_ms = float((data or {}).get("bass_integration_sub_delay_ms", 0.0) or 0.0)
-    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
-        sub_delay_ms = 0.0
-    try:
-        sub_gain_trim_db = float((data or {}).get("bass_integration_sub_gain_trim_db", 0.0) or 0.0)
-    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
-        sub_gain_trim_db = 0.0
-    settings["sub_delay_ms"] = float(sub_delay_ms if math.isfinite(sub_delay_ms) else 0.0)
+    settings["sub_delay_ms"] = float(_safe_export_float(data, "bass_integration_sub_delay_ms", 0.0))
     settings["sub_polarity_invert"] = bool((data or {}).get("bass_integration_sub_polarity_invert", False))
-    settings["sub_gain_trim_db"] = float(sub_gain_trim_db if math.isfinite(sub_gain_trim_db) else 0.0)
-    try:
-        main_hpf_hz = float((data or {}).get("sub_crossover_hz", (data or {}).get("avr_crossover_hz", 80.0)) or 80.0)
-    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
-        main_hpf_hz = 80.0
-    try:
-        sub_hpf_hz = float((data or {}).get("sub_hpf_freq", 20.0) or 20.0)
-    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
-        sub_hpf_hz = 20.0
-    try:
-        sub_lpf_hz = float((data or {}).get("direct_dac_sub_lpf_hz", main_hpf_hz + 20.0) or main_hpf_hz + 20.0)
-    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
-        sub_lpf_hz = main_hpf_hz + 20.0
-    if not math.isfinite(main_hpf_hz) or main_hpf_hz <= 0.0:
-        main_hpf_hz = 80.0
-    if not math.isfinite(sub_hpf_hz) or sub_hpf_hz <= 0.0:
-        sub_hpf_hz = 20.0
-    if not math.isfinite(sub_lpf_hz) or sub_lpf_hz <= 0.0:
-        sub_lpf_hz = main_hpf_hz + 20.0
-    settings["main_hpf_hz"] = float(main_hpf_hz)
-    settings["sub_hpf_hz"] = float(sub_hpf_hz)
-    settings["sub_lpf_hz"] = float(max(main_hpf_hz, sub_lpf_hz))
-    try:
-        xo_order = int(round(float((data or {}).get("sub_crossover_slope", 12) or 12) / 6.0))
-    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
-        xo_order = 2
-    try:
-        sub_hpf_order = int(round(float((data or {}).get("sub_hpf_slope", 12) or 12) / 6.0))
-    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
-        sub_hpf_order = 2
-    settings["main_hpf_order"] = int(xo_order)
-    settings["sub_lpf_order"] = int(xo_order)
-    settings["sub_hpf_order"] = int(sub_hpf_order)
-    if not bool((data or {}).get("bass_integration_allpass_auto_applied", False)):
-        return settings
-
-    try:
-        freq_hz = float((data or {}).get("bass_integration_allpass_freq_hz", 0.0) or 0.0)
-    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
-        freq_hz = float("nan")
-    try:
-        q = float((data or {}).get("bass_integration_allpass_q", 0.707) or 0.707)
-    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
-        q = float("nan")
-
-    if math.isfinite(freq_hz) and math.isfinite(q) and freq_hz > 0.0 and q > 0.0:
-        settings["sub_allpass_freq_hz"] = float(freq_hz)
-        settings["sub_allpass_q"] = float(q)
+    settings["sub_gain_trim_db"] = float(_safe_export_float(data, "bass_integration_sub_gain_trim_db", 0.0))
+    _apply_direct_dac_sub_xo_settings(settings, data)
+    _apply_direct_dac_sub_allpass_settings(settings, data)
     return settings
 
 

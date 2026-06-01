@@ -40,6 +40,69 @@ def _get_pkg():
     return _get_bass_integration_pkg(__name__)
 
 
+def _allpass_result(
+    *,
+    enabled: bool,
+    freq_hz: float,
+    q: float,
+    baseline: dict[str, Any],
+    optimized: dict[str, Any],
+    improvement_score: float,
+    reason: str,
+) -> dict[str, Any]:
+    return {
+        "enabled": bool(enabled),
+        "freq_hz": float(freq_hz) if bool(enabled) else 0.0,
+        "q": float(q) if bool(enabled) else 0.707,
+        "baseline": baseline,
+        "optimized": optimized,
+        "improvement_score": float(improvement_score) if np.isfinite(improvement_score) else 0.0,
+        "reason": str(reason),
+    }
+
+
+def _compute_direct_dac_metrics(
+    pkg,
+    bundle: BassIntegrationBundle,
+    *,
+    fc: float,
+    profile: str,
+    main_hpf_order: int,
+    sub_lpf_order: int,
+    sub_hp: float,
+    sub_hpf_order: int,
+    combine_mode_norm: str,
+    sub_delay_ms: float,
+    sub_polarity_invert: bool,
+    sub_gain_trim_db: float,
+    sub_lpf_hz: float | None,
+    sub_allpass_freq_hz: float | None = None,
+    sub_allpass_q: float | None = None,
+) -> dict[str, Any]:
+    kwargs: dict[str, Any] = {
+        "mode": "direct_dac",
+        "main_hpf_order": int(main_hpf_order),
+        "sub_lpf_order": int(sub_lpf_order),
+        "sub_hpf_hz": float(sub_hp),
+        "sub_hpf_order": int(sub_hpf_order),
+        "sub_combine_mode": combine_mode_norm,
+        "sub_delay_ms": float(sub_delay_ms),
+        "sub_polarity_invert": bool(sub_polarity_invert),
+        "sub_gain_trim_db": float(sub_gain_trim_db),
+        "sub_lpf_hz": sub_lpf_hz,
+    }
+    if sub_allpass_freq_hz is not None:
+        kwargs["sub_allpass_freq_hz"] = float(sub_allpass_freq_hz)
+    if sub_allpass_q is not None:
+        kwargs["sub_allpass_q"] = float(sub_allpass_q)
+    return pkg.compute_final_bass_integration_metrics(
+        bundle,
+        float(fc),
+        profile,
+        **kwargs,
+    )
+
+
 def recommend_direct_dac_allpass(
     bundle: BassIntegrationBundle,
     *,
@@ -60,16 +123,16 @@ def recommend_direct_dac_allpass(
     combine_mode_norm = normalize_sub_combine_mode(sub_combine_mode)
     pkg = _get_pkg()
 
-    baseline_metrics = pkg.compute_final_bass_integration_metrics(
+    baseline_metrics = _compute_direct_dac_metrics(
+        pkg,
         bundle,
-        float(fc),
-        profile,
-        mode="direct_dac",
+        fc=float(fc),
+        profile=profile,
         main_hpf_order=int(main_hpf_order),
         sub_lpf_order=int(sub_lpf_order),
-        sub_hpf_hz=float(sub_hp),
+        sub_hp=float(sub_hp),
         sub_hpf_order=int(sub_hpf_order),
-        sub_combine_mode=combine_mode_norm,
+        combine_mode_norm=combine_mode_norm,
         sub_delay_ms=float(sub_delay_ms),
         sub_polarity_invert=bool(sub_polarity_invert),
         sub_gain_trim_db=float(sub_gain_trim_db),
@@ -78,38 +141,38 @@ def recommend_direct_dac_allpass(
     baseline = _final_metric_snapshot(baseline_metrics)
     baseline_score = _safe_float(baseline_metrics.get("objective", float("nan")), float("nan"))
     if (not np.isfinite(fc)) or fc <= 0.0 or fc <= (sub_hp + 1.0):
-        return {
-            "enabled": False,
-            "freq_hz": 0.0,
-            "q": 0.707,
-            "baseline": baseline,
-            "optimized": baseline,
-            "improvement_score": 0.0,
-            "reason": "No meaningful improvement found.",
-        }
+        return _allpass_result(
+            enabled=False,
+            freq_hz=0.0,
+            q=0.707,
+            baseline=baseline,
+            optimized=baseline,
+            improvement_score=0.0,
+            reason="No meaningful improvement found.",
+        )
 
     if _allpass_baseline_good_enough(baseline_metrics):
-        return {
-            "enabled": False,
-            "freq_hz": 0.0,
-            "q": 0.707,
-            "baseline": baseline,
-            "optimized": baseline,
-            "improvement_score": 0.0,
-            "reason": "Baseline already good enough; auto allpass skipped.",
-        }
+        return _allpass_result(
+            enabled=False,
+            freq_hz=0.0,
+            q=0.707,
+            baseline=baseline,
+            optimized=baseline,
+            improvement_score=0.0,
+            reason="Baseline already good enough; auto allpass skipped.",
+        )
 
     def _evaluate(freq_hz: float, q: float) -> dict[str, Any] | None:
-        metrics = pkg.compute_final_bass_integration_metrics(
+        metrics = _compute_direct_dac_metrics(
+            pkg,
             bundle,
-            float(fc),
-            profile,
-            mode="direct_dac",
+            fc=float(fc),
+            profile=profile,
             main_hpf_order=int(main_hpf_order),
             sub_lpf_order=int(sub_lpf_order),
-            sub_hpf_hz=float(sub_hp),
+            sub_hp=float(sub_hp),
             sub_hpf_order=int(sub_hpf_order),
-            sub_combine_mode=combine_mode_norm,
+            combine_mode_norm=combine_mode_norm,
             sub_delay_ms=float(sub_delay_ms),
             sub_polarity_invert=bool(sub_polarity_invert),
             sub_gain_trim_db=float(sub_gain_trim_db),
@@ -130,15 +193,15 @@ def recommend_direct_dac_allpass(
         evaluate=_evaluate,
     )
     if best_candidate is None:
-        return {
-            "enabled": False,
-            "freq_hz": 0.0,
-            "q": 0.707,
-            "baseline": baseline,
-            "optimized": baseline,
-            "improvement_score": 0.0,
-            "reason": "No meaningful improvement found.",
-        }
+        return _allpass_result(
+            enabled=False,
+            freq_hz=0.0,
+            q=0.707,
+            baseline=baseline,
+            optimized=baseline,
+            improvement_score=0.0,
+            reason="No meaningful improvement found.",
+        )
 
     optimized = _final_metric_snapshot(best_candidate or baseline_metrics)
     improvement = _allpass_improvement_metrics(
@@ -148,15 +211,15 @@ def recommend_direct_dac_allpass(
         optimized_score=_safe_float((best_candidate or {}).get("score", float("nan")), float("nan")),
     )
     enabled = _allpass_candidate_enabled(improvement)
-    return {
-        "enabled": bool(enabled),
-        "freq_hz": float((best_candidate or {}).get("bass_allpass_freq_hz", 0.0)) if enabled else 0.0,
-        "q": float((best_candidate or {}).get("bass_allpass_q", 0.707)) if enabled else 0.707,
-        "baseline": baseline,
-        "optimized": optimized,
-        "improvement_score": float(improvement.get("improvement_score", 0.0) or 0.0),
-        "reason": "Applied shared mono-sub allpass." if enabled else "No meaningful improvement found.",
-    }
+    return _allpass_result(
+        enabled=bool(enabled),
+        freq_hz=float((best_candidate or {}).get("bass_allpass_freq_hz", 0.0)),
+        q=float((best_candidate or {}).get("bass_allpass_q", 0.707)),
+        baseline=baseline,
+        optimized=optimized,
+        improvement_score=float(improvement.get("improvement_score", 0.0) or 0.0),
+        reason="Applied shared mono-sub allpass." if enabled else "No meaningful improvement found.",
+    )
 
 
 def _run_allpass_candidate_search(

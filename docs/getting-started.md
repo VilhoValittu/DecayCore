@@ -11,6 +11,8 @@ DecayCore is designed to measure your system, generate FIR room correction filte
 
 1. Download the latest release build.
 2. Measure your speakers with DecayCore's built-in measurement workflow, or import existing compatible measurement files.
+   - Built-in measurement: Measurement has been verified to work on Windows. Linux has been verified to work at least on Ubuntu 22.04. macOS could not be tested due to unavailable test hardware.
+   - Subwoofer measurement on Windows: Ensure your playback device is configured for 5.1 or 7.1 multichannel in Windows Sound settings.
 3. Review the measured response.
 4. Choose a filter mode and target behavior.
 5. Generate FIR correction filters.

@@ -107,29 +107,31 @@ def _prepare_base_data(base_data: dict, measurements: dict) -> tuple[dict, dict]
     return cache_base_data, search_base_data
 
 
-def _finish_search_setup(context: AutoSearchExecutionContext) -> None:
-    search_base_data = context.search_base_data
-    if str(context.filter_key) in ("linear", "asym"):
-        prev_phase_limit = auto_api._auto_safe_float(search_base_data.get("phase_limit", float("nan")), float("nan"))
-        clamped_phase_limit = round(
-            float(auto_api._auto_phase_limit_center(search_base_data.get("phase_limit", None))),
-            1,
+def _setup_clamp_phase_limit_if_needed(*, search_base_data: dict, filter_key: str) -> None:
+    if str(filter_key) not in ("linear", "asym"):
+        return
+    prev_phase_limit = auto_api._auto_safe_float(search_base_data.get("phase_limit", float("nan")), float("nan"))
+    clamped_phase_limit = round(
+        float(auto_api._auto_phase_limit_center(search_base_data.get("phase_limit", None))),
+        1,
+    )
+    search_base_data["phase_limit"] = float(clamped_phase_limit)
+    if np.isfinite(prev_phase_limit) and abs(float(prev_phase_limit) - float(clamped_phase_limit)) > 1e-9:
+        logger.info(
+            "Automatic mode: clamped phase_limit seed "
+            f"{float(prev_phase_limit):.1f} -> {float(clamped_phase_limit):.1f} Hz "
+            f"for {str(filter_key)} filter"
         )
-        search_base_data["phase_limit"] = float(clamped_phase_limit)
-        if np.isfinite(prev_phase_limit) and abs(float(prev_phase_limit) - float(clamped_phase_limit)) > 1e-9:
-            logger.info(
-                "Automatic mode: clamped phase_limit seed "
-                f"{float(prev_phase_limit):.1f} -> {float(clamped_phase_limit):.1f} Hz "
-                f"for {str(context.filter_key)} filter"
-            )
 
+
+def _setup_candidates_or_optuna(*, context: AutoSearchExecutionContext) -> None:
     context.use_optuna_trials = bool(
         str(context.optimizer_backend) == "optuna" and auto_api._auto_optuna_module_ready(context.optuna_mod)
     )
     context.candidates = []
     if not bool(context.use_optuna_trials):
         context.candidates = auto_api._build_auto_mode_candidates(
-            search_base_data,
+            context.search_base_data,
             n_trials=int(context.n_trials_eff),
             seed=context.seed,
         )
@@ -140,10 +142,11 @@ def _finish_search_setup(context: AutoSearchExecutionContext) -> None:
             f"startup={int(auto_api._auto_optuna_startup_for_phase_kind(context.cfg, phase_kind='phase1', total=int(context.n_trials_eff)))})"
         )
 
+
+def _safe_target_label(search_base_data: dict) -> str:
     try:
         target_label = str(search_base_data.get("hc_mode", "") or "").strip()
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -156,21 +159,10 @@ def _finish_search_setup(context: AutoSearchExecutionContext) -> None:
         NameError,
     ):
         target_label = ""
-    context.winner_target_name = str(target_label or "").strip() or None
-    if not target_label:
-        target_label = "n/a"
-    f6_hz = auto_api._auto_safe_float(
-        search_base_data.get("_auto_mag_c_min_hz", search_base_data.get("mag_c_min", float("nan"))),
-        float("nan"),
-    )
-    low_bass_hz = auto_api._auto_safe_float(
-        search_base_data.get("_auto_low_bass_cut_hz", search_base_data.get("low_bass_cut_hz", float("nan"))),
-        float("nan"),
-    )
-    exc_hz = auto_api._auto_safe_float(
-        search_base_data.get("_auto_exc_freq_hz", search_base_data.get("exc_freq", float("nan"))),
-        float("nan"),
-    )
+    return str(target_label or "").strip()
+
+
+def _resolve_hpf_status_fields(*, search_base_data: dict, hpf: dict | None) -> tuple[bool, float, float]:
     hpf_enabled = bool(search_base_data.get("hpf_enable", False))
     hpf_freq = auto_api._auto_safe_float(search_base_data.get("hpf_freq", float("nan")), float("nan"))
     hpf_slope = auto_api._auto_safe_float(search_base_data.get("hpf_slope", float("nan")), float("nan"))
@@ -183,16 +175,35 @@ def _finish_search_setup(context: AutoSearchExecutionContext) -> None:
             hpf_freq = auto_api._auto_safe_float(hpf_meta.get("freq", float("nan")), float("nan"))
         if not np.isfinite(hpf_slope):
             hpf_slope = auto_api._auto_safe_float(hpf_meta.get("slope_db_oct", float("nan")), float("nan"))
-    if isinstance(context.hpf, dict):
+    if isinstance(hpf, dict):
         if not hpf_enabled:
-            hpf_enabled = bool(context.hpf.get("enabled", False))
+            hpf_enabled = bool(hpf.get("enabled", False))
         if not np.isfinite(hpf_freq):
-            hpf_freq = auto_api._auto_safe_float(context.hpf.get("freq", float("nan")), float("nan"))
+            hpf_freq = auto_api._auto_safe_float(hpf.get("freq", float("nan")), float("nan"))
         if not np.isfinite(hpf_slope):
-            hpf_order = auto_api._auto_safe_float(context.hpf.get("order", float("nan")), float("nan"))
+            hpf_order = auto_api._auto_safe_float(hpf.get("order", float("nan")), float("nan"))
             if np.isfinite(hpf_order) and float(hpf_order) > 0.0:
                 hpf_slope = float(6.0 * float(hpf_order))
+    return bool(hpf_enabled), float(hpf_freq), float(hpf_slope)
 
+
+def _build_status_prefix(*, search_base_data: dict, target_label: str, hpf: dict | None) -> str:
+    f6_hz = auto_api._auto_safe_float(
+        search_base_data.get("_auto_mag_c_min_hz", search_base_data.get("mag_c_min", float("nan"))),
+        float("nan"),
+    )
+    low_bass_hz = auto_api._auto_safe_float(
+        search_base_data.get("_auto_low_bass_cut_hz", search_base_data.get("low_bass_cut_hz", float("nan"))),
+        float("nan"),
+    )
+    exc_hz = auto_api._auto_safe_float(
+        search_base_data.get("_auto_exc_freq_hz", search_base_data.get("exc_freq", float("nan"))),
+        float("nan"),
+    )
+    hpf_enabled, hpf_freq, hpf_slope = _resolve_hpf_status_fields(
+        search_base_data=search_base_data,
+        hpf=hpf,
+    )
     low_txt = f"low-cut {low_bass_hz:.1f} Hz" if np.isfinite(low_bass_hz) else "low-cut n/a"
     exc_txt = f"exc seed {exc_hz:.1f} Hz" if np.isfinite(exc_hz) else "exc seed n/a"
     if bool(hpf_enabled) and np.isfinite(hpf_freq):
@@ -202,22 +213,16 @@ def _finish_search_setup(context: AutoSearchExecutionContext) -> None:
             hpf_txt = f"hpf {hpf_freq:.1f} Hz"
     else:
         hpf_txt = "hpf off"
-
     if np.isfinite(f6_hz):
-        context.status_prefix = (
+        return (
             f"DecayCore automatic mode [{target_label}] "
             f"(-6 dB {f6_hz:.1f} Hz, {low_txt}, {exc_txt}, {hpf_txt})"
         )
-    else:
-        context.status_prefix = f"DecayCore automatic mode [{target_label}] ({low_txt}, {exc_txt}, {hpf_txt})"
-    refine_trial_hint = int(context.cfg.refine_trial_hint(context.goal))
-    logger.info(
-        "Automatic mode search: "
-        f"goal={context.goal}, basis={context.rank_basis}, target={target_label}, "
-        f"trials={int(context.n_trials_eff)}+{int(refine_trial_hint)}, "
-        f"cache_schema={int(auto_api.AUTO_MODE_CACHE_SCHEMA_VERSION)}"
-    )
+    return f"DecayCore automatic mode [{target_label}] ({low_txt}, {exc_txt}, {hpf_txt})"
 
+
+def _maybe_seed_search_state_baseline(*, context: AutoSearchExecutionContext) -> None:
+    search_base_data = context.search_base_data
     context.search_state = auto_api._AutoModeSearchState()
     try:
         seed_metrics = dict(search_base_data.get("_auto_target_seed_metrics", {}) or {})
@@ -235,7 +240,6 @@ def _finish_search_setup(context: AutoSearchExecutionContext) -> None:
                 auto_api._auto_safe_float(seed_metrics.get("rank_score"), 0.0),
             )
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -248,6 +252,32 @@ def _finish_search_setup(context: AutoSearchExecutionContext) -> None:
         NameError,
     ):
         logger.exception("cache seed baseline")
+
+
+def _finish_search_setup(context: AutoSearchExecutionContext) -> None:
+    search_base_data = context.search_base_data
+    _setup_clamp_phase_limit_if_needed(
+        search_base_data=search_base_data,
+        filter_key=str(context.filter_key),
+    )
+    _setup_candidates_or_optuna(context=context)
+    target_label = _safe_target_label(search_base_data)
+    context.winner_target_name = str(target_label or "").strip() or None
+    if not target_label:
+        target_label = "n/a"
+    context.status_prefix = _build_status_prefix(
+        search_base_data=search_base_data,
+        target_label=str(target_label),
+        hpf=context.hpf,
+    )
+    refine_trial_hint = int(context.cfg.refine_trial_hint(context.goal))
+    logger.info(
+        "Automatic mode search: "
+        f"goal={context.goal}, basis={context.rank_basis}, target={target_label}, "
+        f"trials={int(context.n_trials_eff)}+{int(refine_trial_hint)}, "
+        f"cache_schema={int(auto_api.AUTO_MODE_CACHE_SCHEMA_VERSION)}"
+    )
+    _maybe_seed_search_state_baseline(context=context)
 
 
 def build_execution_context(

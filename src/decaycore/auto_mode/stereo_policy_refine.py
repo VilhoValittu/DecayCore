@@ -255,6 +255,158 @@ def _gate_reason(metrics: dict | None, policy: StereoAutoPolicyConfig) -> str | 
     return None
 
 
+def _stereo_trial_scales(*, trial_count: int, rng: np.random.Generator) -> list[float]:
+    out = [0.35, 0.65, 1.0]
+    while len(out) < int(trial_count):
+        out.append(float(np.clip(rng.normal(0.90, 0.22), 0.15, 1.20)))
+    return list(out[: int(trial_count)])
+
+
+def _build_stereo_candidate_overlay(
+    *,
+    shared_policy: ResolvedChannelAutoPolicy,
+    variant: ResolvedChannelAutoPolicy,
+    worse_side: str,
+    split_hz: float,
+) -> StereoResolvedAutoPolicies:
+    return StereoResolvedAutoPolicies(
+        split_hz=float(split_hz),
+        shared=shared_policy,
+        left=(variant if str(worse_side) == "left" else ResolvedChannelAutoPolicy()),
+        right=(variant if str(worse_side) == "right" else ResolvedChannelAutoPolicy()),
+    )
+
+
+def _stereo_candidate_relief_db(
+    *,
+    shared_result,
+    candidate_result,
+    split_hz: float,
+) -> float:
+    return float(
+        worst_channel_relief_db(
+            dict(getattr(shared_result, "l_st", {}) or {}),
+            dict(getattr(shared_result, "r_st", {}) or {}),
+            dict(getattr(candidate_result, "l_st", {}) or {}),
+            dict(getattr(candidate_result, "r_st", {}) or {}),
+            lo_hz=20.0,
+            hi_hz=float(split_hz),
+        )
+    )
+
+
+def _stereo_refine_is_better(
+    *,
+    auto_is_better_refine: Callable[..., Any],
+    candidate_metrics: dict,
+    best_candidate_metrics: dict,
+    goal: str,
+) -> bool:
+    try:
+        return bool(
+            auto_is_better_refine(
+                candidate_metrics,
+                best_candidate_metrics,
+                goal=goal,
+            )
+        )
+    except Exception:
+        logger.exception("stereo policy refine compare")
+        return False
+
+
+def _run_stereo_refine_trials(
+    *,
+    trial_scales: list[float],
+    seed_policy: ResolvedChannelAutoPolicy,
+    shared_policy: ResolvedChannelAutoPolicy,
+    policy: StereoAutoPolicyConfig,
+    shared_preset: dict,
+    shared_result,
+    split_hz: float,
+    worse_side: str,
+    rng: np.random.Generator,
+    materialize_preset_result: Callable[..., tuple[object, dict, dict]],
+    refine_base_data: dict,
+    auto_is_better_refine: Callable[..., Any],
+    goal: str,
+    best_candidate_preset: dict,
+    best_candidate_metrics: dict,
+) -> tuple[dict, dict, float, dict | None, str | None, float, int]:
+    best_candidate_rank = float(official_rank_score(best_candidate_metrics))
+    best_candidate_meta = None
+    gate_reason = None
+    best_failed_relief_db = float("nan")
+    trials_executed = 0
+
+    for idx, scale in enumerate(list(trial_scales), start=1):
+        variant = _scaled_policy_variant(
+            seed_policy,
+            shared=shared_policy,
+            policy=policy,
+            scale=float(scale),
+            rng=(rng if idx > 3 else None),
+        )
+        overlay = _build_stereo_candidate_overlay(
+            shared_policy=shared_policy,
+            variant=variant,
+            worse_side=str(worse_side),
+            split_hz=float(split_hz),
+        )
+        candidate_preset = dict(shared_preset)
+        candidate_preset["_stereo_resolved_auto_policies"] = overlay.to_dict()
+        candidate_result, candidate_metrics, _candidate_data = materialize_preset_result(
+            candidate_preset,
+            include_response_arrays=True,
+            summarize=False,
+            base_data_override=refine_base_data,
+        )
+        trials_executed = int(idx)
+        current_relief = _stereo_candidate_relief_db(
+            shared_result=shared_result,
+            candidate_result=candidate_result,
+            split_hz=float(split_hz),
+        )
+        candidate_metrics = dict(candidate_metrics or {})
+        candidate_metrics["stereo_worst_channel_relief_db"] = (
+            float(current_relief) if np.isfinite(current_relief) else float("nan")
+        )
+        current_gate_reason = _gate_reason(candidate_metrics, policy)
+        if current_gate_reason is not None:
+            gate_reason = str(current_gate_reason)
+            if np.isfinite(current_relief):
+                if (not np.isfinite(best_failed_relief_db)) or float(current_relief) > float(best_failed_relief_db):
+                    best_failed_relief_db = float(current_relief)
+            continue
+        better = _stereo_refine_is_better(
+            auto_is_better_refine=auto_is_better_refine,
+            candidate_metrics=dict(candidate_metrics or {}),
+            best_candidate_metrics=dict(best_candidate_metrics or {}),
+            goal=str(goal),
+        )
+        if bool(better):
+            best_candidate_preset = dict(candidate_preset)
+            best_candidate_metrics = dict(candidate_metrics or {})
+            best_candidate_rank = float(official_rank_score(best_candidate_metrics))
+            best_candidate_meta = {
+                "resolved": overlay.to_dict(),
+                "rank": float(best_candidate_rank),
+                "scale": float(scale),
+                "worst_channel_relief_db": (
+                    float(current_relief) if np.isfinite(current_relief) else float("nan")
+                ),
+            }
+    return (
+        dict(best_candidate_preset or {}),
+        dict(best_candidate_metrics or {}),
+        float(best_candidate_rank),
+        (dict(best_candidate_meta) if isinstance(best_candidate_meta, dict) else None),
+        gate_reason,
+        float(best_failed_relief_db),
+        int(trials_executed),
+    )
+
+
 def apply_stereo_policy_refine(
     *,
     best_preset: dict | None,
@@ -340,79 +492,36 @@ def apply_stereo_policy_refine(
     )
     rng = np.random.default_rng(_stable_rng_seed(shared_preset, split_hz, worse_side))
     trial_count = int(max(1, policy.channel_specific_refine_trials))
-    trial_scales = [0.35, 0.65, 1.0]
-    while len(trial_scales) < trial_count:
-        trial_scales.append(float(np.clip(rng.normal(0.90, 0.22), 0.15, 1.20)))
+    trial_scales = _stereo_trial_scales(trial_count=int(trial_count), rng=rng)
 
     best_candidate_preset = dict(shared_preset)
     best_candidate_metrics = dict(shared_metrics or {})
-    best_candidate_rank = float(official_rank_score(best_candidate_metrics))
-    best_candidate_meta = None
-    gate_reason = None
-    best_failed_relief_db = float("nan")
-
-    for idx, scale in enumerate(trial_scales[:trial_count], start=1):
-        variant = _scaled_policy_variant(
-            seed_policy,
-            shared=shared_policy,
-            policy=policy,
-            scale=float(scale),
-            rng=(rng if idx > 3 else None),
-        )
-        overlay = StereoResolvedAutoPolicies(
-            split_hz=float(split_hz),
-            shared=shared_policy,
-            left=(variant if worse_side == "left" else ResolvedChannelAutoPolicy()),
-            right=(variant if worse_side == "right" else ResolvedChannelAutoPolicy()),
-        )
-        candidate_preset = dict(shared_preset)
-        candidate_preset["_stereo_resolved_auto_policies"] = overlay.to_dict()
-        _result, candidate_metrics, _candidate_data = materialize_preset_result(
-            candidate_preset,
-            include_response_arrays=True,
-            summarize=False,
-            base_data_override=refine_base_data,
-        )
-        meta["trials_executed"] = int(idx)
-        current_relief = worst_channel_relief_db(
-            dict(getattr(shared_result, "l_st", {}) or {}),
-            dict(getattr(shared_result, "r_st", {}) or {}),
-            dict(getattr(_result, "l_st", {}) or {}),
-            dict(getattr(_result, "r_st", {}) or {}),
-            lo_hz=20.0,
-            hi_hz=split_hz,
-        )
-        candidate_metrics["stereo_worst_channel_relief_db"] = (
-            float(current_relief) if np.isfinite(current_relief) else float("nan")
-        )
-        current_gate_reason = _gate_reason(candidate_metrics, policy)
-        if current_gate_reason is not None:
-            gate_reason = str(current_gate_reason)
-            if np.isfinite(current_relief):
-                if (not np.isfinite(best_failed_relief_db)) or float(current_relief) > float(best_failed_relief_db):
-                    best_failed_relief_db = float(current_relief)
-            continue
-        try:
-            better = auto_is_better_refine(
-                candidate_metrics,
-                best_candidate_metrics,
-                goal=goal,
-            )
-        except Exception:
-            logger.exception("stereo policy refine compare")
-            better = False
-        if bool(better):
-            best_candidate_preset = dict(candidate_preset)
-            best_candidate_metrics = dict(candidate_metrics or {})
-            best_candidate_rank = float(official_rank_score(best_candidate_metrics))
-            best_candidate_meta = {
-                "resolved": overlay.to_dict(),
-                "rank": float(best_candidate_rank),
-                "scale": float(scale),
-                "worst_channel_relief_db": (
-                    float(current_relief) if np.isfinite(current_relief) else float("nan")
-                ),
-            }
+    (
+        best_candidate_preset,
+        best_candidate_metrics,
+        best_candidate_rank,
+        best_candidate_meta,
+        gate_reason,
+        best_failed_relief_db,
+        trials_executed,
+    ) = _run_stereo_refine_trials(
+        trial_scales=trial_scales,
+        seed_policy=seed_policy,
+        shared_policy=shared_policy,
+        policy=policy,
+        shared_preset=shared_preset,
+        shared_result=shared_result,
+        split_hz=float(split_hz),
+        worse_side=str(worse_side),
+        rng=rng,
+        materialize_preset_result=materialize_preset_result,
+        refine_base_data=refine_base_data,
+        auto_is_better_refine=auto_is_better_refine,
+        goal=str(goal),
+        best_candidate_preset=best_candidate_preset,
+        best_candidate_metrics=best_candidate_metrics,
+    )
+    meta["trials_executed"] = int(trials_executed)
 
     if best_candidate_meta is None:
         meta.update(

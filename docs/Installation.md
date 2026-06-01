@@ -45,7 +45,9 @@ All releases:
 ./run.sh
 ```
 
-4. Built-in measurement audio requires the system PortAudio library. If measurement audio reports a PortAudio/backend error, install it first:
+4. **Built-in measurement:** Measurement has been verified to work on Windows. Linux has been verified to work at least on Ubuntu 22.04. macOS could not be tested due to unavailable test hardware. On platforms where measurement is unavailable, compatible external measurements can be used.
+
+5. Built-in measurement audio requires the system PortAudio library. If measurement audio reports a PortAudio/backend error, install it first:
 
 ```bash
 sudo apt install libportaudio2
@@ -67,7 +69,8 @@ chmod +x DecayCore
 ```
 
 4. If macOS blocks first launch, open `System Settings -> Privacy & Security -> Open Anyway`.
-5. Open `http://127.0.0.1:8080` if the browser does not open automatically.
+5. **Built-in measurement:** Measurement has been verified to work on Windows. Linux has been verified to work at least on Ubuntu 22.04. macOS could not be tested due to unavailable test hardware. macOS users can use compatible external measurements.
+6. Open `http://127.0.0.1:8080` if the browser does not open automatically.
 
 ---
 

@@ -119,33 +119,22 @@ def _plotly_js_path() -> str | None:
     return p if os.path.isfile(p) else None
 
 
-def _confidence_bad_segments(
-    freqs,
-    conf_mask,
-    *,
-    thr: float = 0.35,
-    min_width_hz: float = 30.0,
-    min_gap_hz: float = 35.0,
-    max_segments: int = 24,
-):
+def _confidence_prepare_arrays(freqs, conf_mask):
     try:
         f = np.asarray(freqs, dtype=float)
         c = np.asarray(conf_mask, dtype=float)
     except _RECOVERABLE_PLOT_EXCEPTIONS:
-        return []
+        return None
     if f.size != c.size or f.size < 8:
-        return []
-
+        return None
     valid = np.isfinite(f) & np.isfinite(c) & (f > 0.0)
     if np.count_nonzero(valid) < 8:
-        return []
-    f = f[valid]
-    c = c[valid]
-    bad = np.asarray(c < float(thr), dtype=bool)
-    if not np.any(bad):
-        return []
+        return None
+    return f[valid], c[valid]
 
-    raw = []
+
+def _confidence_raw_segments(f: np.ndarray, bad: np.ndarray) -> list[tuple[float, float]]:
+    raw: list[tuple[float, float]] = []
     in_seg = False
     seg_start = None
     for fx, is_bad in zip(f, bad):
@@ -159,11 +148,15 @@ def _confidence_bad_segments(
                 raw.append((float(seg_start), float(seg_end)))
     if in_seg and seg_start is not None and float(f[-1]) > float(seg_start):
         raw.append((float(seg_start), float(f[-1])))
+    return list(raw)
 
-    if not raw:
-        return []
 
-    merged = []
+def _merge_confidence_segments(
+    raw: list[tuple[float, float]],
+    *,
+    min_gap_hz: float,
+) -> list[list[float]]:
+    merged: list[list[float]] = []
     for start, end in raw:
         if not merged:
             merged.append([float(start), float(end)])
@@ -173,23 +166,62 @@ def _confidence_bad_segments(
             prev[1] = max(float(prev[1]), float(end))
         else:
             merged.append([float(start), float(end)])
+    return merged
 
+
+def _filter_confidence_segments(
+    merged: list[list[float]],
+    *,
+    min_width_hz: float,
+) -> list[tuple[float, float]]:
     kept = [
         (float(start), float(end))
         for start, end in merged
         if float(end - start) >= float(min_width_hz)
     ]
-    if not kept:
-        kept = [(float(start), float(end)) for start, end in merged]
+    if kept:
+        return kept
+    return [(float(start), float(end)) for start, end in merged]
 
-    if len(kept) > int(max_segments):
-        kept = sorted(
-            kept,
-            key=lambda seg: (-(float(seg[1]) - float(seg[0])), float(seg[0])),
-        )[: int(max_segments)]
-        kept = sorted(kept, key=lambda seg: float(seg[0]))
 
-    return kept
+def _limit_confidence_segments(
+    kept: list[tuple[float, float]],
+    *,
+    max_segments: int,
+) -> list[tuple[float, float]]:
+    if len(kept) <= int(max_segments):
+        return kept
+    limited = sorted(
+        kept,
+        key=lambda seg: (-(float(seg[1]) - float(seg[0])), float(seg[0])),
+    )[: int(max_segments)]
+    return sorted(limited, key=lambda seg: float(seg[0]))
+
+
+def _confidence_bad_segments(
+    freqs,
+    conf_mask,
+    *,
+    thr: float = 0.35,
+    min_width_hz: float = 30.0,
+    min_gap_hz: float = 35.0,
+    max_segments: int = 24,
+):
+    prepared = _confidence_prepare_arrays(freqs, conf_mask)
+    if prepared is None:
+        return []
+    f, c = prepared
+    bad = np.asarray(c < float(thr), dtype=bool)
+    if not np.any(bad):
+        return []
+
+    raw = _confidence_raw_segments(f, bad)
+    if not raw:
+        return []
+
+    merged = _merge_confidence_segments(raw, min_gap_hz=float(min_gap_hz))
+    kept = _filter_confidence_segments(merged, min_width_hz=float(min_width_hz))
+    return _limit_confidence_segments(kept, max_segments=int(max_segments))
 
 
 def smooth_complex(freqs, spec, oct_frac=1.0):

@@ -88,19 +88,20 @@ def _evaluate_level_window_candidate(
         if f_w.size < 20 or m_w.size != f_w.size:
             return None
 
-        if target_mags is not None:
-            t_w = np.asarray(target_mags, dtype=float).reshape(-1)
-            if t_w.size != f_w.size:
-                return None
-            f_eval, (y, t_eval) = resample_log_axis_fn(f_w, m_w, t_w)
-        else:
-            f_eval, (y,) = resample_log_axis_fn(f_w, m_w)
-            t_eval = None
+        eval_data = _resample_level_window_inputs(
+            f_w=f_w,
+            m_w=m_w,
+            target_mags=target_mags,
+            resample_log_axis_fn=resample_log_axis_fn,
+        )
+        if eval_data is None:
+            return None
+        f_eval, y, t_eval = eval_data
 
         if f_eval.size < 20 or y.size < 20:
             return None
 
-        channel_offset = float(np.median(y - t_eval)) if (t_eval is not None and t_eval.size == y.size) else float(np.median(y))
+        channel_offset = _level_window_channel_offset(y=y, t_eval=t_eval)
 
         x = np.log2(np.clip(f_eval, 1e-9, None))
         x0 = float(np.median(x))
@@ -114,48 +115,28 @@ def _evaluate_level_window_candidate(
         weight = 1.0 + 0.05 * abs(np.log10(max(f_center, 1.0) / 1000.0))
         score = float(std * weight)
 
-        target_rms = float("inf")
-        offset_spread = float("inf")
-        tilt_abs = float("inf")
-        perceptual_rms = float("inf")
-        try:
-            if t_eval is not None and t_eval.size == y.size:
-                offset_spread, target_rms, tilt_abs = window_offset_consistency_score_fn(
-                    f_eval,
-                    y,
-                    t_eval,
-                    tilt_comp=bool(tilt_comp),
-                    tilt_max_db_per_oct=float(tilt_max_db_per_oct),
-                )
-                if perceptual_weighting:
-                    perceptual_rms = perceptual_shape_score_fn(
-                        f_eval,
-                        y,
-                        t_eval,
-                        tilt_comp=bool(tilt_comp),
-                        tilt_max_db_per_oct=float(tilt_max_db_per_oct),
-                        min_hz=float(perceptual_min_hz),
-                        max_hz=float(perceptual_max_hz),
-                    )
-            else:
-                offset_spread, _shape_rms, tilt_abs = window_offset_consistency_score_fn(
-                    f_eval,
-                    y,
-                    None,
-                    tilt_comp=bool(tilt_comp),
-                    tilt_max_db_per_oct=float(tilt_max_db_per_oct),
-                )
-        except (TypeError, ValueError, FloatingPointError, IndexError):
-            pass
+        target_rms, offset_spread, tilt_abs, perceptual_rms = _level_window_target_terms(
+            f_eval=f_eval,
+            y=y,
+            t_eval=t_eval,
+            tilt_comp=bool(tilt_comp),
+            tilt_max_db_per_oct=float(tilt_max_db_per_oct),
+            perceptual_weighting=bool(perceptual_weighting),
+            perceptual_shape_score_fn=perceptual_shape_score_fn,
+            perceptual_min_hz=float(perceptual_min_hz),
+            perceptual_max_hz=float(perceptual_max_hz),
+            window_offset_consistency_score_fn=window_offset_consistency_score_fn,
+        )
 
-        if np.isfinite(offset_spread):
-            score += 0.85 * float(offset_spread)
-        if np.isfinite(target_rms):
-            score += 0.20 * float(target_rms)
-        if np.isfinite(tilt_abs):
-            score += 0.08 * float(tilt_abs)
-        if (not perceptual_tie_only) and np.isfinite(perceptual_rms):
-            score += float(perceptual_strength) * float(perceptual_rms)
+        score = _level_window_apply_score_adjustments(
+            score=float(score),
+            target_rms=float(target_rms),
+            offset_spread=float(offset_spread),
+            tilt_abs=float(tilt_abs),
+            perceptual_rms=float(perceptual_rms),
+            perceptual_tie_only=bool(perceptual_tie_only),
+            perceptual_strength=float(perceptual_strength),
+        )
 
         return {
             "score": float(score),
@@ -167,6 +148,100 @@ def _evaluate_level_window_candidate(
         }
     except (TypeError, ValueError, FloatingPointError, IndexError):
         return None
+
+
+def _resample_level_window_inputs(
+    *,
+    f_w: np.ndarray,
+    m_w: np.ndarray,
+    target_mags: np.ndarray | None,
+    resample_log_axis_fn: Callable[..., tuple[np.ndarray, tuple[np.ndarray, ...]]],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray | None] | None:
+    if target_mags is not None:
+        t_w = np.asarray(target_mags, dtype=float).reshape(-1)
+        if t_w.size != f_w.size:
+            return None
+        f_eval, (y, t_eval) = resample_log_axis_fn(f_w, m_w, t_w)
+        return f_eval, y, t_eval
+    f_eval, (y,) = resample_log_axis_fn(f_w, m_w)
+    return f_eval, y, None
+
+
+def _level_window_channel_offset(*, y: np.ndarray, t_eval: np.ndarray | None) -> float:
+    if t_eval is not None and t_eval.size == y.size:
+        return float(np.median(y - t_eval))
+    return float(np.median(y))
+
+
+def _level_window_target_terms(
+    *,
+    f_eval: np.ndarray,
+    y: np.ndarray,
+    t_eval: np.ndarray | None,
+    tilt_comp: bool,
+    tilt_max_db_per_oct: float,
+    perceptual_weighting: bool,
+    perceptual_shape_score_fn: Callable[..., float],
+    perceptual_min_hz: float,
+    perceptual_max_hz: float,
+    window_offset_consistency_score_fn: Callable[..., tuple[float, float, float]],
+) -> tuple[float, float, float, float]:
+    target_rms = float("inf")
+    offset_spread = float("inf")
+    tilt_abs = float("inf")
+    perceptual_rms = float("inf")
+    try:
+        if t_eval is not None and t_eval.size == y.size:
+            offset_spread, target_rms, tilt_abs = window_offset_consistency_score_fn(
+                f_eval,
+                y,
+                t_eval,
+                tilt_comp=bool(tilt_comp),
+                tilt_max_db_per_oct=float(tilt_max_db_per_oct),
+            )
+            if perceptual_weighting:
+                perceptual_rms = perceptual_shape_score_fn(
+                    f_eval,
+                    y,
+                    t_eval,
+                    tilt_comp=bool(tilt_comp),
+                    tilt_max_db_per_oct=float(tilt_max_db_per_oct),
+                    min_hz=float(perceptual_min_hz),
+                    max_hz=float(perceptual_max_hz),
+                )
+        else:
+            offset_spread, _shape_rms, tilt_abs = window_offset_consistency_score_fn(
+                f_eval,
+                y,
+                None,
+                tilt_comp=bool(tilt_comp),
+                tilt_max_db_per_oct=float(tilt_max_db_per_oct),
+            )
+    except (TypeError, ValueError, FloatingPointError, IndexError):
+        pass
+    return float(target_rms), float(offset_spread), float(tilt_abs), float(perceptual_rms)
+
+
+def _level_window_apply_score_adjustments(
+    *,
+    score: float,
+    target_rms: float,
+    offset_spread: float,
+    tilt_abs: float,
+    perceptual_rms: float,
+    perceptual_tie_only: bool,
+    perceptual_strength: float,
+) -> float:
+    out = float(score)
+    if np.isfinite(offset_spread):
+        out += 0.85 * float(offset_spread)
+    if np.isfinite(target_rms):
+        out += 0.20 * float(target_rms)
+    if np.isfinite(tilt_abs):
+        out += 0.08 * float(tilt_abs)
+    if (not perceptual_tie_only) and np.isfinite(perceptual_rms):
+        out += float(perceptual_strength) * float(perceptual_rms)
+    return float(out)
 
 
 def _level_window_ranges(freq_axis: np.ndarray, safe_f_min: float, f_max: float, window_size_octaves: float):

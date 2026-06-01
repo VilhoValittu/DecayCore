@@ -25,6 +25,214 @@ from .winner_polish_utils import _winner_polish_acceptance
 logger = logging.getLogger("DecayCore")
 
 
+def _low_bass_init_meta(*, enabled: bool, phase_label: str) -> dict:
+    return {
+        "enabled": bool(enabled),
+        "applicable": True,
+        "phase_label": str(phase_label),
+        "tested_low_bass_cut_hz": [],
+        "accepted_low_bass_cut_hz": [],
+        "tested_count": 0,
+        "applied": False,
+        "start_low_bass_cut_hz": float("nan"),
+        "final_low_bass_cut_hz": float("nan"),
+        "rank_before": float("nan"),
+        "rank_after": float("nan"),
+        "avg_before": float("nan"),
+        "avg_after": float("nan"),
+    }
+
+
+def _low_bass_candidates(
+    *,
+    initial_low_bass_cut: float,
+    step_hz: float,
+    max_delta_hz: float,
+) -> list[float]:
+    step_hz_eff = max(0.1, float(_auto_safe_float(step_hz, 2.0)))
+    max_delta_hz_eff = max(0.0, float(_auto_safe_float(max_delta_hz, 8.0)))
+    min_low_bass_cut = float(AUTO_MODE_LOW_BASS_MIN_HZ)
+    min_candidate_hz = max(float(min_low_bass_cut), float(initial_low_bass_cut - max_delta_hz_eff))
+    max_candidate_hz = min(float(AUTO_MODE_LOW_BASS_MAX_HZ), float(initial_low_bass_cut + max_delta_hz_eff))
+    candidate_low_bass_cuts: list[float] = []
+    tested_low_bass_cuts: set[float] = {float(initial_low_bass_cut)}
+    max_steps = int(max(0, np.floor((float(max_delta_hz_eff) / float(step_hz_eff)) + 1e-9)))
+    for step_idx in range(1, int(max_steps) + 1):
+        down_value = float(initial_low_bass_cut - float(step_idx) * float(step_hz_eff))
+        if down_value >= (float(min_candidate_hz) - 1e-9):
+            cand_low_bass_cut = round(
+                float(
+                    np.clip(
+                        max(float(min_low_bass_cut), down_value),
+                        float(AUTO_MODE_LOW_BASS_MIN_HZ),
+                        float(AUTO_MODE_LOW_BASS_MAX_HZ),
+                    )
+                ),
+                1,
+            )
+            if cand_low_bass_cut not in tested_low_bass_cuts:
+                tested_low_bass_cuts.add(cand_low_bass_cut)
+                candidate_low_bass_cuts.append(float(cand_low_bass_cut))
+        up_value = float(initial_low_bass_cut + float(step_idx) * float(step_hz_eff))
+        if up_value <= (float(max_candidate_hz) + 1e-9):
+            cand_low_bass_cut = round(
+                float(
+                    np.clip(
+                        max(float(min_low_bass_cut), up_value),
+                        float(AUTO_MODE_LOW_BASS_MIN_HZ),
+                        float(AUTO_MODE_LOW_BASS_MAX_HZ),
+                    )
+                ),
+                1,
+            )
+            if cand_low_bass_cut not in tested_low_bass_cuts:
+                tested_low_bass_cuts.add(cand_low_bass_cut)
+                candidate_low_bass_cuts.append(float(cand_low_bass_cut))
+    return list(candidate_low_bass_cuts)
+
+
+def _low_bass_preset_signature(*, preset: dict | None, metrics: dict | None, cache_ready_preset) -> str:
+    ready = cache_ready_preset(dict(preset or {}), best_metrics=dict(metrics or {}))
+    try:
+        return str(json.dumps(dict(ready or {}), sort_keys=True, separators=(",", ":")))
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        return str(sorted(dict(ready or {}).items()))
+
+
+def _low_bass_candidate_lookup(
+    *,
+    candidate_items: list[dict] | None,
+    cache_ready_preset,
+) -> dict[str, dict]:
+    candidate_metrics_lookup: dict[str, dict] = {}
+    for item in list(candidate_items or []):
+        if not isinstance(item, dict):
+            continue
+        item_preset = dict(item.get("preset", {}) or {})
+        item_metrics = dict(item.get("metrics", {}) or {})
+        if not item_preset or not item_metrics:
+            continue
+        sig = _low_bass_preset_signature(
+            preset=item_preset,
+            metrics=item_metrics,
+            cache_ready_preset=cache_ready_preset,
+        )
+        prev = dict(candidate_metrics_lookup.get(sig, {}) or {})
+        prev_rank = _auto_safe_float(prev.get("metrics", {}).get("rank_score"), float("-inf"))
+        next_rank = _auto_safe_float(item_metrics.get("rank_score"), float("-inf"))
+        if (sig not in candidate_metrics_lookup) or (float(next_rank) > float(prev_rank)):
+            candidate_metrics_lookup[sig] = {
+                "preset": dict(item_preset or {}),
+                "metrics": dict(item_metrics or {}),
+                "source": str(item.get("phase", item.get("source", "search_candidate")) or "search_candidate"),
+            }
+    return dict(candidate_metrics_lookup)
+
+
+def _low_bass_materialize_candidate(
+    *,
+    candidate_hz: float,
+    cur_best_preset: dict,
+    cur_best_metrics: dict,
+    candidate_metrics_lookup: dict[str, dict],
+    cache_ready_preset,
+    materialize_preset_result,
+    base_data_ref: dict | None,
+) -> tuple[dict, dict | None]:
+    cand_test = dict(cur_best_preset or {})
+    cand_test["low_bass_cut_hz"] = float(candidate_hz)
+    reuse_entry = candidate_metrics_lookup.get(
+        _low_bass_preset_signature(
+            preset=cand_test,
+            metrics=cur_best_metrics,
+            cache_ready_preset=cache_ready_preset,
+        )
+    )
+    if isinstance(reuse_entry, dict) and reuse_entry:
+        return dict(cand_test), dict(reuse_entry.get("metrics", {}) or {})
+    try:
+        _result, low_bass_cut_metrics, _data = materialize_preset_result(
+            cand_test,
+            include_response_arrays=False,
+            summarize=False,
+            base_data_override=base_data_ref,
+        )
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        return dict(cand_test), None
+    return dict(cand_test), dict(low_bass_cut_metrics or {})
+
+
+def _low_bass_finalize(
+    *,
+    low_bass_cut_meta: dict,
+    cur_best_preset: dict,
+    cur_best_metrics: dict,
+    improved: bool,
+    initial_low_bass_cut: float,
+    base_data: dict,
+) -> tuple[dict, dict, bool, dict]:
+    low_bass_cut_meta["applied"] = bool(improved)
+    final_low_bass_cut = _auto_safe_float(
+        cur_best_preset.get("low_bass_cut_hz", base_data.get("low_bass_cut_hz", initial_low_bass_cut)),
+        initial_low_bass_cut,
+    )
+    low_bass_cut_meta["final_low_bass_cut_hz"] = float(
+        round(
+            float(
+                np.clip(
+                    float(final_low_bass_cut),
+                    float(AUTO_MODE_LOW_BASS_MIN_HZ),
+                    float(AUTO_MODE_LOW_BASS_MAX_HZ),
+                )
+            ),
+            1,
+        )
+    )
+    low_bass_cut_meta["rank_after"] = float(_auto_safe_float(cur_best_metrics.get("rank_score"), float("nan")))
+    low_bass_cut_meta["avg_after"] = float(_auto_safe_float(cur_best_metrics.get("avg_score"), float("nan")))
+    return cur_best_preset, cur_best_metrics, bool(improved), dict(low_bass_cut_meta or {})
+
+
+def _low_bass_emit_status(
+    *,
+    status_cb,
+    prev_low_bass_cut: float,
+    cand_low_bass_cut: float,
+    prev_best: dict,
+    cur_best_metrics: dict,
+) -> None:
+    if not callable(status_cb):
+        return
+    status_cb(
+        "DecayCore automatic mode: low_bass_cut winner polish improved "
+        f"(low_bass_cut_hz {float(prev_low_bass_cut):.1f} -> {float(cand_low_bass_cut):.1f} Hz, "
+        f"rank {official_rank_score(prev_best):.3f} -> {official_rank_score(cur_best_metrics):.3f}, "
+        f"avg {_auto_safe_float(prev_best.get('avg_score'), 0.0):.3f} -> {_auto_safe_float(cur_best_metrics.get('avg_score'), 0.0):.3f})"
+    )
+
+
 def apply_low_bass_cut_winner_polish(
     *,
     best_preset: dict | None,
@@ -43,21 +251,7 @@ def apply_low_bass_cut_winner_polish(
 ) -> tuple[dict, dict, bool, dict]:
     cur_best_preset = dict(best_preset or {})
     cur_best_metrics = dict(best_metrics or {})
-    low_bass_cut_meta = {
-        "enabled": bool(enabled),
-        "applicable": True,
-        "phase_label": str(phase_label),
-        "tested_low_bass_cut_hz": [],
-        "accepted_low_bass_cut_hz": [],
-        "tested_count": 0,
-        "applied": False,
-        "start_low_bass_cut_hz": float("nan"),
-        "final_low_bass_cut_hz": float("nan"),
-        "rank_before": float("nan"),
-        "rank_after": float("nan"),
-        "avg_before": float("nan"),
-        "avg_after": float("nan"),
-    }
+    low_bass_cut_meta = _low_bass_init_meta(enabled=bool(enabled), phase_label=str(phase_label))
     if not bool(enabled):
         return cur_best_preset, cur_best_metrics, False, low_bass_cut_meta
     if not isinstance(cur_best_metrics, dict) or not cur_best_metrics:
@@ -95,111 +289,27 @@ def apply_low_bass_cut_winner_polish(
         _auto_safe_float(cur_best_metrics.get("avg_score"), float("nan"))
     )
 
-    step_hz_eff = max(0.1, float(_auto_safe_float(step_hz, 2.0)))
-    max_delta_hz_eff = max(0.0, float(_auto_safe_float(max_delta_hz, 8.0)))
-    min_low_bass_cut = float(AUTO_MODE_LOW_BASS_MIN_HZ)
-    min_candidate_hz = max(
-        float(min_low_bass_cut),
-        float(initial_low_bass_cut - max_delta_hz_eff),
+    candidate_low_bass_cuts = _low_bass_candidates(
+        initial_low_bass_cut=float(initial_low_bass_cut),
+        step_hz=step_hz,
+        max_delta_hz=max_delta_hz,
     )
-    max_candidate_hz = min(
-        float(AUTO_MODE_LOW_BASS_MAX_HZ),
-        float(initial_low_bass_cut + max_delta_hz_eff),
-    )
-    candidate_low_bass_cuts: list[float] = []
-    tested_low_bass_cuts: set[float] = {float(initial_low_bass_cut)}
-    max_steps = int(max(0, np.floor((float(max_delta_hz_eff) / float(step_hz_eff)) + 1e-9)))
-    for step_idx in range(1, int(max_steps) + 1):
-        down_value = float(initial_low_bass_cut - float(step_idx) * float(step_hz_eff))
-        if down_value >= (float(min_candidate_hz) - 1e-9):
-            cand_low_bass_cut = round(
-                float(
-                    np.clip(
-                        max(float(min_low_bass_cut), down_value),
-                        float(AUTO_MODE_LOW_BASS_MIN_HZ),
-                        float(AUTO_MODE_LOW_BASS_MAX_HZ),
-                    )
-                ),
-                1,
-            )
-            if cand_low_bass_cut not in tested_low_bass_cuts:
-                tested_low_bass_cuts.add(cand_low_bass_cut)
-                candidate_low_bass_cuts.append(float(cand_low_bass_cut))
-
-        up_value = float(initial_low_bass_cut + float(step_idx) * float(step_hz_eff))
-        if up_value <= (float(max_candidate_hz) + 1e-9):
-            cand_low_bass_cut = round(
-                float(
-                    np.clip(
-                        max(float(min_low_bass_cut), up_value),
-                        float(AUTO_MODE_LOW_BASS_MIN_HZ),
-                        float(AUTO_MODE_LOW_BASS_MAX_HZ),
-                    )
-                ),
-                1,
-            )
-            if cand_low_bass_cut not in tested_low_bass_cuts:
-                tested_low_bass_cuts.add(cand_low_bass_cut)
-                candidate_low_bass_cuts.append(float(cand_low_bass_cut))
-
     low_bass_cut_meta["tested_low_bass_cut_hz"] = [float(v) for v in candidate_low_bass_cuts]
     low_bass_cut_meta["tested_count"] = int(len(candidate_low_bass_cuts))
     if not candidate_low_bass_cuts:
-        low_bass_cut_meta["final_low_bass_cut_hz"] = float(initial_low_bass_cut)
-        low_bass_cut_meta["rank_after"] = float(
-            _auto_safe_float(cur_best_metrics.get("rank_score"), float("nan"))
+        return _low_bass_finalize(
+            low_bass_cut_meta=low_bass_cut_meta,
+            cur_best_preset=cur_best_preset,
+            cur_best_metrics=cur_best_metrics,
+            improved=False,
+            initial_low_bass_cut=float(initial_low_bass_cut),
+            base_data=base_data,
         )
-        low_bass_cut_meta["avg_after"] = float(
-            _auto_safe_float(cur_best_metrics.get("avg_score"), float("nan"))
-        )
-        return cur_best_preset, cur_best_metrics, False, low_bass_cut_meta
 
-    def _preset_signature(preset: dict | None, *, metrics: dict | None = None) -> str:
-        ready = cache_ready_preset(
-            dict(preset or {}),
-            best_metrics=dict(metrics or {}),
-        )
-        try:
-            return str(
-                json.dumps(
-                    dict(ready or {}),
-                    sort_keys=True,
-                    separators=(",", ":"),
-                )
-            )
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            return str(sorted(dict(ready or {}).items()))
-
-    candidate_metrics_lookup: dict[str, dict] = {}
-    for item in list(candidate_items or []):
-        if not isinstance(item, dict):
-            continue
-        item_preset = dict(item.get("preset", {}) or {})
-        item_metrics = dict(item.get("metrics", {}) or {})
-        if not item_preset or not item_metrics:
-            continue
-        sig = _preset_signature(item_preset, metrics=item_metrics)
-        prev = dict(candidate_metrics_lookup.get(sig, {}) or {})
-        prev_rank = _auto_safe_float(prev.get("metrics", {}).get("rank_score"), float("-inf"))
-        next_rank = _auto_safe_float(item_metrics.get("rank_score"), float("-inf"))
-        if (sig not in candidate_metrics_lookup) or (float(next_rank) > float(prev_rank)):
-            candidate_metrics_lookup[sig] = {
-                "preset": dict(item_preset or {}),
-                "metrics": dict(item_metrics or {}),
-                "source": str(item.get("phase", item.get("source", "search_candidate")) or "search_candidate"),
-            }
+    candidate_metrics_lookup = _low_bass_candidate_lookup(
+        candidate_items=candidate_items,
+        cache_ready_preset=cache_ready_preset,
+    )
 
     improved = False
     with profiled_section("winner_polish.low_bass_cut"):
@@ -210,43 +320,31 @@ def apply_low_bass_cut_winner_polish(
             float(initial_low_bass_cut),
         )
         for idx, cand_low_bass_cut in enumerate(candidate_low_bass_cuts, start=1):
-            cand_test = dict(cur_best_preset or {})
-            cand_test["low_bass_cut_hz"] = float(cand_low_bass_cut)
-            reuse_entry = candidate_metrics_lookup.get(
-                _preset_signature(cand_test, metrics=cur_best_metrics)
+            cand_test, low_bass_cut_metrics = _low_bass_materialize_candidate(
+                candidate_hz=float(cand_low_bass_cut),
+                cur_best_preset=cur_best_preset,
+                cur_best_metrics=cur_best_metrics,
+                candidate_metrics_lookup=candidate_metrics_lookup,
+                cache_ready_preset=cache_ready_preset,
+                materialize_preset_result=materialize_preset_result,
+                base_data_ref=base_data_ref,
             )
-            if isinstance(reuse_entry, dict) and reuse_entry:
-                low_bass_cut_metrics = dict(reuse_entry.get("metrics", {}) or {})
-            else:
-                try:
-                    _result, low_bass_cut_metrics, _data = materialize_preset_result(
-                        cand_test,
-                        include_response_arrays=False,
-                        summarize=False,
-                        base_data_override=base_data_ref,
-                    )
-                except (
-
-                    AttributeError,
-                    TypeError,
-                    ValueError,
-                    KeyError,
-                    IndexError,
-                    RuntimeError,
-                    OSError,
-                    ImportError,
-                    ModuleNotFoundError,
-                    NameError,
-                ) as exc:
-                    logger.warning(
-                        "Automatic mode %s failed for candidate %d/%d (low_bass_cut_hz=%.1f Hz): %s",
-                        str(phase_label),
-                        int(idx),
-                        int(len(candidate_low_bass_cuts)),
-                        float(cand_low_bass_cut),
-                        f"{type(exc).__name__}: {exc}",
-                    )
-                    continue
+            reuse_entry = candidate_metrics_lookup.get(
+                _low_bass_preset_signature(
+                    preset=cand_test,
+                    metrics=cur_best_metrics,
+                    cache_ready_preset=cache_ready_preset,
+                )
+            )
+            if not isinstance(low_bass_cut_metrics, dict):
+                logger.warning(
+                    "Automatic mode %s failed for candidate %d/%d (low_bass_cut_hz=%.1f Hz): materialize_failed",
+                    str(phase_label),
+                    int(idx),
+                    int(len(candidate_low_bass_cuts)),
+                    float(cand_low_bass_cut),
+                )
+                continue
 
             low_bass_cut_metrics = dict(low_bass_cut_metrics or {})
             better, reason, accept_meta = _winner_polish_acceptance(
@@ -307,38 +405,19 @@ def apply_low_bass_cut_winner_polish(
                 _auto_safe_float(prev_best.get("avg_score"), 0.0),
                 _auto_safe_float(cur_best_metrics.get("avg_score"), 0.0),
             )
-            if callable(status_cb):
-                status_cb(
-                    "DecayCore automatic mode: low_bass_cut winner polish improved "
-                    f"(low_bass_cut_hz {float(prev_low_bass_cut):.1f} -> {float(cand_low_bass_cut):.1f} Hz, "
-                    f"rank {official_rank_score(prev_best):.3f} -> {official_rank_score(cur_best_metrics):.3f}, "
-                    f"avg {_auto_safe_float(prev_best.get('avg_score'), 0.0):.3f} -> {_auto_safe_float(cur_best_metrics.get('avg_score'), 0.0):.3f})"
-                )
+            _low_bass_emit_status(
+                status_cb=status_cb,
+                prev_low_bass_cut=float(prev_low_bass_cut),
+                cand_low_bass_cut=float(cand_low_bass_cut),
+                prev_best=prev_best,
+                cur_best_metrics=cur_best_metrics,
+            )
 
-    low_bass_cut_meta["applied"] = bool(improved)
-    final_low_bass_cut = _auto_safe_float(
-        cur_best_preset.get(
-            "low_bass_cut_hz",
-            base_data.get("low_bass_cut_hz", initial_low_bass_cut),
-        ),
-        initial_low_bass_cut,
+    return _low_bass_finalize(
+        low_bass_cut_meta=low_bass_cut_meta,
+        cur_best_preset=cur_best_preset,
+        cur_best_metrics=cur_best_metrics,
+        improved=improved,
+        initial_low_bass_cut=float(initial_low_bass_cut),
+        base_data=base_data,
     )
-    low_bass_cut_meta["final_low_bass_cut_hz"] = float(
-        round(
-            float(
-                np.clip(
-                    float(final_low_bass_cut),
-                    float(AUTO_MODE_LOW_BASS_MIN_HZ),
-                    float(AUTO_MODE_LOW_BASS_MAX_HZ),
-                )
-            ),
-            1,
-        )
-    )
-    low_bass_cut_meta["rank_after"] = float(
-        _auto_safe_float(cur_best_metrics.get("rank_score"), float("nan"))
-    )
-    low_bass_cut_meta["avg_after"] = float(
-        _auto_safe_float(cur_best_metrics.get("avg_score"), float("nan"))
-    )
-    return cur_best_preset, cur_best_metrics, bool(improved), dict(low_bass_cut_meta or {})

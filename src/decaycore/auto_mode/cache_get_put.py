@@ -254,49 +254,42 @@ def _auto_cache_put_target_for_measurements_global(
     _auto_cache_save(cache, compat_version=compat_version)
 
 
-@_auto_cache_guard
-def _auto_cache_get_target_for_measurements(
-    measurements: dict,
+def _target_cache_map_lookup(
+    target_map: dict,
     *,
-    goal: str = AUTO_MODE_GOAL_DEFAULT,
-    filter_key: str | None = None,
-    compat_version: str | None = None,
+    msig: str,
+    goal_norm: str,
 ) -> dict | None:
-    goal_norm = _auto_goal_norm(goal)
-    msig = _auto_get_measurement_signature(measurements or {})
-    if not msig:
-        return None
-    cache = _auto_cache_load(compat_version=compat_version)
+    direct = target_map.get(f"{msig}|{goal_norm}")
+    if isinstance(direct, dict):
+        return dict(direct)
+    direct_legacy = target_map.get(msig)
+    if isinstance(direct_legacy, dict):
+        entry_goal = _auto_goal_norm(str(direct_legacy.get("auto_goal", AUTO_MODE_GOAL_DEFAULT) or AUTO_MODE_GOAL_DEFAULT))
+        if entry_goal == goal_norm:
+            return dict(direct_legacy)
+    return None
 
+
+def _target_cache_bucket_target_map(cache: dict, *, filter_key: str | None) -> tuple[dict, bool]:
     bucket = _auto_cache_bucket(cache, filter_key=filter_key, create=False)
     target_map = {}
     if isinstance(bucket, dict):
         raw_target_map = bucket.get("target_by_measurement", {})
         if isinstance(raw_target_map, dict):
             target_map = raw_target_map
-    if isinstance(target_map, dict):
-        direct = target_map.get(f"{msig}|{goal_norm}")
-        if isinstance(direct, dict):
-            return dict(direct)
-        direct_legacy = target_map.get(msig)
-        if isinstance(direct_legacy, dict):
-            entry_goal = _auto_goal_norm(str(direct_legacy.get("auto_goal", AUTO_MODE_GOAL_DEFAULT) or AUTO_MODE_GOAL_DEFAULT))
-            if entry_goal == goal_norm:
-                return dict(direct_legacy)
-        if len(target_map) > 0:
-            return None
+    return dict(target_map or {}), bool(isinstance(target_map, dict) and len(target_map) > 0)
 
+
+def _target_cache_legacy_target_map(cache: dict) -> dict:
     target_map_legacy = cache.get("target_by_measurement", {})
     if isinstance(target_map_legacy, dict):
-        direct = target_map_legacy.get(f"{msig}|{goal_norm}")
-        if isinstance(direct, dict):
-            return dict(direct)
-        direct_legacy = target_map_legacy.get(msig)
-        if isinstance(direct_legacy, dict):
-            entry_goal = _auto_goal_norm(str(direct_legacy.get("auto_goal", AUTO_MODE_GOAL_DEFAULT) or AUTO_MODE_GOAL_DEFAULT))
-            if entry_goal == goal_norm:
-                return dict(direct_legacy)
+        return dict(target_map_legacy)
+    return {}
 
+
+def _target_cache_candidate_items(cache: dict, *, filter_key: str | None) -> dict:
+    bucket = _auto_cache_bucket(cache, filter_key=filter_key, create=False)
     items = {}
     if isinstance(bucket, dict):
         raw_items = bucket.get("items", {})
@@ -304,8 +297,15 @@ def _auto_cache_get_target_for_measurements(
             items = raw_items
     if not items:
         items = cache.get("items", {})
-    if not isinstance(items, dict):
-        return None
+    return dict(items) if isinstance(items, dict) else {}
+
+
+def _target_cache_latest_item_for_measurement(
+    *,
+    items: dict,
+    msig: str,
+    goal_norm: str,
+) -> dict | None:
     best = None
     best_t = -1
     for entry in items.values():
@@ -319,7 +319,6 @@ def _auto_cache_get_target_for_measurements(
         try:
             t = int(entry.get("t", 0) or 0)
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -336,6 +335,53 @@ def _auto_cache_get_target_for_measurements(
             best_t = int(t)
             best = dict(entry)
     return dict(best) if isinstance(best, dict) else None
+
+
+@_auto_cache_guard
+def _auto_cache_get_target_for_measurements(
+    measurements: dict,
+    *,
+    goal: str = AUTO_MODE_GOAL_DEFAULT,
+    filter_key: str | None = None,
+    compat_version: str | None = None,
+) -> dict | None:
+    goal_norm = _auto_goal_norm(goal)
+    msig = _auto_get_measurement_signature(measurements or {})
+    if not msig:
+        return None
+    cache = _auto_cache_load(compat_version=compat_version)
+
+    target_map, bucket_target_map_present = _target_cache_bucket_target_map(
+        cache,
+        filter_key=filter_key,
+    )
+    bucket_match = _target_cache_map_lookup(
+        target_map,
+        msig=str(msig),
+        goal_norm=goal_norm,
+    )
+    if isinstance(bucket_match, dict):
+        return dict(bucket_match)
+    if bool(bucket_target_map_present):
+        return None
+
+    target_map_legacy = _target_cache_legacy_target_map(cache)
+    legacy_match = _target_cache_map_lookup(
+        target_map_legacy,
+        msig=str(msig),
+        goal_norm=goal_norm,
+    )
+    if isinstance(legacy_match, dict):
+        return dict(legacy_match)
+
+    items = _target_cache_candidate_items(cache, filter_key=filter_key)
+    if not items:
+        return None
+    return _target_cache_latest_item_for_measurement(
+        items=items,
+        msig=str(msig),
+        goal_norm=goal_norm,
+    )
 
 
 @_auto_cache_guard

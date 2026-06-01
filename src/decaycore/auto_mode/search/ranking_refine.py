@@ -69,13 +69,10 @@ from .ranking_keys import (
     _auto_target_tracking_for_pareto,
 )
 
-def _auto_build_refine_profile(
-    *,
-    base_data: dict,
-    phase1_top: list,
-) -> dict:
-    mixed_vals = []
-    tdc_vals = []
+
+def _refine_profile_collect_centers(phase1_top: list) -> tuple[list[float], list[float]]:
+    mixed_vals: list[float] = []
+    tdc_vals: list[float] = []
     for it in (phase1_top or []):
         p = dict(it.get("preset", {}) or {})
         mf = _auto_safe_float(p.get("mixed_freq", float("nan")), float("nan"))
@@ -84,36 +81,10 @@ def _auto_build_refine_profile(
             mixed_vals.append(float(mf))
         if np.isfinite(td):
             tdc_vals.append(float(td))
+    return list(mixed_vals), list(tdc_vals)
 
-    if not mixed_vals:
-        mixed_center = 120.0
-        focus_lo = float(max(20.0, float(mixed_center) - 70.0))
-        focus_hi = float(min(220.0, float(mixed_center) + 50.0))
-        bf_hi = float("nan")
-        if bool(base_data.get("bass_first_ai", True)):
-            bf_hi = _auto_safe_float(base_data.get("bass_first_mode_max_hz", 200.0), 200.0)
-            if np.isfinite(bf_hi):
-                focus_hi = min(float(focus_hi), float(bf_hi))
-        focus_lo = float(np.clip(focus_lo, 20.0, 200.0))
-        focus_hi = float(np.clip(focus_hi, 60.0, 220.0))
-        if np.isfinite(bf_hi):
-            focus_hi = min(float(focus_hi), float(bf_hi))
-        if focus_hi <= focus_lo:
-            focus_lo = float(np.clip(min(float(focus_lo), float(focus_hi) - 5.0), 20.0, 200.0))
-        if focus_hi <= focus_lo:
-            focus_hi = float(np.clip(float(focus_lo) + 5.0, 60.0, 220.0))
-        return {
-            "mixed_center": float(mixed_center),
-            "mixed_span": 60.0,
-            "focus_lo": float(focus_lo),
-            "focus_hi": float(focus_hi),
-            "tdc_lo": 45.0,
-            "tdc_hi": 70.0,
-        }
 
-    mixed_center = float(np.median(mixed_vals))
-    mixed_spread = float(np.std(mixed_vals)) if len(mixed_vals) > 1 else 20.0
-    mixed_span = float(np.clip(mixed_spread * 1.5, 25.0, 80.0))
+def _refine_profile_focus_bounds(*, mixed_center: float, base_data: dict) -> tuple[float, float]:
     focus_lo = float(max(20.0, float(mixed_center) - 70.0))
     focus_hi = float(min(220.0, float(mixed_center) + 50.0))
     bf_hi = float("nan")
@@ -121,6 +92,7 @@ def _auto_build_refine_profile(
         bf_hi = _auto_safe_float(base_data.get("bass_first_mode_max_hz", 200.0), 200.0)
         if np.isfinite(bf_hi):
             focus_hi = min(float(focus_hi), float(bf_hi))
+    focus_lo = float(np.clip(focus_lo, 20.0, 200.0))
     focus_hi = float(np.clip(focus_hi, 60.0, 220.0))
     if np.isfinite(bf_hi):
         focus_hi = min(float(focus_hi), float(bf_hi))
@@ -128,7 +100,33 @@ def _auto_build_refine_profile(
         focus_lo = float(np.clip(min(float(focus_lo), float(focus_hi) - 5.0), 20.0, 200.0))
     if focus_hi <= focus_lo:
         focus_hi = float(np.clip(float(focus_lo) + 5.0, 60.0, 220.0))
+    return float(focus_lo), float(focus_hi)
 
+
+def _refine_profile_default(base_data: dict) -> dict:
+    mixed_center = 120.0
+    focus_lo, focus_hi = _refine_profile_focus_bounds(
+        mixed_center=float(mixed_center),
+        base_data=base_data,
+    )
+    return {
+        "mixed_center": float(mixed_center),
+        "mixed_span": 60.0,
+        "focus_lo": float(focus_lo),
+        "focus_hi": float(focus_hi),
+        "tdc_lo": 45.0,
+        "tdc_hi": 70.0,
+    }
+
+
+def _refine_profile_from_mixed(*, mixed_vals: list[float], tdc_vals: list[float], base_data: dict) -> dict:
+    mixed_center = float(np.median(mixed_vals))
+    mixed_spread = float(np.std(mixed_vals)) if len(mixed_vals) > 1 else 20.0
+    mixed_span = float(np.clip(mixed_spread * 1.5, 25.0, 80.0))
+    focus_lo, focus_hi = _refine_profile_focus_bounds(
+        mixed_center=float(mixed_center),
+        base_data=base_data,
+    )
     tdc_center = float(np.median(tdc_vals)) if tdc_vals else 60.0
     return {
         "mixed_center": mixed_center,
@@ -138,6 +136,21 @@ def _auto_build_refine_profile(
         "tdc_lo": float(np.clip(tdc_center - 12.0, 35.0, 80.0)),
         "tdc_hi": float(np.clip(tdc_center + 12.0, 40.0, 85.0)),
     }
+
+
+def _auto_build_refine_profile(
+    *,
+    base_data: dict,
+    phase1_top: list,
+) -> dict:
+    mixed_vals, tdc_vals = _refine_profile_collect_centers(phase1_top)
+    if not mixed_vals:
+        return _refine_profile_default(base_data)
+    return _refine_profile_from_mixed(
+        mixed_vals=mixed_vals,
+        tdc_vals=tdc_vals,
+        base_data=base_data,
+    )
 
 
 def _auto_goal_uses_local_refine(goal: str | None) -> bool:
@@ -169,6 +182,196 @@ def _auto_rank_key_goal(metrics: dict, goal: str = AUTO_MODE_GOAL_DEFAULT) -> tu
     if g == AUTO_MODE_GOAL_LOW_RIPPLE:
         return _auto_rank_key_low_ripple(metrics)
     return _auto_rank_key(metrics)
+
+
+def _refine_mode_guard_or_accept(
+    *,
+    mode_improve: float,
+    new_m: dict,
+    best_m: dict,
+    mode_guard_gain: float,
+    accept_reason: str,
+) -> tuple[bool, str]:
+    new_boost = _auto_safe_float(new_m.get("max_net_boost_db"), 0.0)
+    best_boost = _auto_safe_float(best_m.get("max_net_boost_db"), 0.0)
+    boost_rise = float(new_boost - best_boost)
+    if boost_rise > 1e-6 and float(mode_improve) <= float(mode_guard_gain):
+        return False, "mode_guard"
+    return True, accept_reason
+
+
+def _refine_rank_improves_decision(
+    *,
+    raw_rank_diff: float,
+    ref_rank_diff: float,
+    rank_eps: float,
+    tracking_pair_ok: bool,
+    new_tracking: float,
+    best_tracking: float,
+    tracking_eps: float,
+    mode_pair_ok: bool,
+    best_mode_ripple: float,
+    new_mode_ripple: float,
+    ripple_eps: float,
+    new_m: dict,
+    best_m: dict,
+    mode_guard_gain: float,
+) -> tuple[bool, str]:
+    if ref_rank_diff <= 1e-9:
+        return False, "rank_refine"
+    if abs(raw_rank_diff) <= rank_eps and tracking_pair_ok and float(new_tracking) > float(best_tracking) + tracking_eps:
+        return False, "target_tracking"
+    if abs(raw_rank_diff) <= rank_eps and tracking_pair_ok and float(best_tracking) > float(new_tracking) + tracking_eps:
+        return True, "target_tracking"
+    if abs(raw_rank_diff) <= rank_eps and mode_pair_ok:
+        mode_improve = float(best_mode_ripple - new_mode_ripple)
+        if mode_improve > ripple_eps:
+            return _refine_mode_guard_or_accept(
+                mode_improve=mode_improve,
+                new_m=new_m,
+                best_m=best_m,
+                mode_guard_gain=mode_guard_gain,
+                accept_reason="mode_ripple",
+            )
+    return True, "rank_refine"
+
+
+def _refine_rank_worsens_decision(
+    *,
+    raw_rank_diff: float,
+    ref_rank_diff: float,
+    rank_eps: float,
+    mode_pair_ok: bool,
+    new_mode_ripple: float,
+    best_mode_ripple: float,
+    ripple_eps: float,
+) -> tuple[bool, str]:
+    if ref_rank_diff < -1e-9 and abs(raw_rank_diff) <= rank_eps and mode_pair_ok:
+        if float(new_mode_ripple - best_mode_ripple) > ripple_eps:
+            return False, "mode_ripple"
+    return False, "rank_refine"
+
+
+def _refine_tie_mode_step(
+    out: tuple[bool, str],
+    *,
+    mode_pair_ok: bool,
+    best_mode_ripple: float,
+    new_mode_ripple: float,
+    ripple_eps: float,
+    new_m: dict,
+    best_m: dict,
+    mode_guard_gain: float,
+) -> tuple[bool, str]:
+    if mode_pair_ok:
+        mode_improve = float(best_mode_ripple - new_mode_ripple)
+        if mode_improve > ripple_eps:
+            return _refine_mode_guard_or_accept(
+                mode_improve=mode_improve,
+                new_m=new_m,
+                best_m=best_m,
+                mode_guard_gain=mode_guard_gain,
+                accept_reason="mode_ripple",
+            )
+        if float(new_mode_ripple - best_mode_ripple) > ripple_eps:
+            return False, "mode_ripple"
+    return out
+
+
+def _refine_tie_tracking_step(
+    out: tuple[bool, str],
+    *,
+    tracking_pair_ok: bool,
+    best_tracking: float,
+    new_tracking: float,
+    tracking_eps: float,
+) -> tuple[bool, str]:
+    if out[1] == "rank_tie" and tracking_pair_ok:
+        if float(best_tracking - new_tracking) > tracking_eps:
+            return True, "target_tracking"
+        if float(new_tracking - best_tracking) > tracking_eps:
+            return False, "target_tracking"
+    return out
+
+
+def _refine_tie_focus_ripple_step(
+    out: tuple[bool, str],
+    *,
+    new_m: dict,
+    best_m: dict,
+    ripple_eps: float,
+) -> tuple[bool, str]:
+    if out[1] == "rank_tie":
+        new_ripple = _auto_safe_float(new_m.get("focus_ripple_db"), float("nan"))
+        best_ripple = _auto_safe_float(best_m.get("focus_ripple_db"), float("nan"))
+        if np.isfinite(new_ripple) and np.isfinite(best_ripple):
+            if float(best_ripple - new_ripple) > ripple_eps:
+                return True, "focus_ripple"
+            if float(new_ripple - best_ripple) > ripple_eps:
+                return False, "focus_ripple"
+    return out
+
+
+def _refine_tie_phase_net_step(out: tuple[bool, str], *, new_m: dict, best_m: dict) -> tuple[bool, str]:
+    if out[1] == "rank_tie":
+        phase_eps = float(max(0.0, _auto_safe_float(AUTO_MODE_REFINE_TIEBREAK_PHASE_EPS, 0.10)))
+        new_phase_net = _auto_phase_net_for_rank(new_m)
+        best_phase_net = _auto_phase_net_for_rank(best_m)
+        if float(new_phase_net - best_phase_net) > phase_eps:
+            return True, "phase_net"
+        if float(best_phase_net - new_phase_net) > phase_eps:
+            return False, "phase_net"
+    return out
+
+
+def _refine_tie_phase_risk_step(out: tuple[bool, str], *, new_m: dict, best_m: dict) -> tuple[bool, str]:
+    if out[1] == "rank_tie":
+        phase_risk_eps = 0.10
+        new_phase_risk = _auto_phase_risk_for_rank(new_m)
+        best_phase_risk = _auto_phase_risk_for_rank(best_m)
+        if float(best_phase_risk - new_phase_risk) > phase_risk_eps:
+            return True, "phase_risk"
+        if float(new_phase_risk - best_phase_risk) > phase_risk_eps:
+            return False, "phase_risk"
+    return out
+
+
+def _refine_rank_tie_tiebreak(
+    *,
+    out: tuple[bool, str],
+    mode_pair_ok: bool,
+    best_mode_ripple: float,
+    new_mode_ripple: float,
+    ripple_eps: float,
+    new_m: dict,
+    best_m: dict,
+    mode_guard_gain: float,
+    tracking_pair_ok: bool,
+    best_tracking: float,
+    new_tracking: float,
+    tracking_eps: float,
+) -> tuple[bool, str]:
+    out = _refine_tie_mode_step(
+        out,
+        mode_pair_ok=mode_pair_ok,
+        best_mode_ripple=best_mode_ripple,
+        new_mode_ripple=new_mode_ripple,
+        ripple_eps=ripple_eps,
+        new_m=new_m,
+        best_m=best_m,
+        mode_guard_gain=mode_guard_gain,
+    )
+    out = _refine_tie_tracking_step(
+        out,
+        tracking_pair_ok=tracking_pair_ok,
+        best_tracking=best_tracking,
+        new_tracking=new_tracking,
+        tracking_eps=tracking_eps,
+    )
+    out = _refine_tie_focus_ripple_step(out, new_m=new_m, best_m=best_m, ripple_eps=ripple_eps)
+    out = _refine_tie_phase_net_step(out, new_m=new_m, best_m=best_m)
+    out = _refine_tie_phase_risk_step(out, new_m=new_m, best_m=best_m)
+    return out
 
 
 def _auto_is_better_refine(
@@ -208,78 +411,49 @@ def _auto_is_better_refine(
     tracking_eps = float(max(0.0, _auto_safe_float(AUTO_MODE_REFINE_TIEBREAK_TRACKING_EPS, 0.05)))
 
     if ref_rank_diff > 1e-9:
-        if abs(raw_rank_diff) <= rank_eps and tracking_pair_ok and float(new_tracking) > float(best_tracking) + tracking_eps:
-            out = (False, "target_tracking")
-        elif abs(raw_rank_diff) <= rank_eps and tracking_pair_ok and float(best_tracking) > float(new_tracking) + tracking_eps:
-            out = (True, "target_tracking")
-        elif abs(raw_rank_diff) <= rank_eps and mode_pair_ok:
-            mode_improve = float(best_mode_ripple - new_mode_ripple)
-            if mode_improve > ripple_eps:
-                new_boost = _auto_safe_float(new_m.get("max_net_boost_db"), 0.0)
-                best_boost = _auto_safe_float(best_m.get("max_net_boost_db"), 0.0)
-                boost_rise = float(new_boost - best_boost)
-                if boost_rise > 1e-6 and mode_improve <= mode_guard_gain:
-                    out = (False, "mode_guard")
-                else:
-                    out = (True, "mode_ripple")
-            else:
-                out = (True, "rank_refine")
-        else:
-            out = (True, "rank_refine")
+        out = _refine_rank_improves_decision(
+            raw_rank_diff=raw_rank_diff,
+            ref_rank_diff=ref_rank_diff,
+            rank_eps=rank_eps,
+            tracking_pair_ok=tracking_pair_ok,
+            new_tracking=float(new_tracking),
+            best_tracking=float(best_tracking),
+            tracking_eps=tracking_eps,
+            mode_pair_ok=mode_pair_ok,
+            best_mode_ripple=float(best_mode_ripple),
+            new_mode_ripple=float(new_mode_ripple),
+            ripple_eps=ripple_eps,
+            new_m=new_m,
+            best_m=best_m,
+            mode_guard_gain=mode_guard_gain,
+        )
     elif ref_rank_diff < -1e-9:
-        if abs(raw_rank_diff) <= rank_eps and mode_pair_ok and (float(new_mode_ripple - best_mode_ripple) > ripple_eps):
-            out = (False, "mode_ripple")
-        else:
-            out = (False, "rank_refine")
+        out = _refine_rank_worsens_decision(
+            raw_rank_diff=raw_rank_diff,
+            ref_rank_diff=ref_rank_diff,
+            rank_eps=rank_eps,
+            mode_pair_ok=mode_pair_ok,
+            new_mode_ripple=float(new_mode_ripple),
+            best_mode_ripple=float(best_mode_ripple),
+            ripple_eps=ripple_eps,
+        )
     else:
         out = (False, "rank_tie")
         if bool(AUTO_MODE_REFINE_TIEBREAK_ENABLE):
-            if mode_pair_ok:
-                mode_improve = float(best_mode_ripple - new_mode_ripple)
-                if mode_improve > ripple_eps:
-                    new_boost = _auto_safe_float(new_m.get("max_net_boost_db"), 0.0)
-                    best_boost = _auto_safe_float(best_m.get("max_net_boost_db"), 0.0)
-                    boost_rise = float(new_boost - best_boost)
-                    if boost_rise > 1e-6 and mode_improve <= mode_guard_gain:
-                        out = (False, "mode_guard")
-                    else:
-                        out = (True, "mode_ripple")
-                elif float(new_mode_ripple - best_mode_ripple) > ripple_eps:
-                    out = (False, "mode_ripple")
-
-            if out[1] == "rank_tie":
-                if tracking_pair_ok:
-                    if float(best_tracking - new_tracking) > tracking_eps:
-                        out = (True, "target_tracking")
-                    elif float(new_tracking - best_tracking) > tracking_eps:
-                        out = (False, "target_tracking")
-
-            if out[1] == "rank_tie":
-                new_ripple = _auto_safe_float(new_m.get("focus_ripple_db"), float("nan"))
-                best_ripple = _auto_safe_float(best_m.get("focus_ripple_db"), float("nan"))
-                if np.isfinite(new_ripple) and np.isfinite(best_ripple):
-                    if float(best_ripple - new_ripple) > ripple_eps:
-                        out = (True, "focus_ripple")
-                    elif float(new_ripple - best_ripple) > ripple_eps:
-                        out = (False, "focus_ripple")
-
-            if out[1] == "rank_tie":
-                phase_eps = float(max(0.0, _auto_safe_float(AUTO_MODE_REFINE_TIEBREAK_PHASE_EPS, 0.10)))
-                new_phase_net = _auto_phase_net_for_rank(new_m)
-                best_phase_net = _auto_phase_net_for_rank(best_m)
-                if float(new_phase_net - best_phase_net) > phase_eps:
-                    out = (True, "phase_net")
-                elif float(best_phase_net - new_phase_net) > phase_eps:
-                    out = (False, "phase_net")
-
-            if out[1] == "rank_tie":
-                phase_risk_eps = 0.10
-                new_phase_risk = _auto_phase_risk_for_rank(new_m)
-                best_phase_risk = _auto_phase_risk_for_rank(best_m)
-                if float(best_phase_risk - new_phase_risk) > phase_risk_eps:
-                    out = (True, "phase_risk")
-                elif float(new_phase_risk - best_phase_risk) > phase_risk_eps:
-                    out = (False, "phase_risk")
+            out = _refine_rank_tie_tiebreak(
+                out=out,
+                mode_pair_ok=mode_pair_ok,
+                best_mode_ripple=float(best_mode_ripple),
+                new_mode_ripple=float(new_mode_ripple),
+                ripple_eps=ripple_eps,
+                new_m=new_m,
+                best_m=best_m,
+                mode_guard_gain=mode_guard_gain,
+                tracking_pair_ok=tracking_pair_ok,
+                best_tracking=float(best_tracking),
+                new_tracking=float(new_tracking),
+                tracking_eps=tracking_eps,
+            )
 
         if out[1] == "rank_tie":
             out = (

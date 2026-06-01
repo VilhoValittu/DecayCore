@@ -201,6 +201,115 @@ def _cached_target_seed_label(raw_data: dict) -> str:
     return "cached_target_seed"
 
 
+def _decide_without_cache_seed(
+    *,
+    raw: dict,
+    cache_read_failed: bool,
+    has_target_seed: bool,
+    has_fresh_target_seed: bool,
+    signature_obj: AutoSearchSignature,
+    signature: str,
+    fallback_reasons: list[str],
+    exact_status: str,
+    exact_reason: str,
+    last_best_status: str,
+    last_best_reason: str,
+    filter_key: str,
+    target_mode: str,
+    compat_version: str,
+) -> AutoSearchPlanDecision:
+    if bool(cache_read_failed):
+        return _decision(
+            plan=AutoSearchPlan.FALLBACK_FULL_SEARCH,
+            reason="no valid cache and no compatible last-best seed",
+            signature=signature,
+            fallback_reasons=fallback_reasons,
+            cache_decision_report=_build_cache_decision_report(
+                signature_obj=signature_obj,
+                signature=signature,
+                exact_status=exact_status,
+                exact_reason=exact_reason,
+                last_best_status=last_best_status,
+                last_best_reason=last_best_reason,
+                selected_plan=AutoSearchPlan.FALLBACK_FULL_SEARCH,
+                cache_proof_status="missing",
+                filter_key=filter_key,
+                target_mode=target_mode,
+                compat_version=compat_version,
+            ),
+        )
+    wants_target_preselect = bool(has_target_seed) or _wants_target_preselect(raw)
+    if wants_target_preselect:
+        plan = (
+            AutoSearchPlan.PRESELECTED_TARGET_REFINE
+            if bool(has_fresh_target_seed)
+            else AutoSearchPlan.FIRST_RUN_FULL_SEARCH
+        )
+        return _decision(
+            plan=plan,
+            reason="using target preselect seed; running refine stages"
+            if bool(has_target_seed)
+            else "using automatic target search; running first-run stages",
+            signature=signature,
+            seed_preset=dict(raw.get("_auto_target_seed_preset", {}) or {}) if bool(has_target_seed) else None,
+            fallback_reasons=fallback_reasons,
+            cache_decision_report=_build_cache_decision_report(
+                signature_obj=signature_obj,
+                signature=signature,
+                exact_status=exact_status,
+                exact_reason=exact_reason,
+                last_best_status=last_best_status,
+                last_best_reason=last_best_reason,
+                selected_plan=plan,
+                cache_proof_status="seed_only" if bool(has_target_seed) else "missing",
+                filter_key=filter_key,
+                target_mode=target_mode,
+                compat_version=compat_version,
+            ),
+            seed_source="fresh_target_search" if bool(has_fresh_target_seed) else None,
+        )
+    if _wants_manual_preset_refine(raw):
+        plan = AutoSearchPlan.MANUAL_PRESET_REFINE
+        return _decision(
+            plan=plan,
+            reason="manual target selected and no valid exact cache",
+            signature=signature,
+            fallback_reasons=fallback_reasons,
+            cache_decision_report=_build_cache_decision_report(
+                signature_obj=signature_obj,
+                signature=signature,
+                exact_status=exact_status,
+                exact_reason=exact_reason,
+                last_best_status=last_best_status,
+                last_best_reason=last_best_reason,
+                selected_plan=plan,
+                cache_proof_status="missing",
+                filter_key=filter_key,
+                target_mode=target_mode,
+                compat_version=compat_version,
+            ),
+        )
+    return _decision(
+        plan=AutoSearchPlan.FIRST_RUN_FULL_SEARCH,
+        reason="no valid cache and no compatible last-best seed",
+        signature=signature,
+        fallback_reasons=fallback_reasons,
+        cache_decision_report=_build_cache_decision_report(
+            signature_obj=signature_obj,
+            signature=signature,
+            exact_status=exact_status,
+            exact_reason=exact_reason,
+            last_best_status=last_best_status,
+            last_best_reason=last_best_reason,
+            selected_plan=AutoSearchPlan.FIRST_RUN_FULL_SEARCH,
+            cache_proof_status="missing",
+            filter_key=filter_key,
+            target_mode=target_mode,
+            compat_version=compat_version,
+        ),
+    )
+
+
 def determine_auto_search_plan(
     search_input: AutoSearchInput,
     raw_data: dict,
@@ -374,69 +483,19 @@ def determine_auto_search_plan(
     else:
         fallback_reasons.append("cache skipped: disabled")
 
-    if bool(has_target_seed) or _wants_target_preselect(raw):
-        plan = AutoSearchPlan.PRESELECTED_TARGET_REFINE if bool(has_fresh_target_seed) else AutoSearchPlan.FIRST_RUN_FULL_SEARCH
-        return _decision(
-            plan=plan,
-            reason="using target preselect seed; running refine stages"
-            if bool(has_target_seed)
-            else "using automatic target search; running first-run stages",
-            signature=signature,
-            seed_preset=dict(raw.get("_auto_target_seed_preset", {}) or {}) if bool(has_target_seed) else None,
-            fallback_reasons=fallback_reasons,
-            cache_decision_report=_build_cache_decision_report(
-                signature_obj=signature_obj,
-                signature=signature,
-                exact_status=exact_status,
-                exact_reason=exact_reason,
-                last_best_status=last_best_status,
-                last_best_reason=last_best_reason,
-                selected_plan=plan,
-                cache_proof_status="seed_only" if bool(has_target_seed) else "missing",
-                filter_key=filter_key,
-                target_mode=target_mode,
-                compat_version=compat_version,
-            ),
-            seed_source="fresh_target_search" if bool(has_fresh_target_seed) else None,
-        )
-    if _wants_manual_preset_refine(raw):
-        plan = AutoSearchPlan.MANUAL_PRESET_REFINE
-        return _decision(
-            plan=plan,
-            reason="manual target selected and no valid exact cache",
-            signature=signature,
-            fallback_reasons=fallback_reasons,
-            cache_decision_report=_build_cache_decision_report(
-                signature_obj=signature_obj,
-                signature=signature,
-                exact_status=exact_status,
-                exact_reason=exact_reason,
-                last_best_status=last_best_status,
-                last_best_reason=last_best_reason,
-                selected_plan=plan,
-                cache_proof_status="missing",
-                filter_key=filter_key,
-                target_mode=target_mode,
-                compat_version=compat_version,
-            ),
-        )
-    plan = AutoSearchPlan.FALLBACK_FULL_SEARCH if bool(cache_read_failed) else AutoSearchPlan.FIRST_RUN_FULL_SEARCH
-    return _decision(
-        plan=plan,
-        reason="no valid cache and no compatible last-best seed",
+    return _decide_without_cache_seed(
+        raw=raw,
+        cache_read_failed=cache_read_failed,
+        has_target_seed=has_target_seed,
+        has_fresh_target_seed=has_fresh_target_seed,
+        signature_obj=signature_obj,
         signature=signature,
         fallback_reasons=fallback_reasons,
-        cache_decision_report=_build_cache_decision_report(
-            signature_obj=signature_obj,
-            signature=signature,
-            exact_status=exact_status,
-            exact_reason=exact_reason,
-            last_best_status=last_best_status,
-            last_best_reason=last_best_reason,
-            selected_plan=plan,
-            cache_proof_status="missing",
-            filter_key=filter_key,
-            target_mode=target_mode,
-            compat_version=compat_version,
-        ),
+        exact_status=exact_status,
+        exact_reason=exact_reason,
+        last_best_status=last_best_status,
+        last_best_reason=last_best_reason,
+        filter_key=filter_key,
+        target_mode=target_mode,
+        compat_version=compat_version,
     )

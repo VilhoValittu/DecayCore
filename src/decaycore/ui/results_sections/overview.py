@@ -61,11 +61,92 @@ from ...dsp.lr_difference_metrics import compute_lr_difference_metrics
 
 logger = logging.getLogger("DecayCore")
 
+_RECOVERABLE_UI_EXCEPTIONS = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    KeyError,
+    IndexError,
+    RuntimeError,
+    OSError,
+    ImportError,
+    ModuleNotFoundError,
+    NameError,
+)
+
 def _format_recommended_xo_hz(value: float) -> str:
     hz = float(value)
     if math.isclose(hz, round(hz), abs_tol=1e-6):
         return f"{hz:.0f} Hz"
     return f"{hz:.1f} Hz"
+
+
+def _update_plot_status(run_started_at) -> None:
+    if run_started_at is None:
+        ui_state.update_status(t("stat_plot"))
+        return
+    try:
+        elapsed = max(0.0, float(time.perf_counter() - float(run_started_at)))
+        ui_state.update_status(f"{t('stat_plot')} | {elapsed:.1f} s")
+    except _RECOVERABLE_UI_EXCEPTIONS:
+        ui_state.update_status(t("stat_plot"))
+
+
+def _set_progress_value(prog, value: float, *, log_context: str) -> None:
+    if prog is None:
+        return
+    try:
+        prog.set_value(float(value))
+    except _RECOVERABLE_UI_EXCEPTIONS:
+        logger.exception(log_context)
+
+
+def _format_done_status(done_status: str, saved_filters_dir) -> str:
+    if not saved_filters_dir:
+        return done_status
+    try:
+        return done_status.format(path=str(saved_filters_dir))
+    except _RECOVERABLE_UI_EXCEPTIONS:
+        return f"{done_status} {saved_filters_dir}"
+
+
+def _publish_done_status(done_msg: str, done_status: str, run_started_at) -> None:
+    ui_state.update_status_notices(summary_text=done_msg, info_text="")
+    if run_started_at is None:
+        ui_state.update_status(done_status)
+        return
+    try:
+        total_s = max(0.0, float(time.perf_counter() - float(run_started_at)))
+        ui_state.update_status(f"{done_status} | {total_s:.1f} s")
+    except _RECOVERABLE_UI_EXCEPTIONS:
+        ui_state.update_status(done_status)
+
+
+def _update_last_run_info(l_st_f, r_st_f) -> None:
+    if l_st_f is None or r_st_f is None:
+        return
+    try:
+        l_ai = plots.calc_ai_summary_from_stats(l_st_f)
+        r_ai = plots.calc_ai_summary_from_stats(r_st_f)
+        l_score = l_ai.get("score")
+        r_score = r_ai.get("score")
+        l_match = l_ai.get("match")
+        r_match = r_ai.get("match")
+        l_conf = float(l_st_f.get("avg_confidence") or 0.0)
+        r_conf = float(r_st_f.get("avg_confidence") or 0.0)
+        ui_state.set_last_run_info(
+            {
+                "score": (float(l_score) + float(r_score)) / 2.0
+                if (l_score is not None and r_score is not None)
+                else None,
+                "match": (float(l_match) + float(r_match)) / 2.0
+                if (l_match is not None and r_match is not None)
+                else None,
+                "conf": (l_conf + r_conf) / 2.0,
+            }
+        )
+    except _RECOVERABLE_UI_EXCEPTIONS:
+        logger.debug("set_last_run_info failed", exc_info=True)
 
 def render_results(
     data,
@@ -97,45 +178,10 @@ def render_results(
     from nicegui import ui
     from ..ng_run_section import get_progress_element, get_results_container, set_progress_visual_state  # noqa: PLC0415
 
-    if run_started_at is not None:
-        try:
-            elapsed = max(0.0, float(time.perf_counter() - float(run_started_at)))
-            ui_state.update_status(f"{t('stat_plot')} | {elapsed:.1f} s")
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            ui_state.update_status(t("stat_plot"))
-    else:
-        ui_state.update_status(t("stat_plot"))
+    _update_plot_status(run_started_at)
 
     prog = get_progress_element()
-    if prog is not None:
-        try:
-            prog.set_value(0.96)
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            logger.exception("progress bar set 0.96")
+    _set_progress_value(prog, 0.96, log_context="progress bar set 0.96")
 
     # Clear the per-run plot cache so stale figures don't survive across runs.
     _PLOT_RENDER_CACHE.clear()
@@ -192,103 +238,13 @@ def render_results(
         _render_lr_difference(l_st_f=l_st_f, r_st_f=r_st_f)
 
     done_msg = t("done_msg")
-    done_status = t("stat_done")
-    if saved_filters_dir:
-        try:
-            done_status = done_status.format(path=str(saved_filters_dir))
-        except (
+    done_status = _format_done_status(t("stat_done"), saved_filters_dir)
+    _publish_done_status(done_msg, done_status, run_started_at)
 
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            done_status = f"{done_status} {saved_filters_dir}"
-
-    if run_started_at is not None:
-        try:
-            total_s = max(0.0, float(time.perf_counter() - float(run_started_at)))
-            ui_state.update_status_notices(summary_text=done_msg, info_text="")
-            ui_state.update_status(f"{done_status} | {total_s:.1f} s")
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            ui_state.update_status_notices(summary_text=done_msg, info_text="")
-            ui_state.update_status(done_status)
-    else:
-        ui_state.update_status_notices(summary_text=done_msg, info_text="")
-        ui_state.update_status(done_status)
-
-    if prog is not None:
-        try:
-            prog.set_value(1.0)
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            logger.exception("progress bar set 1.0")
+    _set_progress_value(prog, 1.0, log_context="progress bar set 1.0")
     set_progress_visual_state(completed=True)
 
-    if l_st_f is not None and r_st_f is not None:
-        try:
-            l_ai = plots.calc_ai_summary_from_stats(l_st_f)
-            r_ai = plots.calc_ai_summary_from_stats(r_st_f)
-            l_score = l_ai.get("score")
-            r_score = r_ai.get("score")
-            l_match = l_ai.get("match")
-            r_match = r_ai.get("match")
-            l_conf = float(l_st_f.get("avg_confidence") or 0.0)
-            r_conf = float(r_st_f.get("avg_confidence") or 0.0)
-            ui_state.set_last_run_info(
-                {
-                    "score": (float(l_score) + float(r_score)) / 2.0
-                    if (l_score is not None and r_score is not None)
-                    else None,
-                    "match": (float(l_match) + float(r_match)) / 2.0
-                    if (l_match is not None and r_match is not None)
-                    else None,
-                    "conf": (l_conf + r_conf) / 2.0,
-                }
-            )
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            logger.debug("set_last_run_info failed", exc_info=True)
+    _update_last_run_info(l_st_f, r_st_f)
 
 def _esc(v: Any) -> str:
     return html.escape(str(v) if v is not None else "-")
@@ -471,98 +427,152 @@ def _render_run_overview(*, data: dict, l_st_f: dict, r_st_f: dict) -> None:
         ],
     )
 
+def _display_polish_rank(polish: dict, raw_key: str, official_key: str) -> float:
+    official = safe_float(polish.get(official_key, float("nan")), float("nan"))
+    if math.isfinite(official):
+        return float(official)
+    raw = safe_float(polish.get(raw_key, float("nan")), float("nan"))
+    return float(calibrated_auto_quality(raw))
+
+
+def _rank_delta_display(polish: dict) -> str:
+    before = _display_polish_rank(polish, "rank_before", "rank_before_official")
+    after = _display_polish_rank(polish, "rank_after", "rank_after_official")
+    if math.isfinite(before) and math.isfinite(after):
+        return f", rank {before:.3f} → {after:.3f}"
+    return ""
+
+
+def _build_numeric_polish_line(
+    auto_meta: dict,
+    *,
+    meta_key: str,
+    label: str,
+    start_key: str,
+    final_key: str,
+    precision: int,
+    unit: str = "",
+) -> str | None:
+    polish = dict(auto_meta.get(meta_key, {}) or {})
+    if not bool(polish.get("applicable", False)):
+        return None
+    start = safe_float(polish.get(start_key, float("nan")), float("nan"))
+    final = safe_float(polish.get(final_key, float("nan")), float("nan"))
+    rank_delta = _rank_delta_display(polish)
+    if bool(polish.get("applied", False)):
+        return f"✓ {label}: applied ({start:.{precision}f} → {final:.{precision}f}{unit}{rank_delta})"
+    return f"– {label}: tested, no change (kept {final:.{precision}f}{unit})"
+
+
+def _hpf_polish_label(enabled: bool, freq: float, slope: int) -> str:
+    return "HPF off" if not enabled else f"HPF {freq:.1f} Hz/{slope} dB/oct"
+
+
+def _build_hpf_polish_line(auto_meta: dict) -> str | None:
+    hpf = dict(auto_meta.get("hpf_winner_polish", {}) or {})
+    if not bool(hpf.get("applicable", False)):
+        return None
+    s_en = bool(hpf.get("start_enabled", False))
+    s_fr = safe_float(hpf.get("start_freq_hz", float("nan")), float("nan"))
+    s_sl = int(round(safe_float(hpf.get("start_slope_db_oct", 0.0), 0.0)))
+    f_en = bool(hpf.get("final_enabled", False))
+    f_fr = safe_float(hpf.get("final_freq_hz", float("nan")), float("nan"))
+    f_sl = int(round(safe_float(hpf.get("final_slope_db_oct", 0.0), 0.0)))
+    rank_delta = _rank_delta_display(hpf)
+    if bool(hpf.get("applied", False)):
+        return (
+            f"✓ HPF: applied ("
+            f"{_hpf_polish_label(s_en, s_fr, s_sl)} → {_hpf_polish_label(f_en, f_fr, f_sl)}{rank_delta})"
+        )
+    return f"– HPF: tested, no change (kept {_hpf_polish_label(f_en, f_fr, f_sl)})"
+
+
+def _build_residual_peak_polish_line(auto_meta: dict) -> str | None:
+    rp = dict(auto_meta.get("residual_peak_winner_polish", {}) or {})
+    if not bool(rp.get("applicable", False)):
+        return None
+    pb = safe_float(rp.get("worst_peak_before_db", float("nan")), float("nan"))
+    pa = safe_float(rp.get("worst_peak_after_db", float("nan")), float("nan"))
+    ph = safe_float(rp.get("worst_peak_freq_hz", float("nan")), float("nan"))
+    peak_pos = f" @ {ph:.1f} Hz" if math.isfinite(ph) else ""
+    rank_delta = _rank_delta_display(rp)
+    if bool(rp.get("applied", False)):
+        return f"✓ Residual-peak: applied ({pb:.2f} → {pa:.2f} dB{peak_pos}{rank_delta})"
+    if bool(rp.get("enabled", False)):
+        return f"– Residual-peak: tested, no change (peak {pa:.2f} dB{peak_pos})"
+    return None
+
+
+def _build_stereo_policy_polish_line(auto_meta: dict) -> str | None:
+    sp = dict(auto_meta.get("stereo_policy_refine", {}) or {})
+    if not bool(sp.get("applicable", False)):
+        return None
+    sp_state = str(sp.get("state", "") or "")
+    if sp_state == "applied":
+        return "✓ Stereo-policy: applied"
+    if sp_state:
+        return f"– Stereo-policy: tested, no change ({sp_state})"
+    return None
+
+
 def _build_auto_polish_lines(auto_meta: dict) -> list[str]:
     lines: list[str] = []
 
-    def _display_rank(polish: dict, raw_key: str, official_key: str) -> float:
-        official = safe_float(polish.get(official_key, float("nan")), float("nan"))
-        if math.isfinite(official):
-            return float(official)
-        raw = safe_float(polish.get(raw_key, float("nan")), float("nan"))
-        return float(calibrated_auto_quality(raw))
+    numeric_specs = (
+        (
+            "phase_limit_winner_polish",
+            "Phase-limit",
+            "start_phase_limit_hz",
+            "final_phase_limit_hz",
+            1,
+            " Hz",
+        ),
+        (
+            "mag_c_min_winner_polish",
+            "Mag-c-min",
+            "start_mag_c_min_hz",
+            "final_mag_c_min_hz",
+            1,
+            " Hz",
+        ),
+        (
+            "low_bass_cut_winner_polish",
+            "Low-bass-cut",
+            "start_low_bass_cut_hz",
+            "final_low_bass_cut_hz",
+            1,
+            " Hz",
+        ),
+        (
+            "excess_phase_strength_winner_polish",
+            "Excess-phase-strength",
+            "start_value",
+            "final_value",
+            4,
+            "",
+        ),
+    )
+    for meta_key, label, start_key, final_key, precision, unit in numeric_specs:
+        line = _build_numeric_polish_line(
+            auto_meta,
+            meta_key=meta_key,
+            label=label,
+            start_key=start_key,
+            final_key=final_key,
+            precision=precision,
+            unit=unit,
+        )
+        if line:
+            lines.append(line)
 
-    def _rank_delta_display(polish: dict) -> str:
-        before = _display_rank(polish, "rank_before", "rank_before_official")
-        after = _display_rank(polish, "rank_after", "rank_after_official")
-        if math.isfinite(before) and math.isfinite(after):
-            return f", rank {before:.3f} → {after:.3f}"
-        return ""
-
-    pl = dict(auto_meta.get("phase_limit_winner_polish", {}) or {})
-    if bool(pl.get("applicable", False)):
-        start = safe_float(pl.get("start_phase_limit_hz", float("nan")), float("nan"))
-        final = safe_float(pl.get("final_phase_limit_hz", float("nan")), float("nan"))
-        rd = _rank_delta_display(pl)
-        if bool(pl.get("applied", False)):
-            lines.append(f"✓ Phase-limit: applied ({start:.1f} → {final:.1f} Hz{rd})")
-        else:
-            lines.append(f"– Phase-limit: tested, no change (kept {final:.1f} Hz)")
-
-    mc = dict(auto_meta.get("mag_c_min_winner_polish", {}) or {})
-    if bool(mc.get("applicable", False)):
-        start = safe_float(mc.get("start_mag_c_min_hz", float("nan")), float("nan"))
-        final = safe_float(mc.get("final_mag_c_min_hz", float("nan")), float("nan"))
-        rd = _rank_delta_display(mc)
-        if bool(mc.get("applied", False)):
-            lines.append(f"✓ Mag-c-min: applied ({start:.1f} → {final:.1f} Hz{rd})")
-        else:
-            lines.append(f"– Mag-c-min: tested, no change (kept {final:.1f} Hz)")
-
-    lbc = dict(auto_meta.get("low_bass_cut_winner_polish", {}) or {})
-    if bool(lbc.get("applicable", False)):
-        start = safe_float(lbc.get("start_low_bass_cut_hz", float("nan")), float("nan"))
-        final = safe_float(lbc.get("final_low_bass_cut_hz", float("nan")), float("nan"))
-        rd = _rank_delta_display(lbc)
-        if bool(lbc.get("applied", False)):
-            lines.append(f"✓ Low-bass-cut: applied ({start:.1f} → {final:.1f} Hz{rd})")
-        else:
-            lines.append(f"– Low-bass-cut: tested, no change (kept {final:.1f} Hz)")
-
-    hpf = dict(auto_meta.get("hpf_winner_polish", {}) or {})
-    if bool(hpf.get("applicable", False)):
-        def _hpf_label(enabled: bool, freq: float, slope: int) -> str:
-            return f"HPF off" if not enabled else f"HPF {freq:.1f} Hz/{slope} dB/oct"
-        s_en = bool(hpf.get("start_enabled", False))
-        s_fr = safe_float(hpf.get("start_freq_hz", float("nan")), float("nan"))
-        s_sl = int(round(safe_float(hpf.get("start_slope_db_oct", 0.0), 0.0)))
-        f_en = bool(hpf.get("final_enabled", False))
-        f_fr = safe_float(hpf.get("final_freq_hz", float("nan")), float("nan"))
-        f_sl = int(round(safe_float(hpf.get("final_slope_db_oct", 0.0), 0.0)))
-        rd = _rank_delta_display(hpf)
-        if bool(hpf.get("applied", False)):
-            lines.append(f"✓ HPF: applied ({_hpf_label(s_en, s_fr, s_sl)} → {_hpf_label(f_en, f_fr, f_sl)}{rd})")
-        else:
-            lines.append(f"– HPF: tested, no change (kept {_hpf_label(f_en, f_fr, f_sl)})")
-
-    eps = dict(auto_meta.get("excess_phase_strength_winner_polish", {}) or {})
-    if bool(eps.get("applicable", False)):
-        start = safe_float(eps.get("start_value", float("nan")), float("nan"))
-        final = safe_float(eps.get("final_value", float("nan")), float("nan"))
-        rd = _rank_delta_display(eps)
-        if bool(eps.get("applied", False)):
-            lines.append(f"✓ Excess-phase-strength: applied ({start:.4f} → {final:.4f}{rd})")
-        else:
-            lines.append(f"– Excess-phase-strength: tested, no change (kept {final:.4f})")
-
-    rp = dict(auto_meta.get("residual_peak_winner_polish", {}) or {})
-    if bool(rp.get("applicable", False)):
-        pb = safe_float(rp.get("worst_peak_before_db", float("nan")), float("nan"))
-        pa = safe_float(rp.get("worst_peak_after_db", float("nan")), float("nan"))
-        ph = safe_float(rp.get("worst_peak_freq_hz", float("nan")), float("nan"))
-        peak_pos = f" @ {ph:.1f} Hz" if math.isfinite(ph) else ""
-        rd = _rank_delta_display(rp)
-        if bool(rp.get("applied", False)):
-            lines.append(f"✓ Residual-peak: applied ({pb:.2f} → {pa:.2f} dB{peak_pos}{rd})")
-        elif bool(rp.get("enabled", False)):
-            lines.append(f"– Residual-peak: tested, no change (peak {pa:.2f} dB{peak_pos})")
-
-    sp = dict(auto_meta.get("stereo_policy_refine", {}) or {})
-    if bool(sp.get("applicable", False)):
-        sp_state = str(sp.get("state", "") or "")
-        if sp_state == "applied":
-            lines.append("✓ Stereo-policy: applied")
-        elif sp_state:
-            lines.append(f"– Stereo-policy: tested, no change ({sp_state})")
+    for builder in (
+        _build_hpf_polish_line,
+        _build_residual_peak_polish_line,
+        _build_stereo_policy_polish_line,
+    ):
+        line = builder(auto_meta)
+        if line:
+            lines.append(line)
 
     return lines
 

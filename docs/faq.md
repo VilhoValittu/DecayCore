@@ -19,13 +19,13 @@ No. DecayCore is compatible with CamillaDSP, but the generated FIR filters can a
 
 ## Does DecayCore include measurement?
 
-Yes. DecayCore includes its own built-in measurement workflow in release builds published in the Releases section.
+Yes. DecayCore includes its own built-in measurement workflow in release builds published in the Releases section. Measurement has been verified to work on Windows. Linux has been verified to work at least on Ubuntu 22.04. macOS could not be tested due to unavailable test hardware.
 
 ## Should I measure with DecayCore or REW?
 
-For new measurements, use DecayCore's own measurement workflow. It is designed for DecayCore's correction pipeline.
+For new measurements, use DecayCore's own measurement workflow when available on your platform. It is designed for DecayCore's correction pipeline.
 
-Existing REW-style measurement data may be used where compatible, but REW should be presented as an optional external workflow rather than the main DecayCore workflow.
+When DecayCore's measurement is not available on your platform, use compatible external measurements such as REW-style exports. For subwoofer measurement on Windows, ensure your playback device is configured for 5.1 or 7.1 multichannel in Windows Sound settings.
 
 ## Where can I download DecayCore?
 

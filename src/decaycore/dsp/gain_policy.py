@@ -82,6 +82,67 @@ def build_low_frequency_guard_mask(
     return guard_mask
 
 
+def _resolve_gain_cap_array(
+    cap_values: np.ndarray | None,
+    *,
+    fallback: np.ndarray,
+    clip_hi: float,
+) -> np.ndarray | None:
+    try:
+        if cap_values is None:
+            return None
+        cap = np.asarray(cap_values, dtype=float)
+    except (TypeError, ValueError):
+        return None
+    if cap.shape != fallback.shape or not np.all(np.isfinite(cap)):
+        return None
+    return np.clip(cap, 0.0, float(clip_hi))
+
+
+def _resolve_gain_mask(mask: np.ndarray | None, *, fallback: np.ndarray) -> np.ndarray:
+    try:
+        if mask is None:
+            return np.ones_like(fallback, dtype=bool)
+        mm = np.asarray(mask, dtype=bool)
+        if mm.shape == fallback.shape:
+            return mm
+    except (TypeError, ValueError):
+        pass
+    return np.ones_like(fallback, dtype=bool)
+
+
+def _apply_boost_cap(
+    out: np.ndarray,
+    *,
+    boost_cap: np.ndarray | None,
+    mask: np.ndarray,
+    policy: GainPolicy,
+) -> None:
+    if boost_cap is None:
+        out[:] = np.minimum(out, float(policy.max_boost_db))
+        return
+    if np.any(mask):
+        out[mask] = np.minimum(out[mask], boost_cap[mask])
+    if np.any(~mask):
+        out[~mask] = np.minimum(out[~mask], float(policy.max_boost_db))
+
+
+def _apply_cut_cap(
+    out: np.ndarray,
+    *,
+    cut_cap: np.ndarray | None,
+    mask: np.ndarray,
+    policy: GainPolicy,
+) -> None:
+    if cut_cap is None:
+        out[:] = np.maximum(out, -float(policy.max_cut_db))
+        return
+    if np.any(mask):
+        out[mask] = np.maximum(out[mask], -cut_cap[mask])
+    if np.any(~mask):
+        out[~mask] = np.maximum(out[~mask], -float(policy.max_cut_db))
+
+
 def clamp_gain_curve(
     curve_db: np.ndarray,
     *,
@@ -91,51 +152,19 @@ def clamp_gain_curve(
     mask: np.ndarray | None = None,
 ) -> np.ndarray:
     out = np.asarray(curve_db, dtype=float).copy()
-    boost_cap = None
-    cut_cap = None
-    try:
-        if boost_cap_db is not None:
-            boost_cap = np.asarray(boost_cap_db, dtype=float)
-            if boost_cap.shape != out.shape or not np.all(np.isfinite(boost_cap)):
-                boost_cap = None
-            else:
-                boost_cap = np.clip(boost_cap, 0.0, np.inf)
-    except (TypeError, ValueError):
-        boost_cap = None
-    try:
-        if cut_cap_db is not None:
-            cut_cap = np.asarray(cut_cap_db, dtype=float)
-            if cut_cap.shape != out.shape or not np.all(np.isfinite(cut_cap)):
-                cut_cap = None
-            else:
-                cut_cap = np.clip(cut_cap, 0.0, float(policy.max_cut_db))
-    except (TypeError, ValueError):
-        cut_cap = None
-
-    m = np.ones_like(out, dtype=bool)
-    try:
-        if mask is not None:
-            mm = np.asarray(mask, dtype=bool)
-            if mm.shape == out.shape:
-                m = mm
-    except (TypeError, ValueError):
-        m = np.ones_like(out, dtype=bool)
-
-    if boost_cap is None:
-        out = np.minimum(out, float(policy.max_boost_db))
-    else:
-        if np.any(m):
-            out[m] = np.minimum(out[m], boost_cap[m])
-        if np.any(~m):
-            out[~m] = np.minimum(out[~m], float(policy.max_boost_db))
-
-    if cut_cap is None:
-        out = np.maximum(out, -float(policy.max_cut_db))
-    else:
-        if np.any(m):
-            out[m] = np.maximum(out[m], -cut_cap[m])
-        if np.any(~m):
-            out[~m] = np.maximum(out[~m], -float(policy.max_cut_db))
+    boost_cap = _resolve_gain_cap_array(
+        boost_cap_db,
+        fallback=out,
+        clip_hi=float(np.inf),
+    )
+    cut_cap = _resolve_gain_cap_array(
+        cut_cap_db,
+        fallback=out,
+        clip_hi=float(policy.max_cut_db),
+    )
+    m = _resolve_gain_mask(mask, fallback=out)
+    _apply_boost_cap(out, boost_cap=boost_cap, mask=m, policy=policy)
+    _apply_cut_cap(out, cut_cap=cut_cap, mask=m, policy=policy)
     return out
 
 

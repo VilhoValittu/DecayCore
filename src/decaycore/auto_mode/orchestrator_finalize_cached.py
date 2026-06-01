@@ -45,6 +45,33 @@ logger = logging.getLogger("DecayCore")
 
 __all__ = ["_finalize_cached_result"]
 
+_RECOVERABLE_CACHE_FINALIZE_EXCEPTIONS = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    KeyError,
+    IndexError,
+    RuntimeError,
+    OSError,
+    ImportError,
+    ModuleNotFoundError,
+    NameError,
+)
+
+
+def _apply_cache_improved_state(
+    *,
+    cached_state: dict,
+    improved_count_total: int,
+    winner_phase_label: str,
+    improved: bool,
+    phase_label: str,
+) -> tuple[int, str]:
+    if not bool(improved):
+        return int(improved_count_total), str(winner_phase_label)
+    cached_state["improved_any"] = True
+    return int(improved_count_total) + 1, str(phase_label)
+
 
 def _finalize_cached_result(
     *,
@@ -136,19 +163,7 @@ def _finalize_cached_result(
                 fs_v=int(fs_v),
                 taps_v=int(taps_v),
             )
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ) as exc:
+        except _RECOVERABLE_CACHE_FINALIZE_EXCEPTIONS as exc:
             logger.warning(
                 "Automatic mode: exact preset cache materialization failed, "
                 f"falling back to search ({type(exc).__name__}: {exc})"
@@ -163,10 +178,13 @@ def _finalize_cached_result(
                 base_data_ref=cache_base_data,
                 phase_label="cache residual tie-break",
             )
-        if bool(residual_cache_improved):
-            cached_state["improved_any"] = True
-            improved_count_total += 1
-            winner_phase_label = "cache residual tie-break"
+        improved_count_total, winner_phase_label = _apply_cache_improved_state(
+            cached_state=cached_state,
+            improved_count_total=improved_count_total,
+            winner_phase_label=winner_phase_label,
+            improved=bool(residual_cache_improved),
+            phase_label="cache residual tie-break",
+        )
 
         with profiled_section("finalize.cache_phase_limit_winner_polish"):
             best_preset, best_metrics, phase_limit_cache_improved, phase_limit_cache_meta = (
@@ -185,10 +203,13 @@ def _finalize_cached_result(
                     auto_is_better_refine=_auto_is_better_refine,
                 )
             )
-        if bool(phase_limit_cache_improved):
-            cached_state["improved_any"] = True
-            improved_count_total += 1
-            winner_phase_label = "cache phase_limit winner polish"
+        improved_count_total, winner_phase_label = _apply_cache_improved_state(
+            cached_state=cached_state,
+            improved_count_total=improved_count_total,
+            winner_phase_label=winner_phase_label,
+            improved=bool(phase_limit_cache_improved),
+            phase_label="cache phase_limit winner polish",
+        )
 
         with profiled_section("finalize.cache_mag_c_min_winner_polish"):
             best_preset, best_metrics, mag_c_min_cache_improved, mag_c_min_cache_meta = apply_mag_c_min_winner_polish(
@@ -205,10 +226,13 @@ def _finalize_cached_result(
                 cache_ready_preset=_cache_ready_preset,
                 auto_is_better_refine=_auto_is_better_refine,
             )
-        if bool(mag_c_min_cache_improved):
-            cached_state["improved_any"] = True
-            improved_count_total += 1
-            winner_phase_label = "cache mag_c_min winner polish"
+        improved_count_total, winner_phase_label = _apply_cache_improved_state(
+            cached_state=cached_state,
+            improved_count_total=improved_count_total,
+            winner_phase_label=winner_phase_label,
+            improved=bool(mag_c_min_cache_improved),
+            phase_label="cache mag_c_min winner polish",
+        )
 
         with profiled_section("finalize.cache_low_bass_cut_winner_polish"):
             best_preset, best_metrics, low_bass_cut_cache_improved, low_bass_cut_cache_meta = (
@@ -227,10 +251,13 @@ def _finalize_cached_result(
                     auto_is_better_refine=_auto_is_better_refine,
                 )
             )
-        if bool(low_bass_cut_cache_improved):
-            cached_state["improved_any"] = True
-            improved_count_total += 1
-            winner_phase_label = "cache low_bass_cut winner polish"
+        improved_count_total, winner_phase_label = _apply_cache_improved_state(
+            cached_state=cached_state,
+            improved_count_total=improved_count_total,
+            winner_phase_label=winner_phase_label,
+            improved=bool(low_bass_cut_cache_improved),
+            phase_label="cache low_bass_cut winner polish",
+        )
 
         with profiled_section("finalize.cache_hpf_winner_polish"):
             best_preset, best_metrics, hpf_cache_improved, hpf_cache_meta = apply_hpf_winner_polish(
@@ -245,10 +272,13 @@ def _finalize_cached_result(
                 cache_ready_preset=_cache_ready_preset,
                 auto_is_better_refine=_auto_is_better_refine,
             )
-        if bool(hpf_cache_improved):
-            cached_state["improved_any"] = True
-            improved_count_total += 1
-            winner_phase_label = "cache hpf winner polish"
+        improved_count_total, winner_phase_label = _apply_cache_improved_state(
+            cached_state=cached_state,
+            improved_count_total=improved_count_total,
+            winner_phase_label=winner_phase_label,
+            improved=bool(hpf_cache_improved),
+            phase_label="cache hpf winner polish",
+        )
 
         with profiled_section("finalize.cache_excess_phase_strength_winner_polish"):
             best_preset, best_metrics, eps_cache_improved, eps_cache_meta = apply_excess_phase_strength_winner_polish(
@@ -265,10 +295,13 @@ def _finalize_cached_result(
                 cache_ready_preset=_cache_ready_preset,
                 auto_is_better_refine=_auto_is_better_refine,
             )
-        if bool(eps_cache_improved):
-            cached_state["improved_any"] = True
-            improved_count_total += 1
-            winner_phase_label = "cache excess_phase_strength winner polish"
+        improved_count_total, winner_phase_label = _apply_cache_improved_state(
+            cached_state=cached_state,
+            improved_count_total=improved_count_total,
+            winner_phase_label=winner_phase_label,
+            improved=bool(eps_cache_improved),
+            phase_label="cache excess_phase_strength winner polish",
+        )
 
         with profiled_section("finalize.cache_residual_peak_winner_polish"):
             best_preset, best_metrics, residual_peak_cache_improved, residual_peak_cache_meta = (
@@ -305,10 +338,13 @@ def _finalize_cached_result(
                     auto_is_better_refine=_auto_is_better_refine,
                 )
             )
-        if bool(residual_peak_cache_improved):
-            cached_state["improved_any"] = True
-            improved_count_total += 1
-            winner_phase_label = "cache residual_peak winner polish"
+        improved_count_total, winner_phase_label = _apply_cache_improved_state(
+            cached_state=cached_state,
+            improved_count_total=improved_count_total,
+            winner_phase_label=winner_phase_label,
+            improved=bool(residual_peak_cache_improved),
+            phase_label="cache residual_peak winner polish",
+        )
 
         with profiled_section("finalize.cache_tdc_strength_winner_polish"):
             best_preset, best_metrics, tdc_strength_cache_improved, tdc_strength_cache_meta = (
@@ -325,10 +361,13 @@ def _finalize_cached_result(
                     auto_is_better_refine=_auto_is_better_refine,
                 )
             )
-        if bool(tdc_strength_cache_improved):
-            cached_state["improved_any"] = True
-            improved_count_total += 1
-            winner_phase_label = "cache tdc_strength winner polish"
+        improved_count_total, winner_phase_label = _apply_cache_improved_state(
+            cached_state=cached_state,
+            improved_count_total=improved_count_total,
+            winner_phase_label=winner_phase_label,
+            improved=bool(tdc_strength_cache_improved),
+            phase_label="cache tdc_strength winner polish",
+        )
 
         with profiled_section("finalize.cache_stereo_policy_refine"):
             best_preset, best_metrics, stereo_cache_improved, stereo_cache_meta = apply_stereo_policy_refine(
@@ -341,10 +380,13 @@ def _finalize_cached_result(
                 materialize_preset_result=_materialize_preset_result,
                 auto_is_better_refine=_auto_is_better_refine,
             )
-        if bool(stereo_cache_improved):
-            cached_state["improved_any"] = True
-            improved_count_total += 1
-            winner_phase_label = "cache stereo policy refine"
+        improved_count_total, winner_phase_label = _apply_cache_improved_state(
+            cached_state=cached_state,
+            improved_count_total=improved_count_total,
+            winner_phase_label=winner_phase_label,
+            improved=bool(stereo_cache_improved),
+            phase_label="cache stereo policy refine",
+        )
         cached_state["improved_count_total"] = int(improved_count_total)
         materialized = _materialize_cached_result(
             runtime=runtime,
@@ -392,19 +434,7 @@ def _finalize_cached_result(
             fs_v=int(fs_v),
             taps_v=int(taps_v),
         )
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ) as exc:
+    except _RECOVERABLE_CACHE_FINALIZE_EXCEPTIONS as exc:
         # Exact-cache finalize is a best-effort fast path; search fallback remains authoritative.
         logger.warning(
             "Automatic mode: exact preset cache materialization failed, "

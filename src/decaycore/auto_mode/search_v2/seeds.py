@@ -105,148 +105,177 @@ def _apply_explicit_seed(
     return prior_seed_preset
 
 
-def _apply_legacy_opportunistic_seeds(context: AutoSearchExecutionContext) -> None:
+def _apply_seed_payload(
+    *,
+    search_base_data: dict,
+    cache_base_data: dict,
+    seed_preset: dict,
+    seed_metrics: dict | None,
+    context: AutoSearchExecutionContext,
+    success_log: str,
+) -> bool:
+    if not (isinstance(seed_preset, dict) and seed_preset):
+        return False
+    search_base_data["_auto_target_seed_preset"] = dict(seed_preset)
+    search_base_data.update(dict(seed_preset))
+    _restore_auto_excursion_seed(search_base_data, cache_base_data)
+    context.prior_seed_preset = dict(seed_preset)
+    if "hc_mode" in cache_base_data:
+        search_base_data["hc_mode"] = cache_base_data["hc_mode"]
+    if isinstance(seed_metrics, dict) and seed_metrics:
+        search_base_data["_auto_target_seed_metrics"] = dict(seed_metrics)
+    logger.info(str(success_log))
+    return True
+
+
+def _try_apply_cache_signature_seed(context: AutoSearchExecutionContext) -> None:
     search_base_data = context.search_base_data
     cache_base_data = context.cache_base_data
-    if bool(context.cfg.cache_enabled) and not dict(search_base_data.get("_auto_target_seed_preset", {}) or {}):
-        try:
-            cached_entry_sig = auto_api._auto_cache_get_entry(
-                context.optuna_search_sig,
-                filter_key=context.filter_key,
-                compat_version=context.compat_version,
-            )
-            cached = dict((cached_entry_sig or {}).get("best_preset", {}) or {}) if isinstance(cached_entry_sig, dict) else {}
-            cached_metrics_seed = dict((cached_entry_sig or {}).get("best_metrics", {}) or {}) if isinstance(cached_entry_sig, dict) else {}
-            if isinstance(cached, dict) and cached:
-                search_base_data["_auto_target_seed_preset"] = dict(cached)
-                search_base_data.update(dict(cached))
-                _restore_auto_excursion_seed(search_base_data, cache_base_data)
-                context.prior_seed_preset = dict(cached)
-                if "hc_mode" in cache_base_data:
-                    search_base_data["hc_mode"] = cache_base_data["hc_mode"]
-                if isinstance(cached_metrics_seed, dict) and cached_metrics_seed:
-                    search_base_data["_auto_target_seed_metrics"] = dict(cached_metrics_seed)
-                logger.info("Automatic mode: loaded cached best preset seed.")
-        except (
+    if not (bool(context.cfg.cache_enabled) and not dict(search_base_data.get("_auto_target_seed_preset", {}) or {})):
+        return
+    try:
+        cached_entry_sig = auto_api._auto_cache_get_entry(
+            context.optuna_search_sig,
+            filter_key=context.filter_key,
+            compat_version=context.compat_version,
+        )
+        cached = dict((cached_entry_sig or {}).get("best_preset", {}) or {}) if isinstance(cached_entry_sig, dict) else {}
+        cached_metrics_seed = dict((cached_entry_sig or {}).get("best_metrics", {}) or {}) if isinstance(cached_entry_sig, dict) else {}
+        _apply_seed_payload(
+            search_base_data=search_base_data,
+            cache_base_data=cache_base_data,
+            seed_preset=dict(cached or {}),
+            seed_metrics=dict(cached_metrics_seed or {}),
+            context=context,
+            success_log="Automatic mode: loaded cached best preset seed.",
+        )
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
+        record_auto_search_fallback(
+            search_base_data,
+            f"cache seed skipped: {type(exc).__name__}",
+            exc_info=True,
+        )
 
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ) as exc:
-            record_auto_search_fallback(
-                search_base_data,
-                f"cache seed skipped: {type(exc).__name__}",
-                exc_info=True,
-            )
 
-    if (
-        not dict(search_base_data.get("_auto_target_seed_preset", {}) or {})
-        and str(context.optimizer_backend) == "optuna"
+def _try_apply_optuna_phase1_seed(context: AutoSearchExecutionContext) -> None:
+    search_base_data = context.search_base_data
+    cache_base_data = context.cache_base_data
+    if dict(search_base_data.get("_auto_target_seed_preset", {}) or {}):
+        return
+    if not (
+        str(context.optimizer_backend) == "optuna"
         and bool(getattr(context.cfg, "optuna_persistent_study", False))
         and context.optuna_mod is not None
         and auto_api._auto_optuna_module_ready(context.optuna_mod)
     ):
-        try:
-            storage = context.runtime["auto_optuna_create_storage"](
-                context.optuna_mod,
-                base_data=dict(cache_base_data or {}),
-            )
-            study_name = context.runtime["auto_optuna_study_name"](
-                study_sig=str(context.optuna_search_sig),
-                scope=context.runtime["auto_optuna_effective_scope"](
-                    cache_base_data,
-                    "phase1",
-                    phase_kind="phase1",
-                ),
-            )
-            study = context.optuna_mod.load_study(study_name=str(study_name), storage=storage)
-            best_trial = getattr(study, "best_trial", None)
-            study_seed_preset = context.runtime["auto_optuna_trial_payload_preset"](
-                dict(getattr(best_trial, "user_attrs", {}) or {})
-            )
-            if not isinstance(study_seed_preset, dict) or not study_seed_preset:
-                study_seed_preset = dict(getattr(best_trial, "params", {}) or {})
-            if isinstance(study_seed_preset, dict) and study_seed_preset:
-                study_seed_metrics = dict(
-                    (context.runtime["auto_optuna_trial_out_payload"](best_trial) or {}).get("metrics", {}) or {}
-                )
-                search_base_data["_auto_target_seed_preset"] = dict(study_seed_preset)
-                search_base_data.update(dict(study_seed_preset))
-                _restore_auto_excursion_seed(search_base_data, cache_base_data)
-                context.prior_seed_preset = dict(study_seed_preset)
-                if "hc_mode" in cache_base_data:
-                    search_base_data["hc_mode"] = cache_base_data["hc_mode"]
-                if study_seed_metrics:
-                    search_base_data["_auto_target_seed_metrics"] = dict(study_seed_metrics)
-                logger.info(
-                    "Automatic mode: loaded Optuna phase1 study preset seed for "
-                    "canonical Phase 1 -> Phase 2 -> Micro refine search."
-                )
-        except (
+        return
+    try:
+        storage = context.runtime["auto_optuna_create_storage"](
+            context.optuna_mod,
+            base_data=dict(cache_base_data or {}),
+        )
+        study_name = context.runtime["auto_optuna_study_name"](
+            study_sig=str(context.optuna_search_sig),
+            scope=context.runtime["auto_optuna_effective_scope"](
+                cache_base_data,
+                "phase1",
+                phase_kind="phase1",
+            ),
+        )
+        study = context.optuna_mod.load_study(study_name=str(study_name), storage=storage)
+        best_trial = getattr(study, "best_trial", None)
+        study_seed_preset = context.runtime["auto_optuna_trial_payload_preset"](
+            dict(getattr(best_trial, "user_attrs", {}) or {})
+        )
+        if not isinstance(study_seed_preset, dict) or not study_seed_preset:
+            study_seed_preset = dict(getattr(best_trial, "params", {}) or {})
+        study_seed_metrics = dict(
+            (context.runtime["auto_optuna_trial_out_payload"](best_trial) or {}).get("metrics", {}) or {}
+        ) if isinstance(study_seed_preset, dict) and study_seed_preset else {}
+        _apply_seed_payload(
+            search_base_data=search_base_data,
+            cache_base_data=cache_base_data,
+            seed_preset=dict(study_seed_preset or {}),
+            seed_metrics=dict(study_seed_metrics or {}),
+            context=context,
+            success_log=(
+                "Automatic mode: loaded Optuna phase1 study preset seed for "
+                "canonical Phase 1 -> Phase 2 -> Micro refine search."
+            ),
+        )
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
+        record_auto_search_fallback(
+            search_base_data,
+            f"optuna study seed skipped: {type(exc).__name__}",
+            exc_info=True,
+        )
 
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ) as exc:
-            record_auto_search_fallback(
-                search_base_data,
-                f"optuna study seed skipped: {type(exc).__name__}",
-                exc_info=True,
-            )
 
-    if (
-        bool(context.cfg.cache_enabled)
-        and not dict(search_base_data.get("_auto_target_seed_preset", {}) or {})
-    ):
-        try:
-            cached_entry_last = auto_api._auto_cache_get_last_used_best(
-                goal=context.goal,
-                filter_key=context.filter_key,
-                compat_version=context.compat_version,
-            )
-            cached = dict((cached_entry_last or {}).get("best_preset", {}) or {})
-            cached_metrics_seed = dict((cached_entry_last or {}).get("best_metrics", {}) or {})
-            if isinstance(cached, dict) and cached:
-                search_base_data["_auto_target_seed_preset"] = dict(cached)
-                search_base_data.update(dict(cached))
-                _restore_auto_excursion_seed(search_base_data, cache_base_data)
-                context.prior_seed_preset = dict(cached)
-                if "hc_mode" in cache_base_data:
-                    search_base_data["hc_mode"] = cache_base_data["hc_mode"]
-                if isinstance(cached_metrics_seed, dict) and cached_metrics_seed:
-                    search_base_data["_auto_target_seed_metrics"] = dict(cached_metrics_seed)
-                logger.info(
-                    "Automatic mode: loaded filter-specific last-used preset seed."
-                )
-        except (
+def _try_apply_last_used_seed(context: AutoSearchExecutionContext) -> None:
+    search_base_data = context.search_base_data
+    cache_base_data = context.cache_base_data
+    if not (bool(context.cfg.cache_enabled) and not dict(search_base_data.get("_auto_target_seed_preset", {}) or {})):
+        return
+    try:
+        cached_entry_last = auto_api._auto_cache_get_last_used_best(
+            goal=context.goal,
+            filter_key=context.filter_key,
+            compat_version=context.compat_version,
+        )
+        cached = dict((cached_entry_last or {}).get("best_preset", {}) or {})
+        cached_metrics_seed = dict((cached_entry_last or {}).get("best_metrics", {}) or {})
+        _apply_seed_payload(
+            search_base_data=search_base_data,
+            cache_base_data=cache_base_data,
+            seed_preset=dict(cached or {}),
+            seed_metrics=dict(cached_metrics_seed or {}),
+            context=context,
+            success_log="Automatic mode: loaded filter-specific last-used preset seed.",
+        )
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
+        record_auto_search_fallback(
+            search_base_data,
+            f"last-best seed skipped: {type(exc).__name__}",
+            exc_info=True,
+        )
 
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ) as exc:
-            record_auto_search_fallback(
-                search_base_data,
-                f"last-best seed skipped: {type(exc).__name__}",
-                exc_info=True,
-            )
+
+def _apply_legacy_opportunistic_seeds(context: AutoSearchExecutionContext) -> None:
+    search_base_data = context.search_base_data
+    cache_base_data = context.cache_base_data
+    _try_apply_cache_signature_seed(context)
+    _try_apply_optuna_phase1_seed(context)
+    _try_apply_last_used_seed(context)

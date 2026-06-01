@@ -242,47 +242,7 @@ def format_dsp_quality_report_block(settings, l_stats, r_stats):
         note = "ok" if not suspect else format_pre_energy_status(reason_code, debug=debug_report)
         return suspect, note
 
-    def _active_axes(st):
-        mode = str(st.get("analysis_mode", "native") or "native").strip().lower()
-        if mode == "comparison":
-            f = _as_arr(st.get("cmp_freq_axis", None))
-            t = _as_arr(st.get("cmp_target_mags", None))
-            mm = _as_arr(st.get("cmp_mag_mask", None))
-            offset_db = _safe_float(st.get("cmp_offset_db", 0.0))
-            if offset_db is None:
-                offset_db = 0.0
-            m_raw = _as_arr(st.get("cmp_measured_mags_raw", None))
-            m_corr = _as_arr(st.get("cmp_measured_mags", None))
-            g_pred = _as_arr(st.get("cmp_predicted_filter_mags", None))
-            g_real = _as_arr(st.get("cmp_realized_filter_mags", None))
-            g_legacy = _as_arr(st.get("cmp_filter_mags", None))
-            g_legacy_src = str(st.get("cmp_filter_mags_source", "") or "").strip().lower()
-            if m_raw.size < 8 and m_corr.size >= 8:
-                m_raw = np.asarray(m_corr, dtype=float) + float(offset_db)
-            if m_corr.size < 8 and m_raw.size >= 8:
-                m_corr = np.asarray(m_raw, dtype=float) - float(offset_db)
-            if g_pred.size < 8 and g_legacy.size >= 8 and g_legacy_src != "ir_fft_final":
-                g_pred = g_legacy
-            if g_real.size < 8 and g_legacy.size >= 8 and g_legacy_src == "ir_fft_final":
-                g_real = g_legacy
-            if g_pred.size < 8 and g_legacy.size >= 8:
-                g_pred = g_legacy
-            if g_real.size < 8 and g_legacy.size >= 8:
-                g_real = g_legacy
-            return f, m_corr, t, g_pred, g_real, mm, float(offset_db)
-
-        f = _as_arr(st.get("freq_axis", None))
-        t = _as_arr(st.get("target_mags", None))
-        mm = _as_arr(st.get("mag_mask", st.get("mask_c", None)))
-        offset_db = _safe_float(st.get("offset_db", 0.0))
-        if offset_db is None:
-            offset_db = 0.0
-        m_raw = _as_arr(st.get("measured_mags_raw", None))
-        m_corr = _as_arr(st.get("measured_mags", None))
-        g_pred = _as_arr(st.get("predicted_filter_mags", None))
-        g_real = _as_arr(st.get("realized_filter_mags", None))
-        g_legacy = _as_arr(st.get("filter_mags", None))
-        g_legacy_src = str(st.get("filter_mags_source", "") or "").strip().lower()
+    def _active_axes_repair_arrays(m_raw, m_corr, g_pred, g_real, g_legacy, offset_db, g_legacy_src):
         if m_raw.size < 8 and m_corr.size >= 8:
             m_raw = np.asarray(m_corr, dtype=float) + float(offset_db)
         if m_corr.size < 8 and m_raw.size >= 8:
@@ -295,7 +255,39 @@ def format_dsp_quality_report_block(settings, l_stats, r_stats):
             g_pred = g_legacy
         if g_real.size < 8 and g_legacy.size >= 8:
             g_real = g_legacy
+        return m_corr, g_pred, g_real
+
+    def _active_axes_from_prefix(st, *, prefix: str):
+        pref = str(prefix or "")
+        f = _as_arr(st.get(f"{pref}freq_axis", None))
+        t = _as_arr(st.get(f"{pref}target_mags", None))
+        mm_key = "cmp_mag_mask" if pref else "mag_mask"
+        mm = _as_arr(st.get(mm_key, st.get("mask_c", None) if not pref else None))
+        offset_db = _safe_float(st.get(f"{pref}offset_db", 0.0))
+        if offset_db is None:
+            offset_db = 0.0
+        m_raw = _as_arr(st.get(f"{pref}measured_mags_raw", None))
+        m_corr = _as_arr(st.get(f"{pref}measured_mags", None))
+        g_pred = _as_arr(st.get(f"{pref}predicted_filter_mags", None))
+        g_real = _as_arr(st.get(f"{pref}realized_filter_mags", None))
+        g_legacy = _as_arr(st.get(f"{pref}filter_mags", None))
+        g_legacy_src = str(st.get(f"{pref}filter_mags_source", "") or "").strip().lower()
+        m_corr, g_pred, g_real = _active_axes_repair_arrays(
+            m_raw,
+            m_corr,
+            g_pred,
+            g_real,
+            g_legacy,
+            float(offset_db),
+            g_legacy_src,
+        )
         return f, m_corr, t, g_pred, g_real, mm, float(offset_db)
+
+    def _active_axes(st):
+        mode = str(st.get("analysis_mode", "native") or "native").strip().lower()
+        if mode == "comparison":
+            return _active_axes_from_prefix(st, prefix="cmp_")
+        return _active_axes_from_prefix(st, prefix="")
 
     def _phase_limit_hz(st):
         for k in ("phase_limit_hz", "phase_limit"):

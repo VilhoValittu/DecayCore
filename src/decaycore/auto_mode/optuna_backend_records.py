@@ -65,6 +65,61 @@ _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS = (
 )
 
 
+def _auto_optuna_trial_params_from_trial(tr, *, seed_to_params=None) -> dict:
+    try:
+        user_attrs = dict(getattr(tr, "user_attrs", {}) or {})
+    except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
+        user_attrs = {}
+    payload_preset = _auto_optuna_trial_payload_preset(user_attrs)
+    try:
+        params = dict(getattr(tr, "params", {}) or {})
+    except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
+        params = {}
+    if callable(seed_to_params) and payload_preset:
+        try:
+            canonical_params = dict(seed_to_params(dict(payload_preset)) or {})
+        except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
+            canonical_params = {}
+        if canonical_params:
+            params = dict(canonical_params)
+    return dict(params)
+
+
+def _auto_optuna_trial_value_from_trial(tr) -> float:
+    val = getattr(tr, "value", None)
+    if val is None:
+        vals = getattr(tr, "values", None)
+        if isinstance(vals, (list, tuple)) and vals:
+            val = vals[0]
+    try:
+        val_f = float(val)
+    except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
+        return float("nan")
+    return float(val_f)
+
+
+def _auto_optuna_record_from_trial(tr, *, seed_to_params=None) -> tuple[str, dict] | None:
+    params = _auto_optuna_trial_params_from_trial(tr, seed_to_params=seed_to_params)
+    sig = _auto_optuna_param_signature(params)
+    if not sig:
+        return None
+    rec = {"params": dict(params)}
+    val_f = _auto_optuna_trial_value_from_trial(tr)
+    if np.isfinite(val_f):
+        rec["value"] = float(val_f)
+    state = getattr(tr, "state", None)
+    if state is not None:
+        rec["state"] = state
+    try:
+        user_attrs = dict(getattr(tr, "user_attrs", {}) or {})
+    except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
+        user_attrs = {}
+    cached_out = dict(user_attrs.get(AUTO_MODE_OPTUNA_USER_ATTR_OUT, {}) or {})
+    if cached_out:
+        rec["out"] = cached_out
+    return sig, rec
+
+
 def _auto_optuna_study_records(study, *, seed_to_params=None) -> dict[str, dict]:
     try:
         trials = study.get_trials(deepcopy=False)
@@ -76,45 +131,116 @@ def _auto_optuna_study_records(study, *, seed_to_params=None) -> dict[str, dict]
     _auto_optuna_note_trial_scan(len(trials))
     out: dict[str, dict] = {}
     for tr in trials:
-        try:
-            user_attrs = dict(getattr(tr, "user_attrs", {}) or {})
-        except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
-            user_attrs = {}
-        payload_preset = _auto_optuna_trial_payload_preset(user_attrs)
-        try:
-            params = dict(getattr(tr, "params", {}) or {})
-        except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
-            params = {}
-        if callable(seed_to_params) and payload_preset:
-            try:
-                canonical_params = dict(seed_to_params(dict(payload_preset)) or {})
-            except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
-                canonical_params = {}
-            if canonical_params:
-                params = dict(canonical_params)
-        sig = _auto_optuna_param_signature(params)
-        if not sig:
+        row = _auto_optuna_record_from_trial(tr, seed_to_params=seed_to_params)
+        if row is None:
             continue
-        rec = {"params": dict(params)}
-        val = getattr(tr, "value", None)
-        if val is None:
-            vals = getattr(tr, "values", None)
-            if isinstance(vals, (list, tuple)) and vals:
-                val = vals[0]
-        try:
-            val_f = float(val)
-        except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
-            val_f = float("nan")
-        if np.isfinite(val_f):
-            rec["value"] = float(val_f)
-        state = getattr(tr, "state", None)
-        if state is not None:
-            rec["state"] = state
-        cached_out = dict(user_attrs.get(AUTO_MODE_OPTUNA_USER_ATTR_OUT, {}) or {})
-        if cached_out:
-            rec["out"] = cached_out
+        sig, rec = row
         out[sig] = rec
     return out
+
+
+def _auto_optuna_build_trial_system_attrs(
+    *,
+    base_data: dict | None,
+    scope_eff: str,
+    phase_kind: str | None,
+    metrics: dict | None,
+    constraint_fn,
+) -> dict | None:
+    if not callable(constraint_fn):
+        return None
+    try:
+        thr = _auto_optuna_constraint_thresholds(base_data, scope_eff)
+        use_events = _auto_optuna_use_events_constraint(base_data, phase_kind=phase_kind)
+        cv = _auto_optuna_constraint_vector_from_metrics(
+            dict(metrics or {}),
+            max_mode_ripple_db=float(thr["max_mode_ripple_db"]),
+            max_events_severity=float(thr["max_events_severity"]),
+            max_net_boost_db=float(thr["max_net_boost_db"]),
+            use_events=bool(use_events),
+        )
+        return {"constraints": list(cv)}
+    except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
+        return None
+
+
+def _auto_optuna_remember_with_add_trial(
+    *,
+    optuna_mod,
+    study,
+    params: dict,
+    value: float,
+    payload_json: dict,
+    base_data: dict | None,
+    study_name: str,
+    params_sig: str,
+    trial_system_attrs: dict | None,
+) -> bool:
+    add_trial_obj = _auto_optuna_build_completed_trial(
+        optuna_mod,
+        params=params,
+        value=float(value),
+        user_attrs={AUTO_MODE_OPTUNA_USER_ATTR_OUT: payload_json},
+        base_data=base_data,
+        system_attrs=trial_system_attrs,
+    )
+    if add_trial_obj is None:
+        return False
+    try:
+        study.add_trial(add_trial_obj)
+        _auto_optuna_update_known_record(
+            study_name,
+            params_sig,
+            {
+                "params": dict(params),
+                "value": float(value),
+                "out": dict(payload_json or {}),
+            },
+        )
+        return True
+    except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
+        logger.exception("optuna add_trial")
+        return False
+
+
+def _auto_optuna_remember_with_enqueue_tell(
+    *,
+    study,
+    params: dict,
+    value: float,
+    payload_json: dict,
+    study_name: str,
+    params_sig: str,
+) -> bool:
+    if not hasattr(study, "enqueue_trial") or not hasattr(study, "ask") or not hasattr(study, "tell"):
+        return False
+    try:
+        study.enqueue_trial(dict(params))
+        trial_obj = study.ask()
+    except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
+        return False
+    try:
+        if hasattr(trial_obj, "set_user_attr"):
+            trial_obj.set_user_attr(
+                AUTO_MODE_OPTUNA_USER_ATTR_OUT,
+                payload_json,
+            )
+    except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
+        logger.exception("optuna trial user attr set")
+    try:
+        study.tell(trial_obj, float(value))
+    except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
+        return False
+    _auto_optuna_update_known_record(
+        study_name,
+        params_sig,
+        {
+            "params": dict(params),
+            "value": float(value),
+            "out": dict(payload_json or {}),
+        },
+    )
+    return True
 
 def _auto_optuna_remember_result(
     optuna_mod,
@@ -197,73 +323,33 @@ def _auto_optuna_remember_result(
     )
     payload_json = _auto_optuna_jsonable(dict(payload or {}))
     if hasattr(study, "add_trial"):
-        trial_system_attrs: dict | None = None
-        if callable(constraint_fn):
-            try:
-                thr = _auto_optuna_constraint_thresholds(base_data, scope_eff)
-                use_events = _auto_optuna_use_events_constraint(base_data, phase_kind=phase_kind)
-                cv = _auto_optuna_constraint_vector_from_metrics(
-                    dict(metrics or {}),
-                    max_mode_ripple_db=float(thr["max_mode_ripple_db"]),
-                    max_events_severity=float(thr["max_events_severity"]),
-                    max_net_boost_db=float(thr["max_net_boost_db"]),
-                    use_events=bool(use_events),
-                )
-                trial_system_attrs = {"constraints": list(cv)}
-            except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
-                trial_system_attrs = None
-        add_trial_obj = _auto_optuna_build_completed_trial(
-            optuna_mod,
+        trial_system_attrs = _auto_optuna_build_trial_system_attrs(
+            base_data=base_data,
+            scope_eff=scope_eff,
+            phase_kind=phase_kind,
+            metrics=metrics,
+            constraint_fn=constraint_fn,
+        )
+        if _auto_optuna_remember_with_add_trial(
+            optuna_mod=optuna_mod,
+            study=study,
             params=params,
             value=float(value),
-            user_attrs={AUTO_MODE_OPTUNA_USER_ATTR_OUT: payload_json},
+            payload_json=dict(payload_json or {}),
             base_data=base_data,
-            system_attrs=trial_system_attrs,
-        )
-        if add_trial_obj is not None:
-            try:
-                study.add_trial(add_trial_obj)
-                _auto_optuna_update_known_record(
-                    study_name,
-                    params_sig,
-                    {
-                        "params": dict(params),
-                        "value": float(value),
-                        "out": dict(payload_json or {}),
-                    },
-                )
-                return True
-            except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
-                logger.exception("optuna add_trial")
-    if not hasattr(study, "enqueue_trial") or not hasattr(study, "ask") or not hasattr(study, "tell"):
-        return False
-    try:
-        study.enqueue_trial(dict(params))
-        trial_obj = study.ask()
-    except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
-        return False
-    try:
-        if hasattr(trial_obj, "set_user_attr"):
-            trial_obj.set_user_attr(
-                AUTO_MODE_OPTUNA_USER_ATTR_OUT,
-                payload_json,
-            )
-    except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
-        logger.exception("optuna trial user attr set")
-    try:
-        study.tell(trial_obj, float(value))
-    except _RECOVERABLE_OPTUNA_RECORD_EXCEPTIONS:
-        return False
-    _auto_optuna_update_known_record(
-        study_name,
-        params_sig,
-        {
-            "params": dict(params),
-            "value": float(value),
-            "out": dict(payload_json or {}),
-        },
+            study_name=str(study_name),
+            params_sig=str(params_sig),
+            trial_system_attrs=trial_system_attrs,
+        ):
+            return True
+    return _auto_optuna_remember_with_enqueue_tell(
+        study=study,
+        params=params,
+        value=float(value),
+        payload_json=dict(payload_json or {}),
+        study_name=str(study_name),
+        params_sig=str(params_sig),
     )
-    return True
 
 def _auto_optuna_objective_value(metrics: dict | None, *, use_refine_tiebreak: bool = False, goal: str | None = None) -> float:
     met = dict(metrics or {})

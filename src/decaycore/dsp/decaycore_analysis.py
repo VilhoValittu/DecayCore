@@ -63,6 +63,36 @@ def _distance_bins_from_hz(freq_axis, distance_hz: float, fallback_bins: int = 1
         return int(fallback_bins)
 
 
+def _fit_rt60_window(t_u: np.ndarray, d_u: np.ndarray, lo_db: float, hi_db: float):
+    mask = (d_u <= lo_db) & (d_u >= hi_db)
+    if np.count_nonzero(mask) < 12:
+        return None
+    tt = t_u[mask]
+    yy = d_u[mask]
+    A = np.vstack([tt, np.ones_like(tt)]).T
+    a, b = np.linalg.lstsq(A, yy, rcond=None)[0]
+    yhat = a * tt + b
+    ss_res = float(np.sum((yy - yhat) ** 2))
+    ss_tot = float(np.sum((yy - np.mean(yy)) ** 2)) + 1e-12
+    r2 = 1.0 - ss_res / ss_tot
+    if a >= -1e-9:
+        return None
+    rt60 = -60.0 / a
+    return rt60, r2
+
+
+def _pick_rt60_candidate(candidates: list[tuple[str, float, float]]):
+    if not candidates:
+        return None
+    pref = {"T30": 0, "T20": 1, "EDT": 2}
+    candidates.sort(key=lambda x: (pref[x[0]], -x[2]))
+    for name, rt60, r2 in candidates:
+        if r2 >= 0.90:
+            return rt60, r2, name
+    name, rt60, r2 = candidates[0]
+    return rt60, r2, name
+
+
 def calculate_group_delay(freqs, phases_deg):
     phase_rad = np.unwrap(np.deg2rad(phases_deg))
     d_phi_d_f = np.gradient(phase_rad, freqs)
@@ -154,52 +184,20 @@ def calculate_rt60(impulse, fs):
         t_u = t[:stop_idx + 1]
         d_u = edc_db[:stop_idx + 1]
 
-        def fit_rt(lo_db, hi_db):
-            mask = (d_u <= lo_db) & (d_u >= hi_db)
-            if np.count_nonzero(mask) < 12:
-                return None
-
-            tt = t_u[mask]
-            yy = d_u[mask]
-            A = np.vstack([tt, np.ones_like(tt)]).T
-            a, b = np.linalg.lstsq(A, yy, rcond=None)[0]
-
-            yhat = a * tt + b
-            ss_res = float(np.sum((yy - yhat) ** 2))
-            ss_tot = float(np.sum((yy - np.mean(yy)) ** 2)) + 1e-12
-            r2 = 1.0 - ss_res / ss_tot
-
-            if a >= -1e-9:
-                return None
-
-            rt60 = -60.0 / a
-            return rt60, r2
-
         candidates = []
-        r = fit_rt(0.0, -10.0)
+        r = _fit_rt60_window(t_u, d_u, 0.0, -10.0)
         if r:
             candidates.append(("EDT",) + r)
-        r = fit_rt(-5.0, -25.0)
+        r = _fit_rt60_window(t_u, d_u, -5.0, -25.0)
         if r:
             candidates.append(("T20",) + r)
-        r = fit_rt(-5.0, -35.0)
+        r = _fit_rt60_window(t_u, d_u, -5.0, -35.0)
         if r:
             candidates.append(("T30",) + r)
 
-        if not candidates:
-            return 0.0
-
-        pref = {"T30": 0, "T20": 1, "EDT": 2}
-        candidates.sort(key=lambda x: (pref[x[0]], -x[2]))
-
-        chosen = None
-        for name, rt60, r2 in candidates:
-            if r2 >= 0.90:
-                chosen = (rt60, r2, name)
-                break
+        chosen = _pick_rt60_candidate(candidates)
         if chosen is None:
-            name, rt60, r2 = candidates[0]
-            chosen = (rt60, r2, name)
+            return 0.0
 
         rt60 = float(chosen[0])
         if 0.05 < rt60 < 5.0:

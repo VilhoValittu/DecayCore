@@ -398,11 +398,7 @@ def aggregate_harmonic_curves(
 
     Returns (common_freq_hz, {order: averaged_mag_db}) or (None, None).
     """
-    valid_pairs = [
-        (np.asarray(f, dtype=float), dict(m))
-        for f, m in zip(freqs_list or [], mags_list or [], strict=False)
-        if f is not None and m is not None
-    ]
+    valid_pairs = _harmonic_valid_pairs(freqs_list, mags_list)
     if not valid_pairs:
         return None, None
 
@@ -412,38 +408,63 @@ def aggregate_harmonic_curves(
         return None, None
 
     # Collect all harmonic orders present across takes.
-    all_orders: set[int] = set()
-    for _, m in valid_pairs:
-        all_orders.update(m.keys())
+    all_orders = _harmonic_collect_orders(valid_pairs)
     if not all_orders:
         return None, None
 
     averaged: dict[int, np.ndarray] = {}
     for order in sorted(all_orders):
-        rows = []
-        for f, m in valid_pairs:
-            arr = m.get(order)
-            if arr is None:
-                continue
-            a = np.asarray(arr, dtype=float).reshape(-1)
-            if a.size == ref_freq.size:
-                rows.append(a)
-            elif a.size > 0 and f.size == a.size:
-                # Interpolate to common grid.
-                rows.append(np.interp(ref_freq, f, a, left=a[0], right=a[-1]))
+        rows = _harmonic_rows_for_order(valid_pairs, order=order, ref_freq=ref_freq)
         if not rows:
             continue
-        mat = np.vstack(rows)
-        if mode == "linear_mean":
-            linear = np.power(10.0, mat / 20.0)
-            averaged_linear = np.mean(linear, axis=0)
-            averaged[int(order)] = 20.0 * np.log10(np.maximum(averaged_linear, 1e-12))
-        else:
-            averaged[int(order)] = np.median(mat, axis=0)
+        averaged[int(order)] = _harmonic_average_rows(rows, mode=mode)
 
     if not averaged:
         return None, None
     return np.asarray(ref_freq, dtype=float), averaged
+
+
+def _harmonic_valid_pairs(freqs_list: list, mags_list: list) -> list[tuple[np.ndarray, dict]]:
+    return [
+        (np.asarray(freq, dtype=float), dict(mags))
+        for freq, mags in zip(freqs_list or [], mags_list or [], strict=False)
+        if freq is not None and mags is not None
+    ]
+
+
+def _harmonic_collect_orders(valid_pairs: list[tuple[np.ndarray, dict]]) -> set[int]:
+    orders: set[int] = set()
+    for _, mags in valid_pairs:
+        orders.update(mags.keys())
+    return orders
+
+
+def _harmonic_rows_for_order(
+    valid_pairs: list[tuple[np.ndarray, dict]],
+    *,
+    order: int,
+    ref_freq: np.ndarray,
+) -> list[np.ndarray]:
+    rows: list[np.ndarray] = []
+    for freq, mags in valid_pairs:
+        arr = mags.get(order)
+        if arr is None:
+            continue
+        vals = np.asarray(arr, dtype=float).reshape(-1)
+        if vals.size == ref_freq.size:
+            rows.append(vals)
+        elif vals.size > 0 and freq.size == vals.size:
+            rows.append(np.interp(ref_freq, freq, vals, left=vals[0], right=vals[-1]))
+    return rows
+
+
+def _harmonic_average_rows(rows: list[np.ndarray], *, mode: str) -> np.ndarray:
+    mat = np.vstack(rows)
+    if mode == "linear_mean":
+        linear = np.power(10.0, mat / 20.0)
+        averaged_linear = np.mean(linear, axis=0)
+        return 20.0 * np.log10(np.maximum(averaged_linear, 1e-12))
+    return np.median(mat, axis=0)
 
 
 # ---------------------------------------------------------------------------

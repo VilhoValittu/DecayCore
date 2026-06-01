@@ -218,33 +218,25 @@ def _auto_dsp_quality_penalty(st: dict | None) -> tuple[float, float, dict]:
     return float(max(0.0, penalty)), float(bass_prering_raw), dbg
 
 
-def _auto_phase_quality(st: dict | None) -> tuple[float, float, dict]:
-    st = st or {}
-    dbg = {}
+def _phase_quality_metric01(st: dict, key: str) -> float:
+    v = shared._auto_safe_float(st.get(key, float("nan")), float("nan"))
+    if np.isfinite(v):
+        return float(np.clip(v, 0.0, 1.0))
+    return float("nan")
 
-    def _metric01(key: str) -> float:
-        v = shared._auto_safe_float(st.get(key, float("nan")), float("nan"))
-        if np.isfinite(v):
-            return float(np.clip(v, 0.0, 1.0))
-        return float("nan")
 
-    useful_lf = _metric01("phase_useful_lf_score")
-    useful_xo = _metric01("phase_useful_xo_score")
-    useful_aud = _metric01("phase_useful_audible_score")
-    risk_hf = _metric01("phase_risk_hf_score")
-    risk_spiky = _metric01("phase_risk_spiky_score")
-    risk_clamp = _metric01("phase_risk_clamp_score")
-    conf_mean = _metric01("phase_confidence_mean")
-    conf_lf = _metric01("phase_confidence_lf_mean")
-    conf_xo = _metric01("phase_confidence_xo_mean")
-    guard_scale = shared._auto_safe_float(st.get("phase_guard_scale_total", 1.0), 1.0)
-    if not np.isfinite(guard_scale):
-        guard_scale = 1.0
-    guard_scale = float(np.clip(guard_scale, 0.0, 1.0))
-
+def _phase_quality_conf_anchor(*, conf_lf: float, conf_xo: float, conf_mean: float) -> float:
     conf_anchor_vals = [float(v) for v in (conf_lf, conf_xo, conf_mean) if np.isfinite(v)]
-    conf_anchor = float(np.mean(np.asarray(conf_anchor_vals, dtype=float))) if conf_anchor_vals else float("nan")
+    return float(np.mean(np.asarray(conf_anchor_vals, dtype=float))) if conf_anchor_vals else float("nan")
 
+
+def _phase_quality_benefit(
+    *,
+    useful_lf: float,
+    useful_xo: float,
+    useful_aud: float,
+    conf_anchor: float,
+) -> float:
     benefit = 0.0
     if np.isfinite(useful_lf):
         benefit += 1.65 * float(useful_lf)
@@ -254,7 +246,16 @@ def _auto_phase_quality(st: dict | None) -> tuple[float, float, dict]:
         benefit += 0.55 * float(useful_aud)
     if np.isfinite(conf_anchor):
         benefit *= 0.65 + 0.35 * float(np.clip(conf_anchor, 0.0, 1.0))
+    return float(benefit)
 
+
+def _phase_quality_base_risk(
+    *,
+    risk_hf: float,
+    risk_spiky: float,
+    risk_clamp: float,
+    guard_scale: float,
+) -> float:
     risk = 0.0
     if np.isfinite(risk_hf):
         risk += 1.60 * float(risk_hf)
@@ -263,7 +264,11 @@ def _auto_phase_quality(st: dict | None) -> tuple[float, float, dict]:
     if np.isfinite(risk_clamp):
         risk += 0.70 * float(risk_clamp)
     risk += 0.85 * max(0.0, 1.0 - float(guard_scale))
+    return float(risk)
 
+
+def _phase_quality_extra_risk(st: dict) -> tuple[float, float | None, float | None, float | None, float | None]:
+    risk = 0.0
     pre_ringing_db = None if bool(st.get("pre_energy_metric_suspect", False)) else _auto_pick_metric(
         st,
         (
@@ -310,20 +315,94 @@ def _auto_phase_quality(st: dict | None) -> tuple[float, float, dict]:
     )
     if hf_share is not None:
         risk += 0.40 * max(0.0, float(hf_share) - 0.35)
+    return float(risk), pre_ringing_db, gd_grad_max, gd_abs_max, hf_share
 
-    dbg["useful_lf"] = float(useful_lf) if np.isfinite(useful_lf) else float("nan")
-    dbg["useful_xo"] = float(useful_xo) if np.isfinite(useful_xo) else float("nan")
-    dbg["useful_audible"] = float(useful_aud) if np.isfinite(useful_aud) else float("nan")
-    dbg["risk_hf"] = float(risk_hf) if np.isfinite(risk_hf) else float("nan")
-    dbg["risk_spiky"] = float(risk_spiky) if np.isfinite(risk_spiky) else float("nan")
-    dbg["risk_clamp"] = float(risk_clamp) if np.isfinite(risk_clamp) else float("nan")
-    dbg["conf_anchor"] = float(conf_anchor) if np.isfinite(conf_anchor) else float("nan")
-    dbg["guard_scale"] = float(guard_scale)
-    dbg["pre_ringing_db"] = pre_ringing_db
-    dbg["gd_grad_max"] = gd_grad_max
-    dbg["gd_abs_max"] = gd_abs_max
-    dbg["benefit"] = float(np.clip(benefit, 0.0, 3.5))
-    dbg["risk"] = float(np.clip(risk, 0.0, 4.5))
+
+def _phase_quality_debug(
+    *,
+    useful_lf: float,
+    useful_xo: float,
+    useful_aud: float,
+    risk_hf: float,
+    risk_spiky: float,
+    risk_clamp: float,
+    conf_anchor: float,
+    guard_scale: float,
+    pre_ringing_db,
+    gd_grad_max,
+    gd_abs_max,
+    benefit: float,
+    risk: float,
+) -> dict:
+    return {
+        "useful_lf": float(useful_lf) if np.isfinite(useful_lf) else float("nan"),
+        "useful_xo": float(useful_xo) if np.isfinite(useful_xo) else float("nan"),
+        "useful_audible": float(useful_aud) if np.isfinite(useful_aud) else float("nan"),
+        "risk_hf": float(risk_hf) if np.isfinite(risk_hf) else float("nan"),
+        "risk_spiky": float(risk_spiky) if np.isfinite(risk_spiky) else float("nan"),
+        "risk_clamp": float(risk_clamp) if np.isfinite(risk_clamp) else float("nan"),
+        "conf_anchor": float(conf_anchor) if np.isfinite(conf_anchor) else float("nan"),
+        "guard_scale": float(guard_scale),
+        "pre_ringing_db": pre_ringing_db,
+        "gd_grad_max": gd_grad_max,
+        "gd_abs_max": gd_abs_max,
+        "benefit": float(np.clip(benefit, 0.0, 3.5)),
+        "risk": float(np.clip(risk, 0.0, 4.5)),
+    }
+
+
+def _auto_phase_quality(st: dict | None) -> tuple[float, float, dict]:
+    st = st or {}
+    useful_lf = _phase_quality_metric01(st, "phase_useful_lf_score")
+    useful_xo = _phase_quality_metric01(st, "phase_useful_xo_score")
+    useful_aud = _phase_quality_metric01(st, "phase_useful_audible_score")
+    risk_hf = _phase_quality_metric01(st, "phase_risk_hf_score")
+    risk_spiky = _phase_quality_metric01(st, "phase_risk_spiky_score")
+    risk_clamp = _phase_quality_metric01(st, "phase_risk_clamp_score")
+    conf_mean = _phase_quality_metric01(st, "phase_confidence_mean")
+    conf_lf = _phase_quality_metric01(st, "phase_confidence_lf_mean")
+    conf_xo = _phase_quality_metric01(st, "phase_confidence_xo_mean")
+    guard_scale = shared._auto_safe_float(st.get("phase_guard_scale_total", 1.0), 1.0)
+    if not np.isfinite(guard_scale):
+        guard_scale = 1.0
+    guard_scale = float(np.clip(guard_scale, 0.0, 1.0))
+
+    conf_anchor = _phase_quality_conf_anchor(
+        conf_lf=conf_lf,
+        conf_xo=conf_xo,
+        conf_mean=conf_mean,
+    )
+    benefit = _phase_quality_benefit(
+        useful_lf=useful_lf,
+        useful_xo=useful_xo,
+        useful_aud=useful_aud,
+        conf_anchor=conf_anchor,
+    )
+    risk = _phase_quality_base_risk(
+        risk_hf=risk_hf,
+        risk_spiky=risk_spiky,
+        risk_clamp=risk_clamp,
+        guard_scale=guard_scale,
+    )
+    extra_risk, pre_ringing_db, gd_grad_max, gd_abs_max, hf_share = _phase_quality_extra_risk(st)
+    risk += float(extra_risk)
+
+    dbg = _phase_quality_debug(
+        useful_lf=useful_lf,
+        useful_xo=useful_xo,
+        useful_aud=useful_aud,
+        risk_hf=risk_hf,
+        risk_spiky=risk_spiky,
+        risk_clamp=risk_clamp,
+        conf_anchor=conf_anchor,
+        guard_scale=guard_scale,
+        pre_ringing_db=pre_ringing_db,
+        gd_grad_max=gd_grad_max,
+        gd_abs_max=gd_abs_max,
+        benefit=benefit,
+        risk=risk,
+    )
+    dbg["hf_share"] = hf_share
     return float(dbg["benefit"]), float(dbg["risk"]), dbg
 
 

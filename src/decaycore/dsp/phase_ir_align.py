@@ -32,6 +32,52 @@ def _anchor_index(ir, anchor_mode: str) -> int:
     return int(np.argmax(x))
 
 
+def _record_alignment_modes(st, *, anchor_mode: str, requested_win_mode: str, win_mode: str) -> None:
+    try:
+        if isinstance(st, dict):
+            st["ir_anchor_mode"] = str(anchor_mode)
+            st["ir_window_mode_requested"] = str(requested_win_mode)
+            st["ir_window_mode_effective"] = str(win_mode)
+    except (TypeError, ValueError):
+        pass
+
+
+def _pre_window_alignment_target(*, anchor_mode: str, is_min_filter: bool, win_mode: str) -> int | None:
+    if str(anchor_mode) == "min_causal":
+        return None
+    if bool(is_min_filter) and str(win_mode) == "auto":
+        return 0
+    return None
+
+
+def _min_causal_alignment_target(*, cfg, st, n: int, is_mixed: bool, is_min_filter: bool, win_mode: str) -> int | None:
+    if not is_mixed:
+        return None
+    if bool(is_min_filter) and str(win_mode) == "auto":
+        return 0
+    min_causal_ms = float(getattr(cfg, "min_causal_ms", 80.0) or 80.0)
+    if not np.isfinite(min_causal_ms):
+        min_causal_ms = 80.0
+    min_causal_ms = float(max(0.0, min_causal_ms))
+    target = int(np.clip(int(round(min_causal_ms * float(cfg.fs) / 1000.0)), 0, int(n) - 1))
+    try:
+        if isinstance(st, dict):
+            st["min_causal_ms"] = float(min_causal_ms)
+            st["min_causal_target_samples"] = int(target)
+    except (TypeError, ValueError):
+        pass
+    return int(target)
+
+
+def _mixed_alignment_target(*, cfg, n: int) -> int:
+    return int(np.clip(int(round(90.0 * cfg.fs / 1000.0)), 0, int(n) - 1))
+
+
+def _rew_asym_alignment_target(*, cfg, n: int) -> int:
+    left_ms = _ms_value(cfg, "ir_window_ms_left", "ir_window_left", 0.0)
+    return int(np.clip(int(round(left_ms * cfg.fs / 1000.0)), 0, int(n) - 1))
+
+
 def _compute_alignment_target(ir, cfg, st, *, stage: str = "post_window") -> int | None:
     n = int(len(ir))
     if n <= 0:
@@ -41,46 +87,35 @@ def _compute_alignment_target(ir, cfg, st, *, stage: str = "post_window") -> int
     is_mixed = ("Mixed" in str(getattr(cfg, "filter_type_str", "")))
 
     requested_win_mode, win_mode, is_min_filter = _resolve_ir_window_mode(cfg, logger=None)
-
-    try:
-        if isinstance(st, dict):
-            st["ir_anchor_mode"] = str(anchor_mode)
-            st["ir_window_mode_requested"] = str(requested_win_mode)
-            st["ir_window_mode_effective"] = str(win_mode)
-    except (TypeError, ValueError):
-        pass
+    _record_alignment_modes(
+        st,
+        anchor_mode=str(anchor_mode),
+        requested_win_mode=str(requested_win_mode),
+        win_mode=str(win_mode),
+    )
 
     if stage == "pre_window":
-        if anchor_mode == "min_causal":
-            return None
-        if is_min_filter and win_mode == "auto":
-            return 0
-        return None
+        return _pre_window_alignment_target(
+            anchor_mode=str(anchor_mode),
+            is_min_filter=bool(is_min_filter),
+            win_mode=str(win_mode),
+        )
 
-    if anchor_mode == "min_causal":
-        if not is_mixed:
-            return None
-        if is_min_filter and win_mode == "auto":
-            return 0
-        min_causal_ms = float(getattr(cfg, "min_causal_ms", 80.0) or 80.0)
-        if not np.isfinite(min_causal_ms):
-            min_causal_ms = 80.0
-        min_causal_ms = float(max(0.0, min_causal_ms))
-        target = int(np.clip(int(round(min_causal_ms * float(cfg.fs) / 1000.0)), 0, n - 1))
-        try:
-            if isinstance(st, dict):
-                st["min_causal_ms"] = float(min_causal_ms)
-                st["min_causal_target_samples"] = int(target)
-        except (TypeError, ValueError):
-            pass
-        return target
+    if str(anchor_mode) == "min_causal":
+        return _min_causal_alignment_target(
+            cfg=cfg,
+            st=st,
+            n=int(n),
+            is_mixed=bool(is_mixed),
+            is_min_filter=bool(is_min_filter),
+            win_mode=str(win_mode),
+        )
 
     if is_mixed:
-        return int(np.clip(int(round(90.0 * cfg.fs / 1000.0)), 0, n - 1))
+        return _mixed_alignment_target(cfg=cfg, n=int(n))
 
     if str(requested_win_mode).strip().lower() == "rew_asym":
-        left_ms = _ms_value(cfg, "ir_window_ms_left", "ir_window_left", 0.0)
-        return int(np.clip(int(round(left_ms * cfg.fs / 1000.0)), 0, n - 1))
+        return _rew_asym_alignment_target(cfg=cfg, n=int(n))
 
     return None
 

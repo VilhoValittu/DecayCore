@@ -321,6 +321,88 @@ def build_global_progress_bar() -> None:
     ui.timer(0.5, _refresh_status)
 
 
+def _info_fmt_fs(raw) -> str:
+    try:
+        hz = int(raw)
+        return f"{hz // 1000} kHz" if hz % 1000 == 0 else f"{hz / 1000:.1f} kHz"
+    except (TypeError, ValueError):
+        return "\u2014"
+
+
+def _info_fmt_latency(taps_raw, fs_raw, ftype_str: str) -> str:
+    ftype_low = str(ftype_str).lower()
+    if "min" in ftype_low or "asym" in ftype_low:
+        return t("health_low_latency_mode")
+    if "linear" not in ftype_low:
+        return "\u2014"
+    try:
+        ms = (int(taps_raw) / 2.0 / int(fs_raw)) * 1000.0
+        return f"~{ms:.0f} ms"
+    except (TypeError, ValueError, ZeroDivisionError):
+        return "\u2014"
+
+
+def _info_set_measurement_line_style(line_meas, meas_severity: str) -> None:
+    if str(meas_severity) == "ok":
+        line_meas.classes(add="cf-info-line-ok", remove="cf-info-line-dim cf-info-line-warn")
+        return
+    if str(meas_severity) == "warn":
+        line_meas.classes(add="cf-info-line-warn", remove="cf-info-line-dim cf-info-line-ok")
+        return
+    line_meas.classes(add="cf-info-line-dim", remove="cf-info-line-ok cf-info-line-warn")
+
+
+def _info_render_last_run_info(line3) -> None:
+    info = ui_state.get_last_run_info()
+    if not info:
+        line3.set_visibility(False)
+        return
+    score = info.get("score")
+    match = info.get("match")
+    conf = info.get("conf")
+    parts = []
+    parts.append(
+        t("run_info_score").format(score=score)
+        if score is not None else
+        t("run_info_score_missing")
+    )
+    parts.append(
+        t("run_info_match").format(match=match)
+        if match is not None else
+        t("run_info_match_missing")
+    )
+    if conf is not None:
+        parts.append(t("run_info_conf").format(conf=conf))
+    line3.set_text(" \u00b7 ".join(parts))
+    line3.classes(add="cf-info-line-score", remove="cf-info-line-dim")
+    line3.set_visibility(True)
+
+
+def _refresh_info_panel_lines(*, line1, line2, line_meas, line3, ng_controls) -> None:
+    mode = ng_controls.value("mode") or "\u2014"
+    fs_raw = ng_controls.value("fs")
+    taps_raw = ng_controls.value("taps")
+    ftype = ng_controls.value("filter_type") or "\u2014"
+    hc_mode = ng_controls.value("hc_mode") or ""
+
+    mode_str = str(mode).strip().upper()
+    ftype_str = str(ftype).strip()
+    taps_str = str(int(taps_raw)) if taps_raw is not None else "\u2014"
+    lat_str = _info_fmt_latency(taps_raw, fs_raw, ftype_str)
+    hc_str = str(hc_mode).strip() if hc_mode else "\u2014"
+    line1.set_text(f"{mode_str} \u00b7 {_info_fmt_fs(fs_raw)} \u00b7 {taps_str} taps")
+    line2.set_text(f"{ftype_str} \u00b7 {lat_str} \u00b7 {hc_str}")
+
+    meas_text, meas_severity = _build_measurement_status_line(
+        bass_integration_enabled=bool(ng_controls.value("bass_integration_enable")),
+        value_getter=ng_controls.value,
+        tr=t,
+    )
+    line_meas.set_text(meas_text)
+    _info_set_measurement_line_style(line_meas, str(meas_severity))
+    _info_render_last_run_info(line3)
+
+
 def build_info_panel() -> None:
     """Compact config/score panel for the sticky header (top-right)."""
     from nicegui import ui
@@ -333,82 +415,14 @@ def build_info_panel() -> None:
         line3 = ui.label("")
         line3.set_visibility(False)
 
-    def _fmt_fs(raw) -> str:
-        try:
-            hz = int(raw)
-            return f"{hz // 1000} kHz" if hz % 1000 == 0 else f"{hz / 1000:.1f} kHz"
-        except (TypeError, ValueError):
-            return "\u2014"
-
-    def _fmt_latency(taps_raw, fs_raw, ftype_str: str) -> str:
-        ftype_low = ftype_str.lower()
-        if "min" in ftype_low or "asym" in ftype_low:
-            return t("health_low_latency_mode")
-        if "linear" not in ftype_low:
-            return "\u2014"
-        try:
-            ms = (int(taps_raw) / 2.0 / int(fs_raw)) * 1000.0
-            return f"~{ms:.0f} ms"
-        except (TypeError, ValueError, ZeroDivisionError):
-            return "\u2014"
-
-    def _set_measurement_line_style(meas_severity: str) -> None:
-        if meas_severity == "ok":
-            line_meas.classes(add="cf-info-line-ok", remove="cf-info-line-dim cf-info-line-warn")
-            return
-        if meas_severity == "warn":
-            line_meas.classes(add="cf-info-line-warn", remove="cf-info-line-dim cf-info-line-ok")
-            return
-        line_meas.classes(add="cf-info-line-dim", remove="cf-info-line-ok cf-info-line-warn")
-
-    def _render_last_run_info() -> None:
-        info = ui_state.get_last_run_info()
-        if not info:
-            line3.set_visibility(False)
-            return
-        score = info.get("score")
-        match = info.get("match")
-        conf = info.get("conf")
-        parts = []
-        parts.append(
-            t("run_info_score").format(score=score)
-            if score is not None else
-            t("run_info_score_missing")
-        )
-        parts.append(
-            t("run_info_match").format(match=match)
-            if match is not None else
-            t("run_info_match_missing")
-        )
-        if conf is not None:
-            parts.append(t("run_info_conf").format(conf=conf))
-        line3.set_text(" \u00b7 ".join(parts))
-        line3.classes(add="cf-info-line-score", remove="cf-info-line-dim")
-        line3.set_visibility(True)
-
     def _refresh_info() -> None:
-        mode = ng_controls.value("mode") or "\u2014"
-        fs_raw = ng_controls.value("fs")
-        taps_raw = ng_controls.value("taps")
-        ftype = ng_controls.value("filter_type") or "\u2014"
-        hc_mode = ng_controls.value("hc_mode") or ""
-
-        mode_str = str(mode).strip().upper()
-        ftype_str = str(ftype).strip()
-        taps_str = str(int(taps_raw)) if taps_raw is not None else "\u2014"
-        lat_str = _fmt_latency(taps_raw, fs_raw, ftype_str)
-        hc_str = str(hc_mode).strip() if hc_mode else "\u2014"
-        line1.set_text(f"{mode_str} \u00b7 {_fmt_fs(fs_raw)} \u00b7 {taps_str} taps")
-        line2.set_text(f"{ftype_str} \u00b7 {lat_str} \u00b7 {hc_str}")
-
-        meas_text, meas_severity = _build_measurement_status_line(
-            bass_integration_enabled=bool(ng_controls.value("bass_integration_enable")),
-            value_getter=ng_controls.value,
-            tr=t,
+        _refresh_info_panel_lines(
+            line1=line1,
+            line2=line2,
+            line_meas=line_meas,
+            line3=line3,
+            ng_controls=ng_controls,
         )
-        line_meas.set_text(meas_text)
-        _set_measurement_line_style(str(meas_severity))
-        _render_last_run_info()
 
     ui.timer(1.0, _refresh_info)
 

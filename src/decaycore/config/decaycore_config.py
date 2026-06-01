@@ -34,6 +34,19 @@ from ..ui_i18n import (
 
 CONFIG_FILE = "config.json"
 
+_RECOVERABLE_CONFIG_EXCEPTIONS = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    KeyError,
+    IndexError,
+    RuntimeError,
+    OSError,
+    ImportError,
+    ModuleNotFoundError,
+    NameError,
+)
+
 
 def _normalize_filter_type(value) -> str:
     """Normalize persisted filter type names to the UI/program canonical labels."""
@@ -65,8 +78,98 @@ def _normalize_filter_type(value) -> str:
     return "Asymmetric"
 
 
-def load_config() -> dict:
+def _coerce_legacy_boolean_lists(saved: dict) -> None:
+    for key in [
+        "mag_correct",
+        "normalize_opt",
+        "align_opt",
+        "multi_rate_opt",
+        "stereo_link",
+        "exc_prot",
+        "hpf_enable",
+        "df_smoothing",
+        "bass_smooth_adaptive",
+        "bass_adaptive_isolation_mode",
+        "mid_refit_enable",
+        "bass_boost_cap_enable",
+        "bass_boost_post_restore_enable",
+        "comparison_mode",
+        "phase_safe_2058",
+        "enable_ir_pre_energy_guard",
+        "phase_tail_monotonic_enable",
+        "unsafe_raw_dsp",
+        "enable_channel_specific_auto_policy",
+        "bass_integration_enable",
+        "bass_integration_sub_polarity_invert",
+        "bass_integration_alignment_auto_applied",
+        "bass_integration_allpass_auto_enable",
+        "bass_integration_allpass_auto_applied",
+        "camillafir_automatic_mode",
+    ]:
+        if key in saved and isinstance(saved[key], list):
+            saved[key] = bool(saved[key])
+
+
+def _migrate_lvl_manual_db(saved: dict) -> None:
+    try:
+        if "lvl_manual_db" in saved:
+            value = float(saved.get("lvl_manual_db"))
+            if 40.0 <= value <= 110.0:
+                saved["lvl_manual_db"] = float(value - 75.0)
+    except _RECOVERABLE_CONFIG_EXCEPTIONS:
+        logger.exception("lvl_manual_db migration")
+
+
+def _normalize_saved_filter_type(saved: dict, default_conf: dict) -> None:
+    try:
+        saved["filter_type"] = _normalize_filter_type(
+            saved.get("filter_type", default_conf.get("filter_type"))
+        )
+    except _RECOVERABLE_CONFIG_EXCEPTIONS:
+        saved["filter_type"] = str(default_conf.get("filter_type", "Asymmetric"))
+
+
+def _load_and_merge_saved_config(default_conf: dict) -> bool:
     saved_mode_explicit = False
+    if not os.path.exists(CONFIG_FILE):
+        return saved_mode_explicit
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            saved = json.load(f)
+        if not isinstance(saved, dict):
+            return saved_mode_explicit
+
+        _coerce_legacy_boolean_lists(saved)
+        _migrate_lvl_manual_db(saved)
+        _normalize_saved_filter_type(saved, default_conf)
+
+        saved_mode_explicit = saved.get("mode", None) not in (None, "")
+        saved["layout"] = normalize_layout_value(saved.get("layout", default_conf.get("layout")))
+        saved["lvl_mode"] = normalize_lvl_mode_value(saved.get("lvl_mode", default_conf.get("lvl_mode")))
+        saved["lvl_algo"] = normalize_lvl_algo_value(saved.get("lvl_algo", default_conf.get("lvl_algo")))
+        default_conf.update(saved)
+    except _RECOVERABLE_CONFIG_EXCEPTIONS:
+        logger.exception("config load and merge")
+    return saved_mode_explicit
+
+
+def _resolve_runtime_mode(default_conf: dict, *, saved_mode_explicit: bool) -> str:
+    try:
+        mode_u = str(default_conf.get("mode", "AUTO") or "AUTO").strip().upper()
+    except _RECOVERABLE_CONFIG_EXCEPTIONS:
+        mode_u = "AUTO"
+    try:
+        legacy_auto = bool(default_conf.get("camillafir_automatic_mode", False))
+    except _RECOVERABLE_CONFIG_EXCEPTIONS:
+        legacy_auto = False
+    if legacy_auto and not saved_mode_explicit:
+        mode_u = "AUTO"
+    if mode_u not in ("AUTO", "BASIC", "ADVANCED"):
+        mode_u = "AUTO"
+    return mode_u
+
+
+def load_config() -> dict:
     default_conf = {
         "fmt": "WAV",
         "layout": LAYOUT_MONO,
@@ -266,142 +369,10 @@ def load_config() -> dict:
         "debug_stage_stats": True,
     }
 
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                saved = json.load(f)
-
-
-            for k in [
-                "mag_correct",
-                "normalize_opt",
-                "align_opt",
-                "multi_rate_opt",
-                "stereo_link",
-                "exc_prot",
-                "hpf_enable",
-                "df_smoothing",
-                "bass_smooth_adaptive",
-                "bass_adaptive_isolation_mode",
-                "mid_refit_enable",
-                "bass_boost_cap_enable",
-                "bass_boost_post_restore_enable",
-                "comparison_mode",
-                "phase_safe_2058",
-                "enable_ir_pre_energy_guard",
-                "phase_tail_monotonic_enable",
-                "unsafe_raw_dsp",
-                "enable_channel_specific_auto_policy",
-                "bass_integration_enable",
-                "bass_integration_sub_polarity_invert",
-                "bass_integration_alignment_auto_applied",
-                "bass_integration_allpass_auto_enable",
-                "bass_integration_allpass_auto_applied",
-                "camillafir_automatic_mode",
-            ]:
-                if k in saved and isinstance(saved[k], list):
-                    saved[k] = bool(saved[k])
-
-            try:
-                if "lvl_manual_db" in saved:
-                    _v = float(saved.get("lvl_manual_db"))
-                    if 40.0 <= _v <= 110.0:
-                        saved["lvl_manual_db"] = float(_v - 75.0)
-            except (
-
-                AttributeError,
-                TypeError,
-                ValueError,
-                KeyError,
-                IndexError,
-                RuntimeError,
-                OSError,
-                ImportError,
-                ModuleNotFoundError,
-                NameError,
-            ):
-                logger.exception("lvl_manual_db migration")
-
-            try:
-                saved["filter_type"] = _normalize_filter_type(
-                    saved.get("filter_type", default_conf.get("filter_type"))
-                )
-            except (
-
-                AttributeError,
-                TypeError,
-                ValueError,
-                KeyError,
-                IndexError,
-                RuntimeError,
-                OSError,
-                ImportError,
-                ModuleNotFoundError,
-                NameError,
-            ):
-                saved["filter_type"] = str(default_conf.get("filter_type", "Asymmetric"))
-
-            saved_mode_explicit = saved.get("mode", None) not in (None, "")
-            saved["layout"] = normalize_layout_value(saved.get("layout", default_conf.get("layout")))
-            saved["lvl_mode"] = normalize_lvl_mode_value(saved.get("lvl_mode", default_conf.get("lvl_mode")))
-            saved["lvl_algo"] = normalize_lvl_algo_value(saved.get("lvl_algo", default_conf.get("lvl_algo")))
-
-            default_conf.update(saved)
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            logger.exception("config load and merge")
+    saved_mode_explicit = _load_and_merge_saved_config(default_conf)
 
     default_conf["unsafe_raw_dsp"] = False
-
-    try:
-        mode_u = str(default_conf.get("mode", "AUTO") or "AUTO").strip().upper()
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        mode_u = "AUTO"
-
-    try:
-        legacy_auto = bool(default_conf.get("camillafir_automatic_mode", False))
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        legacy_auto = False
-
-    if legacy_auto and not saved_mode_explicit:
-        mode_u = "AUTO"
-    if mode_u not in ("AUTO", "BASIC", "ADVANCED"):
-        mode_u = "AUTO"
+    mode_u = _resolve_runtime_mode(default_conf, saved_mode_explicit=saved_mode_explicit)
 
     default_conf["mode"] = mode_u
     default_conf["camillafir_automatic_mode"] = bool(mode_u == "AUTO")

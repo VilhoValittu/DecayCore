@@ -127,6 +127,51 @@ def _format_ms(value_ms: float | None, t: Callable[[str], str]) -> str:
         return t("health_not_set")
     return f"{float(value_ms):.1f} ms"
 
+
+def _measurement_timing_reference_text(
+    timing,
+    t: Callable[[str], str],
+) -> str:
+    if timing.reference_expected:
+        return (
+            t("measurement_reference_detected")
+            if timing.reference_detected
+            else t("measurement_reference_missing")
+        )
+    return t("measurement_reference_unused")
+
+
+def _measurement_calibration_text(bundle: MeasurementBundle, t: Callable[[str], str]) -> str:
+    if bundle.health.calibration_applied:
+        return t("measurement_calibration_applied")
+    if bundle.health.calibration_loaded:
+        return t("measurement_calibration_loaded")
+    return t("measurement_calibration_none")
+
+
+def _measurement_level_hint(peak_dbfs: float, clipped: bool, t: Callable[[str], str]) -> str:
+    if peak_dbfs >= -3.0 or clipped:
+        return f" — {t('measurement_level_clip_risk')}"
+    if peak_dbfs >= -20.0:
+        return f" — {t('measurement_level_ok')}"
+    if peak_dbfs > -40.0:
+        return f" — {t('measurement_level_low')}"
+    return f" — {t('measurement_level_very_low')}"
+
+
+def _measurement_snr_text(snr, t: Callable[[str], str]) -> str | None:
+    if snr is None or not math.isfinite(float(snr)):
+        return None
+    snr_float = float(snr)
+    if snr_float >= 30.0:
+        snr_label = t("measurement_snr_good")
+    elif snr_float >= 15.0:
+        snr_label = t("measurement_snr_fair")
+    else:
+        snr_label = t("measurement_snr_poor")
+    return f"<div><b>{t('measurement_snr')}</b>: {snr_float:.1f} dB ({snr_label})</div>"
+
+
 def _measurement_summary_html(
     bundle: MeasurementBundle,
     t: Callable[[str], str],
@@ -149,36 +194,14 @@ def _measurement_summary_html(
             if timing.fallback_latency_samples is not None
             else None
         )
-        if timing.reference_expected:
-            timing_reference_text = (
-                t("measurement_reference_detected")
-                if timing.reference_detected
-                else t("measurement_reference_missing")
-            )
-        else:
-            timing_reference_text = t("measurement_reference_unused")
+        timing_reference_text = _measurement_timing_reference_text(timing, t)
     else:
         reference_arrival_ms = None
         sweep_peak_ms = float(bundle.ir.peak_index) * 1000.0 / float(fs) if fs > 0 else None
         fallback_latency_ms = None
         timing_reference_text = t("measurement_reference_unused")
-    calibration_text = (
-        t("measurement_calibration_applied")
-        if bundle.health.calibration_applied
-        else (
-            t("measurement_calibration_loaded")
-            if bundle.health.calibration_loaded
-            else t("measurement_calibration_none")
-        )
-    )
-    if peak_dbfs >= -3.0 or bundle.health.clipped:
-        level_hint = f" — {t('measurement_level_clip_risk')}"
-    elif peak_dbfs >= -20.0:
-        level_hint = f" — {t('measurement_level_ok')}"
-    elif peak_dbfs > -40.0:
-        level_hint = f" — {t('measurement_level_low')}"
-    else:
-        level_hint = f" — {t('measurement_level_very_low')}"
+    calibration_text = _measurement_calibration_text(bundle, t)
+    level_hint = _measurement_level_hint(peak_dbfs, bool(bundle.health.clipped), t)
     html = (
         f"<div><b>{t('measurement_recording_peak')}</b>: {peak_dbfs:+.1f} dBFS{level_hint}</div>"
         f"<div><b>{t('measurement_timing_reference')}</b>: {timing_reference_text}</div>"
@@ -207,15 +230,9 @@ def _measurement_summary_html(
         rel_ms = bundle.health.latency_ms - timing_ref_latency_ms
         sign = "+" if rel_ms >= 0 else ""
         html += f"<div><b>{t('measurement_left_ref_delay')}</b>: {sign}{rel_ms:.2f} ms</div>"
-    snr = bundle.health.snr_db
-    if snr is not None and math.isfinite(float(snr)):
-        if float(snr) >= 30.0:
-            snr_label = t("measurement_snr_good")
-        elif float(snr) >= 15.0:
-            snr_label = t("measurement_snr_fair")
-        else:
-            snr_label = t("measurement_snr_poor")
-        html += f"<div><b>{t('measurement_snr')}</b>: {float(snr):.1f} dB ({snr_label})</div>"
+    snr_text = _measurement_snr_text(bundle.health.snr_db, t)
+    if snr_text:
+        html += snr_text
     if timing is not None and timing.reference_expected:
         mode = str(bundle.metadata.get("timing_mode", "") or "")
         corr_pre = bundle.metadata.get("pre_chirp_correlation_score")

@@ -47,6 +47,95 @@ from ..runtime_context import (
     _auto_pick_metric,
 )
 
+_RECOVERABLE_TEMPORAL_PENALTY_EXCEPTIONS = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    KeyError,
+    IndexError,
+    RuntimeError,
+    OSError,
+    ImportError,
+    ModuleNotFoundError,
+    NameError,
+)
+
+
+def _harmonic_band_mask(
+    harmonic_freq_hz: np.ndarray | None,
+    *,
+    lo_hz: float,
+    hi_hz: float,
+) -> tuple[np.ndarray, np.ndarray] | None:
+    if harmonic_freq_hz is None:
+        return None
+    freq = np.asarray(harmonic_freq_hz, dtype=float).reshape(-1)
+    band_mask = (freq >= float(lo_hz)) & (freq <= float(hi_hz)) & np.isfinite(freq)
+    if int(np.count_nonzero(band_mask)) < 4:
+        return None
+    return freq, band_mask
+
+
+def _harmonic_fundamental_on_harmonic_grid(
+    *,
+    use_relative: bool,
+    fundamental_freq_hz: np.ndarray | None,
+    fundamental_mag_db: np.ndarray | None,
+    freq: np.ndarray,
+) -> tuple[bool, np.ndarray | None]:
+    if not use_relative:
+        return False, None
+    fund_f = np.asarray(fundamental_freq_hz, dtype=float).reshape(-1)
+    fund_m = np.asarray(fundamental_mag_db, dtype=float).reshape(-1)
+    valid = np.isfinite(fund_f) & np.isfinite(fund_m)
+    if valid.sum() < 4:
+        return False, None
+    return True, np.interp(freq, fund_f[valid], fund_m[valid])
+
+
+def _harmonic_proxy_values(
+    *,
+    harmonic_magnitudes_db: dict | None,
+    freq: np.ndarray,
+    band_mask: np.ndarray,
+    use_relative: bool,
+    fund_at_harm: np.ndarray | None,
+) -> np.ndarray:
+    h_arrays = []
+    for order in (2, 3):
+        arr = (harmonic_magnitudes_db or {}).get(order)
+        if arr is None:
+            continue
+        a = np.asarray(arr, dtype=float).reshape(-1)
+        if a.size != freq.size:
+            continue
+        band_vals = a[band_mask]
+        if use_relative and fund_at_harm is not None:
+            band_vals = band_vals - fund_at_harm[band_mask]
+        h_arrays.append(band_vals)
+    if not h_arrays:
+        return np.asarray([], dtype=float)
+    proxy = np.maximum.reduce(h_arrays)
+    proxy = proxy[np.isfinite(proxy)]
+    return np.asarray(proxy, dtype=float)
+
+
+def _harmonic_severity_from_proxy(
+    proxy: np.ndarray,
+    *,
+    threshold_db: float,
+    thd_range_db: float,
+) -> float:
+    if proxy.size == 0:
+        return 0.0
+    severity_vals = np.clip(
+        (proxy - float(threshold_db)) / max(float(thd_range_db), 1e-6),
+        0.0,
+        1.0,
+    )
+    return float(np.mean(severity_vals))
+
+
 def _auto_harmonic_boost_penalty(
     st: dict | None,
     harmonic_freq_hz: np.ndarray | None,
@@ -68,7 +157,7 @@ def _auto_harmonic_boost_penalty(
     dBFS-kynnykseen ``thd_threshold_db``.
     Palauttaa 0.0 jos harmonidata puuttuu tai mikään ehto ei täyty.
     """
-    if harmonic_freq_hz is None or harmonic_magnitudes_db is None:
+    if harmonic_magnitudes_db is None:
         return 0.0
     try:
         st = dict(st or {})
@@ -76,70 +165,47 @@ def _auto_harmonic_boost_penalty(
         if net_boost <= 0.0:
             return 0.0
 
-        freq = np.asarray(harmonic_freq_hz, dtype=float).reshape(-1)
-        band_mask = (freq >= float(lo_hz)) & (freq <= float(hi_hz)) & np.isfinite(freq)
-        if int(np.count_nonzero(band_mask)) < 4:
+        prepared = _harmonic_band_mask(
+            harmonic_freq_hz,
+            lo_hz=float(lo_hz),
+            hi_hz=float(hi_hz),
+        )
+        if prepared is None:
             return 0.0
+        freq, band_mask = prepared
 
         use_relative = (
             fundamental_freq_hz is not None
             and fundamental_mag_db is not None
         )
-        if use_relative:
-            fund_f = np.asarray(fundamental_freq_hz, dtype=float).reshape(-1)
-            fund_m = np.asarray(fundamental_mag_db, dtype=float).reshape(-1)
-            valid = np.isfinite(fund_f) & np.isfinite(fund_m)
-            if valid.sum() >= 4:
-                fund_at_harm = np.interp(freq, fund_f[valid], fund_m[valid])
-            else:
-                use_relative = False
-
-        h_arrays = []
-        for order in (2, 3):
-            arr = (harmonic_magnitudes_db or {}).get(order)
-            if arr is None:
-                continue
-            a = np.asarray(arr, dtype=float).reshape(-1)
-            if a.size != freq.size:
-                continue
-            band_vals = a[band_mask]
-            if use_relative:
-                band_vals = band_vals - fund_at_harm[band_mask]
-            h_arrays.append(band_vals)
-        if not h_arrays:
-            return 0.0
-
-        effective_threshold = -30.0 if use_relative else float(thd_threshold_db)
-
-        thd_proxy = np.maximum.reduce(h_arrays)
-        thd_proxy = thd_proxy[np.isfinite(thd_proxy)]
+        use_relative, fund_at_harm = _harmonic_fundamental_on_harmonic_grid(
+            use_relative=bool(use_relative),
+            fundamental_freq_hz=fundamental_freq_hz,
+            fundamental_mag_db=fundamental_mag_db,
+            freq=freq,
+        )
+        thd_proxy = _harmonic_proxy_values(
+            harmonic_magnitudes_db=harmonic_magnitudes_db,
+            freq=freq,
+            band_mask=band_mask,
+            use_relative=bool(use_relative),
+            fund_at_harm=fund_at_harm,
+        )
         if thd_proxy.size == 0:
             return 0.0
 
-        severity_vals = np.clip(
-            (thd_proxy - effective_threshold) / max(float(thd_range_db), 1e-6),
-            0.0,
-            1.0,
+        effective_threshold = -30.0 if use_relative else float(thd_threshold_db)
+        severity = _harmonic_severity_from_proxy(
+            thd_proxy,
+            threshold_db=float(effective_threshold),
+            thd_range_db=float(thd_range_db),
         )
-        severity = float(np.mean(severity_vals))
         if severity <= 0.0:
             return 0.0
 
         penalty = float(net_boost) * float(severity) * float(scale)
         return float(max(0.0, penalty))
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
+    except _RECOVERABLE_TEMPORAL_PENALTY_EXCEPTIONS:
         return 0.0
 
 
@@ -218,104 +284,105 @@ def _auto_rt60_band_pairs(base_data: dict | None) -> list[tuple[float, float]]:
     return pairs
 
 
-def _auto_tdc_decay_tradeoff(
-    base_data: dict | None,
-    l_st: dict | None,
-    r_st: dict | None,
-) -> tuple[float, dict]:
-    """Band-limited AUTO TDC decay tradeoff penalty.
-
-    This uses cheap metadata already available during AUTO scoring. It does not
-    estimate new impulse responses inside the optimization loop.
-    """
+def _auto_tdc_decay_config(base_data: dict | None) -> dict:
     bd = dict(base_data or {})
-    penalty_cap = max(
-        0.0,
-        shared._auto_safe_float(
-            bd.get("auto_mode_tdc_decay_penalty_cap", shared.AUTO_MODE_TDC_DECAY_PENALTY_CAP),
-            shared.AUTO_MODE_TDC_DECAY_PENALTY_CAP,
-        ),
-    )
-    penalty_weight = max(
-        0.0,
-        shared._auto_safe_float(
-            bd.get("auto_mode_tdc_decay_penalty_weight", shared.AUTO_MODE_TDC_DECAY_PENALTY_WEIGHT),
-            shared.AUTO_MODE_TDC_DECAY_PENALTY_WEIGHT,
-        ),
-    )
-    extreme_peak_db = max(
-        0.0,
-        shared._auto_safe_float(
-            bd.get("auto_mode_tdc_extreme_peak_reduction_db", shared.AUTO_MODE_TDC_EXTREME_PEAK_REDUCTION_DB),
-            shared.AUTO_MODE_TDC_EXTREME_PEAK_REDUCTION_DB,
-        ),
-    )
-    low_need_threshold = float(
-        np.clip(
-            shared._auto_safe_float(
-                bd.get("auto_mode_tdc_low_need_threshold", shared.AUTO_MODE_TDC_LOW_NEED_THRESHOLD),
-                shared.AUTO_MODE_TDC_LOW_NEED_THRESHOLD,
-            ),
+    return {
+        "bd": bd,
+        "penalty_cap": max(
             0.0,
-            1.0,
-        )
-    )
-    target_low_s = max(
-        0.01,
-        shared._auto_safe_float(
-            bd.get("auto_mode_tdc_rt60_target_low_s", shared.AUTO_MODE_TDC_RT60_TARGET_LOW_S),
-            shared.AUTO_MODE_TDC_RT60_TARGET_LOW_S,
+            shared._auto_safe_float(
+                bd.get("auto_mode_tdc_decay_penalty_cap", shared.AUTO_MODE_TDC_DECAY_PENALTY_CAP),
+                shared.AUTO_MODE_TDC_DECAY_PENALTY_CAP,
+            ),
         ),
-    )
-    target_upper_s = max(
-        0.01,
-        shared._auto_safe_float(
-            bd.get("auto_mode_tdc_rt60_target_upper_s", shared.AUTO_MODE_TDC_RT60_TARGET_UPPER_S),
-            shared.AUTO_MODE_TDC_RT60_TARGET_UPPER_S,
+        "penalty_weight": max(
+            0.0,
+            shared._auto_safe_float(
+                bd.get("auto_mode_tdc_decay_penalty_weight", shared.AUTO_MODE_TDC_DECAY_PENALTY_WEIGHT),
+                shared.AUTO_MODE_TDC_DECAY_PENALTY_WEIGHT,
+            ),
         ),
-    )
-    low_max_hz = max(
-        20.0,
-        shared._auto_safe_float(
-            bd.get("auto_mode_tdc_rt60_low_max_hz", shared.AUTO_MODE_TDC_RT60_LOW_MAX_HZ),
-            shared.AUTO_MODE_TDC_RT60_LOW_MAX_HZ,
+        "extreme_peak_db": max(
+            0.0,
+            shared._auto_safe_float(
+                bd.get("auto_mode_tdc_extreme_peak_reduction_db", shared.AUTO_MODE_TDC_EXTREME_PEAK_REDUCTION_DB),
+                shared.AUTO_MODE_TDC_EXTREME_PEAK_REDUCTION_DB,
+            ),
         ),
-    )
-    eval_max_hz = max(
-        20.0,
-        shared._auto_safe_float(
-            bd.get("auto_mode_tdc_rt60_eval_max_hz", shared.AUTO_MODE_TDC_RT60_EVAL_MAX_HZ),
-            shared.AUTO_MODE_TDC_RT60_EVAL_MAX_HZ,
+        "low_need_threshold": float(
+            np.clip(
+                shared._auto_safe_float(
+                    bd.get("auto_mode_tdc_low_need_threshold", shared.AUTO_MODE_TDC_LOW_NEED_THRESHOLD),
+                    shared.AUTO_MODE_TDC_LOW_NEED_THRESHOLD,
+                ),
+                0.0,
+                1.0,
+            )
         ),
-    )
-    if not bool(bd.get("enable_tdc", True)):
-        return 0.0, {
-            "decay_metadata_available": False,
-            "tdc_decision": "tdc_disabled",
-            "tdc_action_hint": "tdc_disabled",
-            "tdc_weak_penalty": 0.0,
-            "tdc_overdamping_penalty": 0.0,
-            "tdc_overreach_penalty": 0.0,
-            "tdc_decay_penalty_total": 0.0,
-            "tdc_decay_penalty": 0.0,
-            "tdc_extreme_overreach": False,
-            "tdc_decay_scoring_version": int(AUTO_TDC_DECAY_SCORING_VERSION),
-        }
+        "target_low_s": max(
+            0.01,
+            shared._auto_safe_float(
+                bd.get("auto_mode_tdc_rt60_target_low_s", shared.AUTO_MODE_TDC_RT60_TARGET_LOW_S),
+                shared.AUTO_MODE_TDC_RT60_TARGET_LOW_S,
+            ),
+        ),
+        "target_upper_s": max(
+            0.01,
+            shared._auto_safe_float(
+                bd.get("auto_mode_tdc_rt60_target_upper_s", shared.AUTO_MODE_TDC_RT60_TARGET_UPPER_S),
+                shared.AUTO_MODE_TDC_RT60_TARGET_UPPER_S,
+            ),
+        ),
+        "low_max_hz": max(
+            20.0,
+            shared._auto_safe_float(
+                bd.get("auto_mode_tdc_rt60_low_max_hz", shared.AUTO_MODE_TDC_RT60_LOW_MAX_HZ),
+                shared.AUTO_MODE_TDC_RT60_LOW_MAX_HZ,
+            ),
+        ),
+        "eval_max_hz": max(
+            20.0,
+            shared._auto_safe_float(
+                bd.get("auto_mode_tdc_rt60_eval_max_hz", shared.AUTO_MODE_TDC_RT60_EVAL_MAX_HZ),
+                shared.AUTO_MODE_TDC_RT60_EVAL_MAX_HZ,
+            ),
+        ),
+    }
 
-    strength_pct = shared._auto_safe_float(bd.get("tdc_strength", float("nan")), float("nan"))
-    if not np.isfinite(strength_pct):
-        strength_pct = 50.0
-    strength = float(np.clip(float(strength_pct) / 100.0, 0.0, 1.0))
-    pairs = _auto_rt60_band_pairs(bd)
 
+def _auto_tdc_no_metadata_payload(*, strength: float, decision: str, action_hint: str) -> dict:
+    return {
+        "decay_metadata_available": False,
+        "tdc_strength": float(strength),
+        "tdc_decay_need": 0.0,
+        "tdc_weak_penalty": 0.0,
+        "tdc_overdamping_penalty": 0.0,
+        "tdc_overreach_penalty": 0.0,
+        "tdc_decay_penalty_total": 0.0,
+        "tdc_decay_penalty": 0.0,
+        "tdc_decision": str(decision),
+        "tdc_action_hint": str(action_hint),
+        "tdc_extreme_overreach": False,
+        "tdc_decay_scoring_version": int(AUTO_TDC_DECAY_SCORING_VERSION),
+    }
+
+
+def _auto_tdc_modal_decay_need(
+    *,
+    pairs: list[tuple[float, float]],
+    eval_max_hz: float,
+    low_max_hz: float,
+    target_low_s: float,
+    target_upper_s: float,
+) -> tuple[float, bool, float, float, float]:
     weighted_excess = 0.0
     weight_sum = 0.0
     strongest_freq = float("nan")
     strongest_excess = 0.0
     for freq, rt60 in pairs:
-        if freq < 20.0 or freq > eval_max_hz:
+        if freq < 20.0 or freq > float(eval_max_hz):
             continue
-        if freq <= low_max_hz:
+        if freq <= float(low_max_hz):
             weight = 1.0
             target = target_low_s
         else:
@@ -327,34 +394,35 @@ def _auto_tdc_decay_tradeoff(
         if excess > strongest_excess:
             strongest_excess = float(excess)
             strongest_freq = float(freq)
-
     modal_excess_s = float(weighted_excess / weight_sum) if weight_sum > 0.0 else 0.0
     metadata_available = bool(weight_sum > 0.0)
+    need = float(np.clip(modal_excess_s / 0.35, 0.0, 1.0))
+    return (
+        float(need),
+        bool(metadata_available),
+        float(modal_excess_s),
+        float(strongest_freq if np.isfinite(strongest_freq) else float("nan")),
+        float(strongest_excess),
+    )
 
+
+def _auto_tdc_channel_stats(l_st: dict | None, r_st: dict | None) -> dict:
     stats = [dict(l_st or {}), dict(r_st or {})]
-    peak_vals = [
-        shared._auto_safe_float(st.get("tdc_peak_reduction_db", float("nan")), float("nan"))
-        for st in stats
-    ]
-    peak_vals = [float(v) for v in peak_vals if np.isfinite(v) and v > 0.0]
-    tdc_peak_db = float(max(peak_vals)) if peak_vals else 0.0
+
+    def _finite_max(keys: tuple[str, ...], *, minimum_positive: bool = True) -> float:
+        vals = [
+            shared._auto_safe_float(st.get(key, float("nan")), float("nan"))
+            for st in stats
+            for key in keys
+        ]
+        vals = [float(v) for v in vals if np.isfinite(v) and (v > 0.0 if minimum_positive else True)]
+        return float(max(vals)) if vals else 0.0
+
     peak_hz_vals = [
         shared._auto_safe_float(st.get("tdc_peak_reduction_hz", float("nan")), float("nan"))
         for st in stats
     ]
     peak_hz_vals = [float(v) for v in peak_hz_vals if np.isfinite(v) and v > 0.0]
-    tdc_peak_hz = float(peak_hz_vals[0]) if peak_hz_vals else float("nan")
-    area_vals = [
-        shared._auto_safe_float(st.get("tdc_reduction_area_db_hz", float("nan")), float("nan"))
-        for st in stats
-    ]
-    area_vals = [float(v) for v in area_vals if np.isfinite(v) and v > 0.0]
-    tdc_area = float(max(area_vals)) if area_vals else 0.0
-    event_vals = [
-        shared._auto_safe_float(st.get("tdc_events_used", 0.0), 0.0)
-        for st in stats
-    ]
-    tdc_events = float(max([float(v) for v in event_vals if np.isfinite(v)] or [0.0]))
     band_los = [
         shared._auto_safe_float(st.get("tdc_reduction_band_low_hz", float("nan")), float("nan"))
         for st in stats
@@ -365,27 +433,88 @@ def _auto_tdc_decay_tradeoff(
     ]
     band_los = [float(v) for v in band_los if np.isfinite(v) and v > 0.0]
     band_his = [float(v) for v in band_his if np.isfinite(v) and v > 0.0]
-    tdc_band_lo = float(min(band_los)) if band_los else float("nan")
-    tdc_band_hi = float(max(band_his)) if band_his else float("nan")
+    event_vals = [
+        shared._auto_safe_float(st.get("tdc_events_used", 0.0), 0.0)
+        for st in stats
+    ]
+    return {
+        "tdc_peak_db": _finite_max(("tdc_peak_reduction_db",)),
+        "tdc_peak_hz": float(peak_hz_vals[0]) if peak_hz_vals else float("nan"),
+        "tdc_area": _finite_max(("tdc_reduction_area_db_hz",)),
+        "tdc_events": float(max([float(v) for v in event_vals if np.isfinite(v)] or [0.0])),
+        "tdc_band_lo": float(min(band_los)) if band_los else float("nan"),
+        "tdc_band_hi": float(max(band_his)) if band_his else float("nan"),
+    }
 
-    need = float(np.clip(modal_excess_s / 0.35, 0.0, 1.0))
+
+def _auto_tdc_decay_decision(*, strength: float, optimum: float, need: float) -> tuple[str, str]:
+    keep_tol = 0.08
+    if need <= 0.12:
+        decision = "reduced_by_optimizer" if strength <= 0.35 else "possible_overdamping_risk"
+        action_hint = "keep_tdc" if strength <= 0.35 else "decrease_tdc"
+        return decision, action_hint
+    if abs(strength - optimum) <= keep_tol:
+        return "tdc_helped", "keep_tdc"
+    if strength < optimum:
+        return "weak_tdc_left_decay", "increase_tdc"
+    return "strong_tdc_overdamping_risk", "decrease_tdc"
+
+
+def _auto_tdc_decay_tradeoff(
+    base_data: dict | None,
+    l_st: dict | None,
+    r_st: dict | None,
+) -> tuple[float, dict]:
+    """Band-limited AUTO TDC decay tradeoff penalty.
+
+    This uses cheap metadata already available during AUTO scoring. It does not
+    estimate new impulse responses inside the optimization loop.
+    """
+    cfg = _auto_tdc_decay_config(base_data)
+    bd = dict(cfg.get("bd", {}) or {})
+    penalty_cap = float(cfg["penalty_cap"])
+    penalty_weight = float(cfg["penalty_weight"])
+    extreme_peak_db = float(cfg["extreme_peak_db"])
+    low_need_threshold = float(cfg["low_need_threshold"])
+    target_low_s = float(cfg["target_low_s"])
+    target_upper_s = float(cfg["target_upper_s"])
+    low_max_hz = float(cfg["low_max_hz"])
+    eval_max_hz = float(cfg["eval_max_hz"])
+    if not bool(bd.get("enable_tdc", True)):
+        return 0.0, _auto_tdc_no_metadata_payload(
+            strength=0.0,
+            decision="tdc_disabled",
+            action_hint="tdc_disabled",
+        )
+
+    strength_pct = shared._auto_safe_float(bd.get("tdc_strength", float("nan")), float("nan"))
+    if not np.isfinite(strength_pct):
+        strength_pct = 50.0
+    strength = float(np.clip(float(strength_pct) / 100.0, 0.0, 1.0))
+    pairs = _auto_rt60_band_pairs(bd)
+    need, metadata_available, modal_excess_s, strongest_freq, strongest_excess = _auto_tdc_modal_decay_need(
+        pairs=pairs,
+        eval_max_hz=float(eval_max_hz),
+        low_max_hz=float(low_max_hz),
+        target_low_s=float(target_low_s),
+        target_upper_s=float(target_upper_s),
+    )
+    tdc_stats = _auto_tdc_channel_stats(l_st, r_st)
+    tdc_peak_db = float(tdc_stats["tdc_peak_db"])
+    tdc_peak_hz = float(tdc_stats["tdc_peak_hz"])
+    tdc_area = float(tdc_stats["tdc_area"])
+    tdc_events = float(tdc_stats["tdc_events"])
+    tdc_band_lo = float(tdc_stats["tdc_band_lo"])
+    tdc_band_hi = float(tdc_stats["tdc_band_hi"])
+
     if tdc_events > 0.0 and not metadata_available:
         need = max(need, float(np.clip(tdc_peak_db / 5.0, 0.0, 0.65)))
     if not metadata_available and tdc_events <= 0.0:
-        return 0.0, {
-            "decay_metadata_available": False,
-            "tdc_strength": float(strength),
-            "tdc_decay_need": 0.0,
-            "tdc_weak_penalty": 0.0,
-            "tdc_overdamping_penalty": 0.0,
-            "tdc_overreach_penalty": 0.0,
-            "tdc_decay_penalty_total": 0.0,
-            "tdc_decay_penalty": 0.0,
-            "tdc_decision": "neutral_no_decay_metadata",
-            "tdc_action_hint": "neutral_no_metadata",
-            "tdc_extreme_overreach": False,
-            "tdc_decay_scoring_version": int(AUTO_TDC_DECAY_SCORING_VERSION),
-        }
+        return 0.0, _auto_tdc_no_metadata_payload(
+            strength=float(strength),
+            decision="neutral_no_decay_metadata",
+            action_hint="neutral_no_metadata",
+        )
 
     optimum = float(np.clip(0.24 + 0.36 * need, 0.20, 0.75))
     weak_pen = 6.0 * need * max(0.0, optimum - strength) ** 2 / max(optimum * optimum, 1e-6)
@@ -405,23 +534,11 @@ def _auto_tdc_decay_tradeoff(
     improvement = 0.0
     if need > 0.0:
         improvement = float(np.clip((min(strength, optimum) / max(optimum, 1e-6)) * need, 0.0, 1.0))
-    keep_tol = 0.08
-    if need <= 0.12:
-        decision = "reduced_by_optimizer" if strength <= 0.35 else "possible_overdamping_risk"
-    elif abs(strength - optimum) <= keep_tol:
-        decision = "tdc_helped"
-    elif strength < optimum:
-        decision = "weak_tdc_left_decay"
-    else:
-        decision = "strong_tdc_overdamping_risk"
-    if need <= 0.12:
-        action_hint = "keep_tdc" if strength <= 0.35 else "decrease_tdc"
-    elif strength < (optimum - keep_tol):
-        action_hint = "increase_tdc"
-    elif strength > (optimum + keep_tol):
-        action_hint = "decrease_tdc"
-    else:
-        action_hint = "keep_tdc"
+    decision, action_hint = _auto_tdc_decay_decision(
+        strength=float(strength),
+        optimum=float(optimum),
+        need=float(need),
+    )
 
     return penalty, {
         "decay_metadata_available": bool(metadata_available),

@@ -23,6 +23,50 @@ from .winner_polish_utils import _winner_polish_acceptance
 
 logger = logging.getLogger("DecayCore")
 
+_RECOVERABLE_EXCESS_POLISH_EXCEPTIONS = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    KeyError,
+    IndexError,
+    RuntimeError,
+    OSError,
+    ImportError,
+    ModuleNotFoundError,
+    NameError,
+)
+
+
+def _build_excess_phase_candidate_values(initial_value: float, step: float, max_delta: float) -> list[float]:
+    step_eff = max(0.01, float(_auto_safe_float(step, 0.05)))
+    max_delta_eff = max(0.0, float(_auto_safe_float(max_delta, 0.15)))
+    max_steps = int(max(0, np.floor(float(max_delta_eff) / float(step_eff) + 1e-9)))
+    tested_values: set[float] = {float(initial_value)}
+    candidate_values: list[float] = []
+    for step_idx in range(1, max_steps + 1):
+        for sign in (-1.0, 1.0):
+            cand = round(float(np.clip(float(initial_value) + sign * float(step_idx) * float(step_eff), 0.0, 1.0)), 4)
+            if cand not in tested_values:
+                tested_values.add(cand)
+                candidate_values.append(cand)
+    return candidate_values
+
+
+def _update_excess_phase_last_candidate(meta: dict, *, accept_meta: dict) -> None:
+    meta["last_candidate_delta"] = dict(accept_meta.get("delta", {}) or {})
+    meta["last_candidate_hard_gate"] = {
+        "hard_gate_failed": bool(accept_meta.get("hard_gate_failed", False)),
+        "hard_gate_reasons": list(accept_meta.get("hard_gate_reasons", []) or []),
+        "residual_peak_db": float(_auto_safe_float(accept_meta.get("residual_peak_db"), float("nan"))),
+        "residual_peak_hard_gate_db": float(_auto_safe_float(accept_meta.get("residual_peak_hard_gate_db"), float("nan"))),
+    }
+
+def _record_excess_phase_rejection(meta: dict, *, reason: str) -> None:
+    meta.setdefault("reject_reasons", {})
+    reject_reasons = dict(meta.get("reject_reasons", {}) or {})
+    reject_reasons[str(reason)] = int(reject_reasons.get(str(reason), 0) or 0) + 1
+    meta["reject_reasons"] = reject_reasons
+
 
 def apply_excess_phase_strength_winner_polish(
     *,
@@ -75,18 +119,7 @@ def apply_excess_phase_strength_winner_polish(
     meta["rank_before"] = float(_auto_safe_float(cur_best_metrics.get("rank_score"), float("nan")))
     meta["avg_before"] = float(_auto_safe_float(cur_best_metrics.get("avg_score"), float("nan")))
 
-    step_eff = max(0.01, float(_auto_safe_float(step, 0.05)))
-    max_delta_eff = max(0.0, float(_auto_safe_float(max_delta, 0.15)))
-    max_steps = int(max(0, np.floor(float(max_delta_eff) / float(step_eff) + 1e-9)))
-
-    tested_values: set[float] = {float(initial_value)}
-    candidate_values: list[float] = []
-    for step_idx in range(1, max_steps + 1):
-        for sign in (-1.0, 1.0):
-            cand = round(float(np.clip(float(initial_value) + sign * float(step_idx) * float(step_eff), 0.0, 1.0)), 4)
-            if cand not in tested_values:
-                tested_values.add(cand)
-                candidate_values.append(cand)
+    candidate_values = _build_excess_phase_candidate_values(initial_value, step, max_delta)
 
     meta["tested_values"] = [float(v) for v in candidate_values]
     meta["tested_count"] = int(len(candidate_values))
@@ -115,19 +148,7 @@ def apply_excess_phase_strength_winner_polish(
                     summarize=False,
                     base_data_override=base_data_ref,
                 )
-            except (
-
-                AttributeError,
-                TypeError,
-                ValueError,
-                KeyError,
-                IndexError,
-                RuntimeError,
-                OSError,
-                ImportError,
-                ModuleNotFoundError,
-                NameError,
-            ) as exc:
+            except _RECOVERABLE_EXCESS_POLISH_EXCEPTIONS as exc:
                 logger.warning(
                     "Automatic mode %s failed for candidate %d/%d (excess_phase_strength=%.4f): %s",
                     str(phase_label),
@@ -145,18 +166,9 @@ def apply_excess_phase_strength_winner_polish(
                 goal=goal,
                 auto_is_better_refine=auto_is_better_refine,
             )
-            meta.setdefault("reject_reasons", {})
+            _update_excess_phase_last_candidate(meta, accept_meta=dict(accept_meta or {}))
             if not bool(better):
-                reject_reasons = dict(meta.get("reject_reasons", {}) or {})
-                reject_reasons[str(reason)] = int(reject_reasons.get(str(reason), 0) or 0) + 1
-                meta["reject_reasons"] = reject_reasons
-            meta["last_candidate_delta"] = dict(accept_meta.get("delta", {}) or {})
-            meta["last_candidate_hard_gate"] = {
-                "hard_gate_failed": bool(accept_meta.get("hard_gate_failed", False)),
-                "hard_gate_reasons": list(accept_meta.get("hard_gate_reasons", []) or []),
-                "residual_peak_db": float(_auto_safe_float(accept_meta.get("residual_peak_db"), float("nan"))),
-                "residual_peak_hard_gate_db": float(_auto_safe_float(accept_meta.get("residual_peak_hard_gate_db"), float("nan"))),
-            }
+                _record_excess_phase_rejection(meta, reason=str(reason))
             logger.info(
                 "Automatic mode %s candidate %d/%d: excess_phase_strength=%.4f, rank=%.3f, decision=%s (%s)",
                 str(phase_label),

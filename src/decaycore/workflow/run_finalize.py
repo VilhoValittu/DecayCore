@@ -22,6 +22,88 @@ if typing.TYPE_CHECKING:
 
 logger = logging.getLogger("DecayCore")
 
+_RECOVERABLE_FINALIZE_EXCEPTIONS = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    KeyError,
+    IndexError,
+    RuntimeError,
+    OSError,
+    ImportError,
+    ModuleNotFoundError,
+    NameError,
+)
+
+
+def _resolve_mode_upper(data: dict) -> str:
+    try:
+        return str(data.get("mode", "BASIC") or "BASIC").strip().upper()
+    except _RECOVERABLE_FINALIZE_EXCEPTIONS:
+        return "BASIC"
+
+
+def _resolve_auto_cache_and_optuna_paths(data: dict) -> tuple[str | None, str | None]:
+    mode_u = _resolve_mode_upper(data)
+    if not bool(mode_u == "AUTO" or data.get("camillafir_automatic_mode", False)):
+        return None, None
+    auto_cache_path = None
+    optuna_storage_path = None
+    try:
+        auto_cache_path = str(
+            get_auto_mode_cache_path(
+                compat_version=str(
+                    data.get("auto_mode_compat_version", AUTO_MODE_COMPAT_VERSION)
+                    or AUTO_MODE_COMPAT_VERSION
+                ),
+            )
+        )
+    except _RECOVERABLE_FINALIZE_EXCEPTIONS:
+        auto_cache_path = None
+    try:
+        if bool(data.get("auto_mode_optuna_persistent_study", True)):
+            optuna_storage_path = str(
+                _auto_optuna_storage_path(
+                    compat_version=str(
+                        data.get("auto_mode_compat_version", AUTO_MODE_COMPAT_VERSION)
+                        or AUTO_MODE_COMPAT_VERSION
+                    ),
+                )
+            )
+    except _RECOVERABLE_FINALIZE_EXCEPTIONS:
+        optuna_storage_path = None
+    return auto_cache_path, optuna_storage_path
+
+
+def _resolve_primary_fallback_stats(ctx: dict) -> tuple[dict, dict, object, object]:
+    l_st_f = ctx["l_st_f"]
+    r_st_f = ctx["r_st_f"]
+    l_imp_f = ctx["l_imp_f"]
+    r_imp_f = ctx["r_imp_f"]
+    if l_st_f is None or r_st_f is None or l_imp_f is None or r_imp_f is None:
+        fallback = ctx["results_by_fs"][-1]
+        return fallback.l_st, fallback.r_st, fallback.l_ir, fallback.r_ir
+    return l_st_f, r_st_f, l_imp_f, r_imp_f
+
+
+def _resolve_sub_fallback_stats(ctx: dict) -> tuple[object, object, dict]:
+    sub_ir_f = ctx.get("sub_ir_f")
+    sub_st_f = ctx.get("sub_st_f")
+    sub_meas_f = dict(ctx.get("sub_meas_f") or {})
+    if (sub_ir_f is None or sub_st_f is None) and ctx["results_by_fs"]:
+        fallback_r = ctx["results_by_fs"][-1]
+        if sub_ir_f is None:
+            sub_ir_f = fallback_r.sub_ir
+        if sub_st_f is None:
+            sub_st_f = fallback_r.sub_st
+        if not sub_meas_f:
+            sub_meas_f = {
+                k: fallback_r.measurements[k]
+                for k in ("f_sub", "m_sub", "p_sub")
+                if k in fallback_r.measurements
+            }
+    return sub_ir_f, sub_st_f, sub_meas_f
+
 
 def _finalize_run_outputs(ctx: dict, *, callbacks: ProcessRunCallbacks, support: ProcessRunSupport):
     data = ctx.get("resolved_data", ctx["data"])
@@ -63,95 +145,9 @@ def _finalize_run_outputs(ctx: dict, *, callbacks: ProcessRunCallbacks, support:
     )
     ctx["export_filename"] = fname
     ctx["saved_filters_dir"] = saved_filters_dir
-    auto_cache_path = None
-    optuna_storage_path = None
-    try:
-        mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        mode_u = "BASIC"
-    if bool(mode_u == "AUTO" or data.get("camillafir_automatic_mode", False)):
-        try:
-            auto_cache_path = str(
-                get_auto_mode_cache_path(
-                    compat_version=str(
-                        data.get("auto_mode_compat_version", AUTO_MODE_COMPAT_VERSION)
-                        or AUTO_MODE_COMPAT_VERSION
-                    ),
-                )
-            )
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            auto_cache_path = None
-        try:
-            if bool(data.get("auto_mode_optuna_persistent_study", True)):
-                optuna_storage_path = str(
-                    _auto_optuna_storage_path(
-                        compat_version=str(
-                            data.get("auto_mode_compat_version", AUTO_MODE_COMPAT_VERSION)
-                            or AUTO_MODE_COMPAT_VERSION
-                        ),
-                    )
-                )
-            else:
-                optuna_storage_path = None
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            optuna_storage_path = None
-
-    l_st_f = ctx["l_st_f"]
-    r_st_f = ctx["r_st_f"]
-    l_imp_f = ctx["l_imp_f"]
-    r_imp_f = ctx["r_imp_f"]
-    if l_st_f is None or r_st_f is None or l_imp_f is None or r_imp_f is None:
-        fallback = results_by_fs[-1]
-        l_st_f, r_st_f = fallback.l_st, fallback.r_st
-        l_imp_f, r_imp_f = fallback.l_ir, fallback.r_ir
-
-    sub_ir_f = ctx.get("sub_ir_f")
-    sub_st_f = ctx.get("sub_st_f")
-    sub_meas_f = dict(ctx.get("sub_meas_f") or {})
-    if (sub_ir_f is None or sub_st_f is None) and results_by_fs:
-        fallback_r = results_by_fs[-1]
-        if sub_ir_f is None:
-            sub_ir_f = fallback_r.sub_ir
-        if sub_st_f is None:
-            sub_st_f = fallback_r.sub_st
-        if not sub_meas_f:
-            sub_meas_f = {k: fallback_r.measurements[k] for k in ("f_sub", "m_sub", "p_sub") if k in fallback_r.measurements}
+    auto_cache_path, optuna_storage_path = _resolve_auto_cache_and_optuna_paths(data)
+    l_st_f, r_st_f, l_imp_f, r_imp_f = _resolve_primary_fallback_stats(ctx)
+    sub_ir_f, sub_st_f, sub_meas_f = _resolve_sub_fallback_stats(ctx)
     bi_meta = data.get("_bass_integration_meta")
     if isinstance(bi_meta, dict) and isinstance(sub_st_f, dict):
         bi_meta["sub_filter_stats"] = sub_st_f

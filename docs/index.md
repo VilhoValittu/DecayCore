@@ -28,7 +28,7 @@ hide_title: true
 <div class="feature-grid">
   <section class="feature-card">
     <h3>Measurement-first workflow</h3>
-    <p>Release builds include DecayCore's own acoustic measurement workflow for consistent timing, phase, and export behavior.</p>
+    <p>Release builds include DecayCore's own acoustic measurement workflow. Measurement has been verified to work on Windows and at least on Ubuntu 22.04. External measurements can be imported on all platforms.</p>
   </section>
   <section class="feature-card">
     <h3>Convolution-ready export</h3>

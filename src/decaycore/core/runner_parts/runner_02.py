@@ -426,6 +426,69 @@ def _first_existing(base_dir: Path, names: list[str]) -> str:
             return str(path.resolve())
     return ""
 
+
+def _apply_headless_aliases(data: dict, config: dict) -> None:
+    if "sample_rate" in config and "fs" not in config:
+        data["fs"] = int(config.get("sample_rate") or data.get("fs", 48000))
+    if "house_curve" in config and "hc_mode" not in config:
+        data["hc_mode"] = str(config.get("house_curve") or data.get("hc_mode", "Harman10"))
+    if "correction_min_hz" in config and "mag_c_min" not in config:
+        data["mag_c_min"] = float(config.get("correction_min_hz") or data.get("mag_c_min", 20.0))
+    if "correction_max_hz" in config and "mag_c_max" not in config:
+        data["mag_c_max"] = float(config.get("correction_max_hz") or data.get("mag_c_max", 250.0))
+    if ("house_curve" in config or "hc_mode" in config) and "auto_target_mode" not in config:
+        data["auto_target_mode"] = "selected"
+
+
+def _apply_headless_lr_paths(data: dict, config: dict, config_dir: Path) -> None:
+    left = config.get("left_wav", config.get("local_path_l", ""))
+    right = config.get("right_wav", config.get("local_path_r", ""))
+    data["local_path_l"] = _resolve_path(left, config_dir) or _first_existing(config_dir, ["L.wav", "left.wav"])
+    data["local_path_r"] = _resolve_path(right, config_dir) or _first_existing(config_dir, ["R.wav", "right.wav"])
+
+
+def _apply_headless_bass_integration_paths(data: dict, config: dict, config_dir: Path) -> None:
+    bass_integration = config.get("bass_integration", {})
+    if not (isinstance(bass_integration, dict) and bool(bass_integration.get("enabled", False))):
+        return
+    data["bass_integration_enable"] = True
+    data["bass_integration_mode"] = "direct_dac"
+    data["local_path_l_main"] = _resolve_path(
+        bass_integration.get("main_L", bass_integration.get("left_main", "")),
+        config_dir,
+    ) or _first_existing(config_dir, ["main_L.wav"])
+    data["local_path_r_main"] = _resolve_path(
+        bass_integration.get("main_R", bass_integration.get("right_main", "")),
+        config_dir,
+    ) or _first_existing(config_dir, ["main_R.wav"])
+    data["local_path_l_sub"] = _resolve_path(
+        bass_integration.get("sub_L", bass_integration.get("left_sub", "")),
+        config_dir,
+    ) or _first_existing(config_dir, ["sub_L.wav"])
+    data["local_path_r_sub"] = _resolve_path(
+        bass_integration.get("sub_R", bass_integration.get("right_sub", "")),
+        config_dir,
+    ) or _first_existing(config_dir, ["sub_R.wav"])
+    if data["local_path_l_main"]:
+        data["local_path_l"] = data["local_path_l_main"]
+    if data["local_path_r_main"]:
+        data["local_path_r"] = data["local_path_r_main"]
+
+
+def _resolve_headless_paths_inplace(data: dict, config_dir: Path) -> None:
+    for key in (
+        "local_path_l",
+        "local_path_r",
+        "local_path_l_main",
+        "local_path_r_main",
+        "local_path_l_sub",
+        "local_path_r_sub",
+        "local_path_house",
+    ):
+        if key in data:
+            data[key] = _resolve_path(data.get(key), config_dir)
+
+
 def _normalize_headless_config(config: dict, *, config_dir: Path, output_dir: Path) -> dict:
     cwd = os.getcwd()
     with tempfile.TemporaryDirectory(prefix="camillafir-headless-defaults-") as tmp:
@@ -442,39 +505,10 @@ def _normalize_headless_config(config: dict, *, config_dir: Path, output_dir: Pa
     data["program_version"] = str(VERSION)
     data["auto_mode_compat_version"] = str(AUTO_MODE_COMPAT_VERSION)
     data["output_dir"] = str(output_dir)
-
-    if "sample_rate" in config and "fs" not in config:
-        data["fs"] = int(config.get("sample_rate") or data.get("fs", 48000))
-    if "house_curve" in config and "hc_mode" not in config:
-        data["hc_mode"] = str(config.get("house_curve") or data.get("hc_mode", "Harman10"))
-    if "correction_min_hz" in config and "mag_c_min" not in config:
-        data["mag_c_min"] = float(config.get("correction_min_hz") or data.get("mag_c_min", 20.0))
-    if "correction_max_hz" in config and "mag_c_max" not in config:
-        data["mag_c_max"] = float(config.get("correction_max_hz") or data.get("mag_c_max", 250.0))
-    if ("house_curve" in config or "hc_mode" in config) and "auto_target_mode" not in config:
-        data["auto_target_mode"] = "selected"
-
-    left = config.get("left_wav", config.get("local_path_l", ""))
-    right = config.get("right_wav", config.get("local_path_r", ""))
-    data["local_path_l"] = _resolve_path(left, config_dir) or _first_existing(config_dir, ["L.wav", "left.wav"])
-    data["local_path_r"] = _resolve_path(right, config_dir) or _first_existing(config_dir, ["R.wav", "right.wav"])
-
-    bi = config.get("bass_integration", {})
-    if isinstance(bi, dict) and bool(bi.get("enabled", False)):
-        data["bass_integration_enable"] = True
-        data["bass_integration_mode"] = "direct_dac"
-        data["local_path_l_main"] = _resolve_path(bi.get("main_L", bi.get("left_main", "")), config_dir) or _first_existing(config_dir, ["main_L.wav"])
-        data["local_path_r_main"] = _resolve_path(bi.get("main_R", bi.get("right_main", "")), config_dir) or _first_existing(config_dir, ["main_R.wav"])
-        data["local_path_l_sub"] = _resolve_path(bi.get("sub_L", bi.get("left_sub", "")), config_dir) or _first_existing(config_dir, ["sub_L.wav"])
-        data["local_path_r_sub"] = _resolve_path(bi.get("sub_R", bi.get("right_sub", "")), config_dir) or _first_existing(config_dir, ["sub_R.wav"])
-        if data["local_path_l_main"]:
-            data["local_path_l"] = data["local_path_l_main"]
-        if data["local_path_r_main"]:
-            data["local_path_r"] = data["local_path_r_main"]
-
-    for key in ("local_path_l", "local_path_r", "local_path_l_main", "local_path_r_main", "local_path_l_sub", "local_path_r_sub", "local_path_house"):
-        if key in data:
-            data[key] = _resolve_path(data.get(key), config_dir)
+    _apply_headless_aliases(data, config)
+    _apply_headless_lr_paths(data, config, config_dir)
+    _apply_headless_bass_integration_paths(data, config, config_dir)
+    _resolve_headless_paths_inplace(data, config_dir)
     return data
 
 

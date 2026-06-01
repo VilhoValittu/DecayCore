@@ -19,6 +19,8 @@ Before using the **FIR filter generator**, you need accurate measurement data.
 3.  **Run sweeps** for the left and right channels separately.
 4.  The built-in tool saves IR WAV files directly — load them from the Files tab when done.
 
+**Platform support:** Measurement has been verified to work on Windows. Linux has been verified to work at least on Ubuntu 22.04. macOS could not be tested due to unavailable test hardware. Subwoofer measurement on Windows requires the playback device to be configured for 5.1 or 7.1 multichannel in Windows Sound settings.
+
 **Alternative: import from REW (Room EQ Wizard)**
 
 If you already have REW measurements:

@@ -62,6 +62,92 @@ _BUILD_ALLOWED_KEYS = frozenset(
 )
 
 
+def _apply_hpf_magnitude_to_gain(*, cfg, freq_axis: np.ndarray, gain_db: np.ndarray, apply_hpf_to_mags, logger) -> np.ndarray:
+    hs = cfg.hpf_settings
+    if not (isinstance(hs, dict) and hs.get("enabled")):
+        return gain_db
+    hpf_f = float(hs.get("freq", 0.0) or 0.0)
+    hpf_order = int(hs.get("order", 0) or 0)
+    if not (hpf_f > 0 and hpf_order > 0):
+        return gain_db
+    hpf_db = apply_hpf_to_mags(freq_axis, np.zeros_like(freq_axis), hpf_f, hpf_order)
+    out = np.asarray(gain_db, dtype=float) + np.asarray(hpf_db, dtype=float)
+    hpf_guard_mask = np.isfinite(freq_axis) & (freq_axis <= float(hpf_f)) & (out > hpf_db)
+    hpf_guard_bins = int(np.count_nonzero(hpf_guard_mask))
+    if hpf_guard_bins > 0:
+        out[hpf_guard_mask] = np.asarray(hpf_db, dtype=float)[hpf_guard_mask]
+    try:
+        logger.info(
+            "HPF magnitude applied to FIR: "
+            f"fc={hpf_f:.1f} Hz, "
+            f"order={hpf_order} "
+            f"({hpf_order * 6:.0f} dB/oct)"
+            + (f", clamped {hpf_guard_bins} sub-HPF boost bins" if hpf_guard_bins > 0 else "")
+        )
+    except (AttributeError, TypeError, ValueError):
+        pass
+    return np.asarray(out, dtype=float)
+
+
+def _apply_lpf_magnitude_to_gain(*, cfg, freq_axis: np.ndarray, gain_db: np.ndarray, apply_lpf_to_mags, logger) -> np.ndarray:
+    ls = cfg.lpf_settings
+    if not (isinstance(ls, dict) and ls.get("enabled")):
+        return gain_db
+    lpf_f = float(ls.get("freq", 0.0) or 0.0)
+    lpf_order = int(ls.get("order", 0) or 0)
+    if not (lpf_f > 0 and lpf_order > 0):
+        return gain_db
+    lpf_db = apply_lpf_to_mags(freq_axis, np.zeros_like(freq_axis), lpf_f, lpf_order)
+    out = np.asarray(gain_db, dtype=float) + np.asarray(lpf_db, dtype=float)
+    try:
+        logger.info(
+            f"LPF magnitude applied to FIR: fc={lpf_f:.1f} Hz, "
+            f"order={lpf_order} ({lpf_order * 6:.0f} dB/oct)"
+        )
+    except (AttributeError, TypeError, ValueError):
+        pass
+    return np.asarray(out, dtype=float)
+
+
+def _apply_phase_clamp_mag_feedback(
+    *,
+    cfg,
+    mask_c: np.ndarray,
+    gain_db: np.ndarray,
+    p_rad_interp: np.ndarray,
+    theo_xo: np.ndarray,
+    logger,
+) -> np.ndarray:
+    phase_clamp_mag_feedback = float(getattr(cfg, "phase_clamp_mag_feedback", 0.5))
+    if not (phase_clamp_mag_feedback > 0.0 and np.any(mask_c)):
+        return np.asarray(gain_db, dtype=float)
+    out = np.asarray(gain_db, dtype=float)
+    try:
+        excess_approx = np.abs(np.asarray(p_rad_interp, dtype=float) - np.asarray(theo_xo, dtype=float))
+        try:
+            lim_max_deg = float(getattr(cfg, "mixed_phase_budget_lf_deg", 60.0) or 60.0)
+        except (AttributeError, TypeError, ValueError):
+            lim_max_deg = 45.0
+        lim_rad = float(np.deg2rad(lim_max_deg))
+        pred_frac = np.where(
+            excess_approx > lim_rad,
+            np.clip(1.0 - lim_rad / np.maximum(excess_approx, 1e-9), 0.0, 1.0),
+            0.0,
+        )
+        boost_mask = np.asarray(mask_c, dtype=bool) & (out > 0.0)
+        if np.any(boost_mask):
+            strength = float(np.clip(phase_clamp_mag_feedback, 0.0, 1.0))
+            out[boost_mask] -= strength * pred_frac[boost_mask] * out[boost_mask]
+            softened = int(np.sum(pred_frac[boost_mask] > 0.05))
+            logger.info(
+                f"PhaseClampMagFeedback: gain softened at {softened} bins "
+                f"(strength={strength:.2f}, phase_limit≈{lim_max_deg:.1f} deg)"
+            )
+    except (TypeError, ValueError, FloatingPointError, AttributeError, IndexError):
+        pass
+    return np.asarray(out, dtype=float)
+
+
 def run_phase_ir_stage(
     *,
     cfg,
@@ -169,46 +255,20 @@ def _run_phase_ir_stage(inputs: PhaseIRInputs) -> PhaseIROutputs:
     theo_xo = np.asarray(theo["theo_xo"], dtype=float)
     p_rad_interp = np.asarray(theo.get("p_rad_interp", p_rad_interp), dtype=float)
 
-    hs = cfg.hpf_settings
-    if isinstance(hs, dict) and hs.get("enabled"):
-        hpf_f = float(hs.get("freq", 0.0) or 0.0)
-        hpf_order = int(hs.get("order", 0) or 0)
-        if hpf_f > 0 and hpf_order > 0:
-            hpf_db = apply_hpf_to_mags(
-                freq_axis, np.zeros_like(freq_axis), hpf_f, hpf_order
-            )
-            gain_db = gain_db + hpf_db
-            hpf_guard_mask = np.isfinite(freq_axis) & (freq_axis <= float(hpf_f)) & (gain_db > hpf_db)
-            hpf_guard_bins = int(np.count_nonzero(hpf_guard_mask))
-            if hpf_guard_bins > 0:
-                gain_db[hpf_guard_mask] = hpf_db[hpf_guard_mask]
-            try:
-                logger.info(
-                    "HPF magnitude applied to FIR: "
-                    f"fc={hpf_f:.1f} Hz, "
-                    f"order={hpf_order} "
-                    f"({hpf_order * 6:.0f} dB/oct)"
-                    + (f", clamped {hpf_guard_bins} sub-HPF boost bins" if hpf_guard_bins > 0 else "")
-                )
-            except (AttributeError, TypeError, ValueError):
-                pass
-
-    ls = cfg.lpf_settings
-    if isinstance(ls, dict) and ls.get("enabled"):
-        lpf_f = float(ls.get("freq", 0.0) or 0.0)
-        lpf_order = int(ls.get("order", 0) or 0)
-        if lpf_f > 0 and lpf_order > 0:
-            lpf_db = apply_lpf_to_mags(
-                freq_axis, np.zeros_like(freq_axis), lpf_f, lpf_order
-            )
-            gain_db = gain_db + lpf_db
-            try:
-                logger.info(
-                    f"LPF magnitude applied to FIR: fc={lpf_f:.1f} Hz, "
-                    f"order={lpf_order} ({lpf_order * 6:.0f} dB/oct)"
-                )
-            except (AttributeError, TypeError, ValueError):
-                pass
+    gain_db = _apply_hpf_magnitude_to_gain(
+        cfg=cfg,
+        freq_axis=freq_axis,
+        gain_db=gain_db,
+        apply_hpf_to_mags=apply_hpf_to_mags,
+        logger=logger,
+    )
+    gain_db = _apply_lpf_magnitude_to_gain(
+        cfg=cfg,
+        freq_axis=freq_axis,
+        gain_db=gain_db,
+        apply_lpf_to_mags=apply_lpf_to_mags,
+        logger=logger,
+    )
 
     gain_db_before_residual = gain_db.copy()
     freq_axis_before_residual = freq_axis.copy()
@@ -271,35 +331,14 @@ def _run_phase_ir_stage(inputs: PhaseIRInputs) -> PhaseIROutputs:
         mask_c,
     )
 
-    _pcmf = float(getattr(cfg, "phase_clamp_mag_feedback", 0.5))  # vanha käytös 0.0
-    if _pcmf > 0.0 and np.any(mask_c):
-        try:
-            _excess_approx = np.abs(p_rad_interp - theo_xo)
-            try:
-                _lim_max_deg = float(
-                    getattr(cfg, "mixed_phase_budget_lf_deg", 60.0) or 60.0
-                )
-            except (AttributeError, TypeError, ValueError):
-                _lim_max_deg = 45.0
-            _lim_rad = float(np.deg2rad(_lim_max_deg))
-            _pred_frac = np.where(
-                _excess_approx > _lim_rad,
-                np.clip(1.0 - _lim_rad / np.maximum(_excess_approx, 1e-9), 0.0, 1.0),
-                0.0,
-            )
-            _boost_mask = mask_c & (gain_db > 0.0)
-            if np.any(_boost_mask):
-                _strength = float(np.clip(_pcmf, 0.0, 1.0))
-                gain_db[_boost_mask] -= (
-                    _strength * _pred_frac[_boost_mask] * gain_db[_boost_mask]
-                )
-                _softened = int(np.sum(_pred_frac[_boost_mask] > 0.05))
-                logger.info(
-                    f"PhaseClampMagFeedback: gain softened at {_softened} bins "
-                    f"(strength={_strength:.2f}, phase_limit≈{_lim_max_deg:.1f} deg)"
-                )
-        except (TypeError, ValueError, FloatingPointError, AttributeError, IndexError):
-            pass
+    gain_db = _apply_phase_clamp_mag_feedback(
+        cfg=cfg,
+        mask_c=mask_c,
+        gain_db=gain_db,
+        p_rad_interp=p_rad_interp,
+        theo_xo=theo_xo,
+        logger=logger,
+    )
 
     gain_db_before_autogain = gain_db.copy()
     ag = compute_auto_gain_and_headroom(

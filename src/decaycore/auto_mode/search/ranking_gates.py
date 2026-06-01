@@ -185,6 +185,79 @@ def _get_residual_peak_gate_value_and_source(candidate_or_metrics: dict | None) 
     return float("nan"), ""
 
 
+def _append_explicit_hard_gate_reasons(reasons: list[str], metrics: dict) -> None:
+    for reason in list(metrics.get("hard_gate_failures", metrics.get("hard_gate_reasons", [])) or []):
+        reason_txt = str(reason or "").strip()
+        if not reason_txt:
+            continue
+        if reason_txt in {"residual_peak_hard_gate", "residual_peak_severity_gate"}:
+            continue
+        reasons.append(reason_txt)
+
+
+def _append_residual_peak_gate_reason(reasons: list[str], metrics: dict, *, goal: str) -> None:
+    rp_worst, rp_gate_source = _get_residual_peak_gate_value_and_source(metrics)
+    rp_gate = get_residual_peak_hard_gate_effective_db(metrics, goal=goal)
+    if np.isfinite(rp_worst) and np.isfinite(rp_gate) and float(rp_worst) > float(rp_gate):
+        reasons.append("residual_peak_hard_gate" if rp_gate_source == "raw_db" else "residual_peak_severity_gate")
+
+
+def _append_bass_integration_gate_reason(reasons: list[str], metrics: dict) -> None:
+    bass_gate_explicit = bool(metrics.get("bass_integration_hard_gate_failed", False))
+    direct_dac_canonical_bi = bool(
+        str(metrics.get("bass_integration_mode", "") or "").strip().lower() == "direct_dac"
+        or str(metrics.get("bass_direct_dac_export_model", "") or "").strip().lower() == "camilladsp_yaml_compatible"
+    )
+    bass_gate_from_metrics = bool(
+        bool(metrics.get("bass_integration_enable", False))
+        and not direct_dac_canonical_bi
+        and str(metrics.get("bass_feasibility_class", "") or "").strip().lower() == "infeasible"
+    )
+    if bass_gate_explicit or bass_gate_from_metrics:
+        reasons.append("bass_integration_infeasible_hard_gate")
+
+
+def _append_flat_goal_safety_reasons(reasons: list[str], metrics: dict, *, st_l: dict | None, st_r: dict | None) -> None:
+    net_boost = _auto_safe_float(metrics.get("max_net_boost_db"), 0.0)
+    bass_boost = _auto_safe_float(
+        metrics.get("bass_boost_20_200_db", metrics.get("lf_boost_max_db", float("nan"))),
+        float("nan"),
+    )
+    boost_gate = float(AUTO_MODE_PREFER_BASS_MAX_NET_BOOST_HARD_GATE_DB)
+    if np.isfinite(bass_boost) and float(bass_boost) >= 3.0:
+        boost_gate = min(
+            float(AUTO_MODE_PREFER_BASS_MAX_SUPPORTED_NET_BOOST_HARD_GATE_DB),
+            max(boost_gate, float(bass_boost) + 10.0),
+        )
+    if float(net_boost) > float(boost_gate):
+        reasons.append("excessive_net_boost")
+
+    ratio_keys = (
+        "ir_pre_post_ratio",
+        "ir_pre_energy_guard_after_ratio",
+        "ir_pre_energy_guard_before_ratio",
+    )
+    gd_keys = (
+        "gd_grad_limiter_after_max_ms_per_oct",
+        "gd_grad_limiter_before_max_ms_per_oct",
+        "gd_limiter_max_grad_ms_per_oct",
+        "gd_grad_limiter_max_grad_ms_per_oct",
+        "gd_limiter_max_grad_after_ms_per_oct",
+        "gd_grad_limiter_max_grad_after_ms_per_oct",
+        "gd_limiter_max_grad_before_ms_per_oct",
+        "gd_grad_limiter_max_grad_before_ms_per_oct",
+    )
+    for channel, st in (("l", dict(st_l or {})), ("r", dict(st_r or {}))):
+        pre_suspect = bool(st.get("pre_energy_metric_suspect", False))
+        if not pre_suspect:
+            ratio = _auto_pick_metric(st, ratio_keys, nonneg=True)
+            if ratio is not None and float(ratio) > 0.05:
+                reasons.append(f"unsafe_prepost_{channel}")
+        gd_grad = _auto_pick_metric(st, gd_keys, abs_value=True, nonneg=True)
+        if gd_grad is not None and float(gd_grad) > 45.0:
+            reasons.append(f"unsafe_gd_gradient_{channel}")
+
+
 def _auto_hard_gate_reasons(
     metrics: dict | None,
     st_l: dict | None = None,
@@ -193,78 +266,22 @@ def _auto_hard_gate_reasons(
 ) -> list[str]:
     m = dict(metrics or {})
     reasons: list[str] = []
-    for reason in list(m.get("hard_gate_failures", m.get("hard_gate_reasons", [])) or []):
-        reason_txt = str(reason or "").strip()
-        if reason_txt:
-            if reason_txt in {"residual_peak_hard_gate", "residual_peak_severity_gate"}:
-                continue
-            reasons.append(reason_txt)
+    _append_explicit_hard_gate_reasons(reasons, m)
 
     rank = _auto_safe_float(m.get("rank_score", float("nan")), float("nan"))
     if not np.isfinite(rank):
         reasons.append("non_finite_rank_score")
 
-    rp_worst, rp_gate_source = _get_residual_peak_gate_value_and_source(m)
-    rp_gate = get_residual_peak_hard_gate_effective_db(m, goal=goal)
-    if np.isfinite(rp_worst) and np.isfinite(rp_gate) and float(rp_worst) > float(rp_gate):
-        reasons.append("residual_peak_hard_gate" if rp_gate_source == "raw_db" else "residual_peak_severity_gate")
+    _append_residual_peak_gate_reason(reasons, m, goal=goal)
 
     if bool(m.get("stereo_policy_gate_failed", False)):
         reasons.append("stereo_policy_gate_failed")
 
-    bass_gate_explicit = bool(m.get("bass_integration_hard_gate_failed", False))
-    direct_dac_canonical_bi = bool(
-        str(m.get("bass_integration_mode", "") or "").strip().lower() == "direct_dac"
-        or str(m.get("bass_direct_dac_export_model", "") or "").strip().lower() == "camilladsp_yaml_compatible"
-    )
-    bass_gate_from_metrics = bool(
-        bool(m.get("bass_integration_enable", False))
-        and not direct_dac_canonical_bi
-        and str(m.get("bass_feasibility_class", "") or "").strip().lower() == "infeasible"
-    )
-    if bass_gate_explicit or bass_gate_from_metrics:
-        reasons.append("bass_integration_infeasible_hard_gate")
+    _append_bass_integration_gate_reason(reasons, m)
 
     g = _auto_goal_norm(goal)
     if g == AUTO_MODE_GOAL_FLAT:
-        net_boost = _auto_safe_float(m.get("max_net_boost_db"), 0.0)
-        bass_boost = _auto_safe_float(
-            m.get("bass_boost_20_200_db", m.get("lf_boost_max_db", float("nan"))),
-            float("nan"),
-        )
-        boost_gate = float(AUTO_MODE_PREFER_BASS_MAX_NET_BOOST_HARD_GATE_DB)
-        if np.isfinite(bass_boost) and float(bass_boost) >= 3.0:
-            boost_gate = min(
-                float(AUTO_MODE_PREFER_BASS_MAX_SUPPORTED_NET_BOOST_HARD_GATE_DB),
-                max(boost_gate, float(bass_boost) + 10.0),
-            )
-        if float(net_boost) > float(boost_gate):
-            reasons.append("excessive_net_boost")
-
-        ratio_keys = (
-            "ir_pre_post_ratio",
-            "ir_pre_energy_guard_after_ratio",
-            "ir_pre_energy_guard_before_ratio",
-        )
-        gd_keys = (
-            "gd_grad_limiter_after_max_ms_per_oct",
-            "gd_grad_limiter_before_max_ms_per_oct",
-            "gd_limiter_max_grad_ms_per_oct",
-            "gd_grad_limiter_max_grad_ms_per_oct",
-            "gd_limiter_max_grad_after_ms_per_oct",
-            "gd_grad_limiter_max_grad_after_ms_per_oct",
-            "gd_limiter_max_grad_before_ms_per_oct",
-            "gd_grad_limiter_max_grad_before_ms_per_oct",
-        )
-        for channel, st in (("l", dict(st_l or {})), ("r", dict(st_r or {}))):
-            pre_suspect = bool(st.get("pre_energy_metric_suspect", False))
-            if not pre_suspect:
-                ratio = _auto_pick_metric(st, ratio_keys, nonneg=True)
-                if ratio is not None and float(ratio) > 0.05:
-                    reasons.append(f"unsafe_prepost_{channel}")
-            gd_grad = _auto_pick_metric(st, gd_keys, abs_value=True, nonneg=True)
-            if gd_grad is not None and float(gd_grad) > 45.0:
-                reasons.append(f"unsafe_gd_gradient_{channel}")
+        _append_flat_goal_safety_reasons(reasons, m, st_l=st_l, st_r=st_r)
 
     return list(dict.fromkeys(reasons))
 

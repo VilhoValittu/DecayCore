@@ -7,7 +7,9 @@ permalink: /measurement-workflow/
 
 DecayCore includes its own acoustic measurement workflow in release builds.
 
-The recommended path is to measure directly with DecayCore, generate correction filters from those measurements, and export convolution-ready WAV FIR filters.
+**Platform support:** Measurement has been verified to work on Windows. Linux has been verified to work at least on Ubuntu 22.04. macOS could not be tested due to unavailable test hardware. Subwoofer measurement on Windows requires the user to have configured 5.1 or 7.1 multichannel output in Windows Sound settings.
+
+The recommended path is to measure directly with DecayCore, generate correction filters from those measurements, and export convolution-ready WAV FIR filters. When measurement is unavailable on your platform, you can import compatible external measurements instead.
 
 ## Why use DecayCore's own measurement workflow?
 

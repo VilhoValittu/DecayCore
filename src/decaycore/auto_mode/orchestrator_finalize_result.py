@@ -31,6 +31,19 @@ from .orchestrator_finalize_cache import (
 
 logger = logging.getLogger("DecayCore")
 
+_RECOVERABLE_P6_EXCEPTIONS = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    KeyError,
+    IndexError,
+    RuntimeError,
+    OSError,
+    ImportError,
+    ModuleNotFoundError,
+    NameError,
+)
+
 
 def _materialize_final_search_winner(
     *,
@@ -208,6 +221,160 @@ def _p6_filter_mag_arr(st: dict) -> tuple[object | None, str]:
 
     return None, "missing"
 
+def _p6_import_validation_dependencies():
+    try:
+        from ..dsp.final_ir_validation import validate_final_fir_against_ir, final_ir_validation_to_stats
+        from ..dsp.dsp_config import CfgReader
+    except _RECOVERABLE_P6_EXCEPTIONS:
+        return None
+    return validate_final_fir_against_ir, final_ir_validation_to_stats, CfgReader
+
+def _p6_validation_candidates(search_state, n_check: int) -> list[dict]:
+    ranked = sorted(
+        list(search_state.scored or []),
+        key=lambda x: _auto_rank_key(dict((x or {}).get("metrics", {}) or {})),
+    )
+    return list(ranked[:n_check])
+
+def _p6_materialize_candidate_result(search_state, cand: dict, index: int, _materialize_preset_result):
+    if index == 0 and search_state.best_result is not None:
+        return search_state.best_result
+    result_obj, _, _ = _materialize_preset_result(
+        dict(cand.get("preset", {}) or {}),
+        include_response_arrays=True,
+        summarize=False,
+    )
+    return result_obj
+
+def _p6_validate_candidate(
+    *,
+    search_state,
+    cfg,
+    cand: dict,
+    index: int,
+    validate_final_fir_against_ir,
+    _materialize_preset_result,
+):
+    try:
+        result_obj = _p6_materialize_candidate_result(search_state, cand, index, _materialize_preset_result)
+        fir_l, fir_r, st_l, st_r = _p6_extract_fir_and_stats(result_obj)
+        fs = int(getattr(cfg, "fs", 48000) or 48000)
+        mag_l, mag_source_l = _p6_filter_mag_arr(st_l)
+        mag_r, mag_source_r = _p6_filter_mag_arr(st_r)
+        validation_result = validate_final_fir_against_ir(
+            sample_rate=fs,
+            fir_l=fir_l,
+            fir_r=fir_r,
+            freq_axis=_p6_active_stat_arr(st_l, "freq_axis"),
+            target_mag_db=_p6_active_stat_arr(st_l, "target_mags"),
+            target_mag_db_r=_p6_active_stat_arr(st_r, "target_mags"),
+            predicted_mag_db_l=mag_l,
+            predicted_mag_db_r=mag_r,
+            measured_mag_db_l=_p6_active_stat_arr(st_l, "measured_mags"),
+            measured_mag_db_r=_p6_active_stat_arr(st_r, "measured_mags"),
+            ir_anchor_mode=str(st_l.get("ir_anchor_mode", "") or ""),
+            authority_voice_risk=_p6_stat_arr(st_l, "authority_voice_risk"),
+            authority_modal_support=_p6_stat_arr(st_l, "authority_modal_support"),
+            authority_null_risk=_p6_stat_arr(st_l, "authority_null_risk"),
+            authority_reflection_risk=_p6_stat_arr(st_l, "authority_reflection_risk"),
+            config=cfg,
+        )
+    except _RECOVERABLE_P6_EXCEPTIONS as exc:
+        logger.debug("P6 validation failed for candidate %d: %s: %s", index, type(exc).__name__, exc)
+        return None
+    return (index, cand, validation_result, result_obj, mag_source_l, mag_source_r)
+
+def _p6_collect_validation_results(
+    *,
+    search_state,
+    cfg,
+    candidates: list[dict],
+    validate_final_fir_against_ir,
+    _materialize_preset_result,
+) -> list[tuple[int, object, object, object, str, str]]:
+    results: list[tuple[int, object, object, object, str, str]] = []
+    for index, cand in enumerate(candidates):
+        row = _p6_validate_candidate(
+            search_state=search_state,
+            cfg=cfg,
+            cand=cand,
+            index=index,
+            validate_final_fir_against_ir=validate_final_fir_against_ir,
+            _materialize_preset_result=_materialize_preset_result,
+        )
+        if row is not None:
+            results.append(row)
+    return results
+
+def _p6_pick_winner_result(
+    *,
+    results: list[tuple[int, object, object, object, str, str]],
+    mode: str,
+    search_state,
+) -> tuple[int, object, object, object, str, str]:
+    winner_idx, winner_cand, winner_vr, winner_result_obj, winner_mag_source_l, winner_mag_source_r = results[0]
+    if mode != "reject":
+        return winner_idx, winner_cand, winner_vr, winner_result_obj, winner_mag_source_l, winner_mag_source_r
+    non_rejected = [(idx, c, r, ro, sl, sr) for idx, c, r, ro, sl, sr in results if r.severity != "reject"]
+    if not non_rejected:
+        logger.warning("Final IR validation: all %d checked candidate(s) rejected; keeping least-bad.", len(results))
+        return winner_idx, winner_cand, winner_vr, winner_result_obj, winner_mag_source_l, winner_mag_source_r
+    new_idx, new_cand, winner_vr, winner_result_obj, winner_mag_source_l, winner_mag_source_r = non_rejected[0]
+    if new_idx != 0:
+        logger.info(
+            "Final IR validation: candidate #1 rejected (severity=%s), selected candidate #%d.",
+            str(results[0][2].severity),
+            int(new_idx) + 1,
+        )
+        search_state.best_result = winner_result_obj
+        search_state.best_preset = dict((new_cand or {}).get("preset", {}) or {})
+        search_state.best_metrics = dict(
+            attach_official_rank_score(dict((new_cand or {}).get("metrics", {}) or {}))
+        )
+    return new_idx, new_cand, winner_vr, winner_result_obj, winner_mag_source_l, winner_mag_source_r
+
+def _p6_apply_winner_validation_stats(
+    *,
+    search_state,
+    winner_vr,
+    mode: str,
+    score_weight: float,
+    winner_mag_source_l: str,
+    winner_mag_source_r: str,
+    final_ir_validation_to_stats,
+) -> None:
+    vr_stats = final_ir_validation_to_stats(winner_vr)
+    vr_stats["final_ir_validation_mode"] = str(mode)
+    vr_stats["final_ir_validation_filter_mag_source_l"] = str(winner_mag_source_l)
+    vr_stats["final_ir_validation_filter_mag_source_r"] = str(winner_mag_source_r)
+    if isinstance(search_state.best_metrics, dict):
+        search_state.best_metrics.update(vr_stats)
+        if winner_vr.score_penalty > 0.0:
+            existing_penalty = float(
+                search_state.best_metrics.get("final_ir_validation_score_penalty", 0.0) or 0.0
+            )
+            search_state.best_metrics["final_ir_validation_score_penalty"] = float(
+                existing_penalty * float(score_weight)
+            )
+
+def _p6_log_winner_validation(winner_vr, winner_mag_source_l: str, winner_mag_source_r: str) -> None:
+    import numpy as _np
+
+    logger.info(
+        "Final IR validation: severity=%s penalty=%.2f pre=%.1fdB gd=%.0fms "
+        "voice=%.1fdB stereo=%.1fdB bass=%.1fdB mag_source_l=%s mag_source_r=%s reasons=%s",
+        str(winner_vr.severity),
+        float(winner_vr.score_penalty),
+        float(winner_vr.pre_energy_ratio_db) if _np.isfinite(winner_vr.pre_energy_ratio_db) else float("nan"),
+        float(winner_vr.gd_peak_ms) if _np.isfinite(winner_vr.gd_peak_ms) else float("nan"),
+        float(winner_vr.voice_band_peak_excess_db) if _np.isfinite(winner_vr.voice_band_peak_excess_db) else float("nan"),
+        float(winner_vr.stereo_delta_peak_db) if _np.isfinite(winner_vr.stereo_delta_peak_db) else float("nan"),
+        float(winner_vr.bass_residual_peak_db) if _np.isfinite(winner_vr.bass_residual_peak_db) else float("nan"),
+        str(winner_mag_source_l),
+        str(winner_mag_source_r),
+        ",".join(winner_vr.reasons) or "none",
+    )
+
 
 def _run_p6_final_validation(
     search_state,
@@ -216,23 +383,10 @@ def _run_p6_final_validation(
     _materialize_preset_result,
 ) -> None:
     """Run P6 final IR validation; attach stats to search_state.best_metrics. No-op on errors."""
-    try:
-        from ..dsp.final_ir_validation import validate_final_fir_against_ir, final_ir_validation_to_stats
-        from ..dsp.dsp_config import CfgReader
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
+    imports = _p6_import_validation_dependencies()
+    if imports is None:
         return
+    validate_final_fir_against_ir, final_ir_validation_to_stats, CfgReader = imports
 
     try:
         cr = CfgReader(cfg)
@@ -242,130 +396,35 @@ def _run_p6_final_validation(
         mode = cr.enum_string("final_ir_validation_mode", "warn")
         n_check = max(1, int(round(float(cr.float_allow_zero("final_ir_validation_candidate_count", 3)))))
         score_weight = cr.float("final_ir_validation_score_weight", 1.0)
-
-        ranked = sorted(
-            list(search_state.scored or []),
-            key=lambda x: _auto_rank_key(dict((x or {}).get("metrics", {}) or {})),
+        candidates = _p6_validation_candidates(search_state, int(n_check))
+        results = _p6_collect_validation_results(
+            search_state=search_state,
+            cfg=cfg,
+            candidates=candidates,
+            validate_final_fir_against_ir=validate_final_fir_against_ir,
+            _materialize_preset_result=_materialize_preset_result,
         )
-
-        results: list[tuple[int, object, object, object, str, str]] = []
-        for i, cand in enumerate(ranked[:n_check]):
-            try:
-                if i == 0 and search_state.best_result is not None:
-                    result_obj = search_state.best_result
-                else:
-                    result_obj, _, _ = _materialize_preset_result(
-                        dict(cand.get("preset", {}) or {}),
-                        include_response_arrays=True,
-                        summarize=False,
-                    )
-                fir_l, fir_r, st_l, st_r = _p6_extract_fir_and_stats(result_obj)
-                import numpy as _np
-                fs = int(getattr(cfg, "fs", 48000) or 48000)
-                mag_l, mag_source_l = _p6_filter_mag_arr(st_l)
-                mag_r, mag_source_r = _p6_filter_mag_arr(st_r)
-                vr = validate_final_fir_against_ir(
-                    sample_rate=fs,
-                    fir_l=fir_l,
-                    fir_r=fir_r,
-                    freq_axis=_p6_active_stat_arr(st_l, "freq_axis"),
-                    target_mag_db=_p6_active_stat_arr(st_l, "target_mags"),
-                    target_mag_db_r=_p6_active_stat_arr(st_r, "target_mags"),
-                    predicted_mag_db_l=mag_l,
-                    predicted_mag_db_r=mag_r,
-                    measured_mag_db_l=_p6_active_stat_arr(st_l, "measured_mags"),
-                    measured_mag_db_r=_p6_active_stat_arr(st_r, "measured_mags"),
-                    ir_anchor_mode=str(st_l.get("ir_anchor_mode", "") or ""),
-                    authority_voice_risk=_p6_stat_arr(st_l, "authority_voice_risk"),
-                    authority_modal_support=_p6_stat_arr(st_l, "authority_modal_support"),
-                    authority_null_risk=_p6_stat_arr(st_l, "authority_null_risk"),
-                    authority_reflection_risk=_p6_stat_arr(st_l, "authority_reflection_risk"),
-                    config=cfg,
-                )
-                results.append((i, cand, vr, result_obj, mag_source_l, mag_source_r))
-            except (
-
-                AttributeError,
-                TypeError,
-                ValueError,
-                KeyError,
-                IndexError,
-                RuntimeError,
-                OSError,
-                ImportError,
-                ModuleNotFoundError,
-                NameError,
-            ) as exc:
-                logger.debug("P6 validation failed for candidate %d: %s: %s", i, type(exc).__name__, exc)
-
         if not results:
             return
 
-        winner_idx, winner_cand, winner_vr, winner_result_obj, winner_mag_source_l, winner_mag_source_r = results[0]
-
-        if mode == "reject":
-            non_rejected = [(idx, c, r, ro, sl, sr) for idx, c, r, ro, sl, sr in results if r.severity != "reject"]
-            if non_rejected:
-                new_idx, new_cand, winner_vr, winner_result_obj, winner_mag_source_l, winner_mag_source_r = non_rejected[0]
-                if new_idx != 0:
-                    logger.info(
-                        "Final IR validation: candidate #1 rejected (severity=%s), selected candidate #%d.",
-                        str(results[0][2].severity),
-                        int(new_idx) + 1,
-                    )
-                    search_state.best_result = winner_result_obj
-                    search_state.best_preset = dict((new_cand or {}).get("preset", {}) or {})
-                    search_state.best_metrics = dict(
-                        attach_official_rank_score(dict((new_cand or {}).get("metrics", {}) or {}))
-                    )
-            else:
-                # All rejected — keep the first (least-bad)
-                logger.warning(
-                    "Final IR validation: all %d checked candidate(s) rejected; keeping least-bad.",
-                    len(results),
-                )
-
-        vr_stats = final_ir_validation_to_stats(winner_vr)
-        vr_stats["final_ir_validation_mode"] = str(mode)
-        vr_stats["final_ir_validation_filter_mag_source_l"] = str(winner_mag_source_l)
-        vr_stats["final_ir_validation_filter_mag_source_r"] = str(winner_mag_source_r)
-        if isinstance(search_state.best_metrics, dict):
-            search_state.best_metrics.update(vr_stats)
-            if winner_vr.score_penalty > 0.0:
-                existing_penalty = float(
-                    search_state.best_metrics.get("final_ir_validation_score_penalty", 0.0) or 0.0
-                )
-                search_state.best_metrics["final_ir_validation_score_penalty"] = float(
-                    existing_penalty * float(score_weight)
-                )
-
-        logger.info(
-            "Final IR validation: severity=%s penalty=%.2f pre=%.1fdB gd=%.0fms "
-            "voice=%.1fdB stereo=%.1fdB bass=%.1fdB mag_source_l=%s mag_source_r=%s reasons=%s",
-            str(winner_vr.severity),
-            float(winner_vr.score_penalty),
-            float(winner_vr.pre_energy_ratio_db) if _np.isfinite(winner_vr.pre_energy_ratio_db) else float("nan"),
-            float(winner_vr.gd_peak_ms) if _np.isfinite(winner_vr.gd_peak_ms) else float("nan"),
-            float(winner_vr.voice_band_peak_excess_db) if _np.isfinite(winner_vr.voice_band_peak_excess_db) else float("nan"),
-            float(winner_vr.stereo_delta_peak_db) if _np.isfinite(winner_vr.stereo_delta_peak_db) else float("nan"),
-            float(winner_vr.bass_residual_peak_db) if _np.isfinite(winner_vr.bass_residual_peak_db) else float("nan"),
-            str(winner_mag_source_l),
-            str(winner_mag_source_r),
-            ",".join(winner_vr.reasons) or "none",
+        _winner_idx, _winner_cand, winner_vr, _winner_result_obj, winner_mag_source_l, winner_mag_source_r = (
+            _p6_pick_winner_result(results=results, mode=str(mode), search_state=search_state)
         )
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ) as exc:
+        _p6_apply_winner_validation_stats(
+            search_state=search_state,
+            winner_vr=winner_vr,
+            mode=str(mode),
+            score_weight=float(score_weight),
+            winner_mag_source_l=str(winner_mag_source_l),
+            winner_mag_source_r=str(winner_mag_source_r),
+            final_ir_validation_to_stats=final_ir_validation_to_stats,
+        )
+        _p6_log_winner_validation(
+            winner_vr=winner_vr,
+            winner_mag_source_l=str(winner_mag_source_l),
+            winner_mag_source_r=str(winner_mag_source_r),
+        )
+    except _RECOVERABLE_P6_EXCEPTIONS as exc:
         logger.debug("P6 final IR validation raised: %s: %s", type(exc).__name__, exc)
 
 

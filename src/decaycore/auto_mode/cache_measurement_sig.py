@@ -20,6 +20,49 @@ import numpy as np
 from .cache_io import _AUTO_CACHE_LOCK
 from .shared import _auto_hash_array_full, _auto_safe_float, logger
 
+_RECOVERABLE_HASH_EXCEPTIONS = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    KeyError,
+    IndexError,
+    RuntimeError,
+    OSError,
+    ImportError,
+    ModuleNotFoundError,
+    NameError,
+)
+
+
+def _update_hash_from_json(h, payload: object, *, context: str) -> None:
+    try:
+        h.update(json.dumps(payload, sort_keys=True, default=str, separators=(",", ":")).encode("utf-8", "ignore"))
+    except _RECOVERABLE_HASH_EXCEPTIONS:
+        logger.exception(context)
+        h.update(str(payload).encode("utf-8", "ignore"))
+
+
+def _hash_harmonic_magnitudes_dict(h, key: str, value: dict) -> None:
+    if not (isinstance(value, dict) and value):
+        return
+    try:
+        h.update(str(key).encode("utf-8", "ignore"))
+        for order in sorted(value.keys()):
+            arr = value.get(order)
+            if arr is not None:
+                h.update(str(order).encode("utf-8", "ignore"))
+                h.update(_auto_hash_array_full(np.asarray(arr, dtype=float)).encode("ascii", "ignore"))
+    except _RECOVERABLE_HASH_EXCEPTIONS:
+        logger.exception("measurement harmonic metadata identity hash update")
+
+
+def _hash_metadata_arrays(h, measurements: dict, *, array_keys: tuple[str, ...]) -> None:
+    for key in array_keys:
+        value = measurements.get(key)
+        if value is not None:
+            h.update(str(key).encode("utf-8", "ignore"))
+            h.update(_auto_hash_array_full(np.asarray(value, dtype=float)).encode("ascii", "ignore"))
+
 
 def _auto_measurement_metadata_identity(measurements: dict) -> str:
     """Hash measurement-derived metadata that affects DSP policy or scoring.
@@ -85,54 +128,10 @@ def _auto_measurement_metadata_identity(measurements: dict) -> str:
         value = m.get(key)
         if isinstance(value, dict) and value:
             payload[key] = value
-    try:
-        h.update(json.dumps(payload, sort_keys=True, default=str, separators=(",", ":")).encode("utf-8", "ignore"))
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        logger.exception("measurement metadata payload signature hash update")
-        h.update(str(sorted(payload.items())).encode("utf-8", "ignore"))
-
-    for key in array_keys:
-        value = m.get(key)
-        if value is not None:
-            h.update(str(key).encode("utf-8", "ignore"))
-            h.update(_auto_hash_array_full(np.asarray(value, dtype=float)).encode("ascii", "ignore"))
-
+    _update_hash_from_json(h, payload, context="measurement metadata payload signature hash update")
+    _hash_metadata_arrays(h, m, array_keys=array_keys)
     for key in ("harmonic_magnitudes_db_l", "harmonic_magnitudes_db_r"):
-        value = m.get(key)
-        if isinstance(value, dict) and value:
-            try:
-                h.update(str(key).encode("utf-8", "ignore"))
-                for order in sorted(value.keys()):
-                    arr = value.get(order)
-                    if arr is not None:
-                        h.update(str(order).encode("utf-8", "ignore"))
-                        h.update(_auto_hash_array_full(np.asarray(arr, dtype=float)).encode("ascii", "ignore"))
-            except (
-
-                AttributeError,
-                TypeError,
-                ValueError,
-                KeyError,
-                IndexError,
-                RuntimeError,
-                OSError,
-                ImportError,
-                ModuleNotFoundError,
-                NameError,
-            ):
-                logger.exception("measurement harmonic metadata identity hash update")
+        _hash_harmonic_magnitudes_dict(h, key, m.get(key))
 
     return h.hexdigest()
 
@@ -168,6 +167,111 @@ def _auto_get_measurement_signature(measurements: dict) -> str:
         return sig
 
 
+def _update_signature_rt60_scalars(h, measurements: dict) -> None:
+    for rt60_scalar_key in ("measured_rt60_l", "measured_rt60_r"):
+        rt60_scalar = _auto_safe_float(measurements.get(rt60_scalar_key, float("nan")), float("nan"))
+        if np.isfinite(rt60_scalar):
+            h.update(f"{rt60_scalar_key}:{float(rt60_scalar):.6g}".encode("ascii", "ignore"))
+
+
+def _update_signature_rt60_summary(h, measurements: dict) -> None:
+    for rt60_summary_key in ("rt60_summary_l", "rt60_summary_r"):
+        rt60_summary = measurements.get(rt60_summary_key)
+        if isinstance(rt60_summary, dict) and rt60_summary:
+            try:
+                h.update(json.dumps(rt60_summary, sort_keys=True, default=str).encode("utf-8", "ignore"))
+            except _RECOVERABLE_HASH_EXCEPTIONS:
+                logger.exception("rt60 summary signature hash update")
+
+
+def _update_signature_rt60_bands(h, measurements: dict) -> None:
+    for rt60_key in ("measured_rt60_bands_l", "measured_rt60_bands_r"):
+        rt60_bands = measurements.get(rt60_key)
+        if isinstance(rt60_bands, dict) and rt60_bands:
+            try:
+                rt60_sorted = sorted(
+                    (
+                        (float(k), float(v))
+                        for k, v in rt60_bands.items()
+                        if np.isfinite(float(k)) and np.isfinite(float(v))
+                    ),
+                    key=lambda kv: kv[0],
+                )
+                h.update(json.dumps(rt60_sorted).encode("utf-8", "ignore"))
+            except _RECOVERABLE_HASH_EXCEPTIONS:
+                logger.exception("rt60 bands signature hash update")
+
+
+def _update_signature_harmonic_magnitudes(h, measurements: dict) -> None:
+    for hm_key in ("harmonic_magnitudes_db_l", "harmonic_magnitudes_db_r"):
+        hm = measurements.get(hm_key)
+        if isinstance(hm, dict) and hm:
+            try:
+                for order in sorted(hm.keys()):
+                    arr = hm.get(order)
+                    if arr is not None:
+                        h.update(_auto_hash_array_full(np.asarray(arr, dtype=float)).encode("ascii", "ignore"))
+            except _RECOVERABLE_HASH_EXCEPTIONS:
+                logger.exception("harmonic magnitudes signature hash update")
+
+
+def _update_signature_harmonic_risk_summaries(h, measurements: dict) -> None:
+    for hr_key in ("harmonic_risk_summary_l", "harmonic_risk_summary_r"):
+        hr = measurements.get(hr_key)
+        if isinstance(hr, dict) and hr:
+            try:
+                h.update(json.dumps(hr, sort_keys=True, default=str).encode("utf-8", "ignore"))
+            except _RECOVERABLE_HASH_EXCEPTIONS:
+                logger.exception("harmonic risk summary signature hash update")
+
+
+def _update_signature_harmonic_hashes(h, measurements: dict) -> None:
+    for hf_key in ("harmonic_freq_hz_l", "harmonic_freq_hz_r"):
+        hf = measurements.get(hf_key)
+        if hf is not None:
+            h.update(_auto_hash_array_full(np.asarray(hf, dtype=float)).encode("ascii", "ignore"))
+    _update_signature_harmonic_magnitudes(h, measurements)
+    _update_signature_harmonic_risk_summaries(h, measurements)
+
+
+def _update_signature_bass_integration(h, measurements: dict) -> None:
+    if not bool(measurements.get("bass_integration_enabled", False)):
+        return
+    bundle = measurements.get("bass_integration_bundle", None)
+    for attr_name in ("l_main", "r_main", "l_sub", "r_sub"):
+        comp = getattr(bundle, attr_name, None)
+        freqs = getattr(comp, "freqs_hz", None)
+        spec = getattr(comp, "complex_spec", None)
+        h.update(_auto_hash_array_full(np.asarray(freqs) if freqs is not None else np.asarray([])).encode("ascii", "ignore"))
+        arr = np.asarray(spec, dtype=np.complex128).reshape(-1) if spec is not None else np.asarray([], dtype=np.complex128)
+        h.update(_auto_hash_array_full(np.real(arr)).encode("ascii", "ignore"))
+        h.update(_auto_hash_array_full(np.imag(arr)).encode("ascii", "ignore"))
+    try:
+        h.update(
+            json.dumps(
+                {
+                    "avr_crossover_hz": float(_auto_safe_float(measurements.get("avr_crossover_hz", float("nan")), float("nan"))),
+                    "bass_integration_profile": str(measurements.get("bass_integration_profile", "") or ""),
+                    "bass_integration_mode": "direct_dac",
+                    "dual_sub_preprocessing": {
+                        key: dict(getattr(bundle, "diagnostics", {}) or {}).get(key)
+                        for key in (
+                            "dual_sub_preprocessing_applied",
+                            "dual_sub_preprocessing_version",
+                            "dual_sub_combined_method",
+                            "dual_sub_relative_delay_samples",
+                            "dual_sub_original_sub_combine_mode",
+                            "sub_combine_mode",
+                        )
+                    },
+                },
+                sort_keys=True,
+            ).encode("utf-8", "ignore")
+        )
+    except _RECOVERABLE_HASH_EXCEPTIONS:
+        logger.exception("bass integration signature hash update")
+
+
 def _auto_measurement_signature(measurements: dict) -> str:
     fL = measurements.get("f_l")
     mL = measurements.get("m_l")
@@ -183,154 +287,11 @@ def _auto_measurement_signature(measurements: dict) -> str:
     h.update(_auto_hash_array_full(np.asarray(mR) if mR is not None else np.asarray([])).encode("ascii", "ignore"))
     h.update(_auto_hash_array_full(np.asarray(pR) if pR is not None else np.asarray([])).encode("ascii", "ignore"))
     h.update(_auto_measurement_metadata_identity(measurements).encode("ascii", "ignore"))
-
-    for _rt60_scalar_key in ("measured_rt60_l", "measured_rt60_r"):
-        _rt60_scalar = _auto_safe_float(measurements.get(_rt60_scalar_key, float("nan")), float("nan"))
-        if np.isfinite(_rt60_scalar):
-            h.update(f"{_rt60_scalar_key}:{float(_rt60_scalar):.6g}".encode("ascii", "ignore"))
-
-    for _rt60_summary_key in ("rt60_summary_l", "rt60_summary_r"):
-        _rt60_summary = measurements.get(_rt60_summary_key)
-        if isinstance(_rt60_summary, dict) and _rt60_summary:
-            try:
-                h.update(json.dumps(_rt60_summary, sort_keys=True, default=str).encode("utf-8", "ignore"))
-            except (
-
-                AttributeError,
-                TypeError,
-                ValueError,
-                KeyError,
-                IndexError,
-                RuntimeError,
-                OSError,
-                ImportError,
-                ModuleNotFoundError,
-                NameError,
-            ):
-                logger.exception("rt60 summary signature hash update")
-
-    for _rt60_key in ("measured_rt60_bands_l", "measured_rt60_bands_r"):
-        _rt60_bands = measurements.get(_rt60_key)
-        if isinstance(_rt60_bands, dict) and _rt60_bands:
-            try:
-                _rt60_sorted = sorted(
-                    (
-                        (float(k), float(v))
-                        for k, v in _rt60_bands.items()
-                        if np.isfinite(float(k)) and np.isfinite(float(v))
-                    ),
-                    key=lambda kv: kv[0],
-                )
-                h.update(json.dumps(_rt60_sorted).encode("utf-8", "ignore"))
-            except (
-
-                AttributeError,
-                TypeError,
-                ValueError,
-                KeyError,
-                IndexError,
-                RuntimeError,
-                OSError,
-                ImportError,
-                ModuleNotFoundError,
-                NameError,
-            ):
-                logger.exception("rt60 bands signature hash update")
-
-    for _hf_key in ("harmonic_freq_hz_l", "harmonic_freq_hz_r"):
-        _hf = measurements.get(_hf_key)
-        if _hf is not None:
-            h.update(_auto_hash_array_full(np.asarray(_hf, dtype=float)).encode("ascii", "ignore"))
-
-    for _hm_key in ("harmonic_magnitudes_db_l", "harmonic_magnitudes_db_r"):
-        _hm = measurements.get(_hm_key)
-        if isinstance(_hm, dict) and _hm:
-            try:
-                for _order in sorted(_hm.keys()):
-                    _arr = _hm.get(_order)
-                    if _arr is not None:
-                        h.update(_auto_hash_array_full(np.asarray(_arr, dtype=float)).encode("ascii", "ignore"))
-            except (
-
-                AttributeError,
-                TypeError,
-                ValueError,
-                KeyError,
-                IndexError,
-                RuntimeError,
-                OSError,
-                ImportError,
-                ModuleNotFoundError,
-                NameError,
-            ):
-                logger.exception("harmonic magnitudes signature hash update")
-
-    for _hr_key in ("harmonic_risk_summary_l", "harmonic_risk_summary_r"):
-        _hr = measurements.get(_hr_key)
-        if isinstance(_hr, dict) and _hr:
-            try:
-                h.update(json.dumps(_hr, sort_keys=True, default=str).encode("utf-8", "ignore"))
-            except (
-
-                AttributeError,
-                TypeError,
-                ValueError,
-                KeyError,
-                IndexError,
-                RuntimeError,
-                OSError,
-                ImportError,
-                ModuleNotFoundError,
-                NameError,
-            ):
-                logger.exception("harmonic risk summary signature hash update")
-
-    if bool(measurements.get("bass_integration_enabled", False)):
-        bundle = measurements.get("bass_integration_bundle", None)
-        for attr_name in ("l_main", "r_main", "l_sub", "r_sub"):
-            comp = getattr(bundle, attr_name, None)
-            freqs = getattr(comp, "freqs_hz", None)
-            spec = getattr(comp, "complex_spec", None)
-            h.update(_auto_hash_array_full(np.asarray(freqs) if freqs is not None else np.asarray([])).encode("ascii", "ignore"))
-            arr = np.asarray(spec, dtype=np.complex128).reshape(-1) if spec is not None else np.asarray([], dtype=np.complex128)
-            h.update(_auto_hash_array_full(np.real(arr)).encode("ascii", "ignore"))
-            h.update(_auto_hash_array_full(np.imag(arr)).encode("ascii", "ignore"))
-        try:
-            h.update(
-                json.dumps(
-                    {
-                        "avr_crossover_hz": float(_auto_safe_float(measurements.get("avr_crossover_hz", float("nan")), float("nan"))),
-                        "bass_integration_profile": str(measurements.get("bass_integration_profile", "") or ""),
-                        "bass_integration_mode": "direct_dac",
-                        "dual_sub_preprocessing": {
-                            key: dict(getattr(bundle, "diagnostics", {}) or {}).get(key)
-                            for key in (
-                                "dual_sub_preprocessing_applied",
-                                "dual_sub_preprocessing_version",
-                                "dual_sub_combined_method",
-                                "dual_sub_relative_delay_samples",
-                                "dual_sub_original_sub_combine_mode",
-                                "sub_combine_mode",
-                            )
-                        },
-                    },
-                    sort_keys=True,
-                ).encode("utf-8", "ignore")
-            )
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            logger.exception("bass integration signature hash update")
+    _update_signature_rt60_scalars(h, measurements)
+    _update_signature_rt60_summary(h, measurements)
+    _update_signature_rt60_bands(h, measurements)
+    _update_signature_harmonic_hashes(h, measurements)
+    _update_signature_bass_integration(h, measurements)
     return h.hexdigest()
 
 

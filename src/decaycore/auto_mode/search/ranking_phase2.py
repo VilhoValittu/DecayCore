@@ -129,24 +129,11 @@ def _auto_gate_threshold(values: list[float], keep_fraction: float) -> float:
     return float(vals[idx])
 
 
-def _auto_phase2_hard_gate_pool(
-    pool: list[dict],
+def _phase2_abs_peak_gate_filter(
     *,
-    min_keep: int = AUTO_MODE_PHASE2_HARD_GATE_MIN_KEEP,
-    keep_event_fraction: float = AUTO_MODE_PHASE2_HARD_GATE_KEEP_EVENT_FRACTION,
-    keep_ripple_fraction: float = AUTO_MODE_PHASE2_HARD_GATE_KEEP_RIPPLE_FRACTION,
-    keep_peak_fraction: float = AUTO_MODE_PHASE2_HARD_GATE_KEEP_PEAK_FRACTION,
-    abs_max_peak_db: float = AUTO_MODE_PHASE2_HARD_GATE_ABS_MAX_PEAK_DB,
-    fallback_to_rank: bool = AUTO_MODE_PHASE2_HARD_GATE_FALLBACK_TO_RANK,
-) -> tuple[list[dict], float, float, float]:
-    if not isinstance(pool, list) or not pool:
-        return [], float("inf"), float("inf"), float("inf")
-    n_in = int(len(pool))
-    min_keep = int(max(1, min_keep))
-    if n_in <= (min_keep + 2):
-        return [dict(x or {}) for x in pool], float("inf"), float("inf"), float("inf")
-
-    abs_peak = float(max(0.0, _auto_safe_float(abs_max_peak_db, AUTO_MODE_PHASE2_HARD_GATE_ABS_MAX_PEAK_DB)))
+    pool: list[dict],
+    abs_peak: float,
+) -> tuple[list[dict], int, dict | None]:
     abs_pool = []
     abs_rejected = 0
     for it in pool:
@@ -157,28 +144,31 @@ def _auto_phase2_hard_gate_pool(
             continue
         abs_pool.append(dict(it or {}))
     if abs_pool:
-        pool_for_gate = abs_pool
-    else:
-        least_unsafe = sorted(
-            pool,
-            key=lambda it: (
-                _auto_peak_metric_for_gate(dict((it or {}).get("metrics", {}) or {})),
-                _auto_rank_key(dict((it or {}).get("metrics", {}) or {})),
-            ),
-        )[0]
-        lu = dict(least_unsafe or {})
-        lu_pk = _auto_peak_metric_for_gate(dict(lu.get("metrics", {}) or {}))
-        lu["unsafe_fallback"] = True
-        lu["unsafe_fallback_reason"] = "all_candidates_failed_absolute_residual_peak_gate"
-        lu["unsafe_fallback_abs_max_peak_db"] = float(abs_peak)
-        lu["unsafe_fallback_residual_peak_db"] = float(lu_pk)
-        logger.warning(
-            "Phase2 hard-gate: ALL %d candidates failed absolute residual peak gate (threshold=%.2f dB); "
-            "returning least-unsafe fallback candidate with peak=%.2f dB.",
-            n_in, float(abs_peak), float(lu_pk),
-        )
-        return [lu], float("inf"), float("inf"), float("inf")
+        return list(abs_pool), int(abs_rejected), None
+    least_unsafe = sorted(
+        pool,
+        key=lambda it: (
+            _auto_peak_metric_for_gate(dict((it or {}).get("metrics", {}) or {})),
+            _auto_rank_key(dict((it or {}).get("metrics", {}) or {})),
+        ),
+    )[0]
+    lu = dict(least_unsafe or {})
+    lu_pk = _auto_peak_metric_for_gate(dict(lu.get("metrics", {}) or {}))
+    lu["unsafe_fallback"] = True
+    lu["unsafe_fallback_reason"] = "all_candidates_failed_absolute_residual_peak_gate"
+    lu["unsafe_fallback_abs_max_peak_db"] = float(abs_peak)
+    lu["unsafe_fallback_residual_peak_db"] = float(lu_pk)
+    logger.warning(
+        "Phase2 hard-gate: ALL %d candidates failed absolute residual peak gate (threshold=%.2f dB); "
+        "returning least-unsafe fallback candidate with peak=%.2f dB.",
+        int(len(pool)),
+        float(abs_peak),
+        float(lu_pk),
+    )
+    return [], int(abs_rejected), dict(lu)
 
+
+def _phase2_collect_gate_metrics(pool_for_gate: list[dict]) -> tuple[list[float], list[float], list[float]]:
     ev = []
     rp = []
     pk = []
@@ -187,10 +177,16 @@ def _auto_phase2_hard_gate_pool(
         ev.append(_m(m, "events_severity", float("nan")))
         rp.append(_auto_ripple_metric_for_gate(m))
         pk.append(_auto_peak_metric_for_gate(m))
+    return list(ev), list(rp), list(pk)
 
-    ev_thr = _auto_gate_threshold(ev, float(keep_event_fraction))
-    rp_thr = _auto_gate_threshold(rp, float(keep_ripple_fraction))
-    pk_thr = _auto_gate_threshold(pk, float(keep_peak_fraction))
+
+def _phase2_apply_soft_gates(
+    *,
+    pool_for_gate: list[dict],
+    ev_thr: float,
+    rp_thr: float,
+    pk_thr: float,
+) -> tuple[list[dict], list[dict], dict[str, int]]:
     gated = []
     gated_or = []
     reject_counts: dict[str, int] = {}
@@ -217,22 +213,70 @@ def _auto_phase2_hard_gate_pool(
             reasons.extend(_auto_hard_gate_reasons(m))
             for reason in dict.fromkeys(reasons):
                 reject_counts[str(reason)] = int(reject_counts.get(str(reason), 0) or 0) + 1
+    return list(gated), list(gated_or), dict(reject_counts)
+
+
+def _phase2_log_gate_rejects(*, abs_rejected: int, reject_counts: dict[str, int], msg_prefix: str) -> None:
+    if not (abs_rejected or reject_counts):
+        return
+    logger.info(
+        "%s rejected %d absolute-peak candidate(s); soft reject reasons=%s",
+        str(msg_prefix),
+        int(abs_rejected),
+        dict(sorted((reject_counts or {}).items())),
+    )
+
+
+def _auto_phase2_hard_gate_pool(
+    pool: list[dict],
+    *,
+    min_keep: int = AUTO_MODE_PHASE2_HARD_GATE_MIN_KEEP,
+    keep_event_fraction: float = AUTO_MODE_PHASE2_HARD_GATE_KEEP_EVENT_FRACTION,
+    keep_ripple_fraction: float = AUTO_MODE_PHASE2_HARD_GATE_KEEP_RIPPLE_FRACTION,
+    keep_peak_fraction: float = AUTO_MODE_PHASE2_HARD_GATE_KEEP_PEAK_FRACTION,
+    abs_max_peak_db: float = AUTO_MODE_PHASE2_HARD_GATE_ABS_MAX_PEAK_DB,
+    fallback_to_rank: bool = AUTO_MODE_PHASE2_HARD_GATE_FALLBACK_TO_RANK,
+) -> tuple[list[dict], float, float, float]:
+    if not isinstance(pool, list) or not pool:
+        return [], float("inf"), float("inf"), float("inf")
+    n_in = int(len(pool))
+    min_keep = int(max(1, min_keep))
+    if n_in <= (min_keep + 2):
+        return [dict(x or {}) for x in pool], float("inf"), float("inf"), float("inf")
+
+    abs_peak = float(max(0.0, _auto_safe_float(abs_max_peak_db, AUTO_MODE_PHASE2_HARD_GATE_ABS_MAX_PEAK_DB)))
+    pool_for_gate, abs_rejected, unsafe_fallback = _phase2_abs_peak_gate_filter(
+        pool=pool,
+        abs_peak=float(abs_peak),
+    )
+    if isinstance(unsafe_fallback, dict):
+        return [dict(unsafe_fallback)], float("inf"), float("inf"), float("inf")
+
+    ev, rp, pk = _phase2_collect_gate_metrics(pool_for_gate)
+
+    ev_thr = _auto_gate_threshold(ev, float(keep_event_fraction))
+    rp_thr = _auto_gate_threshold(rp, float(keep_ripple_fraction))
+    pk_thr = _auto_gate_threshold(pk, float(keep_peak_fraction))
+    gated, gated_or, reject_counts = _phase2_apply_soft_gates(
+        pool_for_gate=pool_for_gate,
+        ev_thr=float(ev_thr),
+        rp_thr=float(rp_thr),
+        pk_thr=float(pk_thr),
+    )
 
     if len(gated) >= min_keep:
-        if abs_rejected or reject_counts:
-            logger.info(
-                "Phase2 hard-gate rejected %d absolute-peak candidate(s); soft reject reasons=%s",
-                int(abs_rejected),
-                dict(sorted(reject_counts.items())),
-            )
+        _phase2_log_gate_rejects(
+            abs_rejected=int(abs_rejected),
+            reject_counts=reject_counts,
+            msg_prefix="Phase2 hard-gate",
+        )
         return gated, float(ev_thr), float(rp_thr), float(pk_thr)
     if len(gated_or) >= min_keep:
-        if abs_rejected or reject_counts:
-            logger.info(
-                "Phase2 hard-gate relaxed to OR keep; rejected %d absolute-peak candidate(s); soft reject reasons=%s",
-                int(abs_rejected),
-                dict(sorted(reject_counts.items())),
-            )
+        _phase2_log_gate_rejects(
+            abs_rejected=int(abs_rejected),
+            reject_counts=reject_counts,
+            msg_prefix="Phase2 hard-gate relaxed to OR keep;",
+        )
         return gated_or, float(ev_thr), float(rp_thr), float(pk_thr)
     if bool(fallback_to_rank):
         kept = sorted(
@@ -242,12 +286,11 @@ def _auto_phase2_hard_gate_pool(
                 _auto_rank_key(dict(it.get("metrics", {}) or {})),
             ),
         )[:min_keep]
-        if abs_rejected or reject_counts:
-            logger.info(
-                "Phase2 hard-gate fell back to rank; rejected %d absolute-peak candidate(s); soft reject reasons=%s",
-                int(abs_rejected),
-                dict(sorted(reject_counts.items())),
-            )
+        _phase2_log_gate_rejects(
+            abs_rejected=int(abs_rejected),
+            reject_counts=reject_counts,
+            msg_prefix="Phase2 hard-gate fell back to rank;",
+        )
         return kept, float(ev_thr), float(rp_thr), float(pk_thr)
     kept = gated_or or gated or [dict(x or {}) for x in pool_for_gate]
     return kept, float(ev_thr), float(rp_thr), float(pk_thr)
@@ -315,6 +358,163 @@ def _auto_phase2_pareto_front(pool: list[dict]) -> list[dict]:
     return front
 
 
+def _pareto_candidate_metrics(candidate: dict) -> dict:
+    return dict((candidate or {}).get("metrics", {}) or {})
+
+
+def _prefer_higher(lhs: float, rhs: float, eps: float = 0.0) -> int:
+    if float(lhs) > float(rhs) + float(eps):
+        return 1
+    if float(rhs) > float(lhs) + float(eps):
+        return -1
+    return 0
+
+
+def _prefer_lower(lhs: float, rhs: float, eps: float = 0.0) -> int:
+    if float(lhs) < float(rhs) - float(eps):
+        return 1
+    if float(rhs) < float(lhs) - float(eps):
+        return -1
+    return 0
+
+
+def _auto_phase2_lex_compare(a: dict, b: dict) -> int:
+    ma = _pareto_candidate_metrics(a)
+    mb = _pareto_candidate_metrics(b)
+
+    avg_cmp = _prefer_higher(
+        _m(ma, "avg_score", float("-inf")),
+        _m(mb, "avg_score", float("-inf")),
+    )
+    if avg_cmp != 0:
+        return avg_cmp
+
+    prepost_cmp = _prefer_lower(
+        _auto_prepost_for_pareto(ma),
+        _auto_prepost_for_pareto(mb),
+        float(max(0.0, _auto_safe_float(AUTO_MODE_PHASE2_PARETO_PREPOST_EPS, 0.002))),
+    )
+    if prepost_cmp != 0:
+        return prepost_cmp
+
+    phase_cmp = _prefer_lower(
+        float(_auto_phase_risk_for_rank(ma) - _auto_phase_benefit_for_rank(ma)),
+        float(_auto_phase_risk_for_rank(mb) - _auto_phase_benefit_for_rank(mb)),
+        float(max(0.0, _auto_safe_float(AUTO_MODE_REFINE_TIEBREAK_PHASE_EPS, 0.10))),
+    )
+    if phase_cmp != 0:
+        return phase_cmp
+
+    mode_cmp = _prefer_lower(
+        _auto_mode_ripple_for_pareto(ma),
+        _auto_mode_ripple_for_pareto(mb),
+        float(max(0.0, _auto_safe_float(AUTO_MODE_PHASE2_PARETO_MODE_RIPPLE_EPS, 0.005))),
+    )
+    if mode_cmp != 0:
+        return mode_cmp
+
+    tracking_cmp = _prefer_lower(
+        _auto_target_tracking_for_pareto(ma),
+        _auto_target_tracking_for_pareto(mb),
+        float(max(0.0, _auto_safe_float(AUTO_MODE_PHASE2_PARETO_RMS20_200_EPS, 0.003))),
+    )
+    if tracking_cmp != 0:
+        return tracking_cmp
+
+    bass_cmp = _prefer_higher(
+        _auto_bass_boost_for_rank(ma),
+        _auto_bass_boost_for_rank(mb),
+        0.05,
+    )
+    if bass_cmp != 0:
+        return bass_cmp
+
+    boost_cmp = _prefer_lower(
+        _m(ma, "max_net_boost_db", float("inf")),
+        _m(mb, "max_net_boost_db", float("inf")),
+        float(max(0.0, _auto_safe_float(AUTO_MODE_PHASE2_PARETO_BOOST_EPS, 0.02))),
+    )
+    if boost_cmp != 0:
+        return boost_cmp
+
+    return 1 if bool(_auto_rank_key(ma) < _auto_rank_key(mb)) else -1
+
+
+def _sanitize_candidate_list(items: list[dict] | None) -> list[dict]:
+    return [dict(x or {}) for x in (items or []) if isinstance(x, dict)]
+
+
+def _resolve_safe_front_and_pool(front: list[dict], pool: list[dict], goal: str) -> tuple[list[dict], list[dict]]:
+    front_list = _sanitize_candidate_list(front)
+    pool_list = _sanitize_candidate_list(pool)
+    safe_front, _front_diag = filter_hard_failed_candidates(front_list, goal=goal)
+    safe_pool, _pool_diag = filter_hard_failed_candidates(pool_list, goal=goal)
+    if safe_front:
+        return safe_front, pool_list
+    if safe_pool:
+        return _auto_phase2_pareto_front(safe_pool), safe_pool
+    logger.warning(
+        "Pareto winner selection has no non-hard-failed candidates; falling back to least-bad hard-failed front."
+    )
+    return front_list, pool_list
+
+
+def _build_acceptable_front_candidates(front: list[dict], pool: list[dict], drop: float) -> list[dict]:
+    avg_vals = [_m(_pareto_candidate_metrics(it), "avg_score", float("nan")) for it in pool]
+    avg_vals = [float(v) for v in avg_vals if np.isfinite(v)]
+    best_avg = max(avg_vals) if avg_vals else float("nan")
+    if not np.isfinite(best_avg):
+        return []
+    out: list[dict] = []
+    for item in front:
+        avg = _m(_pareto_candidate_metrics(item), "avg_score", float("nan"))
+        if np.isfinite(avg) and float(avg) >= float(best_avg) - float(drop):
+            out.append(dict(item))
+    return out
+
+
+def _fallback_front_choice(front: list[dict]) -> list[dict]:
+    front_with_avg = []
+    for item in front:
+        avg = _m(_pareto_candidate_metrics(item), "avg_score", float("nan"))
+        if np.isfinite(avg):
+            front_with_avg.append((float(avg), dict(item)))
+    if not front_with_avg:
+        return list(front)
+    front_with_avg = sorted(
+        front_with_avg,
+        key=lambda t: (
+            -float(t[0]),
+            _auto_rank_key(_pareto_candidate_metrics(t[1])),
+        ),
+    )
+    return [dict(front_with_avg[0][1])]
+
+
+def _pick_lexicographic_winner(candidates: list[dict]) -> dict | None:
+    if not candidates:
+        return None
+    winner = dict(candidates[0] or {})
+    for cand in candidates[1:]:
+        cand_d = dict(cand or {})
+        if _auto_phase2_lex_compare(cand_d, winner) > 0:
+            winner = cand_d
+    return dict(winner)
+
+
+def _fallback_pool_winner(pool: list[dict]) -> dict | None:
+    if not pool:
+        return None
+    pool_sorted = sorted(
+        pool,
+        key=lambda it: (
+            -_m(_pareto_candidate_metrics(it), "avg_score", float("-inf")),
+            _auto_rank_key(_pareto_candidate_metrics(it)),
+        ),
+    )
+    return dict(pool_sorted[0])
+
+
 def _auto_phase2_pick_pareto_winner(
     front: list[dict],
     pool: list[dict],
@@ -322,134 +522,18 @@ def _auto_phase2_pick_pareto_winner(
     acoustic_drop: float = AUTO_MODE_PHASE2_PARETO_ACOUSTIC_DROP,
     goal: str = AUTO_MODE_GOAL_DEFAULT,
 ) -> dict | None:
-    def _lex_better(a: dict, b: dict) -> bool:
-        ma = dict(a.get("metrics", {}) or {})
-        mb = dict(b.get("metrics", {}) or {})
-        avg_a = _m(ma, "avg_score", float("-inf"))
-        avg_b = _m(mb, "avg_score", float("-inf"))
-        if float(avg_a) > float(avg_b):
-            return True
-        if float(avg_a) < float(avg_b):
-            return False
-
-        prepost_eps = float(max(0.0, _auto_safe_float(AUTO_MODE_PHASE2_PARETO_PREPOST_EPS, 0.002)))
-        prepost_a = _auto_prepost_for_pareto(ma)
-        prepost_b = _auto_prepost_for_pareto(mb)
-        if float(prepost_a) < float(prepost_b) - float(prepost_eps):
-            return True
-        if float(prepost_b) < float(prepost_a) - float(prepost_eps):
-            return False
-
-        phase_eps = float(max(0.0, _auto_safe_float(AUTO_MODE_REFINE_TIEBREAK_PHASE_EPS, 0.10)))
-        phase_a = float(_auto_phase_risk_for_rank(ma) - _auto_phase_benefit_for_rank(ma))
-        phase_b = float(_auto_phase_risk_for_rank(mb) - _auto_phase_benefit_for_rank(mb))
-        if float(phase_a) < float(phase_b) - float(phase_eps):
-            return True
-        if float(phase_b) < float(phase_a) - float(phase_eps):
-            return False
-
-        mode_eps = float(max(0.0, _auto_safe_float(AUTO_MODE_PHASE2_PARETO_MODE_RIPPLE_EPS, 0.005)))
-        mode_a = _auto_mode_ripple_for_pareto(ma)
-        mode_b = _auto_mode_ripple_for_pareto(mb)
-        if float(mode_a) < float(mode_b) - float(mode_eps):
-            return True
-        if float(mode_b) < float(mode_a) - float(mode_eps):
-            return False
-
-        rms_eps = float(max(0.0, _auto_safe_float(AUTO_MODE_PHASE2_PARETO_RMS20_200_EPS, 0.003)))
-        rms_a = _auto_target_tracking_for_pareto(ma)
-        rms_b = _auto_target_tracking_for_pareto(mb)
-        if float(rms_a) < float(rms_b) - float(rms_eps):
-            return True
-        if float(rms_b) < float(rms_a) - float(rms_eps):
-            return False
-
-        bass_eps = 0.05
-        bass_a = _auto_bass_boost_for_rank(ma)
-        bass_b = _auto_bass_boost_for_rank(mb)
-        if float(bass_a) > float(bass_b) + float(bass_eps):
-            return True
-        if float(bass_b) > float(bass_a) + float(bass_eps):
-            return False
-
-        boost_eps = float(max(0.0, _auto_safe_float(AUTO_MODE_PHASE2_PARETO_BOOST_EPS, 0.02)))
-        boost_a = _m(ma, "max_net_boost_db", float("inf"))
-        boost_b = _m(mb, "max_net_boost_db", float("inf"))
-        if float(boost_a) < float(boost_b) - float(boost_eps):
-            return True
-        if float(boost_b) < float(boost_a) - float(boost_eps):
-            return False
-
-        return bool(_auto_rank_key(ma) < _auto_rank_key(mb))
-
-    front_list = [dict(x or {}) for x in (front or []) if isinstance(x, dict)]
-    pool_list = [dict(x or {}) for x in (pool or []) if isinstance(x, dict)]
-    safe_front, _front_diag = filter_hard_failed_candidates(front_list, goal=goal)
-    safe_pool, _pool_diag = filter_hard_failed_candidates(pool_list, goal=goal)
-    if safe_front:
-        front_list = safe_front
-    elif safe_pool:
-        front_list = _auto_phase2_pareto_front(safe_pool)
-        pool_list = safe_pool
-    else:
-        logger.warning(
-            "Pareto winner selection has no non-hard-failed candidates; falling back to least-bad hard-failed front."
-        )
+    front_list, pool_list = _resolve_safe_front_and_pool(front, pool, goal)
     if not front_list:
         return None
 
-    avg_vals = [
-        _m(dict(it.get("metrics", {}) or {}), "avg_score", float("nan"))
-        for it in pool_list
-    ]
-    avg_vals = [float(v) for v in avg_vals if np.isfinite(v)]
-    best_avg = max(avg_vals) if avg_vals else float("nan")
     drop = float(max(0.0, _auto_safe_float(acoustic_drop, AUTO_MODE_PHASE2_PARETO_ACOUSTIC_DROP)))
-
-    acceptable: list[dict] = []
-    if np.isfinite(best_avg):
-        for it in front_list:
-            avg = _m(dict(it.get("metrics", {}) or {}), "avg_score", float("nan"))
-            if np.isfinite(avg) and float(avg) >= float(best_avg) - float(drop):
-                acceptable.append(dict(it))
-    choose_from = acceptable
-
+    choose_from = _build_acceptable_front_candidates(front_list, pool_list, drop)
     if not choose_from:
-        front_with_avg = []
-        for it in front_list:
-            avg = _m(dict(it.get("metrics", {}) or {}), "avg_score", float("nan"))
-            if np.isfinite(avg):
-                front_with_avg.append((float(avg), dict(it)))
-        if front_with_avg:
-            front_with_avg = sorted(
-                front_with_avg,
-                key=lambda t: (
-                    -float(t[0]),
-                    _auto_rank_key(dict((t[1] or {}).get("metrics", {}) or {})),
-                ),
-            )
-            choose_from = [dict(front_with_avg[0][1])]
-        else:
-            choose_from = list(front_list)
-
-    if choose_from:
-        winner = dict(choose_from[0])
-        for cand in choose_from[1:]:
-            cand_d = dict(cand or {})
-            if _lex_better(cand_d, winner):
-                winner = cand_d
-        return dict(winner)
-
-    if pool_list:
-        pool_sorted = sorted(
-            pool_list,
-            key=lambda it: (
-                -_m(dict(it.get("metrics", {}) or {}), "avg_score", float("-inf")),
-                _auto_rank_key(dict(it.get("metrics", {}) or {})),
-            ),
-        )
-        return dict(pool_sorted[0])
-    return None
+        choose_from = _fallback_front_choice(front_list)
+    winner = _pick_lexicographic_winner(choose_from)
+    if winner is not None:
+        return winner
+    return _fallback_pool_winner(pool_list)
 
 
 

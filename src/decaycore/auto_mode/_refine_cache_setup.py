@@ -89,185 +89,205 @@ def _build_exact_cache_refine_context(
     )
 
 
-def _load_exact_cache_seed(
+def _load_explicit_target_seed(
     *,
-    context: _CacheRefineContext,
+    explicit_seed_preset: dict,
+    explicit_seed_metrics: dict,
+    explicit_seed_source: str,
+    cache_base_data: dict,
+    runtime,
+    status_cb,
+    _cache_ready_preset,
+    _materialize_preset_result,
 ) -> _CacheRefineSeed | None:
-    params = dict(context.params or {})
-    runtime = coerce_orchestrator_runtime(params.get("runtime"))
-    cache_base_data = dict(params.get("cache_base_data", {}) or {})
-    measurements = dict(params.get("measurements", {}) or {})
-    fs_v = int(params.get("fs_v", 0) or 0)
-    taps_v = int(params.get("taps_v", 0) or 0)
-    xos = list(params.get("xos", []) or [])
-    hpf = params.get("hpf")
-    status_cb = params.get("status_cb")
-    cfg = params.get("cfg")
-    filter_key = str(params.get("filter_key", "") or "")
-    compat_version = str(params.get("compat_version", "") or "")
-    _cache_ready_preset = params.get("_cache_ready_preset")
-    _materialize_preset_result = params.get("_materialize_preset_result")
-    optimizer_backend = str(params.get("optimizer_backend", "") or "")
-    optuna_mod = params.get("optuna_mod")
-    optuna_search_sig = str(params.get("optuna_search_sig", "") or "")
-
-    explicit_seed_preset = dict(params.get("seed_preset", {}) or {})
-    explicit_seed_source = str(params.get("seed_source", "") or "").strip() or "target_preselect"
-    if explicit_seed_preset:
-        try:
-            explicit_seed_metrics = dict(params.get("seed_metrics", {}) or {})
-            best_preset = _cache_ready_preset(
-                explicit_seed_preset,
-                best_metrics=explicit_seed_metrics,
+    if not explicit_seed_preset:
+        return None
+    try:
+        best_preset = _cache_ready_preset(
+            explicit_seed_preset,
+            best_metrics=explicit_seed_metrics,
+        )
+        best_metrics = dict(explicit_seed_metrics or {})
+        if not best_metrics:
+            _best_result, best_metrics, _best_data = _materialize_preset_result(
+                best_preset,
+                include_response_arrays=False,
+                summarize=False,
             )
-            best_metrics = dict(explicit_seed_metrics or {})
-            if not best_metrics:
-                _best_result, best_metrics, _best_data = _materialize_preset_result(
-                    best_preset,
-                    include_response_arrays=False,
-                    summarize=False,
-                )
-            if not (isinstance(best_preset, dict) and best_preset and isinstance(best_metrics, dict) and best_metrics):
-                raise ValueError("empty target seed preset or metrics")
-            cache_target_name = str(cache_base_data.get("hc_mode", "n/a") or "n/a").strip() or "n/a"
+        if not (isinstance(best_preset, dict) and best_preset and isinstance(best_metrics, dict) and best_metrics):
+            raise ValueError("empty target seed preset or metrics")
+        cache_target_name = str(cache_base_data.get("hc_mode", "n/a") or "n/a").strip() or "n/a"
+        logger.info(
+            "Automatic mode: target preselect seed loaded for target=%s, running up to %d x %d micro-trials around selected winner.",
+            str(cache_target_name),
+            int(runtime.cache_refine_max_rounds),
+            int(runtime.cache_refine_micro_trials),
+        )
+        if callable(status_cb):
+            status_cb(
+                "DecayCore automatic mode: target preselect seed loaded "
+                f"(target {cache_target_name}, running up to "
+                f"{int(runtime.cache_refine_max_rounds)} x "
+                f"{int(runtime.cache_refine_micro_trials)} micro-trials)"
+            )
+        return _CacheRefineSeed(
+            cache_target_name=str(cache_target_name),
+            best_preset=dict(best_preset or {}),
+            best_metrics=dict(best_metrics or {}),
+            seed_source=str(explicit_seed_source),
+        )
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
+        logger.warning(
+            "Automatic mode: target preselect seed micro-refine setup failed, "
+            f"falling back to cache/search ({type(exc).__name__}: {exc})"
+        )
+        return None
+
+
+def _load_exact_cached_payload(
+    *,
+    cfg,
+    runtime,
+    cache_base_data: dict,
+    measurements: dict,
+    fs_v: int,
+    taps_v: int,
+    xos: list,
+    hpf,
+    filter_key: str,
+    compat_version: str,
+) -> tuple[dict, dict]:
+    if not bool(getattr(cfg, "cache_enabled", False)):
+        return {}, {}
+    try:
+        exact_cache_sig = _auto_signature(
+            base_data=cache_base_data,
+            measurements=measurements,
+            fs_v=int(fs_v),
+            taps_v=int(taps_v),
+            xos=xos,
+            hpf=hpf,
+            hc_mode=str(cache_base_data.get("hc_mode", "") or "").strip() or None,
+            include_hc_mode=True,
+        )
+        exact_cached_entry = runtime.auto_cache_get_entry(
+            exact_cache_sig,
+            filter_key=filter_key,
+            compat_version=compat_version,
+        ) or {}
+        exact_cached_preset = runtime.auto_cache_get_best(
+            exact_cache_sig,
+            filter_key=filter_key,
+            compat_version=compat_version,
+        ) or {}
+        exact_cached_metrics = dict((exact_cached_entry or {}).get("best_metrics", {}) or {})
+        return dict(exact_cached_preset or {}), dict(exact_cached_metrics or {})
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
+        logger.debug(
+            "Auto-mode cache read failed, disabling fast path: %s: %s",
+            type(exc).__name__,
+            exc,
+        )
+        return {}, {}
+
+
+def _load_optuna_phase1_seed_payload(
+    *,
+    optimizer_backend: str,
+    cfg,
+    optuna_mod,
+    runtime,
+    cache_base_data: dict,
+    optuna_search_sig: str,
+) -> tuple[dict, dict, str]:
+    optuna_allowed = bool(
+        str(optimizer_backend) == "optuna"
+        and bool(getattr(cfg, "optuna_persistent_study", False))
+        and optuna_mod is not None
+        and runtime.auto_optuna_module_ready(optuna_mod)
+    )
+    if not optuna_allowed:
+        return {}, {}, ""
+    try:
+        storage = runtime.auto_optuna_create_storage(
+            optuna_mod,
+            base_data=dict(cache_base_data or {}),
+        )
+        study_name = runtime.auto_optuna_study_name(
+            study_sig=str(optuna_search_sig),
+            scope=runtime.auto_optuna_effective_scope(
+                cache_base_data,
+                "phase1",
+                phase_kind="phase1",
+            ),
+        )
+        study = optuna_mod.load_study(study_name=str(study_name), storage=storage)
+        best_trial = getattr(study, "best_trial", None)
+        exact_cached_preset = runtime.auto_optuna_trial_payload_preset(
+            dict(getattr(best_trial, "user_attrs", {}) or {})
+        )
+        if not isinstance(exact_cached_preset, dict) or not exact_cached_preset:
+            exact_cached_preset = dict(getattr(best_trial, "params", {}) or {})
+        best_out = runtime.auto_optuna_trial_out_payload(best_trial)
+        exact_cached_metrics = dict((best_out or {}).get("metrics", {}) or {})
+        if isinstance(exact_cached_preset, dict) and exact_cached_preset:
             logger.info(
-                "Automatic mode: target preselect seed loaded for target=%s, running up to %d x %d micro-trials around selected winner.",
-                str(cache_target_name),
-                int(runtime.cache_refine_max_rounds),
-                int(runtime.cache_refine_micro_trials),
+                "Automatic mode: Optuna phase1 study cache hit for same measurements + settings, using cached target=%s from %s and running cache refine.",
+                str(cache_base_data.get("hc_mode", "n/a") or "n/a"),
+                str(study_name),
             )
-            if callable(status_cb):
-                status_cb(
-                    "DecayCore automatic mode: target preselect seed loaded "
-                    f"(target {cache_target_name}, running up to "
-                    f"{int(runtime.cache_refine_max_rounds)} x "
-                    f"{int(runtime.cache_refine_micro_trials)} micro-trials)"
-                )
-            return _CacheRefineSeed(
-                cache_target_name=str(cache_target_name),
-                best_preset=dict(best_preset or {}),
-                best_metrics=dict(best_metrics or {}),
-                seed_source=str(explicit_seed_source),
-            )
-        except (
+            return dict(exact_cached_preset), dict(exact_cached_metrics), "optuna_phase1_study"
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        return {}, {}, ""
+    return {}, {}, ""
 
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ) as exc:
-            logger.warning(
-                "Automatic mode: target preselect seed micro-refine setup failed, "
-                f"falling back to cache/search ({type(exc).__name__}: {exc})"
-            )
 
-    exact_cached_preset = {}
-    exact_cached_metrics = {}
-    seed_source = "exact_cache"
-    if bool(getattr(cfg, "cache_enabled", False)):
-        try:
-            exact_cache_sig = _auto_signature(
-                base_data=cache_base_data,
-                measurements=measurements,
-                fs_v=int(fs_v),
-                taps_v=int(taps_v),
-                xos=xos,
-                hpf=hpf,
-                hc_mode=str(cache_base_data.get("hc_mode", "") or "").strip() or None,
-                include_hc_mode=True,
-            )
-            exact_cached_entry = runtime.auto_cache_get_entry(
-                exact_cache_sig,
-                filter_key=filter_key,
-                compat_version=compat_version,
-            ) or {}
-            exact_cached_preset = runtime.auto_cache_get_best(
-                exact_cache_sig,
-                filter_key=filter_key,
-                compat_version=compat_version,
-            ) or {}
-            exact_cached_metrics = dict((exact_cached_entry or {}).get("best_metrics", {}) or {})
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ) as exc:
-            logger.debug(
-                "Auto-mode cache read failed, disabling fast path: %s: %s",
-                type(exc).__name__,
-                exc,
-            )
-            exact_cached_preset = {}
-            exact_cached_metrics = {}
-
+def _materialize_cache_seed_payload(
+    *,
+    cache_base_data: dict,
+    runtime,
+    status_cb,
+    exact_cached_preset: dict,
+    exact_cached_metrics: dict,
+    seed_source: str,
+    _cache_ready_preset,
+    _materialize_preset_result,
+) -> _CacheRefineSeed | None:
     if not (isinstance(exact_cached_preset, dict) and exact_cached_preset):
-        if not (
-            str(optimizer_backend) == "optuna"
-            and bool(getattr(cfg, "optuna_persistent_study", False))
-            and optuna_mod is not None
-            and runtime.auto_optuna_module_ready(optuna_mod)
-        ):
-            return None
-        try:
-            storage = runtime.auto_optuna_create_storage(
-                optuna_mod,
-                base_data=dict(cache_base_data or {}),
-            )
-            study_name = runtime.auto_optuna_study_name(
-                study_sig=str(optuna_search_sig),
-                scope=runtime.auto_optuna_effective_scope(
-                    cache_base_data,
-                    "phase1",
-                    phase_kind="phase1",
-                ),
-            )
-            study = optuna_mod.load_study(study_name=str(study_name), storage=storage)
-            best_trial = getattr(study, "best_trial", None)
-            exact_cached_preset = runtime.auto_optuna_trial_payload_preset(
-                dict(getattr(best_trial, "user_attrs", {}) or {})
-            )
-            if not isinstance(exact_cached_preset, dict) or not exact_cached_preset:
-                exact_cached_preset = dict(getattr(best_trial, "params", {}) or {})
-            best_out = runtime.auto_optuna_trial_out_payload(best_trial)
-            exact_cached_metrics = dict((best_out or {}).get("metrics", {}) or {})
-            if isinstance(exact_cached_preset, dict) and exact_cached_preset:
-                logger.info(
-                    "Automatic mode: Optuna phase1 study cache hit for same measurements + settings, using cached target=%s from %s and running cache refine.",
-                    str(cache_base_data.get("hc_mode", "n/a") or "n/a"),
-                    str(study_name),
-                )
-                seed_source = "optuna_phase1_study"
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            exact_cached_preset = {}
-            exact_cached_metrics = {}
-        if not (isinstance(exact_cached_preset, dict) and exact_cached_preset):
-            return None
+        return None
     try:
         cache_target_name = str(cache_base_data.get("hc_mode", "n/a") or "n/a").strip() or "n/a"
         best_preset = _cache_ready_preset(
@@ -294,8 +314,13 @@ def _load_exact_cache_seed(
                 include_response_arrays=False,
                 summarize=False,
             )
+        return _CacheRefineSeed(
+            cache_target_name=str(cache_target_name),
+            best_preset=dict(best_preset or {}),
+            best_metrics=dict(best_metrics or {}),
+            seed_source=str(seed_source),
+        )
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -312,11 +337,85 @@ def _load_exact_cache_seed(
             f"falling back to search ({type(exc).__name__}: {exc})"
         )
         return None
-    return _CacheRefineSeed(
-        cache_target_name=str(cache_target_name),
-        best_preset=dict(best_preset or {}),
-        best_metrics=dict(best_metrics or {}),
+
+
+def _load_exact_cache_seed(
+    *,
+    context: _CacheRefineContext,
+) -> _CacheRefineSeed | None:
+    params = dict(context.params or {})
+    runtime = coerce_orchestrator_runtime(params.get("runtime"))
+    cache_base_data = dict(params.get("cache_base_data", {}) or {})
+    measurements = dict(params.get("measurements", {}) or {})
+    fs_v = int(params.get("fs_v", 0) or 0)
+    taps_v = int(params.get("taps_v", 0) or 0)
+    xos = list(params.get("xos", []) or [])
+    hpf = params.get("hpf")
+    status_cb = params.get("status_cb")
+    cfg = params.get("cfg")
+    filter_key = str(params.get("filter_key", "") or "")
+    compat_version = str(params.get("compat_version", "") or "")
+    _cache_ready_preset = params.get("_cache_ready_preset")
+    _materialize_preset_result = params.get("_materialize_preset_result")
+    optimizer_backend = str(params.get("optimizer_backend", "") or "")
+    optuna_mod = params.get("optuna_mod")
+    optuna_search_sig = str(params.get("optuna_search_sig", "") or "")
+
+    explicit_seed_preset = dict(params.get("seed_preset", {}) or {})
+    explicit_seed_source = str(params.get("seed_source", "") or "").strip() or "target_preselect"
+    explicit_seed_metrics = dict(params.get("seed_metrics", {}) or {})
+    explicit_seed_state = _load_explicit_target_seed(
+        explicit_seed_preset=explicit_seed_preset,
+        explicit_seed_metrics=explicit_seed_metrics,
+        explicit_seed_source=explicit_seed_source,
+        cache_base_data=cache_base_data,
+        runtime=runtime,
+        status_cb=status_cb,
+        _cache_ready_preset=_cache_ready_preset,
+        _materialize_preset_result=_materialize_preset_result,
+    )
+    if explicit_seed_state is not None:
+        return explicit_seed_state
+
+    seed_source = "exact_cache"
+    exact_cached_preset, exact_cached_metrics = _load_exact_cached_payload(
+        cfg=cfg,
+        runtime=runtime,
+        cache_base_data=cache_base_data,
+        measurements=measurements,
+        fs_v=fs_v,
+        taps_v=taps_v,
+        xos=xos,
+        hpf=hpf,
+        filter_key=filter_key,
+        compat_version=compat_version,
+    )
+
+    if not (isinstance(exact_cached_preset, dict) and exact_cached_preset):
+        optuna_cached_preset, optuna_cached_metrics, optuna_seed_source = _load_optuna_phase1_seed_payload(
+            optimizer_backend=optimizer_backend,
+            cfg=cfg,
+            optuna_mod=optuna_mod,
+            runtime=runtime,
+            cache_base_data=cache_base_data,
+            optuna_search_sig=optuna_search_sig,
+        )
+        if optuna_cached_preset:
+            exact_cached_preset = dict(optuna_cached_preset or {})
+            exact_cached_metrics = dict(optuna_cached_metrics or {})
+            seed_source = str(optuna_seed_source or "optuna_phase1_study")
+        else:
+            return None
+
+    return _materialize_cache_seed_payload(
+        cache_base_data=cache_base_data,
+        runtime=runtime,
+        status_cb=status_cb,
+        exact_cached_preset=exact_cached_preset,
+        exact_cached_metrics=exact_cached_metrics,
         seed_source=str(seed_source),
+        _cache_ready_preset=_cache_ready_preset,
+        _materialize_preset_result=_materialize_preset_result,
     )
 
 

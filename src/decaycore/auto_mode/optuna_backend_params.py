@@ -51,6 +51,98 @@ _RECOVERABLE_OPTUNA_PARAM_EXCEPTIONS = (
     OverflowError,
     FloatingPointError,
 )
+_DIST_BUILD_FAILED = object()
+
+
+def _auto_optuna_summary_value(summary) -> float:
+    try:
+        best_trial = getattr(summary, "best_trial", None)
+        val = getattr(best_trial, "value", None)
+        return float(val) if val is not None and np.isfinite(float(val)) else float("-inf")
+    except _RECOVERABLE_OPTUNA_PARAM_EXCEPTIONS:
+        return float("-inf")
+
+
+def _auto_optuna_sibling_summaries(*, summaries, current_study_name: str, scope: str) -> list:
+    siblings = []
+    for summary in list(summaries or []):
+        sname = str(getattr(summary, "study_name", "") or "")
+        if sname == current_study_name:
+            continue
+        if not scope or scope not in sname:
+            continue
+        siblings.append(summary)
+    siblings.sort(key=_auto_optuna_summary_value, reverse=True)
+    return list(siblings)
+
+
+def _auto_optuna_best_trial_value_and_params(summary) -> tuple[float, dict]:
+    best_trial = getattr(summary, "best_trial", None)
+    best_val = getattr(best_trial, "value", None)
+    try:
+        best_params = dict(getattr(best_trial, "params", {}) or {})
+        best_val_f = float(best_val)
+        return float(best_val_f), dict(best_params)
+    except _RECOVERABLE_OPTUNA_PARAM_EXCEPTIONS:
+        return float("nan"), {}
+
+
+def _auto_optuna_append_unique_result(
+    *,
+    results: list[tuple[float, dict]],
+    seen_sigs: set[str],
+    value: float,
+    params: dict,
+    top_n: int,
+) -> bool:
+    if not params or not np.isfinite(float(value)):
+        return False
+    sig = _auto_optuna_param_signature(params)
+    if not sig or sig in seen_sigs:
+        return False
+    seen_sigs.add(sig)
+    results.append((float(value), dict(params)))
+    return bool(len(results) >= int(top_n))
+
+
+def _auto_optuna_load_study_trials(*, optuna_mod, storage, summary) -> list:
+    sname = str(getattr(summary, "study_name", "") or "")
+    try:
+        study = optuna_mod.load_study(study_name=sname, storage=storage)
+        trials = list(study.get_trials(deepcopy=False) or [])
+    except _RECOVERABLE_OPTUNA_PARAM_EXCEPTIONS:
+        return []
+    _auto_optuna_note_trial_scan(len(trials))
+    return list(trials)
+
+
+def _auto_optuna_append_trials_results(
+    *,
+    trials: list,
+    results: list[tuple[float, dict]],
+    seen_sigs: set[str],
+) -> None:
+    for trial in trials:
+        val = getattr(trial, "value", None)
+        try:
+            value = float(val)
+        except _RECOVERABLE_OPTUNA_PARAM_EXCEPTIONS:
+            value = float("nan")
+        if not np.isfinite(value):
+            continue
+        try:
+            params = dict(getattr(trial, "params", {}) or {})
+        except _RECOVERABLE_OPTUNA_PARAM_EXCEPTIONS:
+            params = {}
+        if not params:
+            continue
+        _auto_optuna_append_unique_result(
+            results=results,
+            seen_sigs=seen_sigs,
+            value=float(value),
+            params=params,
+            top_n=10**9,
+        )
 
 
 def _auto_optuna_cross_study_best_params(
@@ -81,74 +173,35 @@ def _auto_optuna_cross_study_best_params(
         return []
     try:
         summaries = get_summaries(storage=storage)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except _RECOVERABLE_OPTUNA_PARAM_EXCEPTIONS:
         return []
     seen_sigs: set[str] = set()
     results: list[tuple[float, dict]] = []
-    sibling_summaries = []
-    for summary in list(summaries or []):
-        sname = str(getattr(summary, "study_name", "") or "")
-        if sname == current_study_name:
-            continue
-        if not scope or scope not in sname:
-            continue
-        sibling_summaries.append(summary)
-
-    def _summary_value(summary) -> float:
-        try:
-            best_trial = getattr(summary, "best_trial", None)
-            val = getattr(best_trial, "value", None)
-            return float(val) if val is not None and np.isfinite(float(val)) else float("-inf")
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-            return float("-inf")
-
-    sibling_summaries.sort(key=_summary_value, reverse=True)
+    sibling_summaries = _auto_optuna_sibling_summaries(
+        summaries=summaries,
+        current_study_name=str(current_study_name or ""),
+        scope=str(scope or ""),
+    )
     max_sibling_loads = int(max(int(top_n) * 4, int(top_n), 1))
     for summary in sibling_summaries[:max_sibling_loads]:
-        best_trial = getattr(summary, "best_trial", None)
-        best_val = getattr(best_trial, "value", None)
-        best_params = {}
-        try:
-            best_params = dict(getattr(best_trial, "params", {}) or {})
-            best_val_f = float(best_val)
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-            best_params = {}
-            best_val_f = float("nan")
+        best_val_f, best_params = _auto_optuna_best_trial_value_and_params(summary)
+        if _auto_optuna_append_unique_result(
+            results=results,
+            seen_sigs=seen_sigs,
+            value=float(best_val_f),
+            params=best_params,
+            top_n=int(top_n),
+        ):
+            break
         if best_params and np.isfinite(best_val_f):
-            sig = _auto_optuna_param_signature(best_params)
-            if sig and sig not in seen_sigs:
-                seen_sigs.add(sig)
-                results.append((float(best_val_f), dict(best_params)))
-                if len(results) >= int(top_n):
-                    break
             continue
 
-        sname = str(getattr(summary, "study_name", "") or "")
-        try:
-            s = optuna_mod.load_study(study_name=sname, storage=storage)
-            trials = list(s.get_trials(deepcopy=False) or [])
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-            continue
-        _auto_optuna_note_trial_scan(len(trials))
-        for tr in trials:
-            val = getattr(tr, "value", None)
-            try:
-                vf = float(val)
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-                vf = float("nan")
-            if not np.isfinite(vf):
-                continue
-            try:
-                params = dict(getattr(tr, "params", {}) or {})
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-                params = {}
-            if not params:
-                continue
-            sig = _auto_optuna_param_signature(params)
-            if not sig or sig in seen_sigs:
-                continue
-            seen_sigs.add(sig)
-            results.append((vf, params))
+        trials = _auto_optuna_load_study_trials(optuna_mod=optuna_mod, storage=storage, summary=summary)
+        _auto_optuna_append_trials_results(
+            trials=trials,
+            results=results,
+            seen_sigs=seen_sigs,
+        )
     results.sort(key=lambda kv: kv[0], reverse=True)
     out = [p for _, p in results[: int(top_n)]]
     _OPTUNA_CROSS_STUDY_BEST_PARAMS[cache_key] = [dict(p) for p in out]
@@ -296,6 +349,66 @@ def _auto_optuna_sanitize_enqueued_params(params: dict | None, *, base_data: dic
         out[key] = float(np.clip(value, float(lo), float(hi)))
     return out
 
+def _auto_optuna_trial_float_ranges(max_boost_hi: float) -> dict[str, tuple[float, float, float]]:
+    return {
+        "fdw_cycles": (5.0, 16.0, 0.1),
+        "tdc_strength": (5.0, 75.0, 0.1),
+        "tdc_max_reduction_db": (0.0, float(_TDC_MAX_REDUCTION_MAX_DB), 0.1),
+        "reg_strength": (15.0, 45.0, 0.1),
+        "max_boost": (0.1, float(max_boost_hi), 0.1),
+        "mag_c_min": (float(AUTO_MODE_MAG_C_MIN_MIN_HZ), float(AUTO_MODE_MAG_C_MIN_MAX_HZ), 0.1),
+        "mag_c_max": (float(AUTO_MODE_MAG_C_MAX_MIN_HZ), 400.0, 0.1),
+        "trans_width": (70.0, 150.0, 0.1),
+        "bass_first_mode_max_hz": (40.0, 220.0, 0.1),
+        "conf_pull_max_hz": (80.0, 220.0, 1.0),
+        "low_bass_cut_hz": (float(AUTO_MODE_LOW_BASS_MIN_HZ), float(AUTO_MODE_LOW_BASS_MAX_HZ), 0.1),
+        "mixed_freq": (80.0, 320.0, 0.1),
+        "phase_limit": (float(AUTO_MODE_PHASE_LIMIT_MIN_HZ), float(AUTO_MODE_PHASE_LIMIT_MAX_HZ), 1.0),
+        "output_tilt_db_per_oct": (-2.0, 2.0, 0.05),
+        "synth_tilt_frac": (0.05, 0.55, 0.01),
+    }
+
+def _auto_optuna_distribution_from_key(
+    *,
+    key: str,
+    float_dist,
+    cat_dist,
+    categorical_choices: dict[str, list[object]],
+    float_ranges: dict[str, tuple[float, float, float]],
+    log_params: set[str],
+):
+    if key.endswith("_u"):
+        return float_dist(0.0, 1.0)
+    if key in categorical_choices:
+        return cat_dist(list(categorical_choices[key]))
+    if key in float_ranges:
+        lo, hi, step = float_ranges[key]
+        if key in log_params:
+            return float_dist(float(lo), float(hi), log=True)
+        return float_dist(float(lo), float(hi), step=float(step))
+    return None
+
+def _auto_optuna_try_build_distribution(
+    *,
+    key: str,
+    float_dist,
+    cat_dist,
+    categorical_choices: dict[str, list[object]],
+    float_ranges: dict[str, tuple[float, float, float]],
+    log_params: set[str],
+):
+    try:
+        return _auto_optuna_distribution_from_key(
+            key=key,
+            float_dist=float_dist,
+            cat_dist=cat_dist,
+            categorical_choices=categorical_choices,
+            float_ranges=float_ranges,
+            log_params=log_params,
+        )
+    except _RECOVERABLE_OPTUNA_PARAM_EXCEPTIONS:
+        return _DIST_BUILD_FAILED
+
 
 def _auto_optuna_trial_distributions(optuna_mod, *, params: dict | None, base_data: dict | None) -> dict | None:
     params_in = dict(params or {})
@@ -322,23 +435,7 @@ def _auto_optuna_trial_distributions(optuna_mod, *, params: dict | None, base_da
         if np.isfinite(requested_max_boost):
             max_boost_hi = max(max_boost_hi, float(np.clip(requested_max_boost, 0.1, _PHASE1_FULL_MAX_BOOST_DB)))
 
-    float_ranges = {
-        "fdw_cycles": (5.0, 16.0, 0.1),
-        "tdc_strength": (5.0, 75.0, 0.1),
-        "tdc_max_reduction_db": (0.0, float(_TDC_MAX_REDUCTION_MAX_DB), 0.1),
-        "reg_strength": (15.0, 45.0, 0.1),
-        "max_boost": (0.1, float(max_boost_hi), 0.1),
-        "mag_c_min": (float(AUTO_MODE_MAG_C_MIN_MIN_HZ), float(AUTO_MODE_MAG_C_MIN_MAX_HZ), 0.1),
-        "mag_c_max": (float(AUTO_MODE_MAG_C_MAX_MIN_HZ), 400.0, 0.1),
-        "trans_width": (70.0, 150.0, 0.1),
-        "bass_first_mode_max_hz": (40.0, 220.0, 0.1),
-        "conf_pull_max_hz": (80.0, 220.0, 1.0),
-        "low_bass_cut_hz": (float(AUTO_MODE_LOW_BASS_MIN_HZ), float(AUTO_MODE_LOW_BASS_MAX_HZ), 0.1),
-        "mixed_freq": (80.0, 320.0, 0.1),
-        "phase_limit": (float(AUTO_MODE_PHASE_LIMIT_MIN_HZ), float(AUTO_MODE_PHASE_LIMIT_MAX_HZ), 1.0),
-        "output_tilt_db_per_oct": (-2.0, 2.0, 0.05),
-        "synth_tilt_frac": (0.05, 0.55, 0.01),
-    }
+    float_ranges = _auto_optuna_trial_float_ranges(float(max_boost_hi))
     # Parameters sampled on a log scale in _suggest_auto_mode_candidate_optuna;
     # distributions must match or enqueue_trial / add_trial will fail.
     log_params = {"mag_c_min", "low_bass_cut_hz", "phase_limit"}
@@ -346,29 +443,19 @@ def _auto_optuna_trial_distributions(optuna_mod, *, params: dict | None, base_da
     out: dict[str, object] = {}
     for name in list(params_in.keys()):
         key = str(name)
-        if key.endswith("_u"):
-            try:
-                out[key] = float_dist(0.0, 1.0)
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-                return None
-            continue
-        if key in categorical_choices:
-            try:
-                out[key] = cat_dist(list(categorical_choices[key]))
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-                return None
-            continue
-        if key in float_ranges:
-            lo, hi, _step = float_ranges[key]
-            try:
-                if key in log_params:
-                    out[key] = float_dist(float(lo), float(hi), log=True)
-                else:
-                    out[key] = float_dist(float(lo), float(hi), step=float(_step))
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-                return None
-            continue
-        return None
+        distribution = _auto_optuna_try_build_distribution(
+            key=key,
+            float_dist=float_dist,
+            cat_dist=cat_dist,
+            categorical_choices=categorical_choices,
+            float_ranges=float_ranges,
+            log_params=log_params,
+        )
+        if distribution is _DIST_BUILD_FAILED:
+            return None
+        if distribution is None:
+            return None
+        out[key] = distribution
     return dict(out)
 
 def _auto_optuna_build_completed_trial(

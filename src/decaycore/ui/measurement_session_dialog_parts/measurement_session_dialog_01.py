@@ -367,117 +367,141 @@ def build_measurement_session_dialog(
             "rejected": rejected_items,
         }
 
-    def _handle_event(event: dict[str, Any]) -> None:
-        stage = str(event.get("stage", "") or "")
-        if stage == "capture_take":
-            position_index = int(event.get("position_index", 0) or 0)
-            role = str(event.get("role", "") or "")
-            take_index = int(event.get("take_index", 0) or 0)
-            repeats = int(event.get("repeats_per_channel", state.repeats_per_channel) or 0)
-            state.phase = "running"
-            _clear_pause_prompt()
-            state.current_position = position_index
-            state.position_count = int(event.get("position_count", state.position_count) or state.position_count)
-            state.current_channel = _role_label(role)
-            state.current_take = take_index
-            state.repeats_per_channel = repeats
-            state.completed_steps = max(0, _capture_step_index(position_index, role, take_index) - 1)
-            state.status_text = f"Position {position_index}/{state.position_count} - {state.current_channel} - Take {take_index}/{repeats}"
-        elif stage == "analyzing_repeats":
-            position_index = int(event.get("position_index", 0) or 0)
-            role = str(event.get("role", "") or "")
-            state.phase = "running"
-            _clear_pause_prompt()
-            state.completed_steps = max(
-                state.completed_steps,
-                _capture_step_index(position_index, role, int(state.repeats_per_channel or 1)),
-            )
-            state.status_text = f"Position {position_index}/{state.position_count} - {_role_label(role)} - analyzing repeats"
-        elif stage == "position_ready":
-            position_index = int(event.get("position_index", 0) or 0)
-            role = str(event.get("role", "") or "")
-            summary = _channel_summary_ref(role)
-            kept = int(event.get("take_count_used", 0) or 0)
-            total = int(event.get("take_count_total", 0) or 0)
-            summary["kept"] = int(summary.get("kept", 0) or 0) + kept
-            summary["total"] = int(summary.get("total", 0) or 0) + total
-            rejected = list(summary.get("rejected", []) or [])
-            reject_reasons = dict(event.get("reject_reasons", {}) or {})
-            for take_index in list(event.get("rejected_take_indices", []) or []):
-                reason = str(reject_reasons.get(str(int(take_index)), "rejected") or "rejected")
-                rejected.append(f"P{position_index} {_role_label(role)} take {int(take_index)}: {reason}")
-            summary["rejected"] = rejected
-        elif stage == "move_mic":
-            state.phase = "pause"
-            state.pause_pending = True
-            state.pause_stage = "move_mic"
-            state.next_position_index = int(event.get("next_position_index", 0) or 0)
-            state.position_count = int(event.get("position_count", state.position_count) or state.position_count)
-            state.pause_title = f"Move microphone to position {state.next_position_index}/{state.position_count}"
-            state.pause_help = "Place the microphone at the next listening position, shutdown subwoofer/s, keep the rig unchanged, and continue when ready."
-            state.status_text = f"Move microphone to position {state.next_position_index}/{state.position_count}"
-        elif stage == "prepare_subwoofer":
-            position_index = int(event.get("position_index", 0) or 0)
-            position_count = int(event.get("position_count", state.position_count) or state.position_count)
-            next_role = _role_label(str(event.get("next_role", event.get("role", "sub1")) or "sub1"))
-            state.phase = "pause"
-            state.pause_pending = True
-            state.pause_stage = "prepare_subwoofer"
-            state.position_count = position_count
-            state.current_position = position_index
-            state.pause_title = f"Prepare {next_role} before measuring"
-            state.pause_help = (
-                f"Turn on {next_role}, make sure any other subwoofer under test is off, "
-                "keep the microphone in place, and continue when ready."
-            )
-            state.status_text = f"Position {position_index}/{position_count} - prepare {next_role}"
-        elif stage == "switch_subwoofer":
-            position_index = int(event.get("position_index", 0) or 0)
-            position_count = int(event.get("position_count", state.position_count) or state.position_count)
-            next_role = _role_label(str(event.get("next_role", event.get("role", "sub2")) or "sub2"))
-            previous_role = _role_label(str(event.get("previous_role", "sub1") or "sub1"))
-            state.phase = "pause"
-            state.pause_pending = True
-            state.pause_stage = "switch_subwoofer"
-            state.position_count = position_count
-            state.current_position = position_index
-            state.pause_title = f"Switch subwoofers before measuring {next_role}"
-            state.pause_help = (
-                f"Turn off {previous_role}, turn on {next_role}, keep the microphone in place, and continue when ready."
-            )
-            state.status_text = f"Position {position_index}/{position_count} - switch to {next_role}"
-        elif stage == "building_final_average":
-            state.phase = "running"
-            _clear_pause_prompt()
-            role = _role_label(str(event.get("role", "") or ""))
-            state.completed_steps = max(state.completed_steps, state.total_steps - 2)
-            state.status_text = f"Building final spatial average - {role}"
-        elif stage == "saving_session":
-            state.phase = "running"
-            _clear_pause_prompt()
-            state.completed_steps = state.total_steps - 1
-            state.status_text = "Saving measurement session to disk..."
-        elif stage == "session_complete":
-            result = runner.get_result()
-            state.phase = "summary"
-            state.is_running = False
-            _clear_pause_prompt()
-            state.completed_steps = int(state.total_steps)
-            state.status_text = "Measurement session complete."
-            state.error_text = ""
-            state.session_result = result
-            if result is not None:
-                for role in ("left", "right", "sub1", "sub2"):
-                    _apply_summary_to_state(result.summary.get(role, None), role=role)
-                on_session_complete(result)
-        elif stage == "session_error":
-            state.phase = "summary"
-            state.is_running = False
-            _clear_pause_prompt()
-            state.error_text = str(event.get("error_text", "") or "Measurement session failed.")
-            state.status_text = "Measurement session failed."
-            on_session_error(state.error_text)
+    def _handle_capture_take_event(event: dict[str, Any]) -> None:
+        position_index = int(event.get("position_index", 0) or 0)
+        role = str(event.get("role", "") or "")
+        take_index = int(event.get("take_index", 0) or 0)
+        repeats = int(event.get("repeats_per_channel", state.repeats_per_channel) or 0)
+        state.phase = "running"
+        _clear_pause_prompt()
+        state.current_position = position_index
+        state.position_count = int(event.get("position_count", state.position_count) or state.position_count)
+        state.current_channel = _role_label(role)
+        state.current_take = take_index
+        state.repeats_per_channel = repeats
+        state.completed_steps = max(0, _capture_step_index(position_index, role, take_index) - 1)
+        state.status_text = f"Position {position_index}/{state.position_count} - {state.current_channel} - Take {take_index}/{repeats}"
 
+    def _handle_analyzing_repeats_event(event: dict[str, Any]) -> None:
+        position_index = int(event.get("position_index", 0) or 0)
+        role = str(event.get("role", "") or "")
+        state.phase = "running"
+        _clear_pause_prompt()
+        state.completed_steps = max(
+            state.completed_steps,
+            _capture_step_index(position_index, role, int(state.repeats_per_channel or 1)),
+        )
+        state.status_text = f"Position {position_index}/{state.position_count} - {_role_label(role)} - analyzing repeats"
+
+    def _handle_position_ready_event(event: dict[str, Any]) -> None:
+        position_index = int(event.get("position_index", 0) or 0)
+        role = str(event.get("role", "") or "")
+        summary = _channel_summary_ref(role)
+        kept = int(event.get("take_count_used", 0) or 0)
+        total = int(event.get("take_count_total", 0) or 0)
+        summary["kept"] = int(summary.get("kept", 0) or 0) + kept
+        summary["total"] = int(summary.get("total", 0) or 0) + total
+        rejected = list(summary.get("rejected", []) or [])
+        reject_reasons = dict(event.get("reject_reasons", {}) or {})
+        for take_index in list(event.get("rejected_take_indices", []) or []):
+            reason = str(reject_reasons.get(str(int(take_index)), "rejected") or "rejected")
+            rejected.append(f"P{position_index} {_role_label(role)} take {int(take_index)}: {reason}")
+        summary["rejected"] = rejected
+
+    def _handle_move_mic_event(event: dict[str, Any]) -> None:
+        state.phase = "pause"
+        state.pause_pending = True
+        state.pause_stage = "move_mic"
+        state.next_position_index = int(event.get("next_position_index", 0) or 0)
+        state.position_count = int(event.get("position_count", state.position_count) or state.position_count)
+        state.pause_title = f"Move microphone to position {state.next_position_index}/{state.position_count}"
+        state.pause_help = "Place the microphone at the next listening position, shutdown subwoofer/s, keep the rig unchanged, and continue when ready."
+        state.status_text = f"Move microphone to position {state.next_position_index}/{state.position_count}"
+
+    def _handle_prepare_subwoofer_event(event: dict[str, Any]) -> None:
+        position_index = int(event.get("position_index", 0) or 0)
+        position_count = int(event.get("position_count", state.position_count) or state.position_count)
+        next_role = _role_label(str(event.get("next_role", event.get("role", "sub1")) or "sub1"))
+        state.phase = "pause"
+        state.pause_pending = True
+        state.pause_stage = "prepare_subwoofer"
+        state.position_count = position_count
+        state.current_position = position_index
+        state.pause_title = f"Prepare {next_role} before measuring"
+        state.pause_help = (
+            f"Turn on {next_role}, make sure any other subwoofer under test is off, "
+            "keep the microphone in place, and continue when ready."
+        )
+        state.status_text = f"Position {position_index}/{position_count} - prepare {next_role}"
+
+    def _handle_switch_subwoofer_event(event: dict[str, Any]) -> None:
+        position_index = int(event.get("position_index", 0) or 0)
+        position_count = int(event.get("position_count", state.position_count) or state.position_count)
+        next_role = _role_label(str(event.get("next_role", event.get("role", "sub2")) or "sub2"))
+        previous_role = _role_label(str(event.get("previous_role", "sub1") or "sub1"))
+        state.phase = "pause"
+        state.pause_pending = True
+        state.pause_stage = "switch_subwoofer"
+        state.position_count = position_count
+        state.current_position = position_index
+        state.pause_title = f"Switch subwoofers before measuring {next_role}"
+        state.pause_help = (
+            f"Turn off {previous_role}, turn on {next_role}, keep the microphone in place, and continue when ready."
+        )
+        state.status_text = f"Position {position_index}/{position_count} - switch to {next_role}"
+
+    def _handle_building_final_average_event(event: dict[str, Any]) -> None:
+        state.phase = "running"
+        _clear_pause_prompt()
+        role = _role_label(str(event.get("role", "") or ""))
+        state.completed_steps = max(state.completed_steps, state.total_steps - 2)
+        state.status_text = f"Building final spatial average - {role}"
+
+    def _handle_saving_session_event(_event: dict[str, Any]) -> None:
+        state.phase = "running"
+        _clear_pause_prompt()
+        state.completed_steps = state.total_steps - 1
+        state.status_text = "Saving measurement session to disk..."
+
+    def _handle_session_complete_event(_event: dict[str, Any]) -> None:
+        result = runner.get_result()
+        state.phase = "summary"
+        state.is_running = False
+        _clear_pause_prompt()
+        state.completed_steps = int(state.total_steps)
+        state.status_text = "Measurement session complete."
+        state.error_text = ""
+        state.session_result = result
+        if result is not None:
+            for role in ("left", "right", "sub1", "sub2"):
+                _apply_summary_to_state(result.summary.get(role, None), role=role)
+            on_session_complete(result)
+
+    def _handle_session_error_event(event: dict[str, Any]) -> None:
+        state.phase = "summary"
+        state.is_running = False
+        _clear_pause_prompt()
+        state.error_text = str(event.get("error_text", "") or "Measurement session failed.")
+        state.status_text = "Measurement session failed."
+        on_session_error(state.error_text)
+
+    def _handle_event(event: dict[str, Any]) -> None:
+        handlers = {
+            "capture_take": _handle_capture_take_event,
+            "analyzing_repeats": _handle_analyzing_repeats_event,
+            "position_ready": _handle_position_ready_event,
+            "move_mic": _handle_move_mic_event,
+            "prepare_subwoofer": _handle_prepare_subwoofer_event,
+            "switch_subwoofer": _handle_switch_subwoofer_event,
+            "building_final_average": _handle_building_final_average_event,
+            "saving_session": _handle_saving_session_event,
+            "session_complete": _handle_session_complete_event,
+            "session_error": _handle_session_error_event,
+        }
+        stage = str(event.get("stage", "") or "")
+        handler = handlers.get(stage)
+        if callable(handler):
+            handler(event)
         _append_log(_event_to_log_line(event))
 
     def _start_session() -> None:

@@ -221,244 +221,309 @@ def analysis_smoothing_lf_to_hf(
     return (1.0 - w) * m_low + w * m_high
 
 
-def run_preprocess(freqs, meas_mags, raw_phases, cfg, *, stereo_link_ctx=None, presolve_mode: bool = False) -> PreprocessResult:
-    _cache_key = _preprocess_cache_key(freqs, meas_mags, raw_phases, cfg, stereo_link_ctx, presolve_mode)
-    if _cache_key is not None:
-        _hit = _PREPROCESS_CACHE.get(_cache_key)
-        if _hit is not None:
-            return clone_preprocess_result(_hit)
+def _run_preprocess_cached_result(
+    freqs,
+    meas_mags,
+    raw_phases,
+    cfg,
+    stereo_link_ctx,
+    presolve_mode: bool,
+) -> tuple[tuple | None, PreprocessResult | None]:
+    cache_key = _preprocess_cache_key(freqs, meas_mags, raw_phases, cfg, stereo_link_ctx, presolve_mode)
+    if cache_key is None:
+        return None, None
+    cached = _PREPROCESS_CACHE.get(cache_key)
+    if cached is None:
+        return cache_key, None
+    return cache_key, clone_preprocess_result(cached)
 
-    # Preserve the requested FIR length; bumping even tap counts to n+1 creates
-    # prime-sized FFTs (for example 65536 -> 65537), which is dramatically slower.
-    n_fft = int(cfg.num_taps)
 
-    # Check the measurement-fixed partial cache. This cache covers everything
-    # before AFDW: smoothing, freq grid, interp, phase, confidence, comparison
-    # mode. Trials that differ only in fdw_cycles or enable_afdw still hit it,
-    # which is the common case during Optuna target search.
-    _mfk = _meas_fixed_cache_key(freqs, meas_mags, raw_phases, n_fft, float(cfg.fs), bool(presolve_mode), cfg)
-    _mfc = _MEAS_FIXED_CACHE.get(_mfk) if _mfk is not None else None
+def _meas_fixed_unpack(entry: dict) -> dict:
+    return {
+        "f_in": entry["f_in"],
+        "m_in": entry["m_in"],
+        "p_in": entry["p_in"],
+        "freq_axis": entry["freq_axis"],
+        "m_smooth_std": entry["m_smooth_std"],
+        "p_smooth": entry["p_smooth"],
+        "m_interp": entry["m_interp"],
+        "p_rad_raw": entry["p_rad_raw"],
+        "p_rad_interp": entry["p_rad_interp"],
+        "delay_slope": entry["delay_slope"],
+        "m_plot_db": entry["m_plot_db"],
+        "complex_meas": entry["complex_meas"],
+        "m_anal": np.copy(entry["m_anal_base"]),
+        "p_anal_rad": entry["p_anal_rad"],
+        "complex_anal": entry["complex_anal"],
+        "conf_mask": entry["conf_mask"],
+        "reflections": entry["reflections"],
+        "cmp": entry["cmp"],
+        "analysis_mode": entry["analysis_mode"],
+        "is_psy": entry["is_psy"],
+    }
 
-    if _mfc is not None:
-        _MEAS_FIXED_STATS["hits"] = _MEAS_FIXED_STATS.get("hits", 0) + 1
-        # Cache hit: reconstruct from stored measurement-fixed arrays.
-        f_in = _mfc["f_in"]
-        m_in = _mfc["m_in"]
-        p_in = _mfc["p_in"]
-        freq_axis = _mfc["freq_axis"]
-        m_smooth_std = _mfc["m_smooth_std"]
-        p_smooth = _mfc["p_smooth"]
-        m_interp = _mfc["m_interp"]
-        p_rad_raw = _mfc["p_rad_raw"]
-        p_rad_interp = _mfc["p_rad_interp"]
-        delay_slope = _mfc["delay_slope"]
-        m_plot_db = _mfc["m_plot_db"]
-        complex_meas = _mfc["complex_meas"]
-        # m_anal may be modified below by AFDW, so always work on a copy.
-        m_anal = np.copy(_mfc["m_anal_base"])
-        p_anal_rad = _mfc["p_anal_rad"]
-        complex_anal = _mfc["complex_anal"]
-        conf_mask = _mfc["conf_mask"]
-        reflections = _mfc["reflections"]
-        cmp = _mfc["cmp"]
-        analysis_mode = _mfc["analysis_mode"]
-        is_psy = _mfc["is_psy"]
-    else:
-        min_len = min(len(freqs), len(meas_mags), len(raw_phases))
-        f_in = np.asarray(freqs[:min_len], dtype=float)
-        m_in = np.asarray(meas_mags[:min_len], dtype=float)
-        p_in = np.asarray(raw_phases[:min_len], dtype=float)
 
-        if f_in.size > 1:
-            order = np.argsort(f_in, kind="mergesort")
-            f_in = f_in[order]
-            m_in = m_in[order]
-            p_in = p_in[order]
-            uniq_mask = np.concatenate(([True], np.diff(f_in) > 0.0))
-            f_in = f_in[uniq_mask]
-            m_in = m_in[uniq_mask]
-            p_in = p_in[uniq_mask]
+def _prepare_preprocess_inputs(freqs, meas_mags, raw_phases) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    min_len = min(len(freqs), len(meas_mags), len(raw_phases))
+    f_in = np.asarray(freqs[:min_len], dtype=float)
+    m_in = np.asarray(meas_mags[:min_len], dtype=float)
+    p_in = np.asarray(raw_phases[:min_len], dtype=float)
+    if f_in.size <= 1:
+        return f_in, m_in, p_in
+    order = np.argsort(f_in, kind="mergesort")
+    f_in = f_in[order]
+    m_in = m_in[order]
+    p_in = p_in[order]
+    uniq_mask = np.concatenate(([True], np.diff(f_in) > 0.0))
+    return f_in[uniq_mask], m_in[uniq_mask], p_in[uniq_mask]
 
-        freq_axis = np.fft.rfftfreq(n_fft, d=1.0 / float(cfg.fs))
 
-        is_psy = (not bool(presolve_mode)) and ("psy" in str(cfg.plot_smoothing_level).lower())
-
-        m_smooth_std = analysis_smoothing_lf_to_hf(
-            f_in, m_in, low_bw=1 / 3.0, high_bw=1 / 1.0, f_lo=230.0, f_hi=400.0
+def _compute_comparison_payload(
+    *,
+    cfg,
+    presolve_mode: bool,
+    stereo_link_ctx,
+    freq_axis: np.ndarray,
+    m_anal: np.ndarray,
+    p_anal_rad: np.ndarray,
+) -> tuple[dict | None, str]:
+    cmp = None
+    analysis_mode = "native"
+    if bool(presolve_mode) or not bool(getattr(cfg, "comparison_mode", False)):
+        return cmp, analysis_mode
+    try:
+        ref_fs = int(getattr(cfg, "comparison_ref_fs", 44100) or 44100)
+        ref_taps = int(getattr(cfg, "comparison_ref_taps", 65536) or 65536)
+        ref_nfft = int(ref_taps)
+        freq_cmp_full = np.fft.rfftfreq(ref_nfft, d=1.0 / float(ref_fs))
+        fmax = float(freq_axis[-1]) if freq_axis.size else 0.0
+        freq_cmp = freq_cmp_full[freq_cmp_full <= fmax] if fmax > 0 else freq_cmp_full
+        m_cmp_raw = np.interp(freq_cmp, freq_axis, m_anal)
+        p_cmp_rad = np.interp(freq_cmp, freq_axis, p_anal_rad)
+        complex_cmp = 10 ** (m_cmp_raw / 20.0) * np.exp(1j * p_cmp_rad)
+        conf_cmp, refl_cmp, _ = analyze_acoustic_confidence(freq_cmp, complex_cmp, ref_fs)
+        target_cmp = np.zeros_like(freq_cmp, dtype=float)
+        target_level_db_cmp, calc_offset_db_cmp, meas_level_db_window_cmp, target_level_db_window_cmp, offset_method_cmp, s_min_cmp, s_max_cmp = (
+            compute_leveling(cfg, freq_cmp, m_cmp_raw, target_cmp, stereo_link_ctx=stereo_link_ctx)
         )
-
-        p_smooth_oct = 1 / 12.0 if cfg.fs > 96000 else 1 / 24.0
-        p_smooth, _ = apply_smoothing_std(f_in, p_in, np.zeros_like(p_in), p_smooth_oct)
-
-        m_interp = np.interp(freq_axis, f_in, m_in)
-        p_rad_raw = np.deg2rad(np.interp(freq_axis, f_in, p_in))
-        p_rad_interp, delay_slope = remove_time_of_flight(freq_axis, p_rad_raw)
-
-        m_plot_db = None
-        if is_psy:
-            try:
-                m_plot_db = psychoacoustic_smoothing(freq_axis, m_interp)
-            except (TypeError, ValueError, FloatingPointError):
-                m_plot_db = None
-
-        complex_meas = 10 ** (m_interp / 20.0) * np.exp(1j * p_rad_interp)
-
-        m_anal = np.interp(freq_axis, f_in, m_smooth_std)
-        p_anal_rad = np.deg2rad(np.interp(freq_axis, f_in, p_smooth))
-        p_anal_rad, _ = remove_time_of_flight(freq_axis, p_anal_rad)
-        complex_anal = 10 ** (m_anal / 20.0) * np.exp(1j * p_anal_rad)
-
-        conf_mask, reflections, _ = analyze_acoustic_confidence(freq_axis, complex_anal, cfg.fs)
-
-        # m_anal at this point is the pre-AFDW base. Store it before AFDW may
-        # reassign it so the cached value is always the measurement-fixed version.
-        _m_anal_base = m_anal
-
+        cmp = {
+            "cmp_ref_fs": float(ref_fs),
+            "cmp_ref_taps": float(ref_taps),
+            "cmp_freq_axis": freq_cmp.tolist(),
+            "cmp_target_mags": target_cmp.tolist(),
+            "cmp_measured_mags": (m_cmp_raw - calc_offset_db_cmp).tolist(),
+            "cmp_filter_mags": np.zeros_like(freq_cmp, dtype=float).tolist(),
+            "cmp_confidence_mask": conf_cmp.tolist(),
+            "cmp_reflections": refl_cmp,
+            "cmp_smart_scan_range": [float(s_min_cmp), float(s_max_cmp)],
+            "cmp_eff_target_db": float(target_level_db_cmp),
+            "cmp_offset_db": float(calc_offset_db_cmp),
+            "cmp_meas_level_db_window": float(meas_level_db_window_cmp),
+            "cmp_target_level_db_window": float(target_level_db_window_cmp),
+            "cmp_offset_method": str(offset_method_cmp),
+            "cmp_avg_confidence": float(np.mean(conf_cmp) * 100.0),
+        }
+        if _comparison_payload_valid(cmp):
+            analysis_mode = "comparison"
+    except (AttributeError, TypeError, ValueError, FloatingPointError, IndexError, KeyError):
         cmp = None
         analysis_mode = "native"
-        gain_db_zero = np.zeros_like(freq_axis, dtype=float)
-        target_mags_zero = np.zeros_like(freq_axis, dtype=float)
+    return cmp, analysis_mode
+
+
+def _comparison_payload_valid(cmp: dict | None) -> bool:
+    if not isinstance(cmp, dict):
+        return False
+    keys = ("cmp_freq_axis", "cmp_measured_mags", "cmp_target_mags", "cmp_filter_mags", "cmp_confidence_mask")
+    if any(not isinstance(cmp.get(k), list) for k in keys):
+        return False
+    n = len(cmp["cmp_freq_axis"])
+    if n <= 16:
+        return False
+    return all(len(cmp[k]) == n for k in keys)
+
+
+def _store_meas_fixed_entry(cache_key: tuple | None, payload: dict) -> None:
+    _MEAS_FIXED_STATS["misses"] = _MEAS_FIXED_STATS.get("misses", 0) + 1
+    if cache_key is None:
+        return
+    if len(_MEAS_FIXED_CACHE) >= _MEAS_FIXED_MAX:
+        _MEAS_FIXED_CACHE.clear()
+    _MEAS_FIXED_CACHE[cache_key] = payload
+
+
+def _compute_meas_fixed_payload(
+    freqs,
+    meas_mags,
+    raw_phases,
+    cfg,
+    *,
+    n_fft: int,
+    presolve_mode: bool,
+    stereo_link_ctx,
+) -> dict:
+    f_in, m_in, p_in = _prepare_preprocess_inputs(freqs, meas_mags, raw_phases)
+    freq_axis = np.fft.rfftfreq(n_fft, d=1.0 / float(cfg.fs))
+    is_psy = (not bool(presolve_mode)) and ("psy" in str(cfg.plot_smoothing_level).lower())
+    m_smooth_std = analysis_smoothing_lf_to_hf(
+        f_in, m_in, low_bw=1 / 3.0, high_bw=1 / 1.0, f_lo=230.0, f_hi=400.0
+    )
+    p_smooth_oct = 1 / 12.0 if cfg.fs > 96000 else 1 / 24.0
+    p_smooth, _ = apply_smoothing_std(f_in, p_in, np.zeros_like(p_in), p_smooth_oct)
+    m_interp = np.interp(freq_axis, f_in, m_in)
+    p_rad_raw = np.deg2rad(np.interp(freq_axis, f_in, p_in))
+    p_rad_interp, delay_slope = remove_time_of_flight(freq_axis, p_rad_raw)
+    m_plot_db = None
+    if is_psy:
         try:
-            if (not bool(presolve_mode)) and bool(getattr(cfg, "comparison_mode", False)):
-                ref_fs = int(getattr(cfg, "comparison_ref_fs", 44100) or 44100)
-                ref_taps = int(getattr(cfg, "comparison_ref_taps", 65536) or 65536)
-                ref_nfft = int(ref_taps)
-                freq_cmp_full = np.fft.rfftfreq(ref_nfft, d=1.0 / float(ref_fs))
+            m_plot_db = psychoacoustic_smoothing(freq_axis, m_interp)
+        except (TypeError, ValueError, FloatingPointError):
+            m_plot_db = None
+    complex_meas = 10 ** (m_interp / 20.0) * np.exp(1j * p_rad_interp)
+    m_anal = np.interp(freq_axis, f_in, m_smooth_std)
+    p_anal_rad = np.deg2rad(np.interp(freq_axis, f_in, p_smooth))
+    p_anal_rad, _ = remove_time_of_flight(freq_axis, p_anal_rad)
+    complex_anal = 10 ** (m_anal / 20.0) * np.exp(1j * p_anal_rad)
+    conf_mask, reflections, _ = analyze_acoustic_confidence(freq_axis, complex_anal, cfg.fs)
+    cmp, analysis_mode = _compute_comparison_payload(
+        cfg=cfg,
+        presolve_mode=bool(presolve_mode),
+        stereo_link_ctx=stereo_link_ctx,
+        freq_axis=freq_axis,
+        m_anal=m_anal,
+        p_anal_rad=p_anal_rad,
+    )
+    return {
+        "f_in": f_in,
+        "m_in": m_in,
+        "p_in": p_in,
+        "freq_axis": freq_axis,
+        "m_smooth_std": m_smooth_std,
+        "p_smooth": p_smooth,
+        "m_interp": m_interp,
+        "p_rad_raw": p_rad_raw,
+        "p_rad_interp": p_rad_interp,
+        "delay_slope": float(delay_slope),
+        "m_plot_db": m_plot_db,
+        "complex_meas": complex_meas,
+        "m_anal_base": m_anal,
+        "p_anal_rad": p_anal_rad,
+        "complex_anal": complex_anal,
+        "conf_mask": conf_mask,
+        "reflections": reflections,
+        "cmp": cmp,
+        "analysis_mode": analysis_mode,
+        "is_psy": is_psy,
+    }
 
-                fmax = float(freq_axis[-1]) if freq_axis.size else 0.0
-                if fmax > 0:
-                    freq_cmp = freq_cmp_full[freq_cmp_full <= fmax]
-                else:
-                    freq_cmp = freq_cmp_full
 
-                m_cmp_raw = np.interp(freq_cmp, freq_axis, m_anal)
-                p_cmp_rad = np.interp(freq_cmp, freq_axis, p_anal_rad)
-                complex_cmp = 10 ** (m_cmp_raw / 20.0) * np.exp(1j * p_cmp_rad)
+def _run_preprocess_meas_fixed(
+    freqs,
+    meas_mags,
+    raw_phases,
+    cfg,
+    *,
+    n_fft: int,
+    presolve_mode: bool,
+    stereo_link_ctx,
+) -> dict:
+    mfk = _meas_fixed_cache_key(freqs, meas_mags, raw_phases, n_fft, float(cfg.fs), bool(presolve_mode), cfg)
+    cached = _MEAS_FIXED_CACHE.get(mfk) if mfk is not None else None
+    if cached is not None:
+        _MEAS_FIXED_STATS["hits"] = _MEAS_FIXED_STATS.get("hits", 0) + 1
+        return _meas_fixed_unpack(cached)
+    payload = _compute_meas_fixed_payload(
+        freqs,
+        meas_mags,
+        raw_phases,
+        cfg,
+        n_fft=n_fft,
+        presolve_mode=bool(presolve_mode),
+        stereo_link_ctx=stereo_link_ctx,
+    )
+    _store_meas_fixed_entry(mfk, payload)
+    return _meas_fixed_unpack(payload)
 
-                conf_cmp, refl_cmp, _ = analyze_acoustic_confidence(freq_cmp, complex_cmp, ref_fs)
 
-                target_cmp = np.interp(freq_cmp, freq_axis, target_mags_zero)
-                (
-                    target_level_db_cmp,
-                    calc_offset_db_cmp,
-                    meas_level_db_window_cmp,
-                    target_level_db_window_cmp,
-                    offset_method_cmp,
-                    s_min_cmp,
-                    s_max_cmp,
-                ) = compute_leveling(cfg, freq_cmp, m_cmp_raw, target_cmp, stereo_link_ctx=stereo_link_ctx)
+def _run_preprocess_apply_afdw(cfg, meas_data: dict) -> None:
+    if not getattr(cfg, "enable_afdw", False):
+        return
+    base = float(getattr(cfg, "fdw_cycles", 15.0))
+    min_c = max(3.0, base / 3.0)
+    meas_data["m_anal"] = apply_adaptive_fdw(
+        meas_data["freq_axis"],
+        meas_data["m_anal"],
+        meas_data["conf_mask"],
+        base_cycles=base,
+        min_cycles=min_c,
+    )
 
-                filt_cmp = np.interp(freq_cmp, freq_axis, gain_db_zero)
 
-                cmp = {
-                    "cmp_ref_fs": float(ref_fs),
-                    "cmp_ref_taps": float(ref_taps),
-                    "cmp_freq_axis": freq_cmp.tolist(),
-                    "cmp_target_mags": target_cmp.tolist(),
-                    "cmp_measured_mags": (m_cmp_raw - calc_offset_db_cmp).tolist(),
-                    "cmp_filter_mags": filt_cmp.tolist(),
-                    "cmp_confidence_mask": conf_cmp.tolist(),
-                    "cmp_reflections": refl_cmp,
-                    "cmp_smart_scan_range": [float(s_min_cmp), float(s_max_cmp)],
-                    "cmp_eff_target_db": float(target_level_db_cmp),
-                    "cmp_offset_db": float(calc_offset_db_cmp),
-                    "cmp_meas_level_db_window": float(meas_level_db_window_cmp),
-                    "cmp_target_level_db_window": float(target_level_db_window_cmp),
-                    "cmp_offset_method": str(offset_method_cmp),
-                    "cmp_avg_confidence": float(np.mean(conf_cmp) * 100.0),
-                }
-                if (
-                    isinstance(cmp.get("cmp_freq_axis", None), list)
-                    and isinstance(cmp.get("cmp_measured_mags", None), list)
-                    and isinstance(cmp.get("cmp_target_mags", None), list)
-                    and isinstance(cmp.get("cmp_filter_mags", None), list)
-                    and isinstance(cmp.get("cmp_confidence_mask", None), list)
-                    and len(cmp["cmp_freq_axis"]) > 16
-                    and len(cmp["cmp_freq_axis"]) == len(cmp["cmp_measured_mags"])
-                    and len(cmp["cmp_freq_axis"]) == len(cmp["cmp_target_mags"])
-                    and len(cmp["cmp_freq_axis"]) == len(cmp["cmp_filter_mags"])
-                    and len(cmp["cmp_freq_axis"]) == len(cmp["cmp_confidence_mask"])
-                ):
-                    analysis_mode = "comparison"
-        except (AttributeError, TypeError, ValueError, FloatingPointError, IndexError, KeyError):
-            cmp = None
-            analysis_mode = "native"
-
-        _MEAS_FIXED_STATS["misses"] = _MEAS_FIXED_STATS.get("misses", 0) + 1
-        # Store measurement-fixed entry.
-        if _mfk is not None:
-            if len(_MEAS_FIXED_CACHE) >= _MEAS_FIXED_MAX:
-                _MEAS_FIXED_CACHE.clear()
-            _MEAS_FIXED_CACHE[_mfk] = {
-                "f_in": f_in,
-                "m_in": m_in,
-                "p_in": p_in,
-                "freq_axis": freq_axis,
-                "m_smooth_std": m_smooth_std,
-                "p_smooth": p_smooth,
-                "m_interp": m_interp,
-                "p_rad_raw": p_rad_raw,
-                "p_rad_interp": p_rad_interp,
-                "delay_slope": float(delay_slope),
-                "m_plot_db": m_plot_db,
-                "complex_meas": complex_meas,
-                "m_anal_base": _m_anal_base,
-                "p_anal_rad": p_anal_rad,
-                "complex_anal": complex_anal,
-                "conf_mask": conf_mask,
-                "reflections": reflections,
-                "cmp": cmp,
-                "analysis_mode": analysis_mode,
-                "is_psy": is_psy,
-            }
-
-    gain_db = np.zeros_like(freq_axis, dtype=float)
+def _run_preprocess_build_result(meas_data: dict, *, n_fft: int) -> PreprocessResult:
+    gain_db = np.zeros_like(meas_data["freq_axis"], dtype=float)
     st: dict = {}
-    target_mags = np.zeros_like(freq_axis, dtype=float)
-
-    if getattr(cfg, "enable_afdw", False):
-        base = float(getattr(cfg, "fdw_cycles", 15.0))
-        min_c = max(3.0, base / 3.0)
-        m_anal = apply_adaptive_fdw(
-            freq_axis,
-            m_anal,
-            conf_mask,
-            base_cycles=base,
-            min_cycles=min_c,
-        )
-
+    target_mags = np.zeros_like(meas_data["freq_axis"], dtype=float)
     ctx = DspContext(
         n_fft=n_fft,
-        freq_axis=freq_axis,
+        freq_axis=meas_data["freq_axis"],
         gain_db=gain_db,
         target_mags=target_mags,
         st=st,
     )
-
-    _result = PreprocessResult(
+    return PreprocessResult(
         ctx=ctx,
-        f_in=f_in,
-        m_in=m_in,
-        p_in=p_in,
-        m_smooth_std=m_smooth_std,
-        p_smooth=p_smooth,
-        m_interp=m_interp,
-        p_rad_raw=p_rad_raw,
-        p_rad_interp=p_rad_interp,
-        delay_slope=float(delay_slope),
-        m_plot_db=None if m_plot_db is None else np.asarray(m_plot_db, dtype=float),
-        complex_meas=complex_meas,
-        m_anal=m_anal,
-        p_anal_rad=p_anal_rad,
-        complex_anal=complex_anal,
-        conf_mask=conf_mask,
-        reflections=reflections,
-        cmp=cmp,
-        analysis_mode=analysis_mode,
-        is_psy=is_psy,
+        f_in=meas_data["f_in"],
+        m_in=meas_data["m_in"],
+        p_in=meas_data["p_in"],
+        m_smooth_std=meas_data["m_smooth_std"],
+        p_smooth=meas_data["p_smooth"],
+        m_interp=meas_data["m_interp"],
+        p_rad_raw=meas_data["p_rad_raw"],
+        p_rad_interp=meas_data["p_rad_interp"],
+        delay_slope=float(meas_data["delay_slope"]),
+        m_plot_db=None if meas_data["m_plot_db"] is None else np.asarray(meas_data["m_plot_db"], dtype=float),
+        complex_meas=meas_data["complex_meas"],
+        m_anal=meas_data["m_anal"],
+        p_anal_rad=meas_data["p_anal_rad"],
+        complex_anal=meas_data["complex_anal"],
+        conf_mask=meas_data["conf_mask"],
+        reflections=meas_data["reflections"],
+        cmp=meas_data["cmp"],
+        analysis_mode=meas_data["analysis_mode"],
+        is_psy=meas_data["is_psy"],
     )
-    if _cache_key is not None:
-        if len(_PREPROCESS_CACHE) >= 16:
-            _PREPROCESS_CACHE.clear()
-        _PREPROCESS_CACHE[_cache_key] = clone_preprocess_result(_result)
-    return _result
+
+
+def _store_preprocess_cache_result(cache_key: tuple | None, result: PreprocessResult) -> None:
+    if cache_key is None:
+        return
+    if len(_PREPROCESS_CACHE) >= 16:
+        _PREPROCESS_CACHE.clear()
+    _PREPROCESS_CACHE[cache_key] = clone_preprocess_result(result)
+
+
+def run_preprocess(freqs, meas_mags, raw_phases, cfg, *, stereo_link_ctx=None, presolve_mode: bool = False) -> PreprocessResult:
+    cache_key, cached_result = _run_preprocess_cached_result(
+        freqs,
+        meas_mags,
+        raw_phases,
+        cfg,
+        stereo_link_ctx,
+        bool(presolve_mode),
+    )
+    if cached_result is not None:
+        return cached_result
+    n_fft = int(cfg.num_taps)
+    meas_data = _run_preprocess_meas_fixed(
+        freqs,
+        meas_mags,
+        raw_phases,
+        cfg,
+        n_fft=n_fft,
+        presolve_mode=bool(presolve_mode),
+        stereo_link_ctx=stereo_link_ctx,
+    )
+    _run_preprocess_apply_afdw(cfg, meas_data)
+    result = _run_preprocess_build_result(meas_data, n_fft=n_fft)
+    _store_preprocess_cache_result(cache_key, result)
+    return result

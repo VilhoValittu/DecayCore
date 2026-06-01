@@ -22,6 +22,60 @@ from ..export_scoring import _pick_metric, _safe_float
 
 _AUTO_ASYM_PHASE1_SEARCH_SPACE_EST = 1877500016615829065655090169509480
 
+
+def _stereo_policy_fallback_reason(stereo_meta: dict) -> str:
+    reason_code = str(stereo_meta.get("gate_reason", "") or "").strip().lower()
+    if not reason_code:
+        if stereo_meta:
+            return "shared winner kept; no specific fallback reason was recorded"
+        return "shared winner kept; stereo refine metadata unavailable"
+    return {
+        "asymmetry_too_small": "shared winner kept; L/R LF asymmetry was too small to justify per-channel refinement",
+        "stereo_safety_gate": "shared winner kept; refined candidate failed the stereo safety gate",
+        "worst_channel_gain_too_small": "shared winner kept; worst-channel LF improvement stayed below the minimum threshold",
+        "no_refined_winner": "shared winner kept; no constrained per-channel candidate beat the shared winner",
+        "shared_fallback": "shared winner kept",
+    }.get(reason_code, reason_code)
+
+
+def _append_stereo_penalties(summary_content: str, stereo_meta: dict) -> str:
+    for key, label in (
+        ("stereo_coherence_penalty", "Stereo coherence penalty"),
+        ("phantom_center_stability_penalty", "Phantom center stability penalty"),
+        ("policy_divergence_penalty", "Policy divergence penalty"),
+    ):
+        value = _safe_float(stereo_meta.get(key, float("nan")), float("nan"))
+        if value == value:
+            summary_content += f"{label}: {float(value):.3f}\n"
+    return summary_content
+
+
+def _policy_delta_lines(stereo_meta: dict) -> list[str]:
+    resolved = dict(stereo_meta.get("resolved", {}) or {})
+    shared = dict(resolved.get("shared", {}) or {})
+    left = dict(resolved.get("left", {}) or {})
+    right = dict(resolved.get("right", {}) or {})
+    diverged: list[str] = []
+    for key, label, fmt in (
+        ("conf_pull_floor", "LF confidence floor", "{:.2f}"),
+        ("tdc_strength", "TDC strength", "{:.1f}%"),
+        ("tdc_max_reduction_db", "TDC max reduction", "{:.1f} dB"),
+        ("bass_first_mode_max_hz", "Bass-first LF span", "{:.1f} Hz"),
+        ("low_bass_cut_strength", "Low-bass cut strength", "{:.2f}"),
+    ):
+        s_val = _safe_float(shared.get(key, float("nan")), float("nan"))
+        l_val = _safe_float(left.get(key, s_val), s_val)
+        r_val = _safe_float(right.get(key, s_val), s_val)
+        if not (s_val == s_val and l_val == l_val and r_val == r_val):
+            continue
+        if abs(float(l_val) - float(s_val)) <= 1e-6 and abs(float(r_val) - float(s_val)) <= 1e-6:
+            continue
+        diverged.append(
+            f"{label}: shared {fmt.format(float(s_val))}, L {fmt.format(float(l_val))}, R {fmt.format(float(r_val))}"
+        )
+    return diverged
+
+
 def _append_auto_stereo_policy_summary(
     summary_content: str,
     data: dict | None,
@@ -49,21 +103,7 @@ def _append_auto_stereo_policy_summary(
     if state == "applied":
         summary_content += "Refine source: constrained finalize-stage refinement\n"
     else:
-        reason_code = str(stereo_meta.get("gate_reason", "") or "").strip().lower()
-        if not reason_code:
-            if stereo_meta:
-                reason = "shared winner kept; no specific fallback reason was recorded"
-            else:
-                reason = "shared winner kept; stereo refine metadata unavailable"
-        else:
-            reason = {
-                "asymmetry_too_small": "shared winner kept; L/R LF asymmetry was too small to justify per-channel refinement",
-                "stereo_safety_gate": "shared winner kept; refined candidate failed the stereo safety gate",
-                "worst_channel_gain_too_small": "shared winner kept; worst-channel LF improvement stayed below the minimum threshold",
-                "no_refined_winner": "shared winner kept; no constrained per-channel candidate beat the shared winner",
-                "shared_fallback": "shared winner kept",
-            }.get(reason_code, reason_code)
-        summary_content += f"Fallback reason: {reason}\n"
+        summary_content += f"Fallback reason: {_stereo_policy_fallback_reason(stereo_meta)}\n"
 
     shared_rank = _safe_float(stereo_meta.get("shared_rank", float("nan")), float("nan"))
     refined_rank = _safe_float(stereo_meta.get("refined_rank", float("nan")), float("nan"))
@@ -81,38 +121,9 @@ def _append_auto_stereo_policy_summary(
     if min_relief == min_relief and abs(min_relief) != float("inf"):
         summary_content += f"Minimum required worst-channel relief: {float(min_relief):+.3f} dB\n"
 
-    coh_pen = _safe_float(stereo_meta.get("stereo_coherence_penalty", float("nan")), float("nan"))
-    center_pen = _safe_float(stereo_meta.get("phantom_center_stability_penalty", float("nan")), float("nan"))
-    policy_pen = _safe_float(stereo_meta.get("policy_divergence_penalty", float("nan")), float("nan"))
-    if coh_pen == coh_pen:
-        summary_content += f"Stereo coherence penalty: {float(coh_pen):.3f}\n"
-    if center_pen == center_pen:
-        summary_content += f"Phantom center stability penalty: {float(center_pen):.3f}\n"
-    if policy_pen == policy_pen:
-        summary_content += f"Policy divergence penalty: {float(policy_pen):.3f}\n"
+    summary_content = _append_stereo_penalties(summary_content, stereo_meta)
 
-    resolved = dict(stereo_meta.get("resolved", {}) or {})
-    shared = dict(resolved.get("shared", {}) or {})
-    left = dict(resolved.get("left", {}) or {})
-    right = dict(resolved.get("right", {}) or {})
-    diverged = []
-    for key, label, fmt in (
-        ("conf_pull_floor", "LF confidence floor", "{:.2f}"),
-        ("tdc_strength", "TDC strength", "{:.1f}%"),
-        ("tdc_max_reduction_db", "TDC max reduction", "{:.1f} dB"),
-        ("bass_first_mode_max_hz", "Bass-first LF span", "{:.1f} Hz"),
-        ("low_bass_cut_strength", "Low-bass cut strength", "{:.2f}"),
-    ):
-        s_val = _safe_float(shared.get(key, float("nan")), float("nan"))
-        l_val = _safe_float(left.get(key, s_val), s_val)
-        r_val = _safe_float(right.get(key, s_val), s_val)
-        if not (s_val == s_val and l_val == l_val and r_val == r_val):
-            continue
-        if abs(float(l_val) - float(s_val)) <= 1e-6 and abs(float(r_val) - float(s_val)) <= 1e-6:
-            continue
-        diverged.append(
-            f"{label}: shared {fmt.format(float(s_val))}, L {fmt.format(float(l_val))}, R {fmt.format(float(r_val))}"
-        )
+    diverged = _policy_delta_lines(stereo_meta)
     if diverged:
         summary_content += "Policy deltas:\n"
         for line in diverged:

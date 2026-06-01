@@ -57,66 +57,63 @@ CORRECTION_SHARPNESS_SCORING_VERSION = 1
 DIP_FILL_RISK_SCORING_VERSION = 1
 CHANNEL_OVERFIT_SCORING_VERSION = 1
 
-def _auto_correction_sharpness_metrics_from_stats(
+_RECOVERABLE_SHAPE_PENALTY_EXCEPTIONS = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    KeyError,
+    IndexError,
+    RuntimeError,
+    OSError,
+    ImportError,
+    ModuleNotFoundError,
+    NameError,
+)
+
+
+def _correction_sharpness_prepare_arrays(
     st: dict | None,
     *,
-    lo_hz: float = 20.0,
-    hi_hz: float = 250.0,
-) -> dict:
-    out = {
-        "correction_max_abs_slope_db_per_oct": 0.0,
-        "correction_rms_slope_db_per_oct": 0.0,
-        "correction_curvature_score": 0.0,
-        "narrow_notch_count": 0,
-        "narrow_peak_count": 0,
-        "integrated_correction_db_oct": 0.0,
-        "correction_event_count": 0,
-        "direction_change_count": 0,
-        "correction_sharpness_penalty": 0.0,
-        "correction_sharpness_scoring_version": int(CORRECTION_SHARPNESS_SCORING_VERSION),
-    }
+    lo_hz: float,
+    hi_hz: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
     f = _auto_stats_pick_arr(st, "freq_axis")
     filt = _auto_stats_pick_arr(st, "predicted_filter_mags", "realized_filter_mags", "filter_mags")
     n = int(min(f.size, filt.size))
     if n < 8:
-        return dict(out)
+        return None
     f = np.asarray(f[:n], dtype=float)
     filt = np.asarray(filt[:n], dtype=float)
     mask = np.isfinite(f) & np.isfinite(filt) & (f > 0.0) & (f >= float(lo_hz)) & (f <= float(hi_hz))
     if int(np.count_nonzero(mask)) < 8:
-        return dict(out)
+        return None
     f_use = np.asarray(f[mask], dtype=float)
     y = np.asarray(filt[mask], dtype=float)
     order = np.argsort(f_use)
-    f_use = f_use[order]
-    y = y[order]
-    x = np.log2(np.maximum(f_use, 1e-9))
+    return np.asarray(f_use[order], dtype=float), np.asarray(y[order], dtype=float), np.asarray(np.log2(np.maximum(f_use[order], 1e-9)), dtype=float)
+
+
+def _correction_sharpness_smoothed_gain(f_use: np.ndarray, y: np.ndarray) -> np.ndarray:
     try:
         y_s = np.asarray(smooth_gain_fractional_octave(f_use, y, 12.0), dtype=float).reshape(-1)
         if y_s.size != y.size:
             y_s = y
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
+    except _RECOVERABLE_SHAPE_PENALTY_EXCEPTIONS:
         y_s = y
-    integrated_correction = float(np.trapezoid(np.abs(y_s), x)) if y_s.size >= 2 else 0.0
-    out["integrated_correction_db_oct"] = integrated_correction
+    return np.asarray(y_s, dtype=float)
 
+
+def _correction_sharpness_slope_features(
+    *,
+    x: np.ndarray,
+    y_s: np.ndarray,
+    f_use: np.ndarray,
+) -> tuple[float, float, float, int] | None:
     dx = np.diff(x)
     dy = np.diff(y_s)
     valid_dx = np.isfinite(dx) & (np.abs(dx) > 1e-9) & np.isfinite(dy)
     if int(np.count_nonzero(valid_dx)) < 4:
-        return dict(out)
+        return None
     slope = np.asarray(dy[valid_dx] / dx[valid_dx], dtype=float)
     mid_f = np.sqrt(f_use[:-1][valid_dx] * f_use[1:][valid_dx])
     weights = _auto_band_weight_for_correction_shape(mid_f)
@@ -139,28 +136,83 @@ def _auto_correction_sharpness_metrics_from_stats(
         nz = signs[signs != 0.0]
         if nz.size >= 2:
             direction_changes = int(np.count_nonzero(nz[1:] != nz[:-1]))
+    return float(max_abs_slope), float(rms_slope), float(curvature_score), int(direction_changes)
 
+
+def _correction_sharpness_event_features(
+    *,
+    y_s: np.ndarray,
+    x: np.ndarray,
+    f_use: np.ndarray,
+) -> tuple[int, int, int]:
     narrow_notches = 0
     narrow_peaks = 0
     correction_events = 0
-    if y_s.size >= 5:
-        active = np.abs(y_s) >= 1.0
-        starts = np.flatnonzero(active & ~np.r_[False, active[:-1]])
-        ends = np.flatnonzero(active & ~np.r_[active[1:], False])
-        correction_events = int(len(starts))
-        for start, end in zip(starts, ends, strict=False):
-            if int(end) <= int(start):
-                continue
-            width_oct = float(x[int(end)] - x[int(start)])
-            seg = y_s[int(start):int(end) + 1]
-            depth = float(abs(np.nanmin(seg))) if np.nanmin(seg) < 0.0 else 0.0
-            peak_h = float(np.nanmax(seg)) if np.nanmax(seg) > 0.0 else 0.0
-            center_f = float(np.sqrt(f_use[int(start)] * f_use[int(end)]))
-            min_width = 0.75 * _auto_min_broad_peak_width_oct(center_f)
-            if float(width_oct) < float(min_width) and depth >= 2.0:
-                narrow_notches += 1
-            if float(width_oct) < float(min_width) and peak_h >= 2.5:
-                narrow_peaks += 1
+    if y_s.size < 5:
+        return 0, 0, 0
+    active = np.abs(y_s) >= 1.0
+    starts = np.flatnonzero(active & ~np.r_[False, active[:-1]])
+    ends = np.flatnonzero(active & ~np.r_[active[1:], False])
+    correction_events = int(len(starts))
+    for start, end in zip(starts, ends, strict=False):
+        if int(end) <= int(start):
+            continue
+        width_oct = float(x[int(end)] - x[int(start)])
+        seg = y_s[int(start):int(end) + 1]
+        depth = float(abs(np.nanmin(seg))) if np.nanmin(seg) < 0.0 else 0.0
+        peak_h = float(np.nanmax(seg)) if np.nanmax(seg) > 0.0 else 0.0
+        center_f = float(np.sqrt(f_use[int(start)] * f_use[int(end)]))
+        min_width = 0.75 * _auto_min_broad_peak_width_oct(center_f)
+        if float(width_oct) < float(min_width) and depth >= 2.0:
+            narrow_notches += 1
+        if float(width_oct) < float(min_width) and peak_h >= 2.5:
+            narrow_peaks += 1
+    return int(narrow_notches), int(narrow_peaks), int(correction_events)
+
+
+def _auto_correction_sharpness_metrics_from_stats(
+    st: dict | None,
+    *,
+    lo_hz: float = 20.0,
+    hi_hz: float = 250.0,
+) -> dict:
+    out = {
+        "correction_max_abs_slope_db_per_oct": 0.0,
+        "correction_rms_slope_db_per_oct": 0.0,
+        "correction_curvature_score": 0.0,
+        "narrow_notch_count": 0,
+        "narrow_peak_count": 0,
+        "integrated_correction_db_oct": 0.0,
+        "correction_event_count": 0,
+        "direction_change_count": 0,
+        "correction_sharpness_penalty": 0.0,
+        "correction_sharpness_scoring_version": int(CORRECTION_SHARPNESS_SCORING_VERSION),
+    }
+    prepared = _correction_sharpness_prepare_arrays(
+        st,
+        lo_hz=float(lo_hz),
+        hi_hz=float(hi_hz),
+    )
+    if prepared is None:
+        return dict(out)
+    f_use, y, x = prepared
+    y_s = _correction_sharpness_smoothed_gain(f_use, y)
+    integrated_correction = float(np.trapezoid(np.abs(y_s), x)) if y_s.size >= 2 else 0.0
+    out["integrated_correction_db_oct"] = integrated_correction
+
+    slope_features = _correction_sharpness_slope_features(
+        x=x,
+        y_s=y_s,
+        f_use=f_use,
+    )
+    if slope_features is None:
+        return dict(out)
+    max_abs_slope, rms_slope, curvature_score, direction_changes = slope_features
+    narrow_notches, narrow_peaks, correction_events = _correction_sharpness_event_features(
+        y_s=y_s,
+        x=x,
+        f_use=f_use,
+    )
 
     penalty = (
         0.030 * max(0.0, max_abs_slope - 36.0)

@@ -45,66 +45,88 @@ from ..filter_pipeline import (
 )
 from ..filter_result import _assemble_generate_filter_result
 
+def _channel_hpf_replacement(cfg: FilterConfig, channel: str) -> dict:
+    xo_hz = getattr(cfg, f"avr_crossover_hz_{channel}", None)
+    if xo_hz is None:
+        return {}
+    try:
+        xo_hz = float(xo_hz)
+    except (TypeError, ValueError):
+        return {}
+    if not (np.isfinite(xo_hz) and float(xo_hz) > 0.0):
+        return {}
+    existing_hs = getattr(cfg, "hpf_settings", None) or {}
+    order = int(existing_hs.get("order", 4)) if isinstance(existing_hs, dict) else 4
+    return {"hpf_settings": {"enabled": True, "freq": float(xo_hz), "order": int(order)}}
+
+
+def _side_policy_value(side_policy, shared, key: str):
+    try:
+        return side_policy.effective_value(key, shared)
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        value = getattr(side_policy, key, None)
+        if value is None and shared is not None:
+            value = getattr(shared, key, None)
+        return value
+
+
+def _coerce_clamped_float(value, *, lo: float | None, hi: float | None) -> float | None:
+    if value is None:
+        return None
+    try:
+        value_f = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(value_f):
+        return None
+    if lo is not None:
+        value_f = max(float(lo), value_f)
+    if hi is not None:
+        value_f = min(float(hi), value_f)
+    return float(value_f)
+
+
+def _stereo_policy_replacements(cfg: FilterConfig, channel: str) -> dict:
+    resolved = getattr(cfg, "stereo_resolved_auto_policies", None)
+    if resolved is None:
+        return {}
+    shared = getattr(resolved, "shared", None)
+    side_policy = getattr(resolved, "left" if str(channel).lower() == "l" else "right", None)
+    if side_policy is None:
+        return {}
+    replacements: dict[str, float] = {}
+    for key, lo, hi in (
+        ("conf_pull_floor", 0.0, 1.0),
+        ("tdc_strength", 0.0, 100.0),
+        ("tdc_max_reduction_db", 0.0, None),
+        ("bass_first_mode_max_hz", 20.0, None),
+        ("low_bass_cut_strength", 0.0, 1.0),
+        ("excess_phase_strength", 0.0, 1.0),
+    ):
+        value = _side_policy_value(side_policy, shared, key)
+        value_f = _coerce_clamped_float(value, lo=lo, hi=hi)
+        if value_f is not None:
+            replacements[str(key)] = float(value_f)
+    return replacements
+
+
 def _maybe_per_channel_cfg(cfg: FilterConfig, channel: str) -> FilterConfig:
     """Return a copy of cfg with channel-local overrides applied, or cfg unchanged."""
     import dataclasses as _dc
     replacements = {}
-
-    xo_hz = getattr(cfg, f"avr_crossover_hz_{channel}", None)
-    if xo_hz is not None:
-        try:
-            xo_hz = float(xo_hz)
-        except (TypeError, ValueError):
-            xo_hz = None
-        if xo_hz is not None and np.isfinite(xo_hz) and xo_hz > 0:
-            existing_hs = getattr(cfg, "hpf_settings", None) or {}
-            order = int(existing_hs.get("order", 4)) if isinstance(existing_hs, dict) else 4
-            replacements["hpf_settings"] = {"enabled": True, "freq": xo_hz, "order": order}
-
-    resolved = getattr(cfg, "stereo_resolved_auto_policies", None)
-    if resolved is not None:
-        shared = getattr(resolved, "shared", None)
-        side_policy = getattr(resolved, "left" if str(channel).lower() == "l" else "right", None)
-        if side_policy is not None:
-            for key, lo, hi in (
-                ("conf_pull_floor", 0.0, 1.0),
-                ("tdc_strength", 0.0, 100.0),
-                ("tdc_max_reduction_db", 0.0, None),
-                ("bass_first_mode_max_hz", 20.0, None),
-                ("low_bass_cut_strength", 0.0, 1.0),
-                ("excess_phase_strength", 0.0, 1.0),
-            ):
-                try:
-                    value = side_policy.effective_value(key, shared)
-                except (
-
-                    AttributeError,
-                    TypeError,
-                    ValueError,
-                    KeyError,
-                    IndexError,
-                    RuntimeError,
-                    OSError,
-                    ImportError,
-                    ModuleNotFoundError,
-                    NameError,
-                ):
-                    value = getattr(side_policy, key, None)
-                    if value is None and shared is not None:
-                        value = getattr(shared, key, None)
-                if value is None:
-                    continue
-                try:
-                    value_f = float(value)
-                except (TypeError, ValueError):
-                    continue
-                if not np.isfinite(value_f):
-                    continue
-                if lo is not None:
-                    value_f = max(float(lo), value_f)
-                if hi is not None:
-                    value_f = min(float(hi), value_f)
-                replacements[str(key)] = float(value_f)
+    replacements.update(_channel_hpf_replacement(cfg, channel))
+    replacements.update(_stereo_policy_replacements(cfg, channel))
 
     if not replacements:
         return cfg

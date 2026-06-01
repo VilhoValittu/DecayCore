@@ -45,36 +45,43 @@ def _auto_collect_reflections(st: dict | None) -> list:
     return []
 
 
-def _auto_get_worst_mode_hz(result) -> float | None:
-    def _pick_ch_worst(st: dict | None) -> dict | None:
-        refs = _auto_collect_reflections(st)
-        picks = []
-        for r in refs:
-            if not isinstance(r, dict):
-                continue
-            typ = str(r.get("type", "") or "").strip().lower()
-            if typ != "resonance":
-                continue
-            freq = _auto_safe_float(r.get("freq", float("nan")), float("nan"))
-            dt_ms = _auto_safe_float(
-                r.get("gd_error", r.get("error_ms", float("nan"))),
-                float("nan"),
-            )
-            if not (np.isfinite(freq) and np.isfinite(dt_ms)):
-                continue
-            if float(dt_ms) < float(_AUTO_MODE_MODE_MIN_GD_MS):
-                continue
-            if not (float(_AUTO_MODE_MODE_MIN_HZ) <= float(freq) <= float(_AUTO_MODE_MODE_MAX_HZ)):
-                continue
-            picks.append({"freq": float(freq), "dt_ms": float(dt_ms)})
-        if not picks:
-            return None
-        return dict(max(picks, key=lambda x: float(x.get("dt_ms", 0.0))))
+def _auto_collect_mode_candidates(st: dict | None) -> list[dict]:
+    refs = _auto_collect_reflections(st)
+    picks: list[dict] = []
+    for r in refs:
+        if not isinstance(r, dict):
+            continue
+        typ = str(r.get("type", "") or "").strip().lower()
+        if typ != "resonance":
+            continue
+        freq = _auto_safe_float(r.get("freq", float("nan")), float("nan"))
+        dt_ms = _auto_safe_float(
+            r.get("gd_error", r.get("error_ms", float("nan"))),
+            float("nan"),
+        )
+        if not (np.isfinite(freq) and np.isfinite(dt_ms)):
+            continue
+        if float(dt_ms) < float(_AUTO_MODE_MODE_MIN_GD_MS):
+            continue
+        if not (float(_AUTO_MODE_MODE_MIN_HZ) <= float(freq) <= float(_AUTO_MODE_MODE_MAX_HZ)):
+            continue
+        picks.append({"freq": float(freq), "dt_ms": float(dt_ms)})
+    return picks
 
-    l_st = dict(getattr(result, "l_st", {}) or {})
-    r_st = dict(getattr(result, "r_st", {}) or {})
-    lw = _pick_ch_worst(l_st)
-    rw = _pick_ch_worst(r_st)
+
+def _auto_merge_mode_pick(out: list[dict], *, freq: float, dt_ms: float) -> bool:
+    for q in out:
+        fq = float(_auto_safe_float(q.get("freq", float("nan")), float("nan")))
+        if not (np.isfinite(fq) and fq > 0.0):
+            continue
+        if abs(float(np.log2(freq / fq))) <= 0.25:
+            q["freq"] = float(0.5 * (fq + freq))
+            q["dt_ms"] = float(max(float(_auto_safe_float(q.get("dt_ms", 0.0), 0.0)), dt_ms))
+            return True
+    return False
+
+
+def _auto_select_worst_mode_freq(lw: dict | None, rw: dict | None) -> float | None:
     if isinstance(lw, dict) and isinstance(rw, dict):
         f_l = float(_auto_safe_float(lw.get("freq", float("nan")), float("nan")))
         f_r = float(_auto_safe_float(rw.get("freq", float("nan")), float("nan")))
@@ -91,35 +98,22 @@ def _auto_get_worst_mode_hz(result) -> float | None:
     return None
 
 
+def _auto_get_worst_mode_hz(result) -> float | None:
+    l_st = dict(getattr(result, "l_st", {}) or {})
+    r_st = dict(getattr(result, "r_st", {}) or {})
+    l_picks = _auto_collect_mode_candidates(l_st)
+    r_picks = _auto_collect_mode_candidates(r_st)
+    lw = dict(max(l_picks, key=lambda x: float(x.get("dt_ms", 0.0)))) if l_picks else None
+    rw = dict(max(r_picks, key=lambda x: float(x.get("dt_ms", 0.0)))) if r_picks else None
+    return _auto_select_worst_mode_freq(lw, rw)
+
+
 def _auto_get_top_modes_hz(result, *, top_n: int = 2) -> list[float]:
     n = int(max(1, top_n))
 
-    def _collect(st: dict | None) -> list[dict]:
-        refs = _auto_collect_reflections(st)
-        out = []
-        for r in refs:
-            if not isinstance(r, dict):
-                continue
-            typ = str(r.get("type", "") or "").strip().lower()
-            if typ != "resonance":
-                continue
-            freq = _auto_safe_float(r.get("freq", float("nan")), float("nan"))
-            dt_ms = _auto_safe_float(
-                r.get("gd_error", r.get("error_ms", float("nan"))),
-                float("nan"),
-            )
-            if not (np.isfinite(freq) and np.isfinite(dt_ms)):
-                continue
-            if float(dt_ms) < float(_AUTO_MODE_MODE_MIN_GD_MS):
-                continue
-            if not (float(_AUTO_MODE_MODE_MIN_HZ) <= float(freq) <= float(_AUTO_MODE_MODE_MAX_HZ)):
-                continue
-            out.append({"freq": float(freq), "dt_ms": float(dt_ms)})
-        return out
-
     l_st = dict(getattr(result, "l_st", {}) or {})
     r_st = dict(getattr(result, "r_st", {}) or {})
-    picks = _collect(l_st) + _collect(r_st)
+    picks = _auto_collect_mode_candidates(l_st) + _auto_collect_mode_candidates(r_st)
     if not picks:
         return []
 
@@ -130,19 +124,7 @@ def _auto_get_top_modes_hz(result, *, top_n: int = 2) -> list[float]:
         dt = float(_auto_safe_float(p.get("dt_ms", 0.0), 0.0))
         if not (np.isfinite(f) and f > 0.0):
             continue
-        merged = False
-        for q in out:
-            fq = float(_auto_safe_float(q.get("freq", float("nan")), float("nan")))
-            if not (np.isfinite(fq) and fq > 0.0):
-                continue
-            if abs(float(np.log2(f / fq))) <= 0.25:
-                q["freq"] = float(0.5 * (fq + f))
-                q["dt_ms"] = float(
-                    max(float(_auto_safe_float(q.get("dt_ms", 0.0), 0.0)), dt)
-                )
-                merged = True
-                break
-        if not merged:
+        if not _auto_merge_mode_pick(out, freq=f, dt_ms=dt):
             out.append({"freq": float(f), "dt_ms": float(dt)})
         if len(out) >= n:
             break
