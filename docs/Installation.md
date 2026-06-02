@@ -57,7 +57,7 @@ sudo apt install libportaudio2
 
 ---
 
-### macOS (Intel + Apple Silicon)
+### macOS (Apple Silicon)
 
 1. Download `DecayCore_<version>_macos.7z` from Releases.
 2. Extract the archive.
