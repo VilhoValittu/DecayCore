@@ -30,7 +30,15 @@ def arr_if_valid_for_stats(value, *, expected_size: int | None = None):
     return np.asarray(arr, dtype=float)
 
 
-def apply_measured_mag_stats(stats: dict, *, target_mags, freq_axis, m_anal, calc_offset_db: float) -> None:
+def apply_measured_mag_stats(
+    stats: dict,
+    *,
+    target_mags,
+    freq_axis,
+    m_anal,
+    calc_offset_db: float,
+    include_raw: bool = True,
+) -> None:
     stats["target_mags"] = np.asarray(target_mags, dtype=float).tolist()
     f_ref = np.asarray(stats.get("freq_axis", freq_axis), dtype=float).reshape(-1)
     n_ref = int(f_ref.size)
@@ -38,11 +46,11 @@ def apply_measured_mag_stats(stats: dict, *, target_mags, freq_axis, m_anal, cal
     m_corr_st = arr_if_valid_for_stats(stats.get("measured_mags", None), expected_size=n_ref)
     m_corr = np.asarray(m_anal, dtype=float) - float(calc_offset_db) if m_corr_st is None else np.asarray(m_corr_st, dtype=float)
 
-    m_raw_st = arr_if_valid_for_stats(stats.get("measured_mags_raw", None), expected_size=n_ref)
-    m_raw = np.asarray(m_corr, dtype=float) + float(calc_offset_db) if m_raw_st is None else np.asarray(m_raw_st, dtype=float)
-
     stats["measured_mags"] = np.asarray(m_corr, dtype=float).tolist()
-    stats["measured_mags_raw"] = np.asarray(m_raw, dtype=float).tolist()
+    if bool(include_raw):
+        m_raw_st = arr_if_valid_for_stats(stats.get("measured_mags_raw", None), expected_size=n_ref)
+        m_raw = np.asarray(m_corr, dtype=float) + float(calc_offset_db) if m_raw_st is None else np.asarray(m_raw_st, dtype=float)
+        stats["measured_mags_raw"] = np.asarray(m_raw, dtype=float).tolist()
 
 
 def apply_afdw_stats(

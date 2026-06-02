@@ -53,139 +53,40 @@ def _get_pkg():
     return _get_bass_integration_pkg(__name__)
 
 
-def recommend_direct_dac_prepare_optuna(
+def _direct_dac_build_seed_candidates(
     bundle: BassIntegrationBundle,
     *,
     profile: str,
-    main_hpf_order: int,
-    sub_lpf_order: int,
-    sub_hpf_hz: float,
-    sub_hpf_order: int,
-    sub_combine_mode: str = "average",
-    allpass_auto_enable: bool = False,
-    trials: int = 48,
-    startup_trials: int = 12,
-    local_trials: int = 12,
+    hpf_order_i: int,
+    lpf_order_i: int,
+    sub_hpf_hz_f: float,
+    sub_hpf_order_i: int,
+    combine_mode_norm: str,
     callbacks=None,
-) -> dict[str, Any]:
-    """Unified Optuna-based Direct-DAC bass integration prepare.
-
-    Replaces the three separate staged passes (alignment, crossover, allpass)
-    with one joint search over fc, overlap_ratio, delay, polarity, and gain.
-    Falls back to builtin staged approach if optuna is unavailable.
-    """
-    _FC_LO = float(AVR_CROSSOVER_CANDIDATES[0])
-    _FC_HI = float(AVR_CROSSOVER_CANDIDATES[-1])
-    _DELAY_LO = float(min(DIRECT_DAC_ALIGNMENT_DELAY_CANDIDATES_MS))
-    _DELAY_HI = float(max(DIRECT_DAC_ALIGNMENT_DELAY_CANDIDATES_MS))
-    _GAIN_LO = float(min(DIRECT_DAC_ALIGNMENT_GAIN_CANDIDATES_DB))
-    _GAIN_HI = float(max(DIRECT_DAC_ALIGNMENT_GAIN_CANDIDATES_DB))
-
-    combine_mode_norm = normalize_sub_combine_mode(sub_combine_mode)
-    hpf_order_i = max(1, int(main_hpf_order))
-    lpf_order_i = max(1, int(sub_lpf_order))
-    sub_hpf_hz_f = max(0.0, float(sub_hpf_hz))
-    sub_hpf_order_i = max(1, int(sub_hpf_order))
-
-    weights = _auto_bass_integration_profile_weights(profile)
-    w_main_act = float(weights.get("main_activity", 6.0))
-
-    # --- Memoization helpers ---
-    def _quantize_fc(fc: float) -> float:
-        return round(float(fc), 0)  # 1.0 Hz resolution
-
-    def _quantize_delay(delay_ms: float) -> float:
-        return round(float(delay_ms), 1)  # 0.1 ms resolution
-
-    def _quantize_gain(gain_db: float) -> float:
-        return round(float(gain_db), 1)  # 0.1 dB resolution
-
-    _eval_cache: dict = {}
-    _eval_total = [0]
-    _eval_hits = [0]
-
-    def _eval(fc: float, overlap_ratio: float, delay_ms: float, polarity: bool, gain_db: float) -> tuple[float, dict]:
-        fc_q = _quantize_fc(fc)
-        delay_q = _quantize_delay(delay_ms)
-        gain_q = _quantize_gain(gain_db)
-        cache_key = (
-            fc_q,
-            float(overlap_ratio),
-            delay_q,
-            bool(polarity),
-            gain_q,
-            hpf_order_i,
-            lpf_order_i,
-            sub_hpf_hz_f,
-            sub_hpf_order_i,
-            str(profile),
-            combine_mode_norm,
-        )
-        _eval_total[0] += 1
-        cached = _eval_cache.get(cache_key)
-        if cached is not None:
-            _eval_hits[0] += 1
-            return cached
-
-        sub_lpf = float(fc_q * overlap_ratio)
-        m = _get_pkg().compute_final_bass_integration_metrics(
-            bundle,
-            fc_q,
-            profile,
-            mode="direct_dac",
-            main_hpf_order=hpf_order_i,
-            sub_lpf_order=lpf_order_i,
-            sub_hpf_hz=sub_hpf_hz_f,
-            sub_hpf_order=sub_hpf_order_i,
-            sub_combine_mode=combine_mode_norm,
-            sub_delay_ms=float(delay_q),
-            sub_polarity_invert=bool(polarity),
-            sub_gain_trim_db=float(gain_q),
-            sub_lpf_hz=sub_lpf,
-        )
-        obj = _safe_float(m.get("objective", float("nan")), float("nan"))
-        if np.isfinite(obj):
-            _pkg = _get_pkg()
-            l_drop = _pkg._main_guard_band_drop_db(bundle.l_main, fc_q)
-            r_drop = _pkg._main_guard_band_drop_db(bundle.r_main, fc_q)
-            drop_vals = [v for v in (l_drop, r_drop) if np.isfinite(v)]
-            if drop_vals:
-                avg_drop = float(np.mean(np.asarray(drop_vals, dtype=float)))
-                obj -= w_main_act * max(0.0, avg_drop) / 12.0
-        result = (obj, m)
-        _eval_cache[cache_key] = result
-        return result
-
-    # Baseline at canonical defaults
-    baseline_obj, baseline_metrics = _eval(80.0, MIN_DIRECT_DAC_OVERLAP_RATIO, 0.0, False, 0.0)
-    baseline_snap = _final_metric_snapshot(baseline_metrics)
-
-    try:
-        import optuna as _optuna  # type: ignore
-        _optuna.logging.set_verbosity(_optuna.logging.WARNING)
-    except _RECOVERABLE_OPTUNA_EXCEPTIONS:
-        _LOG.debug("Optuna unavailable for Direct-DAC prepare; falling back to builtin", exc_info=True)
-        return _recommend_direct_dac_prepare_builtin_core(
-            bundle,
-            profile=profile,
-            main_hpf_order=hpf_order_i,
-            sub_lpf_order=lpf_order_i,
-            sub_hpf_hz=sub_hpf_hz_f,
-            sub_hpf_order=sub_hpf_order_i,
-            sub_combine_mode=combine_mode_norm,
-            allpass_auto_enable=allpass_auto_enable,
-            callbacks=callbacks,
-        )
-
-    _status_callback(callbacks, "DecayCore automatic mode: bass integration optuna init")
-
-    # --- Seed candidates from builtins ---
+) -> tuple[list[dict], float, dict]:
     seeds: list[dict] = [
         {"fc_hz": 80.0, "overlap_ratio": MIN_DIRECT_DAC_OVERLAP_RATIO, "sub_delay_ms": 0.0, "sub_polarity_invert": False, "sub_gain_trim_db": 0.0},
     ]
-    _align_delay = 0.0
-    _align_polarity = False
-    _align_gain = 0.0
+    baseline_obj = float("-inf")
+    baseline_metrics: dict = {}
+
+    try:
+        baseline_obj, baseline_metrics = _direct_dac_eval_candidate(
+            bundle,
+            80.0,
+            MIN_DIRECT_DAC_OVERLAP_RATIO,
+            0.0,
+            False,
+            0.0,
+            profile=profile,
+            hpf_order_i=hpf_order_i,
+            lpf_order_i=lpf_order_i,
+            sub_hpf_hz_f=sub_hpf_hz_f,
+            sub_hpf_order_i=sub_hpf_order_i,
+            combine_mode_norm=combine_mode_norm,
+        )
+    except _RECOVERABLE_PREPARE_EXCEPTIONS:
+        baseline_obj, baseline_metrics = float("-inf"), {}
 
     try:
         _ar = recommend_direct_dac_alignment(
@@ -198,12 +99,15 @@ def recommend_direct_dac_prepare_optuna(
             sub_hpf_order=sub_hpf_order_i,
             sub_combine_mode=combine_mode_norm,
         )
-        _align_delay = float(_ar.get("sub_delay_ms", 0.0) or 0.0)
-        _align_polarity = bool(_ar.get("sub_polarity_invert", False))
-        _align_gain = float(_ar.get("sub_gain_trim_db", 0.0) or 0.0)
+        align_delay = float(_ar.get("sub_delay_ms", 0.0) or 0.0)
+        align_polarity = bool(_ar.get("sub_polarity_invert", False))
+        align_gain = float(_ar.get("sub_gain_trim_db", 0.0) or 0.0)
         seeds.append({
-            "fc_hz": 80.0, "overlap_ratio": MIN_DIRECT_DAC_OVERLAP_RATIO,
-            "sub_delay_ms": _align_delay, "sub_polarity_invert": _align_polarity, "sub_gain_trim_db": _align_gain,
+            "fc_hz": 80.0,
+            "overlap_ratio": MIN_DIRECT_DAC_OVERLAP_RATIO,
+            "sub_delay_ms": align_delay,
+            "sub_polarity_invert": align_polarity,
+            "sub_gain_trim_db": align_gain,
         })
     except _RECOVERABLE_PREPARE_EXCEPTIONS:
         _LOG.debug("Direct-DAC Optuna alignment seed failed; continuing with baseline seed", exc_info=True)
@@ -218,97 +122,330 @@ def recommend_direct_dac_prepare_optuna(
             sub_hpf_order=sub_hpf_order_i,
             sub_combine_mode=combine_mode_norm,
         )
-        _xo_hz = float(np.clip(_safe_float(_xr.get("recommended_hz", 80.0), 80.0), _FC_LO, _FC_HI))
-        _xo_lpf = float(_safe_float(_xr.get("recommended_sub_lpf_hz", _xo_hz), _xo_hz))
-        _xo_ratio_raw = _xo_lpf / max(_xo_hz, 1.0)
-        _xo_ratio = min(DIRECT_DAC_OVERLAP_RATIOS, key=lambda r: abs(r - _xo_ratio_raw))
+        xo_hz = float(np.clip(_safe_float(_xr.get("recommended_hz", 80.0), 80.0), float(AVR_CROSSOVER_CANDIDATES[0]), float(AVR_CROSSOVER_CANDIDATES[-1])))
+        xo_lpf = float(_safe_float(_xr.get("recommended_sub_lpf_hz", xo_hz), xo_hz))
+        xo_ratio_raw = xo_lpf / max(xo_hz, 1.0)
+        xo_ratio = min(DIRECT_DAC_OVERLAP_RATIOS, key=lambda r: abs(r - xo_ratio_raw))
         seeds.append({
-            "fc_hz": _xo_hz, "overlap_ratio": _xo_ratio,
-            "sub_delay_ms": 0.0, "sub_polarity_invert": False, "sub_gain_trim_db": 0.0,
+            "fc_hz": xo_hz,
+            "overlap_ratio": xo_ratio,
+            "sub_delay_ms": 0.0,
+            "sub_polarity_invert": False,
+            "sub_gain_trim_db": 0.0,
         })
         seeds.append({
-            "fc_hz": _xo_hz, "overlap_ratio": _xo_ratio,
-            "sub_delay_ms": _align_delay, "sub_polarity_invert": _align_polarity, "sub_gain_trim_db": _align_gain,
+            "fc_hz": xo_hz,
+            "overlap_ratio": xo_ratio,
+            "sub_delay_ms": float(_ar.get("sub_delay_ms", 0.0) or 0.0) if "_ar" in locals() else 0.0,
+            "sub_polarity_invert": bool(_ar.get("sub_polarity_invert", False)) if "_ar" in locals() else False,
+            "sub_gain_trim_db": float(_ar.get("sub_gain_trim_db", 0.0) or 0.0) if "_ar" in locals() else 0.0,
         })
     except _RECOVERABLE_PREPARE_EXCEPTIONS:
         _LOG.debug("Direct-DAC Optuna crossover seed failed; continuing without crossover seed", exc_info=True)
 
-    # --- Global Optuna search ---
-    sampler = _optuna.samplers.TPESampler(n_startup_trials=int(startup_trials), seed=42)
-    study = _optuna.create_study(direction="maximize", sampler=sampler)
+    return seeds, float(baseline_obj), dict(baseline_metrics or {})
 
-    for _s in seeds:
+
+def _direct_dac_eval_candidate(
+    bundle: BassIntegrationBundle,
+    fc: float,
+    overlap_ratio: float,
+    delay_ms: float,
+    polarity: bool,
+    gain_db: float,
+    *,
+    profile: str,
+    hpf_order_i: int,
+    lpf_order_i: int,
+    sub_hpf_hz_f: float,
+    sub_hpf_order_i: int,
+    combine_mode_norm: str,
+    weights: dict[str, float] | None = None,
+    cache: dict | None = None,
+) -> tuple[float, dict]:
+    fc_q = round(float(fc), 0)
+    delay_q = round(float(delay_ms), 1)
+    gain_q = round(float(gain_db), 1)
+    cache_key = (
+        fc_q,
+        float(overlap_ratio),
+        delay_q,
+        bool(polarity),
+        gain_q,
+        hpf_order_i,
+        lpf_order_i,
+        sub_hpf_hz_f,
+        sub_hpf_order_i,
+        str(profile),
+        combine_mode_norm,
+    )
+    if cache is not None:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+    sub_lpf = float(fc_q * overlap_ratio)
+    metrics = _get_pkg().compute_final_bass_integration_metrics(
+        bundle,
+        fc_q,
+        profile,
+        mode="direct_dac",
+        main_hpf_order=hpf_order_i,
+        sub_lpf_order=lpf_order_i,
+        sub_hpf_hz=sub_hpf_hz_f,
+        sub_hpf_order=sub_hpf_order_i,
+        sub_combine_mode=combine_mode_norm,
+        sub_delay_ms=float(delay_q),
+        sub_polarity_invert=bool(polarity),
+        sub_gain_trim_db=float(gain_q),
+        sub_lpf_hz=sub_lpf,
+    )
+    obj = _safe_float(metrics.get("objective", float("nan")), float("nan"))
+    if np.isfinite(obj):
+        main_act_weight = float((weights or {}).get("main_activity", 6.0))
+        l_drop = _get_pkg()._main_guard_band_drop_db(bundle.l_main, fc_q)
+        r_drop = _get_pkg()._main_guard_band_drop_db(bundle.r_main, fc_q)
+        drop_vals = [v for v in (l_drop, r_drop) if np.isfinite(v)]
+        if drop_vals:
+            avg_drop = float(np.mean(np.asarray(drop_vals, dtype=float)))
+            obj -= main_act_weight * max(0.0, avg_drop) / 12.0
+    result = (obj, metrics)
+    if cache is not None:
+        cache[cache_key] = result
+    return result
+
+
+def _direct_dac_enqueue_seed_trials(
+    study,
+    *,
+    seeds: list[dict],
+    fc_lo: float,
+    fc_hi: float,
+    delay_lo: float,
+    delay_hi: float,
+    gain_lo: float,
+    gain_hi: float,
+) -> None:
+    for seed in seeds:
         try:
             study.enqueue_trial({
-                "fc_hz": float(np.clip(_s["fc_hz"], _FC_LO, _FC_HI)),
-                "overlap_ratio": float(_s["overlap_ratio"]),
-                "sub_delay_ms": float(np.clip(_s["sub_delay_ms"], _DELAY_LO, _DELAY_HI)),
-                "sub_polarity_invert": bool(_s["sub_polarity_invert"]),
-                "sub_gain_trim_db": float(np.clip(_s["sub_gain_trim_db"], _GAIN_LO, _GAIN_HI)),
+                "fc_hz": float(np.clip(seed["fc_hz"], fc_lo, fc_hi)),
+                "overlap_ratio": float(seed["overlap_ratio"]),
+                "sub_delay_ms": float(np.clip(seed["sub_delay_ms"], delay_lo, delay_hi)),
+                "sub_polarity_invert": bool(seed["sub_polarity_invert"]),
+                "sub_gain_trim_db": float(np.clip(seed["sub_gain_trim_db"], gain_lo, gain_hi)),
             })
         except _RECOVERABLE_OPTUNA_EXCEPTIONS:
             _LOG.debug("Direct-DAC Optuna seed enqueue failed; skipping seed", exc_info=True)
 
+
+def _direct_dac_global_search_objective(
+    trial,
+    *,
+    eval_fn,
+    callbacks=None,
+    trials: int,
+    best_global: list[float],
+    trial_n: list[int],
+    fc_lo: float,
+    fc_hi: float,
+    delay_lo: float,
+    delay_hi: float,
+    gain_lo: float,
+    gain_hi: float,
+) -> float:
+    fc = float(trial.suggest_float("fc_hz", fc_lo, fc_hi))
+    overlap_ratio = float(trial.suggest_categorical("overlap_ratio", list(DIRECT_DAC_OVERLAP_RATIOS)))
+    delay_ms = float(trial.suggest_float("sub_delay_ms", delay_lo, delay_hi))
+    polarity = bool(trial.suggest_categorical("sub_polarity_invert", [False, True]))
+    gain_db = float(trial.suggest_float("sub_gain_trim_db", gain_lo, gain_hi))
+    obj, _ = eval_fn(fc, overlap_ratio, delay_ms, polarity, gain_db)
+    if not np.isfinite(obj):
+        return float("-inf")
+    trial_n[0] += 1
+    improved = obj > best_global[0] + 0.005
+    if improved:
+        best_global[0] = obj
+    if trial_n[0] % 4 == 0 or improved:
+        _status_callback(
+            callbacks,
+            f"DecayCore automatic mode: bass integration optuna search "
+            f"(trial {trial_n[0]}/{trials})"
+        )
+    return float(obj)
+
+
+def _direct_dac_extract_best_params(
+    study,
+    *,
+    fc_lo: float,
+    fc_hi: float,
+    delay_lo: float,
+    delay_hi: float,
+    gain_lo: float,
+    gain_hi: float,
+) -> tuple[float, float, float, bool, float]:
+    best_fc = 80.0
+    best_ratio = MIN_DIRECT_DAC_OVERLAP_RATIO
+    best_delay = 0.0
+    best_polarity = False
+    best_gain = 0.0
+    try:
+        _gb = study.best_trial
+        best_fc = float(np.clip(_gb.params.get("fc_hz", 80.0), fc_lo, fc_hi))
+        best_ratio = float(_gb.params.get("overlap_ratio", MIN_DIRECT_DAC_OVERLAP_RATIO))
+        best_delay = float(np.clip(_gb.params.get("sub_delay_ms", 0.0), delay_lo, delay_hi))
+        best_polarity = bool(_gb.params.get("sub_polarity_invert", False))
+        best_gain = float(np.clip(_gb.params.get("sub_gain_trim_db", 0.0), gain_lo, gain_hi))
+    except _RECOVERABLE_OPTUNA_EXCEPTIONS:
+        _LOG.debug("Direct-DAC Optuna global best extraction failed; using default candidate", exc_info=True)
+    return float(best_fc), float(best_ratio), float(best_delay), bool(best_polarity), float(best_gain)
+
+
+def _direct_dac_run_global_search(
+    *,
+    bundle: BassIntegrationBundle,
+    profile: str,
+    hpf_order_i: int,
+    lpf_order_i: int,
+    sub_hpf_hz_f: float,
+    sub_hpf_order_i: int,
+    combine_mode_norm: str,
+    weights: dict[str, float],
+    seeds: list[dict],
+    callbacks=None,
+    trials: int,
+    startup_trials: int,
+) -> tuple[Any, float, float, float, bool, float, Any]:
+    try:
+        import optuna as _optuna  # type: ignore
+        _optuna.logging.set_verbosity(_optuna.logging.WARNING)
+    except _RECOVERABLE_OPTUNA_EXCEPTIONS:
+        _LOG.debug("Optuna unavailable for Direct-DAC prepare; falling back to builtin", exc_info=True)
+        return None, float("nan"), 80.0, MIN_DIRECT_DAC_OVERLAP_RATIO, False, 0.0, None
+
+    sampler = _optuna.samplers.TPESampler(n_startup_trials=int(startup_trials), seed=42)
+    study = _optuna.create_study(direction="maximize", sampler=sampler)
+    eval_cache: dict = {}
+    eval_total = [0]
+    eval_hits = [0]
+
+    def _eval(fc: float, overlap_ratio: float, delay_ms: float, polarity: bool, gain_db: float) -> tuple[float, dict]:
+        eval_total[0] += 1
+        cache_key = (
+            round(float(fc), 0),
+            float(overlap_ratio),
+            round(float(delay_ms), 1),
+            bool(polarity),
+            round(float(gain_db), 1),
+            hpf_order_i,
+            lpf_order_i,
+            sub_hpf_hz_f,
+            sub_hpf_order_i,
+            str(profile),
+            combine_mode_norm,
+        )
+        cached = eval_cache.get(cache_key)
+        if cached is not None:
+            eval_hits[0] += 1
+            return cached
+        result = _direct_dac_eval_candidate(
+            bundle,
+            fc,
+            overlap_ratio,
+            delay_ms,
+            polarity,
+            gain_db,
+            profile=profile,
+            hpf_order_i=hpf_order_i,
+            lpf_order_i=lpf_order_i,
+            sub_hpf_hz_f=sub_hpf_hz_f,
+            sub_hpf_order_i=sub_hpf_order_i,
+            combine_mode_norm=combine_mode_norm,
+            weights=weights,
+        )
+        eval_cache[cache_key] = result
+        return result
+
+    _direct_dac_enqueue_seed_trials(
+        study,
+        seeds=seeds,
+        fc_lo=float(AVR_CROSSOVER_CANDIDATES[0]),
+        fc_hi=float(AVR_CROSSOVER_CANDIDATES[-1]),
+        delay_lo=float(min(DIRECT_DAC_ALIGNMENT_DELAY_CANDIDATES_MS)),
+        delay_hi=float(max(DIRECT_DAC_ALIGNMENT_DELAY_CANDIDATES_MS)),
+        gain_lo=float(min(DIRECT_DAC_ALIGNMENT_GAIN_CANDIDATES_DB)),
+        gain_hi=float(max(DIRECT_DAC_ALIGNMENT_GAIN_CANDIDATES_DB)),
+    )
+
     _best_global = [float("-inf")]
     _trial_n = [0]
-
-    def _objective(trial) -> float:
-        fc = float(trial.suggest_float("fc_hz", _FC_LO, _FC_HI))
-        overlap_ratio = float(trial.suggest_categorical("overlap_ratio", list(DIRECT_DAC_OVERLAP_RATIOS)))
-        delay_ms = float(trial.suggest_float("sub_delay_ms", _DELAY_LO, _DELAY_HI))
-        polarity = bool(trial.suggest_categorical("sub_polarity_invert", [False, True]))
-        gain_db = float(trial.suggest_float("sub_gain_trim_db", _GAIN_LO, _GAIN_HI))
-        obj, _ = _eval(fc, overlap_ratio, delay_ms, polarity, gain_db)
-        if not np.isfinite(obj):
-            return float("-inf")
-        _trial_n[0] += 1
-        improved = obj > _best_global[0] + 0.005
-        if improved:
-            _best_global[0] = obj
-        if _trial_n[0] % 4 == 0 or improved:
-            _status_callback(
-                callbacks,
-                f"DecayCore automatic mode: bass integration optuna search "
-                f"(trial {_trial_n[0]}/{trials})"
-            )
-        return float(obj)
+    _objective = lambda trial: _direct_dac_global_search_objective(
+        trial,
+        eval_fn=_eval,
+        callbacks=callbacks,
+        trials=trials,
+        best_global=_best_global,
+        trial_n=_trial_n,
+        fc_lo=float(AVR_CROSSOVER_CANDIDATES[0]),
+        fc_hi=float(AVR_CROSSOVER_CANDIDATES[-1]),
+        delay_lo=float(min(DIRECT_DAC_ALIGNMENT_DELAY_CANDIDATES_MS)),
+        delay_hi=float(max(DIRECT_DAC_ALIGNMENT_DELAY_CANDIDATES_MS)),
+        gain_lo=float(min(DIRECT_DAC_ALIGNMENT_GAIN_CANDIDATES_DB)),
+        gain_hi=float(max(DIRECT_DAC_ALIGNMENT_GAIN_CANDIDATES_DB)),
+    )
 
     try:
         study.optimize(_objective, n_trials=int(trials))
     except _RECOVERABLE_OPTUNA_EXCEPTIONS:
         _LOG.debug("Direct-DAC Optuna global search failed; using best available seed/default", exc_info=True)
 
-    # Extract global best params
-    best_fc = 80.0
-    best_ratio = 1.0
-    best_delay = 0.0
-    best_polarity = False
-    best_gain = 0.0
-    try:
-        _gb = study.best_trial
-        best_fc = float(np.clip(_gb.params.get("fc_hz", 80.0), _FC_LO, _FC_HI))
-        best_ratio = float(_gb.params.get("overlap_ratio", MIN_DIRECT_DAC_OVERLAP_RATIO))
-        best_delay = float(np.clip(_gb.params.get("sub_delay_ms", 0.0), _DELAY_LO, _DELAY_HI))
-        best_polarity = bool(_gb.params.get("sub_polarity_invert", False))
-        best_gain = float(np.clip(_gb.params.get("sub_gain_trim_db", 0.0), _GAIN_LO, _GAIN_HI))
-    except _RECOVERABLE_OPTUNA_EXCEPTIONS:
-        _LOG.debug("Direct-DAC Optuna global best extraction failed; using default candidate", exc_info=True)
+    best_fc, best_ratio, best_delay, best_polarity, best_gain = _direct_dac_extract_best_params(
+        study,
+        fc_lo=float(AVR_CROSSOVER_CANDIDATES[0]),
+        fc_hi=float(AVR_CROSSOVER_CANDIDATES[-1]),
+        delay_lo=float(min(DIRECT_DAC_ALIGNMENT_DELAY_CANDIDATES_MS)),
+        delay_hi=float(max(DIRECT_DAC_ALIGNMENT_DELAY_CANDIDATES_MS)),
+        gain_lo=float(min(DIRECT_DAC_ALIGNMENT_GAIN_CANDIDATES_DB)),
+        gain_hi=float(max(DIRECT_DAC_ALIGNMENT_GAIN_CANDIDATES_DB)),
+    )
 
-    # --- Local refine around best ---
+    setattr(study, "_decaycore_eval_total", eval_total[0])
+    setattr(study, "_decaycore_eval_hits", eval_hits[0])
+    setattr(study, "_decaycore_eval_cache", eval_cache)
+    return study, float(best_fc), float(best_ratio), float(best_delay), bool(best_polarity), float(best_gain), _eval
+
+
+def _direct_dac_run_local_refine(
+    *,
+    study,
+    eval_fn,
+    best_fc: float,
+    best_ratio: float,
+    best_delay: float,
+    best_polarity: bool,
+    best_gain: float,
+    callbacks=None,
+    local_trials: int,
+) -> tuple[Any, float, float, float, bool, float]:
+    try:
+        import optuna as _optuna  # type: ignore
+    except _RECOVERABLE_OPTUNA_EXCEPTIONS:
+        return None, best_fc, best_ratio, best_delay, best_polarity, best_gain
+
     _status_callback(callbacks, "DecayCore automatic mode: bass integration optuna local refine")
 
-    local_fc_lo = float(np.clip(best_fc - 10.0, _FC_LO, _FC_HI))
-    local_fc_hi = float(np.clip(best_fc + 10.0, _FC_LO, _FC_HI))
-    local_delay_lo = float(np.clip(best_delay - 2.0, _DELAY_LO, _DELAY_HI))
-    local_delay_hi = float(np.clip(best_delay + 2.0, _DELAY_LO, _DELAY_HI))
-    local_gain_lo = float(np.clip(best_gain - 2.0, _GAIN_LO, _GAIN_HI))
-    local_gain_hi = float(np.clip(best_gain + 2.0, _GAIN_LO, _GAIN_HI))
+    local_fc_lo = float(np.clip(best_fc - 10.0, float(AVR_CROSSOVER_CANDIDATES[0]), float(AVR_CROSSOVER_CANDIDATES[-1])))
+    local_fc_hi = float(np.clip(best_fc + 10.0, float(AVR_CROSSOVER_CANDIDATES[0]), float(AVR_CROSSOVER_CANDIDATES[-1])))
+    local_delay_lo = float(np.clip(best_delay - 2.0, float(min(DIRECT_DAC_ALIGNMENT_DELAY_CANDIDATES_MS)), float(max(DIRECT_DAC_ALIGNMENT_DELAY_CANDIDATES_MS))))
+    local_delay_hi = float(np.clip(best_delay + 2.0, float(min(DIRECT_DAC_ALIGNMENT_DELAY_CANDIDATES_MS)), float(max(DIRECT_DAC_ALIGNMENT_DELAY_CANDIDATES_MS))))
+    local_gain_lo = float(np.clip(best_gain - 2.0, float(min(DIRECT_DAC_ALIGNMENT_GAIN_CANDIDATES_DB)), float(max(DIRECT_DAC_ALIGNMENT_GAIN_CANDIDATES_DB))))
+    local_gain_hi = float(np.clip(best_gain + 2.0, float(min(DIRECT_DAC_ALIGNMENT_GAIN_CANDIDATES_DB)), float(max(DIRECT_DAC_ALIGNMENT_GAIN_CANDIDATES_DB))))
 
-    # Polarity: lock unless competing polarities are near-tie
     _polarity_tie = False
     try:
-        _opp_obj, _ = _eval(best_fc, best_ratio, best_delay, not best_polarity, best_gain)
-        _cur_obj, _ = _eval(best_fc, best_ratio, best_delay, best_polarity, best_gain)
+        _opp_obj, _ = eval_fn(best_fc, best_ratio, best_delay, not best_polarity, best_gain)
+        _cur_obj, _ = eval_fn(best_fc, best_ratio, best_delay, best_polarity, best_gain)
         _polarity_tie = (
             np.isfinite(_opp_obj) and np.isfinite(_cur_obj)
             and abs(_opp_obj - _cur_obj) < 0.05
@@ -317,7 +454,6 @@ def recommend_direct_dac_prepare_optuna(
         _LOG.debug("Direct-DAC Optuna polarity tie check failed; locking current polarity", exc_info=True)
     local_polarity_choices = [False, True] if _polarity_tie else [best_polarity]
 
-    # Overlap ratio: allow ±1 step around best
     _ratio_list = list(DIRECT_DAC_OVERLAP_RATIOS)
     try:
         _ratio_idx = _ratio_list.index(best_ratio)
@@ -350,7 +486,7 @@ def recommend_direct_dac_prepare_optuna(
         delay_ms = float(trial.suggest_float("sub_delay_ms", local_delay_lo, local_delay_hi))
         polarity = bool(trial.suggest_categorical("sub_polarity_invert", local_polarity_choices))
         gain_db = float(trial.suggest_float("sub_gain_trim_db", local_gain_lo, local_gain_hi))
-        obj, _ = _eval(fc, overlap_ratio, delay_ms, polarity, gain_db)
+        obj, _ = eval_fn(fc, overlap_ratio, delay_ms, polarity, gain_db)
         return float(obj) if np.isfinite(obj) else float("-inf")
 
     try:
@@ -358,22 +494,46 @@ def recommend_direct_dac_prepare_optuna(
     except _RECOVERABLE_OPTUNA_EXCEPTIONS:
         _LOG.debug("Direct-DAC Optuna local refine failed; keeping global best", exc_info=True)
 
-    # Pick best of global + local
     try:
         _lb = local_study.best_trial
         _gb_val = study.best_value if study.trials else float("-inf")
         if _lb.value is not None and np.isfinite(_lb.value) and _lb.value > (_gb_val or float("-inf")):
-            best_fc = float(np.clip(_lb.params.get("fc_hz", best_fc), _FC_LO, _FC_HI))
+            best_fc = float(np.clip(_lb.params.get("fc_hz", best_fc), float(AVR_CROSSOVER_CANDIDATES[0]), float(AVR_CROSSOVER_CANDIDATES[-1])))
             best_ratio = float(_lb.params.get("overlap_ratio", best_ratio))
-            best_delay = float(np.clip(_lb.params.get("sub_delay_ms", best_delay), _DELAY_LO, _DELAY_HI))
+            best_delay = float(np.clip(_lb.params.get("sub_delay_ms", best_delay), float(min(DIRECT_DAC_ALIGNMENT_DELAY_CANDIDATES_MS)), float(max(DIRECT_DAC_ALIGNMENT_DELAY_CANDIDATES_MS))))
             best_polarity = bool(_lb.params.get("sub_polarity_invert", best_polarity))
-            best_gain = float(np.clip(_lb.params.get("sub_gain_trim_db", best_gain), _GAIN_LO, _GAIN_HI))
+            best_gain = float(np.clip(_lb.params.get("sub_gain_trim_db", best_gain), float(min(DIRECT_DAC_ALIGNMENT_GAIN_CANDIDATES_DB)), float(max(DIRECT_DAC_ALIGNMENT_GAIN_CANDIDATES_DB))))
     except _RECOVERABLE_OPTUNA_EXCEPTIONS:
         _LOG.debug("Direct-DAC Optuna local best extraction failed; keeping global best", exc_info=True)
 
-    # Final evaluation of chosen params
+    return local_study, best_fc, best_ratio, best_delay, best_polarity, best_gain
+
+
+def _direct_dac_finalize_prepare_result(
+    *,
+    bundle: BassIntegrationBundle,
+    profile: str,
+    hpf_order_i: int,
+    lpf_order_i: int,
+    sub_hpf_hz_f: float,
+    sub_hpf_order_i: int,
+    combine_mode_norm: str,
+    allpass_auto_enable: bool,
+    callbacks=None,
+    baseline_obj: float,
+    baseline_snap: dict,
+    study,
+    local_study,
+    eval_fn,
+    best_fc: float,
+    best_ratio: float,
+    best_delay: float,
+    best_polarity: bool,
+    best_gain: float,
+    weights: dict[str, float],
+) -> dict[str, Any]:
     best_sub_lpf = float(best_fc * best_ratio)
-    _, optimized_metrics = _eval(best_fc, best_ratio, best_delay, best_polarity, best_gain)
+    _, optimized_metrics = eval_fn(best_fc, best_ratio, best_delay, best_polarity, best_gain)
     optimized_obj = _safe_float(optimized_metrics.get("objective", float("nan")), float("nan"))
     optimized_snap = _final_metric_snapshot(optimized_metrics)
     candidate_score = _safe_float(
@@ -389,7 +549,6 @@ def recommend_direct_dac_prepare_optuna(
         else float("nan")
     )
 
-    # Acceptance guards: reject if not meaningfully better or if quality worsens
     _opt_cancel = _safe_float(optimized_snap.get("cancellation_risk", float("nan")), float("nan"))
     _base_cancel = _safe_float(baseline_snap.get("cancellation_risk", float("nan")), float("nan"))
     _opt_ripple = _safe_float(optimized_snap.get("overlap_ripple_db", float("nan")), float("nan"))
@@ -446,13 +605,14 @@ def recommend_direct_dac_prepare_optuna(
     except _RECOVERABLE_OPTUNA_EXCEPTIONS:
         _LOG.debug("Direct-DAC Optuna local trial count unavailable", exc_info=True)
 
-    # Memoization telemetry
-    _unique_evals = len(_eval_cache)
-    _hit_ratio = float(_eval_hits[0]) / max(1, _eval_total[0])
+    _unique_evals = len(getattr(study, "_decaycore_eval_cache", {}) or {})
+    _eval_total = int(getattr(study, "_decaycore_eval_total", 0) or 0)
+    _eval_hits = int(getattr(study, "_decaycore_eval_hits", 0) or 0)
+    _hit_ratio = float(_eval_hits) / max(1, _eval_total)
     _LOG.info(
         f"Bass-integration Optuna: trials={_study_trials}, "
-        f"evals={_eval_total[0]}, unique={_unique_evals}, "
-        f"cache_hits={_eval_hits[0]} ({_hit_ratio:.0%})"
+        f"evals={_eval_total}, unique={_unique_evals}, "
+        f"cache_hits={_eval_hits} ({_hit_ratio:.0%})"
     )
 
     _status_callback(callbacks, "DecayCore automatic mode: bass integration diagnostics refresh")
@@ -474,4 +634,107 @@ def recommend_direct_dac_prepare_optuna(
         candidate_score=candidate_score,
         reject_reasons=reject_reasons,
         worst_channel=worst_channel,
+    )
+
+
+def recommend_direct_dac_prepare_optuna(
+    bundle: BassIntegrationBundle,
+    *,
+    profile: str,
+    main_hpf_order: int,
+    sub_lpf_order: int,
+    sub_hpf_hz: float,
+    sub_hpf_order: int,
+    sub_combine_mode: str = "average",
+    allpass_auto_enable: bool = False,
+    trials: int = 48,
+    startup_trials: int = 12,
+    local_trials: int = 12,
+    callbacks=None,
+) -> dict[str, Any]:
+    """Unified Optuna-based Direct-DAC bass integration prepare.
+
+    Replaces the three separate staged passes (alignment, crossover, allpass)
+    with one joint search over fc, overlap_ratio, delay, polarity, and gain.
+    Falls back to builtin staged approach if optuna is unavailable.
+    """
+    combine_mode_norm = normalize_sub_combine_mode(sub_combine_mode)
+    hpf_order_i = max(1, int(main_hpf_order))
+    lpf_order_i = max(1, int(sub_lpf_order))
+    sub_hpf_hz_f = max(0.0, float(sub_hpf_hz))
+    sub_hpf_order_i = max(1, int(sub_hpf_order))
+
+    weights = _auto_bass_integration_profile_weights(profile)
+    seeds, baseline_obj, baseline_metrics = _direct_dac_build_seed_candidates(
+        bundle,
+        profile=profile,
+        hpf_order_i=hpf_order_i,
+        lpf_order_i=lpf_order_i,
+        sub_hpf_hz_f=sub_hpf_hz_f,
+        sub_hpf_order_i=sub_hpf_order_i,
+        combine_mode_norm=combine_mode_norm,
+        callbacks=callbacks,
+    )
+    baseline_snap = _final_metric_snapshot(baseline_metrics)
+
+    study, best_fc, best_ratio, best_delay, best_polarity, best_gain, eval_fn = _direct_dac_run_global_search(
+        bundle=bundle,
+        profile=profile,
+        hpf_order_i=hpf_order_i,
+        lpf_order_i=lpf_order_i,
+        sub_hpf_hz_f=sub_hpf_hz_f,
+        sub_hpf_order_i=sub_hpf_order_i,
+        combine_mode_norm=combine_mode_norm,
+        weights=weights,
+        seeds=seeds,
+        callbacks=callbacks,
+        trials=trials,
+        startup_trials=startup_trials,
+    )
+    if study is None:
+        return _recommend_direct_dac_prepare_builtin_core(
+            bundle,
+            profile=profile,
+            main_hpf_order=hpf_order_i,
+            sub_lpf_order=lpf_order_i,
+            sub_hpf_hz=sub_hpf_hz_f,
+            sub_hpf_order=sub_hpf_order_i,
+            sub_combine_mode=combine_mode_norm,
+            allpass_auto_enable=allpass_auto_enable,
+            callbacks=callbacks,
+        )
+
+    local_study, best_fc, best_ratio, best_delay, best_polarity, best_gain = _direct_dac_run_local_refine(
+        study=study,
+        eval_fn=eval_fn,
+        best_fc=best_fc,
+        best_ratio=best_ratio,
+        best_delay=best_delay,
+        best_polarity=best_polarity,
+        best_gain=best_gain,
+        callbacks=callbacks,
+        local_trials=local_trials,
+    )
+
+    return _direct_dac_finalize_prepare_result(
+        bundle=bundle,
+        profile=profile,
+        hpf_order_i=hpf_order_i,
+        lpf_order_i=lpf_order_i,
+        sub_hpf_hz_f=sub_hpf_hz_f,
+        sub_hpf_order_i=sub_hpf_order_i,
+        combine_mode_norm=combine_mode_norm,
+        allpass_auto_enable=allpass_auto_enable,
+        callbacks=callbacks,
+        baseline_obj=baseline_obj,
+        baseline_snap=baseline_snap,
+        study=study,
+        local_study=local_study,
+        eval_fn=eval_fn,
+        best_fc=best_fc,
+        best_ratio=best_ratio,
+        best_delay=best_delay,
+        best_polarity=best_polarity,
+        best_gain=best_gain,
+        weights=weights,
     )

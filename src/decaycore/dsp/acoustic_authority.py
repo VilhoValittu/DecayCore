@@ -344,7 +344,7 @@ def build_acoustic_authority_map(
     )
 
 
-def acoustic_authority_to_stats(authority: AcousticAuthority, *, include_arrays: bool = True) -> dict:
+def acoustic_authority_to_stats(authority: AcousticAuthority, *, include_arrays: bool | str = True) -> dict:
     freq = _as_float_array(authority.freq_axis)
     cut = _clip01(authority.cut_authority)
     boost = _clip01(authority.boost_authority)
@@ -373,6 +373,16 @@ def acoustic_authority_to_stats(authority: AcousticAuthority, *, include_arrays:
         "authority_modal_support_peak_20_300": _peak(_band_values(modal, freq, 20.0, 300.0)),
     }
     if include_arrays:
+        scoring_only = str(include_arrays).strip().lower() == "scoring"
+        if scoring_only:
+            stats.update(
+                {
+                    "authority_modal_support": modal.tolist(),
+                    "authority_null_risk": null.tolist(),
+                    "authority_voice_risk": voice.tolist(),
+                }
+            )
+            return stats
         stats.update(
             {
                 "authority_cut": cut.tolist(),

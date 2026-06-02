@@ -113,6 +113,283 @@ def _as_int(value: Any, default: int = 0) -> int:
         return int(default)
 
 
+def _build_config_apply_mode_clamp(cfg: FilterConfig, mode_u: str) -> None:
+    try:
+        apply_mode_to_cfg(cfg, mode_u, apply_defaults=False)
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
+        logger.warning(f"Mode clamp apply failed ({mode_u}): {exc}")
+
+
+def _build_config_apply_resolved_policies(cfg: FilterConfig, data: dict) -> None:
+    try:
+        overlay_data = data.get("_stereo_resolved_auto_policies", None)
+        resolved_policies = StereoResolvedAutoPolicies.from_dict(overlay_data)
+        setattr(cfg, "stereo_resolved_auto_policies", resolved_policies)
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        logger.exception("stereo_resolved_auto_policies attr set")
+
+
+def _build_config_apply_basic_stereo_clamp(cfg: FilterConfig, mode_u: str) -> None:
+    try:
+        stereo_policy = getattr(cfg, "stereo_auto_policy", None)
+        if mode_u == "BASIC" and stereo_policy is not None:
+            setattr(stereo_policy, "enable_channel_specific_auto_policy", False)
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        logger.exception("stereo_auto_policy basic clamp")
+
+
+def _build_config_safe_auto_goal(data: dict) -> str:
+    try:
+        return _auto_goal_norm(str(data.get("auto_goal", "balanced") or "balanced"))
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        logger.debug("auto_goal normalisation failed, using balanced", exc_info=True)
+        return "balanced"
+
+
+def _build_config_apply_unsafe_raw(cfg: FilterConfig, data: dict, *, mode_u: str, auto_goal: str, max_safe_boost: float) -> None:
+    unsafe_raw_req = bool(data.get("unsafe_raw_dsp", False))
+    unsafe_raw_auto = bool(mode_u == "AUTO" and auto_goal == AUTO_MODE_GOAL_FLAT)
+    unsafe_raw = bool(unsafe_raw_req and (mode_u == "ADVANCED" or unsafe_raw_auto))
+    try:
+        setattr(cfg, "unsafe_raw_dsp", bool(unsafe_raw))
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        logger.exception("unsafe_raw_dsp attr set")
+
+    try:
+        _apply_max_boost_safety_cap(cfg, max_safe_boost=float(max_safe_boost), unsafe_raw=bool(unsafe_raw))
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        logger.exception("max_boost_db safety cap apply")
+    if unsafe_raw:
+        try:
+            setattr(cfg, "max_boost_db", float(max(120.0, float(getattr(cfg, "max_boost_db", 0.0) or 0.0))))
+            setattr(cfg, "max_cut_db", float(max(120.0, abs(float(getattr(cfg, "max_cut_db", 0.0) or 0.0)))))
+            setattr(cfg, "max_slope_db_per_oct", 0.0)
+            setattr(cfg, "max_slope_boost_db_per_oct", 0.0)
+            setattr(cfg, "max_slope_cut_db_per_oct", 0.0)
+            setattr(cfg, "reg_strength", 0.0)
+            setattr(cfg, "low_bass_cut_enable", False)
+            setattr(cfg, "low_bass_cut_hz", 0.0)
+            setattr(cfg, "low_bass_cut_strength", 0.0)
+            setattr(cfg, "exc_prot", False)
+            setattr(cfg, "bass_boost_cap_enable", False)
+            setattr(cfg, "bass_boost_post_restore_enable", False)
+            setattr(cfg, "bass_smooth_adaptive", False)
+            setattr(cfg, "enable_ir_pre_energy_guard", False)
+            logger.info("UNSAFE Raw DSP: guard rails disabled (FOR TEST USE ONLY)")
+        except (
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
+            logger.exception("unsafe raw DSP guard rail disable")
+
+
+def _build_config_detect_is_wav_source(data: dict) -> bool:
+    try:
+        if "_is_wav_source" in data:
+            return bool(data.get("_is_wav_source"))
+        return bool(detect_is_wav_source(data))
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        return False
+
+
+def _build_config_apply_post_mode_settings(cfg: FilterConfig, data: dict) -> None:
+    irw_raw = data.get("ir_export_window_mode", data.get("ir_window_mode", "auto"))
+    irw_mode = str(irw_raw or "auto").strip().lower()
+    if irw_mode not in ("auto", "off", "rew_sym", "rew_asym"):
+        irw_mode = "auto"
+    sh = str(data.get("ir_export_window_shape", "hann") or "hann").strip().lower()
+    if sh not in ("hann", "tukey"):
+        sh = "hann"
+    tukey_alpha = float(np.clip(_as_float(data.get("ir_export_tukey_alpha", 0.25), 0.25), 0.0, 1.0))
+
+    filter_type_s = str(getattr(cfg, "filter_type_str", data.get("filter_type", "")) or "").strip().lower()
+    if "asym" in filter_type_s:
+        irw_mode = "rew_asym"
+        sh = "tukey"
+        tukey_alpha = 0.25
+
+    setattr(cfg, "ir_export_window_mode", irw_mode)
+    setattr(cfg, "ir_export_window_shape", sh)
+    setattr(cfg, "ir_export_tukey_alpha", float(tukey_alpha))
+
+    try:
+        setattr(cfg, "ir_window", float(data.get("ir_window", getattr(cfg, "ir_window", 500.0)) or 500.0))
+        setattr(cfg, "ir_window_left", float(data.get("ir_window_left", getattr(cfg, "ir_window_left", 120.0)) or 120.0))
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        logger.exception("ir_window attr set")
+    try:
+        ir_anchor_mode = str(data.get("ir_anchor_mode", getattr(cfg, "ir_anchor_mode", "min_causal")) or "min_causal").strip().lower()
+        if ir_anchor_mode not in ("peak", "centroid", "min_causal"):
+            ir_anchor_mode = "min_causal"
+        setattr(cfg, "ir_anchor_mode", ir_anchor_mode)
+        setattr(cfg, "min_causal_ms", float(max(0.0, _as_float(data.get("min_causal_ms", getattr(cfg, "min_causal_ms", 80.0)), 80.0))))
+        setattr(
+            cfg,
+            "auto_asym_left_ratio",
+            float(np.clip(_as_float(data.get("auto_asym_left_ratio", getattr(cfg, "auto_asym_left_ratio", 0.35)), 0.35), 0.0, 1.0)),
+        )
+        setattr(
+            cfg,
+            "auto_asym_left_max_ms",
+            float(max(0.0, _as_float(data.get("auto_asym_left_max_ms", getattr(cfg, "auto_asym_left_max_ms", 25.0)), 25.0))),
+        )
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        logger.exception("ir anchor/asym attr set")
+    try:
+        setattr(
+            cfg,
+            "enable_ir_pre_energy_guard",
+            bool(data.get("enable_ir_pre_energy_guard", getattr(cfg, "enable_ir_pre_energy_guard", True))),
+        )
+        setattr(
+            cfg,
+            "pre_energy_ratio_max",
+            float(max(0.0, _as_float(data.get("pre_energy_ratio_max", getattr(cfg, "pre_energy_ratio_max", 0.25)), 0.25))),
+        )
+        setattr(
+            cfg,
+            "pre_energy_guard_strength",
+            float(np.clip(_as_float(data.get("pre_energy_guard_strength", getattr(cfg, "pre_energy_guard_strength", 0.8)), 0.8), 0.0, 1.0)),
+        )
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        logger.exception("pre_energy_guard attr set")
+
+    is_wav = _build_config_detect_is_wav_source(data)
+    try:
+        setattr(cfg, "is_wav_source", bool(is_wav))
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        logger.exception("is_wav_source attr set")
+
+
 def build_config(
     ui_data: dict,
     preset: dict | None = None,
@@ -159,275 +436,11 @@ def build_config(
     )
 
     mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
-    try:
-        apply_mode_to_cfg(cfg, mode_u, apply_defaults=False)
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ) as exc:
-        logger.warning(f"Mode clamp apply failed ({mode_u}): {exc}")
-    try:
-        overlay_data = data.get("_stereo_resolved_auto_policies", None)
-        resolved_policies = StereoResolvedAutoPolicies.from_dict(overlay_data)
-        setattr(cfg, "stereo_resolved_auto_policies", resolved_policies)
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        logger.exception("stereo_resolved_auto_policies attr set")
-    try:
-        stereo_policy = getattr(cfg, "stereo_auto_policy", None)
-        if mode_u == "BASIC" and stereo_policy is not None:
-            setattr(stereo_policy, "enable_channel_specific_auto_policy", False)
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        logger.exception("stereo_auto_policy basic clamp")
-    unsafe_raw_req = bool(data.get("unsafe_raw_dsp", False))
-    try:
-        auto_goal = _auto_goal_norm(str(data.get("auto_goal", "balanced") or "balanced"))
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        logger.debug("auto_goal normalisation failed, using balanced", exc_info=True)
-        auto_goal = "balanced"
-    unsafe_raw_auto = bool(mode_u == "AUTO" and auto_goal == AUTO_MODE_GOAL_FLAT)
-    unsafe_raw = bool(unsafe_raw_req and (mode_u == "ADVANCED" or unsafe_raw_auto))
-    try:
-        setattr(cfg, "unsafe_raw_dsp", bool(unsafe_raw))
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        logger.exception("unsafe_raw_dsp attr set")
-
-    irw_raw = data.get("ir_export_window_mode", data.get("ir_window_mode", "auto"))
-    irw_mode = str(irw_raw or "auto").strip().lower()
-    if irw_mode not in ("auto", "off", "rew_sym", "rew_asym"):
-        irw_mode = "auto"
-    sh = str(data.get("ir_export_window_shape", "hann") or "hann").strip().lower()
-    if sh not in ("hann", "tukey"):
-        sh = "hann"
-    tukey_alpha = float(np.clip(_as_float(data.get("ir_export_tukey_alpha", 0.25), 0.25), 0.0, 1.0))
-
-    filter_type_s = str(getattr(cfg, "filter_type_str", data.get("filter_type", "")) or "").strip().lower()
-    if "asym" in filter_type_s:
-        irw_mode = "rew_asym"
-        sh = "tukey"
-        tukey_alpha = 0.25
-
-    setattr(cfg, "ir_export_window_mode", irw_mode)
-    setattr(cfg, "ir_export_window_shape", sh)
-    setattr(cfg, "ir_export_tukey_alpha", float(tukey_alpha))
-
-    try:
-        setattr(cfg, "ir_window", float(data.get("ir_window", getattr(cfg, "ir_window", 500.0)) or 500.0))
-        setattr(cfg, "ir_window_left", float(data.get("ir_window_left", getattr(cfg, "ir_window_left", 120.0)) or 120.0))
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        logger.exception("ir_window attr set")
-    try:
-        ir_anchor_mode = str(data.get("ir_anchor_mode", getattr(cfg, "ir_anchor_mode", "min_causal")) or "min_causal").strip().lower()
-        if ir_anchor_mode not in ("peak", "centroid", "min_causal"):
-            ir_anchor_mode = "min_causal"
-        setattr(cfg, "ir_anchor_mode", ir_anchor_mode)
-        setattr(cfg, "min_causal_ms", float(max(0.0, _as_float(data.get("min_causal_ms", getattr(cfg, "min_causal_ms", 80.0)), 80.0))))
-        setattr(
-            cfg,
-            "auto_asym_left_ratio",
-            float(np.clip(_as_float(data.get("auto_asym_left_ratio", getattr(cfg, "auto_asym_left_ratio", 0.35)), 0.35), 0.0, 1.0)),
-        )
-        setattr(
-            cfg,
-            "auto_asym_left_max_ms",
-            float(max(0.0, _as_float(data.get("auto_asym_left_max_ms", getattr(cfg, "auto_asym_left_max_ms", 25.0)), 25.0))),
-        )
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        logger.exception("ir anchor/asym attr set")
-    try:
-        setattr(
-            cfg,
-            "enable_ir_pre_energy_guard",
-            bool(data.get("enable_ir_pre_energy_guard", getattr(cfg, "enable_ir_pre_energy_guard", True))),
-        )
-        setattr(
-            cfg,
-            "pre_energy_ratio_max",
-            float(max(0.0, _as_float(data.get("pre_energy_ratio_max", getattr(cfg, "pre_energy_ratio_max", 0.25)), 0.25))),
-        )
-        setattr(
-            cfg,
-            "pre_energy_guard_strength",
-            float(np.clip(_as_float(data.get("pre_energy_guard_strength", getattr(cfg, "pre_energy_guard_strength", 0.8)), 0.8), 0.0, 1.0)),
-        )
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        logger.exception("pre_energy_guard attr set")
-
-    try:
-        _apply_max_boost_safety_cap(cfg, max_safe_boost=float(max_safe_boost), unsafe_raw=bool(unsafe_raw))
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        logger.exception("max_boost_db safety cap apply")
-    if unsafe_raw:
-        try:
-            setattr(cfg, "max_boost_db", float(max(120.0, float(getattr(cfg, "max_boost_db", 0.0) or 0.0))))
-            setattr(cfg, "max_cut_db", float(max(120.0, abs(float(getattr(cfg, "max_cut_db", 0.0) or 0.0)))))
-            setattr(cfg, "max_slope_db_per_oct", 0.0)
-            setattr(cfg, "max_slope_boost_db_per_oct", 0.0)
-            setattr(cfg, "max_slope_cut_db_per_oct", 0.0)
-            setattr(cfg, "reg_strength", 0.0)
-            setattr(cfg, "low_bass_cut_enable", False)
-            setattr(cfg, "low_bass_cut_hz", 0.0)
-            setattr(cfg, "low_bass_cut_strength", 0.0)
-            setattr(cfg, "exc_prot", False)
-            setattr(cfg, "bass_boost_cap_enable", False)
-            setattr(cfg, "bass_boost_post_restore_enable", False)
-            setattr(cfg, "bass_smooth_adaptive", False)
-            setattr(cfg, "enable_ir_pre_energy_guard", False)
-            logger.info("UNSAFE Raw DSP: guard rails disabled (FOR TEST USE ONLY)")
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            logger.exception("unsafe raw DSP guard rail disable")
-
-    is_wav = False
-    try:
-        if "_is_wav_source" in data:
-            is_wav = bool(data.get("_is_wav_source"))
-        else:
-            is_wav = detect_is_wav_source(data)
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        is_wav = False
-    try:
-        setattr(cfg, "is_wav_source", bool(is_wav))
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        logger.exception("is_wav_source attr set")
+    _build_config_apply_mode_clamp(cfg, mode_u)
+    _build_config_apply_resolved_policies(cfg, data)
+    _build_config_apply_basic_stereo_clamp(cfg, mode_u)
+    auto_goal = _build_config_safe_auto_goal(data)
+    _build_config_apply_unsafe_raw(cfg, data, mode_u=mode_u, auto_goal=auto_goal, max_safe_boost=max_safe_boost)
+    _build_config_apply_post_mode_settings(cfg, data)
 
     return cfg

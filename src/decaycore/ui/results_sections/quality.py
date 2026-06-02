@@ -66,203 +66,200 @@ from ...dsp.lr_difference_metrics import compute_lr_difference_metrics
 
 logger = logging.getLogger("DecayCore")
 
-def _render_ir_alignment(*, l_st_f: dict) -> None:
-    """Renderöi Mittausten IR-infot -osion jos ir_align- tai ir_align_sub-data löytyy."""
-    ir_align = dict(l_st_f.get("ir_align") or {})
-    ir_align_sub = dict(l_st_f.get("ir_align_sub") or {})
-    if not ir_align and not ir_align_sub:
-        return
+def _format_ir_alignment_ms(v) -> str:
+    try:
+        x = float(v)
+        if math.isfinite(x):
+            return f"{x:+.2f} ms"
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        logger.exception("ir align ms format")
+    return "-"
 
-    def _fmt_ms(v) -> str:
-        try:
-            x = float(v)
-            if math.isfinite(x):
-                return f"{x:+.2f} ms"
-        except (
 
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            logger.exception("ir align ms format")
-        return "-"
+def _format_ir_alignment_db(v) -> str:
+    try:
+        x = float(v)
+        if math.isfinite(x):
+            return f"{x:+.1f} dB"
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        logger.exception("ir align dB format")
+    return "-"
 
-    def _fmt_db(v) -> str:
-        try:
-            x = float(v)
-            if math.isfinite(x):
-                return f"{x:+.1f} dB"
-        except (
 
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            logger.exception("ir align dB format")
-        return "-"
+def _format_ir_alignment_deg(v) -> str:
+    try:
+        x = float(v)
+        if math.isfinite(x):
+            return f"{x:+.1f}°"
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        logger.exception("ir align deg format")
+    return "-"
 
-    def _fmt_deg(v) -> str:
-        try:
-            x = float(v)
-            if math.isfinite(x):
-                return f"{x:+.1f}°"
-        except (
 
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            logger.exception("ir align deg format")
-        return "-"
+def _format_ir_alignment_pct(v) -> str:
+    try:
+        x = float(v)
+        if math.isfinite(x):
+            return f"{x * 100.0:.0f}%"
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        logger.exception("ir align pct format")
+    return "-"
 
-    def _fmt_pct(v) -> str:
-        try:
-            x = float(v)
-            if math.isfinite(x):
-                return f"{x * 100.0:.0f}%"
-        except (
 
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            logger.exception("ir align pct format")
-        return "-"
+def _format_ir_alignment_dbfs(v) -> str:
+    try:
+        x = float(v)
+        if math.isfinite(x):
+            return f"{x:.1f} dBFS"
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        logger.exception("ir align dBFS format")
+    return "-"
 
-    def _fmt_dbfs(v) -> str:
-        try:
-            x = float(v)
-            if math.isfinite(x):
-                return f"{x:.1f} dBFS"
-        except (
 
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            logger.exception("ir align dBFS format")
-        return "-"
+def _ir_alignment_polarity_label(d: dict) -> str:
+    inv = bool(d.get("ir_align_polarity_inverted", False)) or bool(d.get("ir_align_xcorr_polarity_flip", False))
+    return t("ir_align_value_inverted") if inv else t("ir_align_value_ok")
 
-    def _polarity_str(d: dict) -> str:
-        inv = bool(d.get("ir_align_polarity_inverted", False)) or bool(d.get("ir_align_xcorr_polarity_flip", False))
-        return t("ir_align_value_inverted") if inv else t("ir_align_value_ok")
 
-    def _xo_label(d: dict) -> str:
-        xo = safe_float(d.get("ir_align_xo_hz"), None)
-        if xo is not None and math.isfinite(xo):
-            return f"{xo:.0f}"
-        return "80"
+def _ir_alignment_xo_label(d: dict) -> str:
+    xo = safe_float(d.get("ir_align_xo_hz"), None)
+    if xo is not None and math.isfinite(xo):
+        return f"{xo:.0f}"
+    return "80"
 
+
+def _build_ir_alignment_rows(ir_align: dict, ir_align_sub: dict) -> list[dict]:
     rows: list[dict] = []
-
     if ir_align:
         rows.append(metric_row(f"── {t('ir_align_group_lr')} ──", "", ""))
         rows.append(metric_row(
             t("ir_align_metric_xcorr_offset"),
-            _fmt_ms(ir_align.get("ir_align_xcorr_offset_ms")),
-            _fmt_ms(ir_align.get("ir_align_xcorr_offset_ms")),
+            _format_ir_alignment_ms(ir_align.get("ir_align_xcorr_offset_ms")),
+            _format_ir_alignment_ms(ir_align.get("ir_align_xcorr_offset_ms")),
         ))
         rows.append(metric_row(
             t("ir_align_metric_xcorr_confidence"),
-            _fmt_pct(ir_align.get("ir_align_xcorr_confidence")),
-            _fmt_pct(ir_align.get("ir_align_xcorr_confidence")),
+            _format_ir_alignment_pct(ir_align.get("ir_align_xcorr_confidence")),
+            _format_ir_alignment_pct(ir_align.get("ir_align_xcorr_confidence")),
         ))
         rows.append(metric_row(
             t("ir_align_metric_polarity"),
-            _polarity_str(ir_align),
-            _polarity_str(ir_align),
+            _ir_alignment_polarity_label(ir_align),
+            _ir_alignment_polarity_label(ir_align),
         ))
         rows.append(metric_row(
             t("ir_align_metric_level_peak"),
-            _fmt_dbfs(ir_align.get("ir_align_level_peak_a_dbfs")),
-            _fmt_dbfs(ir_align.get("ir_align_level_peak_b_dbfs")),
+            _format_ir_alignment_dbfs(ir_align.get("ir_align_level_peak_a_dbfs")),
+            _format_ir_alignment_dbfs(ir_align.get("ir_align_level_peak_b_dbfs")),
         ))
         rows.append(metric_row(
             t("ir_align_metric_level_diff"),
-            _fmt_db(ir_align.get("ir_align_level_rms_diff_db")),
-            _fmt_db(ir_align.get("ir_align_level_rms_diff_db")),
+            _format_ir_alignment_db(ir_align.get("ir_align_level_rms_diff_db")),
+            _format_ir_alignment_db(ir_align.get("ir_align_level_rms_diff_db")),
         ))
 
     if ir_align_sub:
-        xo_lbl = _xo_label(ir_align_sub)
+        xo_lbl = _ir_alignment_xo_label(ir_align_sub)
         rows.append(metric_row(f"── {t('ir_align_group_sub')} ──", "", ""))
         rows.append(metric_row(
             t("ir_align_metric_xcorr_offset"),
-            _fmt_ms(ir_align_sub.get("ir_align_xcorr_offset_ms")),
-            _fmt_ms(ir_align_sub.get("ir_align_xcorr_offset_ms")),
+            _format_ir_alignment_ms(ir_align_sub.get("ir_align_xcorr_offset_ms")),
+            _format_ir_alignment_ms(ir_align_sub.get("ir_align_xcorr_offset_ms")),
         ))
         rows.append(metric_row(
             t("ir_align_metric_xcorr_confidence"),
-            _fmt_pct(ir_align_sub.get("ir_align_xcorr_confidence")),
-            _fmt_pct(ir_align_sub.get("ir_align_xcorr_confidence")),
+            _format_ir_alignment_pct(ir_align_sub.get("ir_align_xcorr_confidence")),
+            _format_ir_alignment_pct(ir_align_sub.get("ir_align_xcorr_confidence")),
         ))
         rows.append(metric_row(
             t("ir_align_metric_polarity"),
-            _polarity_str(ir_align_sub),
-            _polarity_str(ir_align_sub),
+            _ir_alignment_polarity_label(ir_align_sub),
+            _ir_alignment_polarity_label(ir_align_sub),
         ))
         rows.append(metric_row(
             t("ir_align_metric_level_peak"),
-            _fmt_dbfs(ir_align_sub.get("ir_align_level_peak_a_dbfs")),
-            _fmt_dbfs(ir_align_sub.get("ir_align_level_peak_b_dbfs")),
+            _format_ir_alignment_dbfs(ir_align_sub.get("ir_align_level_peak_a_dbfs")),
+            _format_ir_alignment_dbfs(ir_align_sub.get("ir_align_level_peak_b_dbfs")),
         ))
         rows.append(metric_row(
             t("ir_align_metric_level_diff"),
-            _fmt_db(ir_align_sub.get("ir_align_level_rms_diff_db")),
-            _fmt_db(ir_align_sub.get("ir_align_level_rms_diff_db")),
+            _format_ir_alignment_db(ir_align_sub.get("ir_align_level_rms_diff_db")),
+            _format_ir_alignment_db(ir_align_sub.get("ir_align_level_rms_diff_db")),
         ))
         rows.append(metric_row(
             t("ir_align_metric_phase_diff").format(xo=xo_lbl),
-            _fmt_deg(ir_align_sub.get("ir_align_phase_diff_deg")),
-            _fmt_deg(ir_align_sub.get("ir_align_phase_diff_deg")),
+            _format_ir_alignment_deg(ir_align_sub.get("ir_align_phase_diff_deg")),
+            _format_ir_alignment_deg(ir_align_sub.get("ir_align_phase_diff_deg")),
         ))
         rows.append(metric_row(
             t("ir_align_metric_gd").format(xo=xo_lbl),
-            _fmt_ms(ir_align_sub.get("ir_align_gd_a_ms")),
-            _fmt_ms(ir_align_sub.get("ir_align_gd_b_ms")),
+            _format_ir_alignment_ms(ir_align_sub.get("ir_align_gd_a_ms")),
+            _format_ir_alignment_ms(ir_align_sub.get("ir_align_gd_b_ms")),
         ))
         rows.append(metric_row(
             t("ir_align_metric_gd_diff"),
-            _fmt_ms(ir_align_sub.get("ir_align_gd_diff_ms")),
-            _fmt_ms(ir_align_sub.get("ir_align_gd_diff_ms")),
+            _format_ir_alignment_ms(ir_align_sub.get("ir_align_gd_diff_ms")),
+            _format_ir_alignment_ms(ir_align_sub.get("ir_align_gd_diff_ms")),
         ))
+    return rows
 
-    # Yhteenvetorivi
+
+def _build_ir_alignment_summary(ir_align: dict, ir_align_sub: dict) -> str:
     issues: list[str] = []
     for d in (ir_align, ir_align_sub):
         if not d:
@@ -281,10 +278,19 @@ def _render_ir_alignment(*, l_st_f: dict) -> None:
     seen: set[str] = set()
     unique_issues = [x for x in issues if not (x in seen or seen.add(x))]
     if unique_issues:
-        summary_line = t("ir_align_summary_issues").format(issues=", ".join(unique_issues))
-    else:
-        summary_line = t("ir_align_summary_ok")
+        return t("ir_align_summary_issues").format(issues=", ".join(unique_issues))
+    return t("ir_align_summary_ok")
 
+
+def _render_ir_alignment(*, l_st_f: dict) -> None:
+    """Renderöi Mittausten IR-infot -osion jos ir_align- tai ir_align_sub-data löytyy."""
+    ir_align = dict(l_st_f.get("ir_align") or {})
+    ir_align_sub = dict(l_st_f.get("ir_align_sub") or {})
+    if not ir_align and not ir_align_sub:
+        return
+
+    rows = _build_ir_alignment_rows(ir_align, ir_align_sub)
+    summary_line = _build_ir_alignment_summary(ir_align, ir_align_sub)
     _section(t("results_section_ir_alignment"), rows, summary_lines=[summary_line])
 
 def _render_dsp_quality(*, data: dict, l_st_f: dict, r_st_f: dict, psl_str: str) -> None:

@@ -61,6 +61,207 @@ def _auto_target_one_step_milder(hc_name: str) -> str | None:
         return str(ladder[idx - 1])
     return None
 
+
+def _auto_target_preselect_safe_mask(raw_mask, *, n: int, fallback=None, min_pts: int = 8):
+    try:
+        mk = np.asarray(raw_mask, dtype=bool).reshape(-1)
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        mk = np.asarray([], dtype=bool)
+    if mk.size != n:
+        if fallback is not None:
+            mk = np.asarray(fallback, dtype=bool).reshape(-1)
+        else:
+            mk = np.ones(n, dtype=bool)
+    if int(np.count_nonzero(mk)) < int(max(1, min_pts)):
+        if fallback is not None:
+            mk = np.asarray(fallback, dtype=bool).reshape(-1)
+        if mk.size != n or int(np.count_nonzero(mk)) < int(max(1, min_pts)):
+            mk = np.ones(n, dtype=bool)
+    return np.asarray(mk, dtype=bool)
+
+
+def _auto_target_preselect_safe_median(v, default=0.0) -> float:
+    vv = np.asarray(v, dtype=float).reshape(-1)
+    vv = vv[np.isfinite(vv)]
+    if vv.size <= 0:
+        return float(default)
+    return float(np.median(vv))
+
+
+def _auto_target_preselect_safe_rms(v, default=float("nan")) -> float:
+    vv = np.asarray(v, dtype=float).reshape(-1)
+    vv = vv[np.isfinite(vv)]
+    if vv.size <= 0:
+        return float(default)
+    return float(np.sqrt(np.mean(np.square(vv))))
+
+
+def _auto_target_preselect_safe_pos_mean(v, default=0.0) -> float:
+    vv = np.asarray(v, dtype=float).reshape(-1)
+    vv = vv[np.isfinite(vv)]
+    if vv.size <= 0:
+        return float(default)
+    return float(np.mean(np.maximum(vv, 0.0)))
+
+
+def _auto_target_preselect_weighted_band_median_rms(ff, err_v, bands, *, min_pts: int = 6, default=0.0) -> float:
+    ev = np.asarray(err_v, dtype=float).reshape(-1)
+    ff = np.asarray(ff, dtype=float).reshape(-1)
+    if ev.size != ff.size:
+        return float(default)
+    acc = 0.0
+    w_sum = 0.0
+    for lo_hz, hi_hz, weight in list(bands or []):
+        try:
+            lo = float(lo_hz)
+            hi = float(hi_hz)
+            w = float(weight)
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+            continue
+        if (not np.isfinite(lo)) or (not np.isfinite(hi)) or hi <= lo or w <= 0.0:
+            continue
+        m_band = np.isfinite(ev) & (ff >= lo) & (ff < hi)
+        if int(np.count_nonzero(m_band)) < int(max(1, min_pts)):
+            continue
+        band_med = _auto_target_preselect_safe_median(ev[m_band], 0.0)
+        acc += float(w) * float(band_med) * float(band_med)
+        w_sum += float(w)
+    if w_sum <= 1e-9:
+        return float(default)
+    return float(np.sqrt(acc / w_sum))
+
+
+def _auto_target_preselect_sort_xy(f, y):
+    idx = np.argsort(f)
+    ff = np.asarray(f[idx], dtype=float)
+    yy = np.asarray(y[idx], dtype=float)
+    m = np.isfinite(ff) & np.isfinite(yy) & (ff > 0.0)
+    return ff[m], yy[m]
+
+
+def _auto_target_preselect_common_ranges(data: dict) -> tuple[float, float, float, float, float, float]:
+    try:
+        lvl_min = float(data.get("lvl_min", 500.0) or 500.0)
+        lvl_max = float(data.get("lvl_max", 2000.0) or 2000.0)
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        lvl_min, lvl_max = 500.0, 2000.0
+    if not np.isfinite(lvl_min) or not np.isfinite(lvl_max) or lvl_min <= 0.0 or lvl_max <= lvl_min:
+        lvl_min, lvl_max = 500.0, 2000.0
+
+    try:
+        mag_lo = float(data.get("mag_c_min", 20.0) or 20.0)
+        mag_hi = float(data.get("mag_c_max", 250.0) or 250.0)
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        mag_lo, mag_hi = 20.0, 250.0
+    if not np.isfinite(mag_lo) or not np.isfinite(mag_hi) or mag_lo <= 0.0 or mag_hi <= mag_lo:
+        mag_lo, mag_hi = 20.0, 250.0
+
+    mode_lo = float(_auto_safe_float(AUTO_MODE_TARGET_PRESELECT_MODE_BAND_MIN_HZ, 25.0))
+    mode_hi = float(_auto_safe_float(AUTO_MODE_TARGET_PRESELECT_MODE_BAND_MAX_HZ, 160.0))
+    if (not np.isfinite(mode_lo)) or (not np.isfinite(mode_hi)) or mode_hi <= mode_lo:
+        mode_lo, mode_hi = 25.0, 160.0
+    return float(lvl_min), float(lvl_max), float(mag_lo), float(mag_hi), float(mode_lo), float(mode_hi)
+
+
+def _auto_target_preselect_prepare_grid_and_masks(
+    data: dict,
+    *,
+    fl,
+    ml,
+    fr,
+    mr,
+    hf,
+    hm,
+):
+    lvl_min, lvl_max, mag_lo, mag_hi, mode_lo, mode_hi = _auto_target_preselect_common_ranges(data)
+    try:
+        f_lo = max(20.0, float(np.min(fl)), float(np.min(fr)), float(np.min(hf)))
+        f_hi = min(20000.0, float(np.max(fl)), float(np.max(fr)), float(np.max(hf)))
+        if not np.isfinite(f_lo) or not np.isfinite(f_hi) or f_hi <= f_lo * 1.15:
+            return None
+        fg = np.logspace(np.log10(f_lo), np.log10(f_hi), 320)
+        ml_g = np.interp(fg, fl, ml)
+        mr_g = np.interp(fg, fr, mr)
+        try:
+            ml_g = smooth_meas_freq_dep(ml_g, fg)
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+            logger.exception("left smoothing in target preselection score")
+        try:
+            mr_g = smooth_meas_freq_dep(mr_g, fg)
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+            logger.exception("right smoothing in target preselection score")
+        t_g = np.interp(fg, hf, hm)
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        return None
+
+    lvl_mask = (fg >= lvl_min) & (fg <= lvl_max)
+    if int(np.count_nonzero(lvl_mask)) < 16:
+        lvl_mask = (fg >= 300.0) & (fg <= 3000.0)
+    if int(np.count_nonzero(lvl_mask)) < 16:
+        lvl_mask = np.ones_like(fg, dtype=bool)
+
+    corr_mask = (fg >= mag_lo) & (fg <= mag_hi)
+    if int(np.count_nonzero(corr_mask)) < 16:
+        corr_mask = np.ones_like(fg, dtype=bool)
+
+    mode_mask = (fg >= mode_lo) & (fg <= mode_hi) & corr_mask
+    if int(np.count_nonzero(mode_mask)) < 8:
+        mode_mask = (fg >= mode_lo) & (fg <= mode_hi)
+
+    return fg, ml_g, mr_g, t_g, lvl_mask, corr_mask, mode_mask
+
+
+def _auto_target_preselect_score_curve(
+    data: dict,
+    *,
+    fl,
+    ml,
+    fr,
+    mr,
+    hf,
+    hm,
+) -> dict | None:
+    try:
+        fl = np.asarray(fl, dtype=float).reshape(-1)
+        ml = np.asarray(ml, dtype=float).reshape(-1)
+        fr = np.asarray(fr, dtype=float).reshape(-1)
+        mr = np.asarray(mr, dtype=float).reshape(-1)
+        hf = np.asarray(hf, dtype=float).reshape(-1)
+        hm = np.asarray(hm, dtype=float).reshape(-1)
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        return None
+    fl, ml = _auto_target_preselect_sort_xy(fl, ml)
+    fr, mr = _auto_target_preselect_sort_xy(fr, mr)
+    hf, hm = _auto_target_preselect_sort_xy(hf, hm)
+    if fl.size < 32 or fr.size < 32 or hf.size < 4 or hm.size != hf.size:
+        return None
+    prepared = _auto_target_preselect_prepare_grid_and_masks(
+        data,
+        fl=fl,
+        ml=ml,
+        fr=fr,
+        mr=mr,
+        hf=hf,
+        hm=hm,
+    )
+    if prepared is None:
+        return None
+    fg, ml_g, mr_g, t_g, lvl_mask, corr_mask, mode_mask = prepared
+    tc = _auto_target_preselect_score(
+        fg=fg,
+        ml_g=ml_g,
+        mr_g=mr_g,
+        t_g=t_g,
+        lvl_mask=lvl_mask,
+        corr_mask=corr_mask,
+        mode_mask=mode_mask,
+    )
+    if not isinstance(tc, dict) or not tc:
+        return None
+    tc["_preselect_fg"] = fg
+    tc["_preselect_tg"] = t_g
+    return dict(tc)
+
 def _auto_target_slope_estimate(f_hz, mag_db, *, mask=None) -> float:
     try:
         ff = np.asarray(f_hz, dtype=float).reshape(-1)
@@ -111,99 +312,36 @@ def _auto_target_preselect_score(
     if n <= 0 or ml_arr.size != n or mr_arr.size != n or tg_arr.size != n:
         return {}
 
-    def _safe_mask(raw_mask, *, fallback=None, min_pts: int = 8):
-        try:
-            mk = np.asarray(raw_mask, dtype=bool).reshape(-1)
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
-            mk = np.asarray([], dtype=bool)
-        if mk.size != n:
-            if fallback is not None:
-                mk = np.asarray(fallback, dtype=bool).reshape(-1)
-            else:
-                mk = np.ones(n, dtype=bool)
-        if int(np.count_nonzero(mk)) < int(max(1, min_pts)):
-            if fallback is not None:
-                mk = np.asarray(fallback, dtype=bool).reshape(-1)
-            if mk.size != n or int(np.count_nonzero(mk)) < int(max(1, min_pts)):
-                mk = np.ones(n, dtype=bool)
-        return np.asarray(mk, dtype=bool)
+    lvl_m = _auto_target_preselect_safe_mask(lvl_mask, n=n, fallback=np.ones(n, dtype=bool), min_pts=8)
+    corr_m = _auto_target_preselect_safe_mask(corr_mask, n=n, fallback=np.ones(n, dtype=bool), min_pts=8)
+    mode_m = _auto_target_preselect_safe_mask(mode_mask, n=n, fallback=corr_m, min_pts=6)
 
-    def _safe_median(v, default=0.0) -> float:
-        vv = np.asarray(v, dtype=float).reshape(-1)
-        vv = vv[np.isfinite(vv)]
-        if vv.size <= 0:
-            return float(default)
-        return float(np.median(vv))
-
-    def _safe_rms(v, default=float("nan")) -> float:
-        vv = np.asarray(v, dtype=float).reshape(-1)
-        vv = vv[np.isfinite(vv)]
-        if vv.size <= 0:
-            return float(default)
-        return float(np.sqrt(np.mean(np.square(vv))))
-
-    def _safe_pos_mean(v, default=0.0) -> float:
-        vv = np.asarray(v, dtype=float).reshape(-1)
-        vv = vv[np.isfinite(vv)]
-        if vv.size <= 0:
-            return float(default)
-        return float(np.mean(np.maximum(vv, 0.0)))
-
-    def _weighted_band_median_rms(err_v, bands, *, min_pts: int = 6, default=0.0) -> float:
-        ev = np.asarray(err_v, dtype=float).reshape(-1)
-        if ev.size != n:
-            return float(default)
-        acc = 0.0
-        w_sum = 0.0
-        for lo_hz, hi_hz, weight in list(bands or []):
-            try:
-                lo = float(lo_hz)
-                hi = float(hi_hz)
-                w = float(weight)
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
-                continue
-            if (not np.isfinite(lo)) or (not np.isfinite(hi)) or hi <= lo or w <= 0.0:
-                continue
-            m_band = np.isfinite(ev) & (ff >= lo) & (ff < hi)
-            if int(np.count_nonzero(m_band)) < int(max(1, min_pts)):
-                continue
-            band_med = _safe_median(ev[m_band], 0.0)
-            acc += float(w) * float(band_med) * float(band_med)
-            w_sum += float(w)
-        if w_sum <= 1e-9:
-            return float(default)
-        return float(np.sqrt(acc / w_sum))
-
-    lvl_m = _safe_mask(lvl_mask, fallback=np.ones(n, dtype=bool), min_pts=8)
-    corr_m = _safe_mask(corr_mask, fallback=np.ones(n, dtype=bool), min_pts=8)
-    mode_m = _safe_mask(mode_mask, fallback=corr_m, min_pts=6)
-
-    off_l = _safe_median(ml_arr[lvl_m] - tg_arr[lvl_m], 0.0)
-    off_r = _safe_median(mr_arr[lvl_m] - tg_arr[lvl_m], 0.0)
+    off_l = _auto_target_preselect_safe_median(ml_arr[lvl_m] - tg_arr[lvl_m], 0.0)
+    off_r = _auto_target_preselect_safe_median(mr_arr[lvl_m] - tg_arr[lvl_m], 0.0)
     off = 0.5 * (float(off_l) + float(off_r))
 
     err_l = ml_arr - (tg_arr + float(off_l))
     err_r = mr_arr - (tg_arr + float(off_r))
     err_avg = 0.5 * (err_l + err_r)
 
-    fit_l = _safe_rms(err_l[corr_m], float("nan"))
-    fit_r = _safe_rms(err_r[corr_m], float("nan"))
+    fit_l = _auto_target_preselect_safe_rms(err_l[corr_m], float("nan"))
+    fit_r = _auto_target_preselect_safe_rms(err_r[corr_m], float("nan"))
     if not np.isfinite(fit_l):
-        fit_l = _safe_rms(err_l, 0.0)
+        fit_l = _auto_target_preselect_safe_rms(err_l, 0.0)
     if not np.isfinite(fit_r):
-        fit_r = _safe_rms(err_r, 0.0)
+        fit_r = _auto_target_preselect_safe_rms(err_r, 0.0)
     fit_rms_db = 0.5 * (float(fit_l) + float(fit_r))
     asym_penalty_db = abs(float(fit_l) - float(fit_r))
 
     needed_l = (tg_arr + float(off_l)) - ml_arr
     needed_r = (tg_arr + float(off_r)) - mr_arr
     total_boost = 0.5 * (
-        _safe_pos_mean(needed_l[corr_m], 0.0)
-        + _safe_pos_mean(needed_r[corr_m], 0.0)
+        _auto_target_preselect_safe_pos_mean(needed_l[corr_m], 0.0)
+        + _auto_target_preselect_safe_pos_mean(needed_r[corr_m], 0.0)
     )
     mode_boost = 0.5 * (
-        _safe_pos_mean(needed_l[mode_m], 0.0)
-        + _safe_pos_mean(needed_r[mode_m], 0.0)
+        _auto_target_preselect_safe_pos_mean(needed_l[mode_m], 0.0)
+        + _auto_target_preselect_safe_pos_mean(needed_r[mode_m], 0.0)
     )
     boost_raw = 0.65 * float(total_boost) + 0.35 * float(mode_boost)
     boost_ref = float(max(0.1, _auto_safe_float(AUTO_MODE_TARGET_PRESELECT_MAX_BASS_BOOST_REF_DB, 8.0)))
@@ -215,11 +353,12 @@ def _auto_target_preselect_score(
     if np.isfinite(slope_meas) and np.isfinite(slope_target):
         slope_penalty = abs(float(slope_meas) - float(slope_target))
 
-    mode_fit_rms_db = _safe_rms(err_avg[mode_m], float("nan"))
+    mode_fit_rms_db = _auto_target_preselect_safe_rms(err_avg[mode_m], float("nan"))
     if not np.isfinite(mode_fit_rms_db):
-        mode_fit_rms_db = _safe_rms(err_avg[corr_m], 0.0)
+        mode_fit_rms_db = _auto_target_preselect_safe_rms(err_avg[corr_m], 0.0)
 
-    bass_shape_penalty = _weighted_band_median_rms(
+    bass_shape_penalty = _auto_target_preselect_weighted_band_median_rms(
+        ff,
         err_avg,
         (
             (20.0, 35.0, 1.35),
@@ -231,7 +370,8 @@ def _auto_target_preselect_score(
         min_pts=5,
         default=0.0,
     )
-    treble_shape_penalty = _weighted_band_median_rms(
+    treble_shape_penalty = _auto_target_preselect_weighted_band_median_rms(
+        ff,
         err_avg,
         (
             (2200.0, 4000.0, 0.80),
@@ -387,14 +527,8 @@ def _auto_build_synth_target_candidate(
         if synth is None:
             return None
         hf, hm = synth
-        hf = np.asarray(hf, dtype=float).reshape(-1)
-        hm = np.asarray(hm, dtype=float).reshape(-1)
-        if hf.size < 4 or hm.size != hf.size:
-            return None
     except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
         return None
-
-    # Build scoring grid from raw measurement arrays
     try:
         fl = np.asarray(f_l, dtype=float).reshape(-1)
         ml = np.asarray(m_l, dtype=float).reshape(-1)
@@ -402,219 +536,48 @@ def _auto_build_synth_target_candidate(
         mr = np.asarray(m_r, dtype=float).reshape(-1)
     except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
         return None
-
-    l_ok = bool(fl.size >= 32 and ml.size == fl.size)
-    r_ok = bool(fr.size >= 32 and mr.size == fr.size)
-    if not l_ok and not r_ok:
+    if fl.size < 32 and fr.size >= 32:
+        fl, ml = np.asarray(fr, dtype=float).copy(), np.asarray(mr, dtype=float).copy()
+    if fr.size < 32 and fl.size >= 32:
+        fr, mr = np.asarray(fl, dtype=float).copy(), np.asarray(ml, dtype=float).copy()
+    tc = _auto_target_preselect_score_curve(
+        data,
+        fl=fl,
+        ml=ml,
+        fr=fr,
+        mr=mr,
+        hf=hf,
+        hm=hm,
+    )
+    if not isinstance(tc, dict) or not tc:
         return None
-    if not l_ok:
-        fl, ml = fr.copy(), mr.copy()
-    if not r_ok:
-        fr, mr = fl.copy(), ml.copy()
+    tc["hc_mode"] = str(AUTO_MODE_SYNTH_TARGET_NAME)
+    tc["_synth_hc_f"] = np.asarray(hf, dtype=float).reshape(-1)
+    tc["_synth_hc_m"] = np.asarray(hm, dtype=float).reshape(-1)
+    return dict(tc)
 
-    def _sf(f, m):
-        idx = np.argsort(f)
-        ff, mm = f[idx], m[idx]
-        mask = np.isfinite(ff) & np.isfinite(mm) & (ff > 0.)
-        return ff[mask], mm[mask]
 
-    fl, ml = _sf(fl, ml)
-    fr, mr = _sf(fr, mr)
-    if fl.size < 32 or fr.size < 32:
-        return None
-
-    try:
-        lvl_min = float(data.get("lvl_min", 500.0) or 500.0)
-        lvl_max = float(data.get("lvl_max", 2000.0) or 2000.0)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
-        lvl_min, lvl_max = 500.0, 2000.0
-    if not np.isfinite(lvl_min) or not np.isfinite(lvl_max) or lvl_min <= 0. or lvl_max <= lvl_min:
-        lvl_min, lvl_max = 500.0, 2000.0
-
-    try:
-        mag_lo = float(data.get("mag_c_min", 20.0) or 20.0)
-        mag_hi = float(data.get("mag_c_max", 250.0) or 250.0)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
-        mag_lo, mag_hi = 20.0, 250.0
-    if not np.isfinite(mag_lo) or not np.isfinite(mag_hi) or mag_lo <= 0. or mag_hi <= mag_lo:
-        mag_lo, mag_hi = 20.0, 250.0
-
-    mode_lo = float(_auto_safe_float(AUTO_MODE_TARGET_PRESELECT_MODE_BAND_MIN_HZ, 25.0))
-    mode_hi = float(_auto_safe_float(AUTO_MODE_TARGET_PRESELECT_MODE_BAND_MAX_HZ, 160.0))
-    if not np.isfinite(mode_lo) or not np.isfinite(mode_hi) or mode_hi <= mode_lo:
-        mode_lo, mode_hi = 25.0, 160.0
-
-    try:
-        f_lo = max(20., float(np.min(fl)), float(np.min(fr)), float(np.min(hf)))
-        f_hi = min(20000., float(np.max(fl)), float(np.max(fr)), float(np.max(hf)))
-        if not np.isfinite(f_lo) or not np.isfinite(f_hi) or f_hi <= f_lo * 1.15:
-            return None
-
-        fg = np.logspace(np.log10(f_lo), np.log10(f_hi), 320)
-        ml_g = np.interp(fg, fl, ml)
-        mr_g = np.interp(fg, fr, mr)
-        try:
-            ml_g = smooth_meas_freq_dep(ml_g, fg)
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
-            logger.exception("left smoothing in target preselection score")
-        try:
-            mr_g = smooth_meas_freq_dep(mr_g, fg)
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
-            logger.exception("right smoothing in target preselection score")
-        t_g = np.interp(fg, hf, hm)
-
-        lvl_mask = (fg >= lvl_min) & (fg <= lvl_max)
-        if int(np.count_nonzero(lvl_mask)) < 16:
-            lvl_mask = (fg >= 300.0) & (fg <= 3000.0)
-        if int(np.count_nonzero(lvl_mask)) < 16:
-            lvl_mask = np.ones_like(fg, dtype=bool)
-
-        corr_mask = (fg >= mag_lo) & (fg <= mag_hi)
-        if int(np.count_nonzero(corr_mask)) < 16:
-            corr_mask = np.ones_like(fg, dtype=bool)
-
-        mode_mask = (fg >= mode_lo) & (fg <= mode_hi) & corr_mask
-        if int(np.count_nonzero(mode_mask)) < 8:
-            mode_mask = (fg >= mode_lo) & (fg <= mode_hi)
-
-        tc = _auto_target_preselect_score(
-            fg=fg, ml_g=ml_g, mr_g=mr_g, t_g=t_g,
-            lvl_mask=lvl_mask, corr_mask=corr_mask, mode_mask=mode_mask,
-        )
-        if not isinstance(tc, dict) or not tc:
-            return None
-
-        tc["hc_mode"] = str(AUTO_MODE_SYNTH_TARGET_NAME)
-        tc["_synth_hc_f"] = hf
-        tc["_synth_hc_m"] = hm
-        return dict(tc)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
-        return None
-
-def _auto_select_builtin_target_curve(
+def _auto_select_builtin_target_curve_scores(
     data: dict,
     *,
-    f_l,
-    m_l,
-    f_r,
-    m_r,
+    fl,
+    ml,
+    fr,
+    mr,
     measurements: dict | None = None,
-) -> dict | None:
-    try:
-        fl = np.asarray(f_l, dtype=float).reshape(-1)
-        ml = np.asarray(m_l, dtype=float).reshape(-1)
-        fr = np.asarray(f_r, dtype=float).reshape(-1)
-        mr = np.asarray(m_r, dtype=float).reshape(-1)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
-        return None
-
-    l_ok = bool(fl.size >= 32 and ml.size == fl.size)
-    r_ok = bool(fr.size >= 32 and mr.size == fr.size)
-    if (not l_ok) and (not r_ok):
-        return None
-    if (not l_ok) and r_ok:
-        fl = np.asarray(fr, dtype=float).copy()
-        ml = np.asarray(mr, dtype=float).copy()
-    if (not r_ok) and l_ok:
-        fr = np.asarray(fl, dtype=float).copy()
-        mr = np.asarray(ml, dtype=float).copy()
-
-    def _sorted_xy(f, y):
-        idx = np.argsort(f)
-        ff = np.asarray(f[idx], dtype=float)
-        yy = np.asarray(y[idx], dtype=float)
-        m = np.isfinite(ff) & np.isfinite(yy) & (ff > 0.0)
-        return ff[m], yy[m]
-
-    fl, ml = _sorted_xy(fl, ml)
-    fr, mr = _sorted_xy(fr, mr)
-    if fl.size < 32 and fr.size >= 32:
-        fl = np.asarray(fr, dtype=float).copy()
-        ml = np.asarray(mr, dtype=float).copy()
-    if fr.size < 32 and fl.size >= 32:
-        fr = np.asarray(fl, dtype=float).copy()
-        mr = np.asarray(ml, dtype=float).copy()
-    if fl.size < 32 or fr.size < 32:
-        return None
-
-    try:
-        lvl_min = float(data.get("lvl_min", 500.0) or 500.0)
-        lvl_max = float(data.get("lvl_max", 2000.0) or 2000.0)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
-        lvl_min, lvl_max = 500.0, 2000.0
-    if not np.isfinite(lvl_min) or not np.isfinite(lvl_max) or lvl_min <= 0.0 or lvl_max <= lvl_min:
-        lvl_min, lvl_max = 500.0, 2000.0
-
-    try:
-        mag_lo = float(data.get("mag_c_min", 20.0) or 20.0)
-        mag_hi = float(data.get("mag_c_max", 250.0) or 250.0)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
-        mag_lo, mag_hi = 20.0, 250.0
-    if not np.isfinite(mag_lo) or not np.isfinite(mag_hi) or mag_lo <= 0.0 or mag_hi <= mag_lo:
-        mag_lo, mag_hi = 20.0, 250.0
-
-    mode_lo = float(_auto_safe_float(AUTO_MODE_TARGET_PRESELECT_MODE_BAND_MIN_HZ, 25.0))
-    mode_hi = float(_auto_safe_float(AUTO_MODE_TARGET_PRESELECT_MODE_BAND_MAX_HZ, 160.0))
-    if (not np.isfinite(mode_lo)) or (not np.isfinite(mode_hi)) or mode_hi <= mode_lo:
-        mode_lo, mode_hi = 25.0, 160.0
-
+) -> list[dict]:
     scored = []
     for hc_name in AUTO_MODE_BUILTIN_TARGETS:
         try:
             hf, hm = get_house_curve_by_name(hc_name)
-            hf = np.asarray(hf, dtype=float).reshape(-1)
-            hm = np.asarray(hm, dtype=float).reshape(-1)
-            if hf.size < 4 or hm.size != hf.size:
-                continue
-            hs = np.argsort(hf)
-            hf = hf[hs]
-            hm = hm[hs]
-            m_h = np.isfinite(hf) & np.isfinite(hm) & (hf > 0.0)
-            hf = hf[m_h]
-            hm = hm[m_h]
-            if hf.size < 4:
-                continue
-
-            f_lo = max(20.0, float(np.min(fl)), float(np.min(fr)), float(np.min(hf)))
-            f_hi = min(20000.0, float(np.max(fl)), float(np.max(fr)), float(np.max(hf)))
-            if not np.isfinite(f_lo) or not np.isfinite(f_hi) or f_hi <= (f_lo * 1.15):
-                continue
-
-            fg = np.logspace(np.log10(f_lo), np.log10(f_hi), 320)
-            ml_g = np.interp(fg, fl, ml)
-            mr_g = np.interp(fg, fr, mr)
-            try:
-                ml_g = smooth_meas_freq_dep(ml_g, fg)
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
-                logger.exception("left smoothing in target ranking")
-            try:
-                mr_g = smooth_meas_freq_dep(mr_g, fg)
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
-                logger.exception("right smoothing in target ranking")
-            t_g = np.interp(fg, hf, hm)
-
-            lvl_mask = (fg >= lvl_min) & (fg <= lvl_max)
-            if int(np.count_nonzero(lvl_mask)) < 16:
-                lvl_mask = (fg >= 300.0) & (fg <= 3000.0)
-            if int(np.count_nonzero(lvl_mask)) < 16:
-                lvl_mask = np.ones_like(fg, dtype=bool)
-
-            corr_mask = (fg >= mag_lo) & (fg <= mag_hi)
-            if int(np.count_nonzero(corr_mask)) < 16:
-                corr_mask = np.ones_like(fg, dtype=bool)
-
-            mode_mask = (fg >= mode_lo) & (fg <= mode_hi) & corr_mask
-            if int(np.count_nonzero(mode_mask)) < 8:
-                mode_mask = (fg >= mode_lo) & (fg <= mode_hi)
-
-            tc = _auto_target_preselect_score(
-                fg=fg,
-                ml_g=ml_g,
-                mr_g=mr_g,
-                t_g=t_g,
-                lvl_mask=lvl_mask,
-                corr_mask=corr_mask,
-                mode_mask=mode_mask,
+            tc = _auto_target_preselect_score_curve(
+                data,
+                fl=fl,
+                ml=ml,
+                fr=fr,
+                mr=mr,
+                hf=hf,
+                hm=hm,
             )
             if not isinstance(tc, dict) or not tc:
                 continue
@@ -637,10 +600,38 @@ def _auto_select_builtin_target_curve(
                 scored.append(dict(synth_tc))
         except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
             logger.exception("synth target candidate build")
+    return scored
 
+def _auto_select_builtin_target_curve(
+    data: dict,
+    *,
+    f_l,
+    m_l,
+    f_r,
+    m_r,
+    measurements: dict | None = None,
+) -> dict | None:
+    try:
+        fl = np.asarray(f_l, dtype=float).reshape(-1)
+        ml = np.asarray(m_l, dtype=float).reshape(-1)
+        fr = np.asarray(f_r, dtype=float).reshape(-1)
+        mr = np.asarray(m_r, dtype=float).reshape(-1)
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        return None
+    if fl.size < 32 and fr.size >= 32:
+        fl, ml = np.asarray(fr, dtype=float).copy(), np.asarray(mr, dtype=float).copy()
+    if fr.size < 32 and fl.size >= 32:
+        fr, mr = np.asarray(fl, dtype=float).copy(), np.asarray(ml, dtype=float).copy()
+    scored = _auto_select_builtin_target_curve_scores(
+        data,
+        fl=fl,
+        ml=ml,
+        fr=fr,
+        mr=mr,
+        measurements=measurements,
+    )
     if not scored:
         return None
-
     scored = sorted(
         scored,
         key=lambda d: (

@@ -59,128 +59,81 @@ def _status_split_elapsed_suffix(msg: str) -> tuple[str, str]:
     return str(match.group(1) or "").strip(), str(match.group(2) or "").strip()
 
 
-def _compact_auto_status_core(core: str) -> str:
-    try:
-        s = str(core or "").strip()
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-        s = ""
+def _compact_auto_status_bracket(after_colon: str) -> str:
+    low_ac = after_colon.lower()
+    best_m = re.match(r"(phase\s+\d+/\d+)\s+best improved trial\s+(\d+/\d+)", after_colon, re.IGNORECASE)
+    if best_m:
+        return f"Optimizing · {{target}} · {best_m.group(1)} · trial {best_m.group(2)} ↑"
+    phase_m = re.match(r"(phase\s+\d+/\d+)\s+(\d+/\d+)", after_colon, re.IGNORECASE)
+    if phase_m:
+        return f"Optimizing · {{target}} · {phase_m.group(1)} · trial {phase_m.group(2)}"
+    polish_best_m = re.match(r"(\S+)\s+winner polish\s+best improved trial\s+(\d+/\d+)", after_colon, re.IGNORECASE)
+    if polish_best_m:
+        label = _polish_param_label(polish_best_m.group(1))
+        return f"Polishing · {{target}} · {label} · {polish_best_m.group(2)} ↑"
+    polish_m = re.match(r"(\S+)\s+winner polish\s+(\d+/\d+)", after_colon, re.IGNORECASE)
+    if polish_m:
+        label = _polish_param_label(polish_m.group(1))
+        return f"Polishing · {{target}} · {label} · {polish_m.group(2)}"
+    if low_ac.startswith("residual tie-break"):
+        return "Polishing · {target} · peaks"
+    if low_ac.startswith("residual_peak safety override"):
+        return "Safety check · {target}"
+    clean = re.sub(r"\s*\(.*\)\s*$", "", after_colon).strip()
+    clean = re.sub(r"\s+\d+/\d+\s*$", "", clean).strip()
+    return f"Optimizing · {{target}} · {clean}" if clean else "Optimizing · {target}"
 
-    # --- Bracket format: "DecayCore automatic mode [target] (...): <phase_text>" ---
-    bracket_m = re.match(
-        r"^DecayCore automatic mode \[([^\]]+)\][^:]*:\s*(.+)$",
-        s,
-        flags=re.IGNORECASE,
-    )
-    if bracket_m:
-        target = bracket_m.group(1).strip()
-        after_colon = bracket_m.group(2).strip()
-        low_ac = after_colon.lower()
 
-        # Main search: "phase 1/2 best improved trial N/M (...)"
-        best_m = re.match(
-            r"(phase\s+\d+/\d+)\s+best improved trial\s+(\d+/\d+)",
-            after_colon, re.IGNORECASE,
-        )
-        if best_m:
-            return f"Optimizing · {target} · {best_m.group(1)} · trial {best_m.group(2)} ↑"
-
-        # Main search: "phase 1/2 N/M (...)"
-        phase_m = re.match(r"(phase\s+\d+/\d+)\s+(\d+/\d+)", after_colon, re.IGNORECASE)
-        if phase_m:
-            return f"Optimizing · {target} · {phase_m.group(1)} · trial {phase_m.group(2)}"
-
-        # Winner polish with trial counts: "<param> winner polish best improved trial N/M"
-        polish_best_m = re.match(
-            r"(\S+)\s+winner polish\s+best improved trial\s+(\d+/\d+)",
-            after_colon, re.IGNORECASE,
-        )
-        if polish_best_m:
-            label = _polish_param_label(polish_best_m.group(1))
-            return f"Polishing · {target} · {label} · {polish_best_m.group(2)} ↑"
-
-        # Winner polish with trial counts: "<param> winner polish N/M"
-        polish_m = re.match(r"(\S+)\s+winner polish\s+(\d+/\d+)", after_colon, re.IGNORECASE)
-        if polish_m:
-            label = _polish_param_label(polish_m.group(1))
-            return f"Polishing · {target} · {label} · {polish_m.group(2)}"
-
-        # Residual tie-break / safety
-        if low_ac.startswith("residual tie-break"):
-            return f"Polishing · {target} · peaks"
-        if low_ac.startswith("residual_peak safety override"):
-            return f"Safety check · {target}"
-
-        # Fallback: strip parenthetical suffix
-        clean = re.sub(r"\s*\(.*\)\s*$", "", after_colon).strip()
-        clean = re.sub(r"\s+\d+/\d+\s*$", "", clean).strip()
-        return f"Optimizing · {target} · {clean}" if clean else f"Optimizing · {target}"
-
-    # --- Old format: "DecayCore automatic mode: <phase_text>" ---
-    prefix = "DecayCore automatic mode:"
-    if not s.startswith(prefix):
-        return s
-    after = s[len(prefix):].strip()
+def _compact_auto_status_legacy_target(after: str) -> str | None:
     low = after.lower()
-
-    # Target curve selection
-    if low.startswith("adaptive target"):
-        return "Synthesizing · target"
-    if low.startswith("target shortlist"):
-        return "Selecting · target"
-    if low.startswith("target preselect winner"):
-        return "Selecting · target"
-    if low.startswith("target preselect cache seed") or low.startswith("target preselect seed loaded"):
-        return "Loading · target"
-    if low.startswith("target preselect"):
-        return "Selecting · target"
-    if low.startswith("target search"):
-        return "Selecting · target"
-    if low.startswith("selecting target curve"):
-        return "Selecting · target"
-    if low.startswith("target trials"):
-        return "Searching · target"
-    if low.startswith("target finalize"):
-        return "Selecting · target"
-    if low.startswith("target curve mode"):
-        return "Selecting · target"
+    for prefixes, compact in (
+        (("adaptive target",), "Synthesizing · target"),
+        (("target shortlist", "target preselect winner", "target preselect", "target search", "selecting target curve", "target trials", "target finalize", "target curve mode"), "Selecting · target"),
+        (("target preselect cache seed", "target preselect seed loaded"), "Loading · target"),
+    ):
+        if any(low.startswith(prefix) for prefix in prefixes):
+            return compact
     if low.startswith("target loaded directly from cache") or low.startswith("target cache hit"):
         return "Loaded from cache"
+    return None
 
-    # Phase 1 search
+
+def _compact_auto_status_legacy_progress(after: str) -> str | None:
+    low = after.lower()
     if low.startswith("phase1 done") or low.startswith("phase 1 done"):
         return "Searching · done"
-
-    # Phase 2 local refine
     if low.startswith("local refine summary"):
         return "Refining · done"
-    if low.startswith("local refine fallback"):
-        return "Refining"
-    if low.startswith("local refine"):
+    if low.startswith("local refine fallback") or low.startswith("local refine"):
         return "Refining"
     if low.startswith("phase2 summary"):
         return "Refining · done"
-
-    # Phase 3 micro refine
     if low.startswith("micro refine summary"):
         return "Micro-refining · done"
-    if low.startswith("micro refine fallback"):
+    if low.startswith("micro refine fallback") or low.startswith("micro refine"):
         return "Micro-refining"
-    if low.startswith("micro refine"):
-        return "Micro-refining"
+    return None
 
-    # Cache
+
+def _compact_auto_status_legacy_cache(after: str) -> str | None:
+    low = after.lower()
     if low.startswith("cache refine best improved"):
         return "Refining · cache ↑"
     if low.startswith("cache refine round summary") or low.startswith("cache refine summary"):
         return "Refining · cache done"
-    if low.startswith("cache refine init"):
-        return "Refining · cache"
-    if low.startswith("cache refine"):
+    if low.startswith("cache refine init") or low.startswith("cache refine"):
         return "Refining · cache"
     if low.startswith("preset loaded from cache"):
         return "Loaded from cache"
+    if low.startswith("preset search"):
+        return "Searching · preset"
+    if low.startswith("phase search"):
+        return "Searching · phase"
+    return None
 
-    # Winner polish (old format "improved" messages)
+
+def _compact_auto_status_legacy_polish(after: str) -> str | None:
+    low = after.lower()
     if low.startswith("tdc_strength winner polish"):
         return "Polishing · decay ↑"
     if low.startswith("mag_c_min winner polish"):
@@ -199,16 +152,13 @@ def _compact_auto_status_core(core: str) -> str:
         return "Polishing · peaks"
     if low.startswith("residual_peak safety override"):
         return "Safety check"
+    return None
 
-    # Finalize
+
+def _compact_auto_status_legacy_misc(after: str) -> str | None:
+    low = after.lower()
     if low.startswith("phase 4 finalize") or low.startswith("finalize"):
         return "Finalizing"
-
-    # Other search phases
-    if low.startswith("preset search"):
-        return "Searching · preset"
-    if low.startswith("phase search"):
-        return "Searching · phase"
     if low.startswith("protection model"):
         return "Safety check"
     if low.startswith("hpf auto-fit"):
@@ -217,13 +167,42 @@ def _compact_auto_status_core(core: str) -> str:
         return "Refining · stereo"
     if low.startswith("init"):
         return "Initializing"
+    return None
 
-    # Generic fallback
+
+def _compact_auto_status_legacy(after: str) -> str:
+    for helper in (
+        _compact_auto_status_legacy_target,
+        _compact_auto_status_legacy_progress,
+        _compact_auto_status_legacy_cache,
+        _compact_auto_status_legacy_polish,
+        _compact_auto_status_legacy_misc,
+    ):
+        compact = helper(after)
+        if compact is not None:
+            return compact
     try:
         clean = re.sub(r"\s*\(.*\)\s*$", "", after).strip()
     except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         clean = after
     return f"Auto · {clean}" if clean else "Auto · running"
+
+
+def _compact_auto_status_core(core: str) -> str:
+    try:
+        s = str(core or "").strip()
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        s = ""
+    bracket_m = re.match(r"^DecayCore automatic mode \[([^\]]+)\][^:]*:\s*(.+)$", s, flags=re.IGNORECASE)
+    if bracket_m:
+        target = bracket_m.group(1).strip()
+        after_colon = bracket_m.group(2).strip()
+        return _compact_auto_status_bracket(after_colon).format(target=target)
+    prefix = "DecayCore automatic mode:"
+    if not s.startswith(prefix):
+        return s
+    after = s[len(prefix):].strip()
+    return _compact_auto_status_legacy(after)
 
 
 def _polish_param_label(param: str) -> str:

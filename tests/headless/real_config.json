@@ -1,0 +1,9 @@
+﻿{
+  "mode": "auto",
+  "left_wav": "C:\\Users\\ville\\Documents\\DecayCore\\measurement\\measurement_left__20260422_154122__ir.wav",
+  "right_wav": "C:\\Users\\ville\\Documents\\DecayCore\\measurement\\measurement_right__20260422_154153__ir.wav",
+  "sample_rate": 48000,
+  "house_curve": "Harman10",
+  "correction_min_hz": 20,
+  "correction_max_hz": 250
+}

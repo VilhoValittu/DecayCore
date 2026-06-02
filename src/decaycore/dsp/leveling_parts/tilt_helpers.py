@@ -259,14 +259,12 @@ def _smooth_tilt_fit_series(y: np.ndarray, *, sigma_bins: float) -> np.ndarray:
         except (TypeError, ValueError):
             return np.asarray([], dtype=float)
 
-def _tilt_fit_lf_piecewise_log_axis(
+def _tilt_fit_lf_piecewise_prepare(
     log_freq: np.ndarray,
     diff_db: np.ndarray,
     *,
-    linear_offset: float,
-    linear_slope: float,
     max_db_per_oct: float = 2.0,
-) -> tuple[float, float] | None:
+) -> tuple[np.ndarray, float, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
     try:
         x = np.asarray(log_freq, dtype=float).reshape(-1)
         y_raw = np.asarray(diff_db, dtype=float).reshape(-1)
@@ -283,9 +281,9 @@ def _tilt_fit_lf_piecewise_log_axis(
         if np.count_nonzero(xl < 0.0) < 10 or np.count_nonzero(xr > 0.0) < 10:
             return None
 
-        y_med = float(np.median(y_raw))
         y_fit = y_raw.copy()
         if y_fit.size >= 30:
+            y_med = float(np.median(y_fit))
             thr = float(np.quantile(np.abs(y_fit - y_med), 0.90))
             if np.isfinite(thr) and thr > 1e-9:
                 y_fit = np.clip(y_fit, y_med - thr, y_med + thr)
@@ -297,43 +295,89 @@ def _tilt_fit_lf_piecewise_log_axis(
         if y_smooth.size != x.size:
             return None
 
-        design = np.column_stack([np.ones_like(x), xl, xr])
-        try:
-            coeffs = np.linalg.lstsq(design, y_smooth, rcond=None)[0]
-        except np.linalg.LinAlgError:
-            return None
-        if np.asarray(coeffs).size != 3 or not np.all(np.isfinite(coeffs)):
-            return None
+        return x, x0, xl, xr, y_raw, y_smooth
+    except (TypeError, ValueError, FloatingPointError, IndexError):
+        return None
 
-        max_db_per_oct = float(max_db_per_oct)
-        if not np.isfinite(max_db_per_oct) or max_db_per_oct <= 0.0:
-            max_db_per_oct = 2.0
-        slope_lo = float(np.clip(float(coeffs[1]), -max_db_per_oct, +max_db_per_oct))
-        slope_hi = float(np.clip(float(coeffs[2]), -max_db_per_oct, +max_db_per_oct))
-        if abs(slope_hi - slope_lo) < 0.35:
-            return None
 
-        basis_piecewise = (slope_lo * xl) + (slope_hi * xr)
-        off_piecewise = float(np.median(y_raw - basis_piecewise))
-        if not np.isfinite(off_piecewise):
-            return None
+def _tilt_fit_lf_piecewise_evaluate(
+    x: np.ndarray,
+    x0: float,
+    xl: np.ndarray,
+    xr: np.ndarray,
+    y_raw: np.ndarray,
+    y_smooth: np.ndarray,
+    *,
+    linear_offset: float,
+    linear_slope: float,
+    max_db_per_oct: float = 2.0,
+) -> tuple[float, float] | None:
+    design = np.column_stack([np.ones_like(x), xl, xr])
+    try:
+        coeffs = np.linalg.lstsq(design, y_smooth, rcond=None)[0]
+    except np.linalg.LinAlgError:
+        return None
+    if np.asarray(coeffs).size != 3 or not np.all(np.isfinite(coeffs)):
+        return None
 
-        linear_pred = float(linear_offset) + (float(linear_slope) * (x - x0))
-        piecewise_pred = off_piecewise + basis_piecewise
-        linear_rms = _centered_rms(y_smooth - linear_pred)
-        piecewise_rms = _centered_rms(y_smooth - piecewise_pred)
-        if (not np.isfinite(piecewise_rms)) or (not np.isfinite(linear_rms)):
-            return None
-        if piecewise_rms > max(linear_rms * 0.88, linear_rms - 0.08):
-            return None
-        if abs(off_piecewise - float(linear_offset)) > 1.5:
-            return None
+    max_db_per_oct = float(max_db_per_oct)
+    if not np.isfinite(max_db_per_oct) or max_db_per_oct <= 0.0:
+        max_db_per_oct = 2.0
+    slope_lo = float(np.clip(float(coeffs[1]), -max_db_per_oct, +max_db_per_oct))
+    slope_hi = float(np.clip(float(coeffs[2]), -max_db_per_oct, +max_db_per_oct))
+    if abs(slope_hi - slope_lo) < 0.35:
+        return None
 
-        span_lo = max(float(x0 - x[0]), 1e-9)
-        span_hi = max(float(x[-1] - x0), 1e-9)
-        slope_eq = ((slope_lo * span_lo) + (slope_hi * span_hi)) / (span_lo + span_hi)
-        slope_eq = float(np.clip(slope_eq, -max_db_per_oct, +max_db_per_oct))
-        return float(off_piecewise), float(slope_eq)
+    basis_piecewise = (slope_lo * xl) + (slope_hi * xr)
+    off_piecewise = float(np.median(y_raw - basis_piecewise))
+    if not np.isfinite(off_piecewise):
+        return None
+
+    linear_pred = float(linear_offset) + (float(linear_slope) * (x - x0))
+    piecewise_pred = off_piecewise + basis_piecewise
+    linear_rms = _centered_rms(y_smooth - linear_pred)
+    piecewise_rms = _centered_rms(y_smooth - piecewise_pred)
+    if (not np.isfinite(piecewise_rms)) or (not np.isfinite(linear_rms)):
+        return None
+    if piecewise_rms > max(linear_rms * 0.88, linear_rms - 0.08):
+        return None
+    if abs(off_piecewise - float(linear_offset)) > 1.5:
+        return None
+
+    span_lo = max(float(x0 - x[0]), 1e-9)
+    span_hi = max(float(x[-1] - x0), 1e-9)
+    slope_eq = ((slope_lo * span_lo) + (slope_hi * span_hi)) / (span_lo + span_hi)
+    slope_eq = float(np.clip(slope_eq, -max_db_per_oct, +max_db_per_oct))
+    return float(off_piecewise), float(slope_eq)
+
+def _tilt_fit_lf_piecewise_log_axis(
+    log_freq: np.ndarray,
+    diff_db: np.ndarray,
+    *,
+    linear_offset: float,
+    linear_slope: float,
+    max_db_per_oct: float = 2.0,
+) -> tuple[float, float] | None:
+    try:
+        prepared = _tilt_fit_lf_piecewise_prepare(
+            log_freq,
+            diff_db,
+            max_db_per_oct=max_db_per_oct,
+        )
+        if prepared is None:
+            return None
+        x, x0, xl, xr, y_raw, y_smooth = prepared
+        return _tilt_fit_lf_piecewise_evaluate(
+            x,
+            x0,
+            xl,
+            xr,
+            y_raw,
+            y_smooth,
+            linear_offset=linear_offset,
+            linear_slope=linear_slope,
+            max_db_per_oct=max_db_per_oct,
+        )
     except (TypeError, ValueError, FloatingPointError, IndexError):
         return None
 

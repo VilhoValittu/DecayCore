@@ -1,0 +1,1071 @@
+{
+  "dataset": "synthetic_optuna_measurements_v2_hard",
+  "meta": {
+    "known_configs": 20,
+    "resolved_configs": 20,
+    "known_studies": 80,
+    "matched_studies": 80,
+    "records": 1060,
+    "unresolved_configs": []
+  },
+  "filters": {
+    "Asymmetric": {
+      "cases": 5,
+      "pairs": [
+        "pair_03_treble_hostile",
+        "pair_02_crossover_disaster",
+        "pair_05_noisy_compromise",
+        "pair_01_low_end_trap",
+        "pair_04_room_asymmetry"
+      ],
+      "recommended_seed_preset": {
+        "fdw_cycles": 11.16,
+        "tdc_strength": 45.0,
+        "tdc_max_reduction_db": 17.8,
+        "reg_strength": 34.6,
+        "max_boost": 4.11,
+        "mag_c_min": 15.0,
+        "low_bass_cut_hz": 18.0,
+        "mag_c_max": 179.6,
+        "trans_width": 132.0,
+        "bass_first_mode_max_hz": 184.5,
+        "phase_limit": 407.2,
+        "bass_first_ai": 1.0,
+        "comparison_mode": 1.0,
+        "enable_afdw": 1.0,
+        "enable_tdc": 1.0,
+        "filter_smooth": 12,
+        "max_slope_db_per_oct": 16.0,
+        "tdc_slope_db_per_oct": 8.0
+      },
+      "parameter_stats": {
+        "fdw_cycles": {
+          "count": 5,
+          "min": 8.14,
+          "q25": 8.55,
+          "median": 11.16,
+          "q75": 12.87,
+          "max": 14.48
+        },
+        "tdc_strength": {
+          "count": 5,
+          "min": 34.0,
+          "q25": 42.9,
+          "median": 45.0,
+          "q75": 45.0,
+          "max": 58.6
+        },
+        "tdc_max_reduction_db": {
+          "count": 5,
+          "min": 16.5,
+          "q25": 16.5,
+          "median": 17.8,
+          "q75": 25.7,
+          "max": 32.0
+        },
+        "reg_strength": {
+          "count": 5,
+          "min": 17.4,
+          "q25": 22.7,
+          "median": 34.6,
+          "q75": 36.2,
+          "max": 43.2
+        },
+        "max_boost": {
+          "count": 5,
+          "min": 3.05,
+          "q25": 3.13,
+          "median": 4.11,
+          "q75": 7.66,
+          "max": 7.93
+        },
+        "mag_c_min": {
+          "count": 5,
+          "min": 15.0,
+          "q25": 15.0,
+          "median": 15.0,
+          "q75": 15.8,
+          "max": 69.20224
+        },
+        "low_bass_cut_hz": {
+          "count": 5,
+          "min": 18.0,
+          "q25": 18.0,
+          "median": 18.0,
+          "q75": 18.4,
+          "max": 55.0
+        },
+        "mag_c_max": {
+          "count": 5,
+          "min": 175.6,
+          "q25": 176.9,
+          "median": 179.6,
+          "q75": 253.8,
+          "max": 284.0
+        },
+        "trans_width": {
+          "count": 5,
+          "min": 126.3,
+          "q25": 128.4,
+          "median": 132.0,
+          "q75": 140.4,
+          "max": 149.3
+        },
+        "bass_first_mode_max_hz": {
+          "count": 5,
+          "min": 152.6,
+          "q25": 184.2,
+          "median": 184.5,
+          "q75": 191.8,
+          "max": 199.5
+        },
+        "phase_limit": {
+          "count": 5,
+          "min": 316.2,
+          "q25": 378.5,
+          "median": 407.2,
+          "q75": 426.9,
+          "max": 473.9
+        },
+        "bass_first_ai": {
+          "count": 5,
+          "min": 1.0,
+          "q25": 1.0,
+          "median": 1.0,
+          "q75": 1.0,
+          "max": 1.0
+        },
+        "comparison_mode": {
+          "count": 5,
+          "min": 1.0,
+          "q25": 1.0,
+          "median": 1.0,
+          "q75": 1.0,
+          "max": 1.0
+        },
+        "enable_afdw": {
+          "count": 5,
+          "min": 1.0,
+          "q25": 1.0,
+          "median": 1.0,
+          "q75": 1.0,
+          "max": 1.0
+        },
+        "enable_tdc": {
+          "count": 5,
+          "min": 1.0,
+          "q25": 1.0,
+          "median": 1.0,
+          "q75": 1.0,
+          "max": 1.0
+        },
+        "filter_smooth": {
+          "count": 5,
+          "mode": 12,
+          "choices": [
+            {
+              "value": 12,
+              "count": 2
+            },
+            {
+              "value": 24,
+              "count": 2
+            },
+            {
+              "value": 96,
+              "count": 1
+            }
+          ]
+        },
+        "max_slope_db_per_oct": {
+          "count": 5,
+          "mode": 16.0,
+          "choices": [
+            {
+              "value": 16.0,
+              "count": 3
+            },
+            {
+              "value": 12.0,
+              "count": 2
+            }
+          ]
+        },
+        "tdc_slope_db_per_oct": {
+          "count": 5,
+          "mode": 8.0,
+          "choices": [
+            {
+              "value": 8.0,
+              "count": 1
+            },
+            {
+              "value": 24.0,
+              "count": 1
+            },
+            {
+              "value": 4.0,
+              "count": 1
+            },
+            {
+              "value": 10.0,
+              "count": 1
+            },
+            {
+              "value": 3.0,
+              "count": 1
+            }
+          ]
+        }
+      },
+      "best_case": {
+        "pair": "pair_03_treble_hostile",
+        "scope": "phase1",
+        "rank_score": 100.0,
+        "avg_score": 88.642358,
+        "preset": {
+          "bass_first_ai": true,
+          "bass_first_mode_max_hz": 191.8,
+          "comparison_mode": true,
+          "enable_afdw": true,
+          "enable_tdc": true,
+          "fdw_cycles": 8.55,
+          "filter_smooth": 12,
+          "low_bass_cut_hz": 18.0,
+          "mag_c_max": 179.6,
+          "mag_c_min": 15.0,
+          "max_boost": 7.93,
+          "max_slope_db_per_oct": 12.0,
+          "phase_limit": 378.5,
+          "reg_strength": 36.2,
+          "tdc_max_reduction_db": 25.7,
+          "tdc_slope_db_per_oct": 8.0,
+          "tdc_strength": 45.0,
+          "trans_width": 128.4
+        }
+      },
+      "case_winners": [
+        {
+          "pair": "pair_03_treble_hostile",
+          "scope": "phase1",
+          "rank_score": 100.0,
+          "avg_score": 88.642358
+        },
+        {
+          "pair": "pair_02_crossover_disaster",
+          "scope": "phase1",
+          "rank_score": 100.0,
+          "avg_score": 88.589713
+        },
+        {
+          "pair": "pair_05_noisy_compromise",
+          "scope": "phase3-micro-u1",
+          "rank_score": 93.332781,
+          "avg_score": 77.610512
+        },
+        {
+          "pair": "pair_01_low_end_trap",
+          "scope": "phase3-micro-u1",
+          "rank_score": 88.659816,
+          "avg_score": 71.201807
+        },
+        {
+          "pair": "pair_04_room_asymmetry",
+          "scope": "phase1",
+          "rank_score": 87.535237,
+          "avg_score": 70.569571
+        }
+      ]
+    },
+    "Linear": {
+      "cases": 5,
+      "pairs": [
+        "pair_03_treble_hostile",
+        "pair_02_crossover_disaster",
+        "pair_05_noisy_compromise",
+        "pair_04_room_asymmetry",
+        "pair_01_low_end_trap"
+      ],
+      "recommended_seed_preset": {
+        "fdw_cycles": 12.58,
+        "tdc_strength": 63.9,
+        "tdc_max_reduction_db": 23.7,
+        "reg_strength": 22.5,
+        "max_boost": 3.22,
+        "mag_c_min": 15.0,
+        "low_bass_cut_hz": 18.0,
+        "mag_c_max": 196.1,
+        "trans_width": 139.2,
+        "bass_first_mode_max_hz": 171.0,
+        "phase_limit": 448.0,
+        "bass_first_ai": 1.0,
+        "comparison_mode": 1.0,
+        "enable_afdw": 1.0,
+        "enable_tdc": 1.0,
+        "filter_smooth": 12,
+        "max_slope_db_per_oct": 12.0,
+        "tdc_slope_db_per_oct": 12.0
+      },
+      "parameter_stats": {
+        "fdw_cycles": {
+          "count": 5,
+          "min": 7.05,
+          "q25": 9.86,
+          "median": 12.58,
+          "q75": 12.58,
+          "max": 15.06
+        },
+        "tdc_strength": {
+          "count": 5,
+          "min": 61.4,
+          "q25": 61.4,
+          "median": 63.9,
+          "q75": 64.9,
+          "max": 68.1
+        },
+        "tdc_max_reduction_db": {
+          "count": 5,
+          "min": 11.0,
+          "q25": 17.6,
+          "median": 23.7,
+          "q75": 23.7,
+          "max": 24.2
+        },
+        "reg_strength": {
+          "count": 5,
+          "min": 16.5,
+          "q25": 18.2,
+          "median": 22.5,
+          "q75": 22.5,
+          "max": 44.4
+        },
+        "max_boost": {
+          "count": 5,
+          "min": 3.03,
+          "q25": 3.22,
+          "median": 3.22,
+          "q75": 4.23,
+          "max": 5.37
+        },
+        "mag_c_min": {
+          "count": 5,
+          "min": 15.0,
+          "q25": 15.0,
+          "median": 15.0,
+          "q75": 46.722523,
+          "max": 46.722523
+        },
+        "low_bass_cut_hz": {
+          "count": 5,
+          "min": 18.0,
+          "q25": 18.0,
+          "median": 18.0,
+          "q75": 47.789273,
+          "max": 47.789273
+        },
+        "mag_c_max": {
+          "count": 5,
+          "min": 174.8,
+          "q25": 196.1,
+          "median": 196.1,
+          "q75": 205.3,
+          "max": 291.1
+        },
+        "trans_width": {
+          "count": 5,
+          "min": 76.5,
+          "q25": 112.0,
+          "median": 139.2,
+          "q75": 140.8,
+          "max": 140.8
+        },
+        "bass_first_mode_max_hz": {
+          "count": 5,
+          "min": 152.1,
+          "q25": 156.0,
+          "median": 171.0,
+          "q75": 171.0,
+          "max": 211.8
+        },
+        "phase_limit": {
+          "count": 5,
+          "min": 240.4,
+          "q25": 278.3,
+          "median": 448.0,
+          "q75": 467.6,
+          "max": 467.6
+        },
+        "bass_first_ai": {
+          "count": 5,
+          "min": 1.0,
+          "q25": 1.0,
+          "median": 1.0,
+          "q75": 1.0,
+          "max": 1.0
+        },
+        "comparison_mode": {
+          "count": 5,
+          "min": 1.0,
+          "q25": 1.0,
+          "median": 1.0,
+          "q75": 1.0,
+          "max": 1.0
+        },
+        "enable_afdw": {
+          "count": 5,
+          "min": 1.0,
+          "q25": 1.0,
+          "median": 1.0,
+          "q75": 1.0,
+          "max": 1.0
+        },
+        "enable_tdc": {
+          "count": 5,
+          "min": 1.0,
+          "q25": 1.0,
+          "median": 1.0,
+          "q75": 1.0,
+          "max": 1.0
+        },
+        "filter_smooth": {
+          "count": 5,
+          "mode": 12,
+          "choices": [
+            {
+              "value": 12,
+              "count": 2
+            },
+            {
+              "value": 24,
+              "count": 1
+            },
+            {
+              "value": 96,
+              "count": 1
+            },
+            {
+              "value": 48,
+              "count": 1
+            }
+          ]
+        },
+        "max_slope_db_per_oct": {
+          "count": 5,
+          "mode": 12.0,
+          "choices": [
+            {
+              "value": 12.0,
+              "count": 3
+            },
+            {
+              "value": 16.0,
+              "count": 1
+            },
+            {
+              "value": 8.0,
+              "count": 1
+            }
+          ]
+        },
+        "tdc_slope_db_per_oct": {
+          "count": 5,
+          "mode": 12.0,
+          "choices": [
+            {
+              "value": 12.0,
+              "count": 2
+            },
+            {
+              "value": 36.0,
+              "count": 1
+            },
+            {
+              "value": 6.0,
+              "count": 1
+            },
+            {
+              "value": 10.0,
+              "count": 1
+            }
+          ]
+        }
+      },
+      "best_case": {
+        "pair": "pair_03_treble_hostile",
+        "scope": "phase1",
+        "rank_score": 100.0,
+        "avg_score": 88.642358,
+        "preset": {
+          "bass_first_ai": true,
+          "bass_first_mode_max_hz": 211.8,
+          "comparison_mode": true,
+          "enable_afdw": true,
+          "enable_tdc": true,
+          "fdw_cycles": 9.86,
+          "filter_smooth": 24,
+          "low_bass_cut_hz": 18.0,
+          "mag_c_max": 174.8,
+          "mag_c_min": 15.0,
+          "max_boost": 4.23,
+          "max_slope_db_per_oct": 12.0,
+          "phase_limit": 240.4,
+          "reg_strength": 16.5,
+          "tdc_max_reduction_db": 11.0,
+          "tdc_slope_db_per_oct": 36.0,
+          "tdc_strength": 64.9,
+          "trans_width": 139.2
+        }
+      },
+      "case_winners": [
+        {
+          "pair": "pair_03_treble_hostile",
+          "scope": "phase1",
+          "rank_score": 100.0,
+          "avg_score": 88.642358
+        },
+        {
+          "pair": "pair_02_crossover_disaster",
+          "scope": "phase1",
+          "rank_score": 100.0,
+          "avg_score": 88.589713
+        },
+        {
+          "pair": "pair_05_noisy_compromise",
+          "scope": "phase1",
+          "rank_score": 88.858284,
+          "avg_score": 72.943067
+        },
+        {
+          "pair": "pair_04_room_asymmetry",
+          "scope": "phase3-micro-u1",
+          "rank_score": 87.981711,
+          "avg_score": 70.977553
+        },
+        {
+          "pair": "pair_01_low_end_trap",
+          "scope": "phase1",
+          "rank_score": 85.794644,
+          "avg_score": 69.75229
+        }
+      ]
+    },
+    "Minimum": {
+      "cases": 5,
+      "pairs": [
+        "pair_03_treble_hostile",
+        "pair_02_crossover_disaster",
+        "pair_01_low_end_trap",
+        "pair_04_room_asymmetry",
+        "pair_05_noisy_compromise"
+      ],
+      "recommended_seed_preset": {
+        "fdw_cycles": 12.68,
+        "tdc_strength": 46.6,
+        "tdc_max_reduction_db": 20.8,
+        "reg_strength": 30.4,
+        "max_boost": 3.93,
+        "mag_c_min": 32.257,
+        "low_bass_cut_hz": 35.134,
+        "mag_c_max": 194.0,
+        "trans_width": 127.2,
+        "bass_first_mode_max_hz": 202.8,
+        "bass_first_ai": 1.0,
+        "comparison_mode": 1.0,
+        "enable_afdw": 1.0,
+        "enable_tdc": 1.0,
+        "filter_smooth": 24,
+        "max_slope_db_per_oct": 12.0,
+        "tdc_slope_db_per_oct": 8.0
+      },
+      "parameter_stats": {
+        "fdw_cycles": {
+          "count": 5,
+          "min": 6.81,
+          "q25": 7.05,
+          "median": 12.68,
+          "q75": 13.82,
+          "max": 14.54
+        },
+        "tdc_strength": {
+          "count": 5,
+          "min": 22.8,
+          "q25": 45.7,
+          "median": 46.6,
+          "q75": 67.0,
+          "max": 67.3
+        },
+        "tdc_max_reduction_db": {
+          "count": 5,
+          "min": 12.6,
+          "q25": 15.1,
+          "median": 20.8,
+          "q75": 25.2,
+          "max": 35.9
+        },
+        "reg_strength": {
+          "count": 5,
+          "min": 17.4,
+          "q25": 29.2,
+          "median": 30.4,
+          "q75": 32.2,
+          "max": 39.8
+        },
+        "max_boost": {
+          "count": 5,
+          "min": 3.14,
+          "q25": 3.26,
+          "median": 3.93,
+          "q75": 5.94,
+          "max": 7.84
+        },
+        "mag_c_min": {
+          "count": 5,
+          "min": 15.0,
+          "q25": 15.2,
+          "median": 32.257127,
+          "q75": 49.7,
+          "max": 64.002295
+        },
+        "low_bass_cut_hz": {
+          "count": 5,
+          "min": 18.0,
+          "q25": 18.2,
+          "median": 35.134258,
+          "q75": 51.7,
+          "max": 55.0
+        },
+        "mag_c_max": {
+          "count": 5,
+          "min": 173.0,
+          "q25": 179.3,
+          "median": 194.0,
+          "q75": 198.9,
+          "max": 293.6
+        },
+        "trans_width": {
+          "count": 5,
+          "min": 84.7,
+          "q25": 89.0,
+          "median": 127.2,
+          "q75": 129.9,
+          "max": 149.3
+        },
+        "bass_first_mode_max_hz": {
+          "count": 5,
+          "min": 165.7,
+          "q25": 191.0,
+          "median": 202.8,
+          "q75": 212.0,
+          "max": 213.6
+        },
+        "bass_first_ai": {
+          "count": 5,
+          "min": 1.0,
+          "q25": 1.0,
+          "median": 1.0,
+          "q75": 1.0,
+          "max": 1.0
+        },
+        "comparison_mode": {
+          "count": 5,
+          "min": 1.0,
+          "q25": 1.0,
+          "median": 1.0,
+          "q75": 1.0,
+          "max": 1.0
+        },
+        "enable_afdw": {
+          "count": 5,
+          "min": 1.0,
+          "q25": 1.0,
+          "median": 1.0,
+          "q75": 1.0,
+          "max": 1.0
+        },
+        "enable_tdc": {
+          "count": 5,
+          "min": 1.0,
+          "q25": 1.0,
+          "median": 1.0,
+          "q75": 1.0,
+          "max": 1.0
+        },
+        "filter_smooth": {
+          "count": 5,
+          "mode": 24,
+          "choices": [
+            {
+              "value": 24,
+              "count": 2
+            },
+            {
+              "value": 48,
+              "count": 2
+            },
+            {
+              "value": 12,
+              "count": 1
+            }
+          ]
+        },
+        "max_slope_db_per_oct": {
+          "count": 5,
+          "mode": 12.0,
+          "choices": [
+            {
+              "value": 12.0,
+              "count": 2
+            },
+            {
+              "value": 10.0,
+              "count": 2
+            },
+            {
+              "value": 16.0,
+              "count": 1
+            }
+          ]
+        },
+        "tdc_slope_db_per_oct": {
+          "count": 5,
+          "mode": 8.0,
+          "choices": [
+            {
+              "value": 8.0,
+              "count": 3
+            },
+            {
+              "value": 24.0,
+              "count": 1
+            },
+            {
+              "value": 10.0,
+              "count": 1
+            }
+          ]
+        }
+      },
+      "best_case": {
+        "pair": "pair_03_treble_hostile",
+        "scope": "phase1",
+        "rank_score": 95.334529,
+        "avg_score": 88.642358,
+        "preset": {
+          "bass_first_ai": true,
+          "bass_first_mode_max_hz": 202.8,
+          "comparison_mode": true,
+          "enable_afdw": true,
+          "enable_tdc": true,
+          "fdw_cycles": 12.68,
+          "filter_smooth": 12,
+          "low_bass_cut_hz": 18.0,
+          "mag_c_max": 198.9,
+          "mag_c_min": 15.0,
+          "max_boost": 7.84,
+          "max_slope_db_per_oct": 12.0,
+          "reg_strength": 29.2,
+          "tdc_max_reduction_db": 25.2,
+          "tdc_slope_db_per_oct": 8.0,
+          "tdc_strength": 67.0,
+          "trans_width": 84.7
+        }
+      },
+      "case_winners": [
+        {
+          "pair": "pair_03_treble_hostile",
+          "scope": "phase1",
+          "rank_score": 95.334529,
+          "avg_score": 88.642358
+        },
+        {
+          "pair": "pair_02_crossover_disaster",
+          "scope": "phase1",
+          "rank_score": 94.281014,
+          "avg_score": 88.589713
+        },
+        {
+          "pair": "pair_01_low_end_trap",
+          "scope": "phase3-micro-u1",
+          "rank_score": 84.675256,
+          "avg_score": 79.027903
+        },
+        {
+          "pair": "pair_04_room_asymmetry",
+          "scope": "phase3-micro-u1",
+          "rank_score": 80.571675,
+          "avg_score": 75.431246
+        },
+        {
+          "pair": "pair_05_noisy_compromise",
+          "scope": "phase3-micro-u1",
+          "rank_score": 78.002089,
+          "avg_score": 72.585496
+        }
+      ]
+    },
+    "Mixed": {
+      "cases": 5,
+      "pairs": [
+        "pair_03_treble_hostile",
+        "pair_02_crossover_disaster",
+        "pair_01_low_end_trap",
+        "pair_05_noisy_compromise",
+        "pair_04_room_asymmetry"
+      ],
+      "recommended_seed_preset": {
+        "fdw_cycles": 8.61,
+        "tdc_strength": 47.5,
+        "tdc_max_reduction_db": 24.0,
+        "reg_strength": 25.6,
+        "max_boost": 3.5,
+        "mag_c_min": 15.0,
+        "low_bass_cut_hz": 18.0,
+        "mag_c_max": 180.3,
+        "trans_width": 114.0,
+        "bass_first_mode_max_hz": 201.2,
+        "mixed_freq": 177.3,
+        "bass_first_ai": 1.0,
+        "comparison_mode": 1.0,
+        "enable_afdw": 1.0,
+        "enable_tdc": 1.0,
+        "filter_smooth": 12,
+        "max_slope_db_per_oct": 12.0,
+        "tdc_slope_db_per_oct": 8.0
+      },
+      "parameter_stats": {
+        "fdw_cycles": {
+          "count": 5,
+          "min": 6.81,
+          "q25": 7.44,
+          "median": 8.61,
+          "q75": 9.64,
+          "max": 10.69
+        },
+        "tdc_strength": {
+          "count": 5,
+          "min": 36.7,
+          "q25": 39.5,
+          "median": 47.5,
+          "q75": 53.2,
+          "max": 56.9
+        },
+        "tdc_max_reduction_db": {
+          "count": 5,
+          "min": 14.3,
+          "q25": 21.6,
+          "median": 24.0,
+          "q75": 28.4,
+          "max": 31.6
+        },
+        "reg_strength": {
+          "count": 5,
+          "min": 20.8,
+          "q25": 22.1,
+          "median": 25.6,
+          "q75": 26.5,
+          "max": 40.7
+        },
+        "max_boost": {
+          "count": 5,
+          "min": 3.08,
+          "q25": 3.1,
+          "median": 3.5,
+          "q75": 4.72,
+          "max": 5.53
+        },
+        "mag_c_min": {
+          "count": 5,
+          "min": 15.0,
+          "q25": 15.0,
+          "median": 15.0,
+          "q75": 15.8,
+          "max": 15.9
+        },
+        "low_bass_cut_hz": {
+          "count": 5,
+          "min": 18.0,
+          "q25": 18.0,
+          "median": 18.0,
+          "q75": 18.1,
+          "max": 18.5
+        },
+        "mag_c_max": {
+          "count": 5,
+          "min": 171.7,
+          "q25": 175.0,
+          "median": 180.3,
+          "q75": 180.5,
+          "max": 252.0
+        },
+        "trans_width": {
+          "count": 5,
+          "min": 81.5,
+          "q25": 95.9,
+          "median": 114.0,
+          "q75": 149.3,
+          "max": 149.9
+        },
+        "bass_first_mode_max_hz": {
+          "count": 5,
+          "min": 157.9,
+          "q25": 183.4,
+          "median": 201.2,
+          "q75": 210.2,
+          "max": 215.9
+        },
+        "mixed_freq": {
+          "count": 5,
+          "min": 96.3,
+          "q25": 124.9,
+          "median": 177.3,
+          "q75": 187.2,
+          "max": 260.6
+        },
+        "bass_first_ai": {
+          "count": 5,
+          "min": 1.0,
+          "q25": 1.0,
+          "median": 1.0,
+          "q75": 1.0,
+          "max": 1.0
+        },
+        "comparison_mode": {
+          "count": 5,
+          "min": 1.0,
+          "q25": 1.0,
+          "median": 1.0,
+          "q75": 1.0,
+          "max": 1.0
+        },
+        "enable_afdw": {
+          "count": 5,
+          "min": 1.0,
+          "q25": 1.0,
+          "median": 1.0,
+          "q75": 1.0,
+          "max": 1.0
+        },
+        "enable_tdc": {
+          "count": 5,
+          "min": 1.0,
+          "q25": 1.0,
+          "median": 1.0,
+          "q75": 1.0,
+          "max": 1.0
+        },
+        "filter_smooth": {
+          "count": 5,
+          "mode": 12,
+          "choices": [
+            {
+              "value": 12,
+              "count": 3
+            },
+            {
+              "value": 48,
+              "count": 1
+            },
+            {
+              "value": 96,
+              "count": 1
+            }
+          ]
+        },
+        "max_slope_db_per_oct": {
+          "count": 5,
+          "mode": 12.0,
+          "choices": [
+            {
+              "value": 12.0,
+              "count": 2
+            },
+            {
+              "value": 10.0,
+              "count": 2
+            },
+            {
+              "value": 14.0,
+              "count": 1
+            }
+          ]
+        },
+        "tdc_slope_db_per_oct": {
+          "count": 5,
+          "mode": 8.0,
+          "choices": [
+            {
+              "value": 8.0,
+              "count": 3
+            },
+            {
+              "value": 36.0,
+              "count": 1
+            },
+            {
+              "value": 24.0,
+              "count": 1
+            }
+          ]
+        }
+      },
+      "best_case": {
+        "pair": "pair_03_treble_hostile",
+        "scope": "phase1",
+        "rank_score": 100.0,
+        "avg_score": 88.642358,
+        "preset": {
+          "bass_first_ai": true,
+          "bass_first_mode_max_hz": 215.9,
+          "comparison_mode": true,
+          "enable_afdw": true,
+          "enable_tdc": true,
+          "fdw_cycles": 10.69,
+          "filter_smooth": 12,
+          "low_bass_cut_hz": 18.0,
+          "mag_c_max": 180.3,
+          "mag_c_min": 15.0,
+          "max_boost": 3.08,
+          "max_slope_db_per_oct": 14.0,
+          "mixed_freq": 187.2,
+          "reg_strength": 26.5,
+          "tdc_max_reduction_db": 24.0,
+          "tdc_slope_db_per_oct": 8.0,
+          "tdc_strength": 53.2,
+          "trans_width": 81.5
+        }
+      },
+      "case_winners": [
+        {
+          "pair": "pair_03_treble_hostile",
+          "scope": "phase1",
+          "rank_score": 100.0,
+          "avg_score": 88.642358
+        },
+        {
+          "pair": "pair_02_crossover_disaster",
+          "scope": "phase1",
+          "rank_score": 100.0,
+          "avg_score": 88.589713
+        },
+        {
+          "pair": "pair_01_low_end_trap",
+          "scope": "phase1",
+          "rank_score": 91.40481,
+          "avg_score": 74.96462
+        },
+        {
+          "pair": "pair_05_noisy_compromise",
+          "scope": "phase3-micro-u1",
+          "rank_score": 90.061264,
+          "avg_score": 73.370245
+        },
+        {
+          "pair": "pair_04_room_asymmetry",
+          "scope": "phase3-micro-u1",
+          "rank_score": 87.674072,
+          "avg_score": 71.313063
+        }
+      ]
+    }
+  }
+}

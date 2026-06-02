@@ -161,6 +161,198 @@ def summarize_rt60_bands(
 # Harmonic boost-risk curve
 # ---------------------------------------------------------------------------
 
+
+def _harmonic_boost_risk_empty_summary() -> dict:
+    return {
+        "mean_risk_20_80": 0.0,
+        "mean_risk_20_120": 0.0,
+        "mean_risk_20_200": 0.0,
+        "peak_risk": 0.0,
+        "peak_risk_hz": float("nan"),
+        "valid": False,
+    }
+
+
+def _harmonic_boost_risk_collect_inputs(
+    harmonic_freq_hz,
+    harmonic_magnitudes_db: dict,
+    fundamental_freq_hz=None,
+    fundamental_mag_db=None,
+):
+    if harmonic_freq_hz is None or not isinstance(harmonic_magnitudes_db, dict):
+        return None, None, False, None
+
+    freq = np.asarray(harmonic_freq_hz, dtype=float).reshape(-1)
+    if freq.size < 4:
+        return None, None, False, None
+
+    use_relative = fundamental_freq_hz is not None and fundamental_mag_db is not None
+    fund_at_harm: np.ndarray | None = None
+    if use_relative:
+        ff = np.asarray(fundamental_freq_hz, dtype=float).reshape(-1)
+        fm = np.asarray(fundamental_mag_db, dtype=float).reshape(-1)
+        valid_f = np.isfinite(ff) & np.isfinite(fm) & (ff > 0.0)
+        if valid_f.sum() >= 4:
+            fund_at_harm = np.interp(freq, ff[valid_f], fm[valid_f], left=fm[valid_f][0], right=fm[valid_f][-1])
+        else:
+            use_relative = False
+    return freq, harmonic_magnitudes_db, use_relative, fund_at_harm
+
+
+def _harmonic_boost_risk_collect_orders(freq: np.ndarray, harmonic_magnitudes_db: dict) -> list[np.ndarray]:
+    h_arrays: list[np.ndarray] = []
+    for order in (2, 3, 4):
+        arr = harmonic_magnitudes_db.get(order)
+        if arr is None:
+            continue
+        a = np.asarray(arr, dtype=float).reshape(-1)
+        if a.size != freq.size:
+            continue
+        if not np.any(np.isfinite(a)):
+            continue
+        h_arrays.append(a)
+        if order == 3 and len(h_arrays) == 0:
+            break
+    return h_arrays
+
+
+def _harmonic_boost_risk_raw_curve(
+    freq: np.ndarray,
+    h_arrays: list[np.ndarray],
+    *,
+    use_relative: bool,
+    fund_at_harm: np.ndarray | None,
+) -> np.ndarray | None:
+    if not h_arrays:
+        return None
+    if use_relative and fund_at_harm is not None:
+        threshold_db = -30.0
+        range_db = 15.0
+        effective = [h - fund_at_harm for h in h_arrays]
+    else:
+        threshold_db = -40.0
+        range_db = 15.0
+        effective = h_arrays
+
+    worst = np.full(freq.size, float("-inf"), dtype=float)
+    for e in effective:
+        finite_mask = np.isfinite(e)
+        worst[finite_mask] = np.maximum(worst[finite_mask], e[finite_mask])
+    nonfinite = ~np.isfinite(worst)
+    if np.all(nonfinite):
+        return None
+    worst[nonfinite] = float(threshold_db) - 1.0
+    raw_risk = np.clip((worst - threshold_db) / max(range_db, 1e-6), 0.0, 1.0)
+    return np.asarray(raw_risk, dtype=float)
+
+
+def _harmonic_boost_risk_smooth_curve(
+    freq: np.ndarray,
+    raw_risk: np.ndarray,
+    *,
+    lo_hz: float,
+    hi_hz: float,
+) -> np.ndarray:
+    band_mask = (freq >= lo_hz) & (freq <= hi_hz) & np.isfinite(freq)
+    if not np.any(band_mask) or freq[band_mask].size < 4:
+        return raw_risk.copy()
+
+    lf = np.log2(np.maximum(freq[band_mask], 1e-6))
+    dlf = np.diff(lf)
+    dlf = dlf[dlf > 0]
+    if dlf.size < 2:
+        return raw_risk.copy()
+
+    step = float(np.median(dlf))
+    sigma_bins = max(1.0, 0.5 / max(step, 1e-6))
+    half = int(np.ceil(3.0 * sigma_bins))
+    x = np.arange(-half, half + 1, dtype=float)
+    k = np.exp(-0.5 * (x / sigma_bins) ** 2)
+    k /= k.sum()
+    from scipy.signal import fftconvolve  # noqa: PLC0415
+
+    smoothed = fftconvolve(raw_risk[band_mask], k, mode="same")
+    risk = np.zeros(freq.size, dtype=float)
+    risk[band_mask] = np.clip(smoothed, 0.0, 1.0)
+    return risk
+
+
+def _harmonic_boost_risk_summary(freq: np.ndarray, risk: np.ndarray) -> dict:
+    def _mean_in_band(lo: float, hi: float) -> float:
+        m = (freq >= lo) & (freq <= hi) & np.isfinite(risk)
+        if np.any(m):
+            return float(np.mean(risk[m]))
+        return 0.0
+
+    if np.any(np.isfinite(risk) & (risk > 0.0)):
+        peak_idx = int(np.argmax(risk))
+        peak_risk = float(risk[peak_idx])
+        peak_risk_hz = float(freq[peak_idx])
+    else:
+        peak_risk = 0.0
+        peak_risk_hz = float("nan")
+
+    return {
+        "mean_risk_20_80": _mean_in_band(20.0, 80.0),
+        "mean_risk_20_120": _mean_in_band(20.0, 120.0),
+        "mean_risk_20_200": _mean_in_band(20.0, 200.0),
+        "peak_risk": peak_risk,
+        "peak_risk_hz": peak_risk_hz,
+        "valid": bool(peak_risk > 0.0),
+    }
+
+
+def _harmonic_boost_risk_build(
+    harmonic_freq_hz,
+    harmonic_magnitudes_db: dict,
+    *,
+    fundamental_freq_hz=None,
+    fundamental_mag_db=None,
+    lo_hz: float,
+    hi_hz: float,
+) -> tuple[np.ndarray | None, np.ndarray | None, dict]:
+    empty_summary = _harmonic_boost_risk_empty_summary()
+    try:
+        freq, harmonic_magnitudes_db, use_relative, fund_at_harm = _harmonic_boost_risk_collect_inputs(
+            harmonic_freq_hz,
+            harmonic_magnitudes_db,
+            fundamental_freq_hz,
+            fundamental_mag_db,
+        )
+        if freq is None or harmonic_magnitudes_db is None:
+            return None, None, empty_summary
+
+        h_arrays = _harmonic_boost_risk_collect_orders(freq, harmonic_magnitudes_db)
+        if not h_arrays:
+            return None, None, empty_summary
+
+        raw_risk = _harmonic_boost_risk_raw_curve(
+            freq,
+            h_arrays,
+            use_relative=use_relative,
+            fund_at_harm=fund_at_harm,
+        )
+        if raw_risk is None:
+            return None, None, empty_summary
+
+        risk = _harmonic_boost_risk_smooth_curve(freq, raw_risk, lo_hz=lo_hz, hi_hz=hi_hz)
+        summary = _harmonic_boost_risk_summary(freq, risk)
+        return np.asarray(freq, dtype=float), np.asarray(risk, dtype=float), summary
+
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        return None, None, empty_summary
+
 def build_harmonic_boost_risk_curve(
     harmonic_freq_hz,
     harmonic_magnitudes_db: dict,
@@ -179,144 +371,14 @@ def build_harmonic_boost_risk_curve(
     summary keys: mean_risk_20_80, mean_risk_20_120, mean_risk_20_200,
                   peak_risk, peak_risk_hz, valid.
     """
-    empty_summary = {
-        "mean_risk_20_80": 0.0,
-        "mean_risk_20_120": 0.0,
-        "mean_risk_20_200": 0.0,
-        "peak_risk": 0.0,
-        "peak_risk_hz": float("nan"),
-        "valid": False,
-    }
-    try:
-        if harmonic_freq_hz is None or not isinstance(harmonic_magnitudes_db, dict):
-            return None, None, empty_summary
-
-        freq = np.asarray(harmonic_freq_hz, dtype=float).reshape(-1)
-        if freq.size < 4:
-            return None, None, empty_summary
-
-        use_relative = (
-            fundamental_freq_hz is not None
-            and fundamental_mag_db is not None
-        )
-        fund_at_harm: np.ndarray | None = None
-        if use_relative:
-            ff = np.asarray(fundamental_freq_hz, dtype=float).reshape(-1)
-            fm = np.asarray(fundamental_mag_db, dtype=float).reshape(-1)
-            valid_f = np.isfinite(ff) & np.isfinite(fm) & (ff > 0.0)
-            if valid_f.sum() >= 4:
-                fund_at_harm = np.interp(
-                    freq,
-                    ff[valid_f],
-                    fm[valid_f],
-                    left=fm[valid_f][0],
-                    right=fm[valid_f][-1],
-                )
-            else:
-                use_relative = False
-
-        h_arrays: list[np.ndarray] = []
-        for order in (2, 3, 4):
-            arr = harmonic_magnitudes_db.get(order)
-            if arr is None:
-                continue
-            a = np.asarray(arr, dtype=float).reshape(-1)
-            if a.size != freq.size:
-                continue
-            if not np.any(np.isfinite(a)):
-                continue
-            h_arrays.append(a)
-            if order == 3 and len(h_arrays) == 0:
-                break
-
-        if not h_arrays:
-            return None, None, empty_summary
-
-        # Choose threshold logic.
-        if use_relative and fund_at_harm is not None:
-            # Relative: H2/H3 vs fundamental, threshold -30 dBr
-            threshold_db = -30.0
-            range_db = 15.0
-            effective = [h - fund_at_harm for h in h_arrays]
-        else:
-            # Absolute: threshold around -40 dBFS, range 15 dB
-            threshold_db = -40.0
-            range_db = 15.0
-            effective = h_arrays
-
-        # Pointwise worst-case across orders, then normalise to 0..1.
-        worst = np.full(freq.size, float("-inf"), dtype=float)
-        for e in effective:
-            finite_mask = np.isfinite(e)
-            worst[finite_mask] = np.maximum(worst[finite_mask], e[finite_mask])
-
-        nonfinite = ~np.isfinite(worst)
-        if np.all(nonfinite):
-            return None, None, empty_summary
-        worst[nonfinite] = float(threshold_db) - 1.0
-
-        raw_risk = np.clip((worst - threshold_db) / max(range_db, 1e-6), 0.0, 1.0)
-
-        # Smooth on log-frequency axis with ~0.5 octave kernel.
-        band_mask = (freq >= lo_hz) & (freq <= hi_hz) & np.isfinite(freq)
-        if np.any(band_mask) and freq[band_mask].size >= 4:
-            lf = np.log2(np.maximum(freq[band_mask], 1e-6))
-            dlf = np.diff(lf)
-            dlf = dlf[dlf > 0]
-            if dlf.size >= 2:
-                step = float(np.median(dlf))
-                sigma_bins = max(1.0, 0.5 / max(step, 1e-6))
-                half = int(np.ceil(3.0 * sigma_bins))
-                x = np.arange(-half, half + 1, dtype=float)
-                k = np.exp(-0.5 * (x / sigma_bins) ** 2)
-                k /= k.sum()
-                from scipy.signal import fftconvolve  # noqa: PLC0415
-                smoothed = fftconvolve(raw_risk[band_mask], k, mode="same")
-                risk = np.zeros(freq.size, dtype=float)
-                risk[band_mask] = np.clip(smoothed, 0.0, 1.0)
-            else:
-                risk = raw_risk.copy()
-        else:
-            risk = raw_risk.copy()
-
-        def _mean_in_band(lo: float, hi: float) -> float:
-            m = (freq >= lo) & (freq <= hi) & np.isfinite(risk)
-            if np.any(m):
-                return float(np.mean(risk[m]))
-            return 0.0
-
-        if np.any(np.isfinite(risk) & (risk > 0.0)):
-            peak_idx = int(np.argmax(risk))
-            peak_risk = float(risk[peak_idx])
-            peak_risk_hz = float(freq[peak_idx])
-        else:
-            peak_risk = 0.0
-            peak_risk_hz = float("nan")
-
-        summary = {
-            "mean_risk_20_80": _mean_in_band(20.0, 80.0),
-            "mean_risk_20_120": _mean_in_band(20.0, 120.0),
-            "mean_risk_20_200": _mean_in_band(20.0, 200.0),
-            "peak_risk": peak_risk,
-            "peak_risk_hz": peak_risk_hz,
-            "valid": bool(peak_risk > 0.0),
-        }
-        return np.asarray(freq, dtype=float), np.asarray(risk, dtype=float), summary
-
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        return None, None, empty_summary
+    return _harmonic_boost_risk_build(
+        harmonic_freq_hz,
+        harmonic_magnitudes_db,
+        fundamental_freq_hz=fundamental_freq_hz,
+        fundamental_mag_db=fundamental_mag_db,
+        lo_hz=lo_hz,
+        hi_hz=hi_hz,
+    )
 
 
 # ---------------------------------------------------------------------------

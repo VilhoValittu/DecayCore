@@ -267,20 +267,8 @@ def _auto_optuna_needs_zero_feasible_rescue(
     infeasible_n = int(tel.get("infeasible_trials", 0) or 0)
     return bool(complete_n > 0 and feasible_n == 0 and infeasible_n > 0)
 
-def _auto_optuna_build_run_telemetry(
-    study,
-    *,
-    base_data: dict | None,
-    study_name: str | None,
-    study_scope: str | None,
-    phase_kind: str | None,
-    run_token: str,
-    requested_total: int,
-    startup_trials: int,
-    duplicate_skips: int,
-    duplicate_replays: int,
-    duplicate_reserved: int,
-) -> dict:
+
+def _auto_optuna_collect_run_trials(study, *, run_token: str) -> list[tuple]:
     try:
         trials = list(
             study.get_trials(deepcopy=False)
@@ -288,7 +276,6 @@ def _auto_optuna_build_run_telemetry(
             else getattr(study, "trials", [])
         )
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -308,7 +295,6 @@ def _auto_optuna_build_run_telemetry(
         try:
             user_attrs = dict(getattr(tr, "user_attrs", {}) or {})
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -325,84 +311,102 @@ def _auto_optuna_build_run_telemetry(
         opt_meta = dict(out.get("optuna", {}) or {})
         if str(opt_meta.get("run_token", "")) == str(run_token):
             run_trials.append((tr, out, opt_meta))
+    return run_trials
 
-    state_counts = {}
-    complete_n = 0
-    fail_n = 0
-    feasible_n = 0
-    infeasible_n = 0
-    best_raw_value = None
-    best_raw_trial = None
-    best_feasible_value = None
-    best_feasible_trial = None
 
-    violation_counts = {"ripple": 0, "events": 0, "boost": 0}
-    violation_max = {"ripple": 0.0, "events": 0.0, "boost": 0.0}
-    source_counts = {}
-    events_all = []
-    events_feasible = []
-    events_infeasible = []
-    constraint_flags = {}
-    run_phase_kind = ""
+def _auto_optuna_init_run_telemetry_state() -> dict:
+    return {
+        "state_counts": {},
+        "complete_n": 0,
+        "fail_n": 0,
+        "feasible_n": 0,
+        "infeasible_n": 0,
+        "best_raw_value": None,
+        "best_raw_trial": None,
+        "best_feasible_value": None,
+        "best_feasible_trial": None,
+        "violation_counts": {"ripple": 0, "events": 0, "boost": 0},
+        "violation_max": {"ripple": 0.0, "events": 0.0, "boost": 0.0},
+        "source_counts": {},
+        "events_all": [],
+        "events_feasible": [],
+        "events_infeasible": [],
+        "constraint_flags": {},
+        "run_phase_kind": "",
+    }
 
-    for tr, out, opt_meta in list(run_trials):
-        state_obj = getattr(tr, "state", None)
-        state_name = str(getattr(state_obj, "name", state_obj or "UNKNOWN"))
-        state_counts[state_name] = int(state_counts.get(state_name, 0) or 0) + 1
 
-        source = str(opt_meta.get("source", "") or "")
-        if source:
-            source_counts[source] = int(source_counts.get(source, 0) or 0) + 1
-        if not run_phase_kind:
-            run_phase_kind = str(opt_meta.get("phase_kind", "") or "")
+def _auto_optuna_update_run_telemetry_state_counts(state: dict, tr, opt_meta: dict) -> None:
+    state_obj = getattr(tr, "state", None)
+    state_name = str(getattr(state_obj, "name", state_obj or "UNKNOWN"))
+    state_counts = state["state_counts"]
+    state_counts[state_name] = int(state_counts.get(state_name, 0) or 0) + 1
 
-        if state_name == "COMPLETE":
-            complete_n += 1
-        elif state_name == "FAIL":
-            fail_n += 1
+    source = str(opt_meta.get("source", "") or "")
+    if source:
+        source_counts = state["source_counts"]
+        source_counts[source] = int(source_counts.get(source, 0) or 0) + 1
+    if not state["run_phase_kind"]:
+        state["run_phase_kind"] = str(opt_meta.get("phase_kind", "") or "")
 
+    if state_name == "COMPLETE":
+        state["complete_n"] += 1
+    elif state_name == "FAIL":
+        state["fail_n"] += 1
+    state["_state_name"] = state_name
+
+
+def _auto_optuna_update_run_telemetry_state_constraints(state: dict, opt_meta: dict) -> None:
+    constraints_active = bool(opt_meta.get("constraints_active", False))
+    feasible = opt_meta.get("feasible", None)
+    violations = dict(opt_meta.get("violations", {}) or {})
+    trial_constraint_flags = dict(opt_meta.get("constraint_flags", {}) or {})
+    if trial_constraint_flags and not state["constraint_flags"]:
+        state["constraint_flags"] = dict(trial_constraint_flags)
+
+    if constraints_active and feasible is True:
+        state["feasible_n"] += 1
+    elif constraints_active and feasible is False:
+        state["infeasible_n"] += 1
+
+    violation_counts = state["violation_counts"]
+    violation_max = state["violation_max"]
+    for key in ("ripple", "events", "boost"):
+        v = _auto_safe_float(violations.get(key, 0.0), 0.0)
+        if float(v) > 0.0:
+            violation_counts[key] = int(violation_counts.get(key, 0) or 0) + 1
+            violation_max[key] = float(max(float(violation_max.get(key, 0.0) or 0.0), float(v)))
+
+
+def _auto_optuna_update_run_telemetry_state_complete(state: dict, tr, out: dict, opt_meta: dict) -> None:
+    if state.get("_state_name") != "COMPLETE":
+        return
+
+    metrics = dict(out.get("metrics", {}) or {})
+    events_val = _auto_safe_float(metrics.get("events_severity", float("nan")), float("nan"))
+    if np.isfinite(events_val):
+        state["events_all"].append(float(events_val))
         constraints_active = bool(opt_meta.get("constraints_active", False))
         feasible = opt_meta.get("feasible", None)
-        violations = dict(opt_meta.get("violations", {}) or {})
-        trial_constraint_flags = dict(opt_meta.get("constraint_flags", {}) or {})
-        if trial_constraint_flags and not constraint_flags:
-            constraint_flags = dict(trial_constraint_flags)
-
         if constraints_active and feasible is True:
-            feasible_n += 1
+            state["events_feasible"].append(float(events_val))
         elif constraints_active and feasible is False:
-            infeasible_n += 1
+            state["events_infeasible"].append(float(events_val))
 
-        for key in ("ripple", "events", "boost"):
-            v = _auto_safe_float(violations.get(key, 0.0), 0.0)
-            if float(v) > 0.0:
-                violation_counts[key] = int(violation_counts.get(key, 0) or 0) + 1
-                violation_max[key] = float(max(float(violation_max.get(key, 0.0) or 0.0), float(v)))
+    obj_val = _auto_optuna_trial_objective_value(tr, out)
+    if obj_val is not None:
+        if state["best_raw_value"] is None or float(obj_val) > float(state["best_raw_value"]):
+            state["best_raw_value"] = float(obj_val)
+            state["best_raw_trial"] = int(getattr(tr, "number", -1))
 
-        if state_name == "COMPLETE":
-            metrics = dict(out.get("metrics", {}) or {})
-            events_val = _auto_safe_float(metrics.get("events_severity", float("nan")), float("nan"))
-            if np.isfinite(events_val):
-                events_all.append(float(events_val))
-                if constraints_active and feasible is True:
-                    events_feasible.append(float(events_val))
-                elif constraints_active and feasible is False:
-                    events_infeasible.append(float(events_val))
-            obj_val = _auto_optuna_trial_objective_value(tr, out)
-            if obj_val is not None:
-                if best_raw_value is None or float(obj_val) > float(best_raw_value):
-                    best_raw_value = float(obj_val)
-                    best_raw_trial = int(getattr(tr, "number", -1))
+        feasible_ok = opt_meta.get("feasible", None)
+        if feasible_ok is True:
+            if state["best_feasible_value"] is None or float(obj_val) > float(state["best_feasible_value"]):
+                state["best_feasible_value"] = float(obj_val)
+                state["best_feasible_trial"] = int(getattr(tr, "number", -1))
 
-                feasible_ok = opt_meta.get("feasible", None)
-                if feasible_ok is True:
-                    if best_feasible_value is None or float(obj_val) > float(best_feasible_value):
-                        best_feasible_value = float(obj_val)
-                        best_feasible_trial = int(getattr(tr, "number", -1))
 
-    startup_complete = int(min(max(1, int(startup_trials)), int(complete_n))) if complete_n > 0 else 0
-    model_complete = int(max(0, int(complete_n) - int(startup_complete)))
-    constraints_active_any = bool(_auto_optuna_constraints_enabled_for_scope(base_data, study_scope, phase_kind=phase_kind or run_phase_kind))
+def _auto_optuna_constraint_threshold_summary(base_data: dict | None, study_scope: str | None) -> dict:
     constraint_thresholds = {}
     try:
         thr = _auto_optuna_constraint_thresholds(base_data, study_scope)
@@ -412,7 +416,6 @@ def _auto_optuna_build_run_telemetry(
             "max_net_boost_db": float(thr["max_net_boost_db"]),
         }
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -425,6 +428,34 @@ def _auto_optuna_build_run_telemetry(
         NameError,
     ):
         constraint_thresholds = {}
+    return constraint_thresholds
+
+def _auto_optuna_build_run_telemetry(
+    study,
+    *,
+    base_data: dict | None,
+    study_name: str | None,
+    study_scope: str | None,
+    phase_kind: str | None,
+    run_token: str,
+    requested_total: int,
+    startup_trials: int,
+    duplicate_skips: int,
+    duplicate_replays: int,
+    duplicate_reserved: int,
+) -> dict:
+    run_trials = _auto_optuna_collect_run_trials(study, run_token=run_token)
+    state = _auto_optuna_init_run_telemetry_state()
+    for tr, out, opt_meta in list(run_trials):
+        _auto_optuna_update_run_telemetry_state_counts(state, tr, opt_meta)
+        _auto_optuna_update_run_telemetry_state_constraints(state, opt_meta)
+        _auto_optuna_update_run_telemetry_state_complete(state, tr, out, opt_meta)
+
+    startup_complete = int(min(max(1, int(startup_trials)), int(state["complete_n"]))) if state["complete_n"] > 0 else 0
+    model_complete = int(max(0, int(state["complete_n"]) - int(startup_complete)))
+    run_phase_kind = str(state["run_phase_kind"] or phase_kind or "")
+    constraints_active_any = bool(_auto_optuna_constraints_enabled_for_scope(base_data, study_scope, phase_kind=phase_kind or run_phase_kind))
+    constraint_thresholds = _auto_optuna_constraint_threshold_summary(base_data, study_scope)
 
     return {
         "study_name": str(study_name or "in-memory"),
@@ -434,9 +465,9 @@ def _auto_optuna_build_run_telemetry(
         "cache_schema_version": int(AUTO_MODE_CACHE_SCHEMA_VERSION),
         "requested_total": int(requested_total),
         "run_trials": int(len(run_trials)),
-        "complete_trials": int(complete_n),
-        "failed_trials": int(fail_n),
-        "state_counts": dict(state_counts or {}),
+        "complete_trials": int(state["complete_n"]),
+        "failed_trials": int(state["fail_n"]),
+        "state_counts": dict(state["state_counts"] or {}),
         "startup_trials": int(startup_trials),
         "startup_complete": int(startup_complete),
         "model_complete": int(model_complete),
@@ -444,18 +475,18 @@ def _auto_optuna_build_run_telemetry(
         "duplicate_replays": int(duplicate_replays),
         "duplicate_reserved": int(duplicate_reserved),
         "constraints_active": bool(constraints_active_any),
-        "feasible_trials": int(feasible_n) if bool(constraints_active_any) else 0,
-        "infeasible_trials": int(infeasible_n) if bool(constraints_active_any) else 0,
-        "best_raw_value": best_raw_value,
-        "best_raw_trial": best_raw_trial,
-        "best_feasible_value": best_feasible_value if bool(constraints_active_any) else None,
-        "best_feasible_trial": best_feasible_trial if bool(constraints_active_any) else None,
-        "violation_counts": dict(violation_counts or {}),
-        "violation_max": dict(violation_max or {}),
-        "events_summary": _auto_metric_summary(events_all),
-        "events_feasible_summary": _auto_metric_summary(events_feasible),
-        "events_infeasible_summary": _auto_metric_summary(events_infeasible),
+        "feasible_trials": int(state["feasible_n"]) if bool(constraints_active_any) else 0,
+        "infeasible_trials": int(state["infeasible_n"]) if bool(constraints_active_any) else 0,
+        "best_raw_value": state["best_raw_value"],
+        "best_raw_trial": state["best_raw_trial"],
+        "best_feasible_value": state["best_feasible_value"] if bool(constraints_active_any) else None,
+        "best_feasible_trial": state["best_feasible_trial"] if bool(constraints_active_any) else None,
+        "violation_counts": dict(state["violation_counts"] or {}),
+        "violation_max": dict(state["violation_max"] or {}),
+        "events_summary": _auto_metric_summary(state["events_all"]),
+        "events_feasible_summary": _auto_metric_summary(state["events_feasible"]),
+        "events_infeasible_summary": _auto_metric_summary(state["events_infeasible"]),
         "constraint_thresholds": dict(constraint_thresholds or {}),
-        "constraint_flags": dict(constraint_flags or {}),
-        "source_counts": dict(source_counts or {}),
+        "constraint_flags": dict(state["constraint_flags"] or {}),
+        "source_counts": dict(state["source_counts"] or {}),
     }

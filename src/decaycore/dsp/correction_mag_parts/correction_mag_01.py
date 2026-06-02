@@ -206,6 +206,76 @@ def _log_peak_priority_summary(
     except (AttributeError, TypeError, ValueError):
         return
 
+
+def _set_bass_adaptive_smoothing_state(
+    st: Any,
+    *,
+    enabled: bool,
+    avg_w_20_200: float = 0.0,
+    sigma_scale: float | None = None,
+    conf_floor: float | None = None,
+    w_gamma: float | None = None,
+    w_max: float | None = None,
+) -> None:
+    try:
+        if not isinstance(st, dict):
+            return
+        st["bass_adaptive_smoothing_enabled"] = bool(enabled)
+        st["bass_adaptive_smoothing_avg_w_20_200"] = float(avg_w_20_200)
+        if sigma_scale is not None:
+            st["bass_adaptive_smoothing_sigma_scale"] = float(sigma_scale)
+        if conf_floor is not None:
+            st["bass_adaptive_smoothing_conf_floor"] = float(conf_floor)
+        if w_gamma is not None:
+            st["bass_adaptive_smoothing_w_gamma"] = float(w_gamma)
+        if w_max is not None:
+            st["bass_adaptive_smoothing_w_max"] = float(w_max)
+    except (TypeError, ValueError):
+        pass
+
+
+def _resolve_bass_smoothing_params(cfg_reader: CfgReader) -> tuple[float, float, float, float, float]:
+    f_bass = cfg_reader.float("bass_smooth_hz", 200.0)
+    if not np.isfinite(f_bass) or f_bass <= 0.0:
+        f_bass = 200.0
+
+    conf_floor = cfg_reader.float("bass_smooth_conf_floor", 0.3)
+    if not np.isfinite(conf_floor) or conf_floor <= 0.0:
+        conf_floor = 0.3
+
+    sigma_scale = cfg_reader.float("bass_smooth_sigma_scale", 1.4)
+    if (not np.isfinite(sigma_scale)) or sigma_scale < 1.0:
+        sigma_scale = 1.0
+
+    w_gamma = cfg_reader.float("bass_smooth_w_gamma", 2.0)
+    if (not np.isfinite(w_gamma)) or w_gamma <= 0.0:
+        w_gamma = 2.0
+
+    w_max = cfg_reader.float("bass_smooth_w_max", 0.55)
+    if not np.isfinite(w_max):
+        w_max = 0.55
+    w_max = float(np.clip(w_max, 0.0, 1.0))
+    return float(f_bass), float(conf_floor), float(sigma_scale), float(w_gamma), float(w_max)
+
+
+def _build_bass_smoothing_weights(conf_arr: np.ndarray, conf_floor: float, w_gamma: float, w_max: float) -> np.ndarray:
+    c = np.asarray(conf_arr, dtype=float)
+    c = np.nan_to_num(c, nan=1.0, posinf=1.0, neginf=0.0)
+    c = np.clip(c, 0.0, 1.0)
+    w = np.clip((conf_floor - c) / max(conf_floor, 1e-9), 0.0, 1.0)
+    w = np.power(w, float(w_gamma))
+    w = np.minimum(w, float(w_max))
+    return np.clip(w, 0.0, 1.0)
+
+
+def _blend_bass_smoothing(base: np.ndarray, more: np.ndarray, bass_mask: np.ndarray, weights: np.ndarray) -> np.ndarray:
+    out = np.asarray(base, dtype=float).copy()
+    w_eff = np.zeros_like(weights, dtype=float)
+    w_eff[bass_mask] = np.asarray(weights[bass_mask], dtype=float)
+    out[bass_mask] = (out[bass_mask] * (1.0 - w_eff[bass_mask])) + (np.asarray(more, dtype=float)[bass_mask] * w_eff[bass_mask])
+    return out
+
+
 def _apply_smoothing(
     err_db: np.ndarray,
     freq_axis: np.ndarray,
@@ -227,12 +297,7 @@ def _apply_smoothing(
         smoothed_base = smooth_gain_fractional_octave(freq_axis, err_db, filter_smooth)
 
     if not cfg_reader.bool("bass_smooth_adaptive", False):
-        try:
-            if isinstance(st, dict):
-                st["bass_adaptive_smoothing_enabled"] = False
-                st["bass_adaptive_smoothing_avg_w_20_200"] = 0.0
-        except (TypeError, ValueError):
-            pass
+        _set_bass_adaptive_smoothing_state(st, enabled=False)
         return smoothed_base
 
     try:
@@ -240,56 +305,31 @@ def _apply_smoothing(
     except (TypeError, ValueError):
         conf_arr = None
     if conf_arr is None or conf_arr.shape != np.asarray(freq_axis, dtype=float).shape:
-        try:
-            if isinstance(st, dict):
-                st["bass_adaptive_smoothing_enabled"] = False
-                st["bass_adaptive_smoothing_avg_w_20_200"] = 0.0
-        except (TypeError, ValueError):
-            pass
+        _set_bass_adaptive_smoothing_state(st, enabled=False)
         return smoothed_base
 
-    f_bass = cfg_reader.float("bass_smooth_hz", 200.0)
-    if not np.isfinite(f_bass) or f_bass <= 0.0:
-        f_bass = 200.0
-
-    conf_floor = cfg_reader.float("bass_smooth_conf_floor", 0.3)
-    if not np.isfinite(conf_floor) or conf_floor <= 0.0:
-        conf_floor = 0.3
-
-    sigma_scale = cfg_reader.float("bass_smooth_sigma_scale", 1.4)
-    if (not np.isfinite(sigma_scale)) or sigma_scale < 1.0:
-        sigma_scale = 1.0
-    w_gamma = cfg_reader.float("bass_smooth_w_gamma", 2.0)
-    if (not np.isfinite(w_gamma)) or w_gamma <= 0.0:
-        w_gamma = 2.0
-    w_max = cfg_reader.float("bass_smooth_w_max", 0.55)
-    if not np.isfinite(w_max):
-        w_max = 0.55
-    w_max = float(np.clip(w_max, 0.0, 1.0))
-    try:
-        if isinstance(st, dict):
-            st["bass_adaptive_smoothing_sigma_scale"] = float(sigma_scale)
-            st["bass_adaptive_smoothing_conf_floor"] = float(conf_floor)
-            st["bass_adaptive_smoothing_w_gamma"] = float(w_gamma)
-            st["bass_adaptive_smoothing_w_max"] = float(w_max)
-    except (TypeError, ValueError):
-        pass
+    f_bass, conf_floor, sigma_scale, w_gamma, w_max = _resolve_bass_smoothing_params(cfg_reader)
+    _set_bass_adaptive_smoothing_state(
+        st,
+        enabled=False,
+        sigma_scale=sigma_scale,
+        conf_floor=conf_floor,
+        w_gamma=w_gamma,
+        w_max=w_max,
+    )
 
     f = np.asarray(freq_axis, dtype=float)
-    c = np.asarray(conf_arr, dtype=float)
-    c = np.nan_to_num(c, nan=1.0, posinf=1.0, neginf=0.0)
-    c = np.clip(c, 0.0, 1.0)
-    w = np.clip((conf_floor - c) / max(conf_floor, 1e-9), 0.0, 1.0)
-    w = np.power(w, float(w_gamma))
-    w = np.minimum(w, float(w_max))
+    w = _build_bass_smoothing_weights(conf_arr, conf_floor, w_gamma, w_max)
     bass = (f > 0.0) & (f <= float(f_bass))
     if not np.any(bass):
-        try:
-            if isinstance(st, dict):
-                st["bass_adaptive_smoothing_enabled"] = False
-                st["bass_adaptive_smoothing_avg_w_20_200"] = 0.0
-        except (TypeError, ValueError):
-            pass
+        _set_bass_adaptive_smoothing_state(
+            st,
+            enabled=False,
+            sigma_scale=sigma_scale,
+            conf_floor=conf_floor,
+            w_gamma=w_gamma,
+            w_max=w_max,
+        )
         return smoothed_base
 
     if df_mode:
@@ -299,20 +339,109 @@ def _apply_smoothing(
         smooth2 = float(max(1.0, float(filter_smooth) / float(sigma_scale)))
         smoothed_more = smooth_gain_fractional_octave(freq_axis, err_db, smooth2)
 
-    out = np.asarray(smoothed_base, dtype=float).copy()
-    # Explicitly touch bass-only bins; keep >bass range identical.
+    out = _blend_bass_smoothing(smoothed_base, smoothed_more, bass, w)
     w_eff = np.zeros_like(w, dtype=float)
     w_eff[bass] = np.asarray(w[bass], dtype=float)
-    out[bass] = (out[bass] * (1.0 - w_eff[bass])) + (np.asarray(smoothed_more, dtype=float)[bass] * w_eff[bass])
 
     try:
         if isinstance(st, dict):
-            st["bass_adaptive_smoothing_enabled"] = True
-            b20 = (f >= 20.0) & (f <= 200.0)
-            st["bass_adaptive_smoothing_avg_w_20_200"] = float(np.mean(w_eff[b20])) if np.any(b20) else 0.0
+            _set_bass_adaptive_smoothing_state(
+                st,
+                enabled=True,
+                avg_w_20_200=float(np.mean(w_eff[(f >= 20.0) & (f <= 200.0)]))
+                if np.any((f >= 20.0) & (f <= 200.0))
+                else 0.0,
+                sigma_scale=sigma_scale,
+                conf_floor=conf_floor,
+                w_gamma=w_gamma,
+                w_max=w_max,
+            )
     except (TypeError, ValueError):
         pass
     return out
+
+
+def _confidence_adaptive_bass_smoothing_mark_disabled(st: Any, stage_key: str) -> None:
+    try:
+        if not isinstance(st, dict):
+            return
+        safe_put_many(
+            st,
+            {
+                "bass_adaptive_smoothing_enabled": False,
+                "bass_adaptive_smoothing_avg_w_20_200": 0.0,
+                "bass_adaptive_smoothing_delta_rms_db_20_200": 0.0,
+                "bass_adaptive_smoothing_delta_max_db_20_200": 0.0,
+                "bass_adaptive_smoothing_delta_max_hz_20_200": None,
+                "bass_adaptive_smoothing_delta_rms_db_20_200_stage_local": 0.0,
+                "bass_adaptive_smoothing_delta_max_db_20_200_stage_local": 0.0,
+                "bass_adaptive_smoothing_delta_max_hz_20_200_stage_local": None,
+                f"bass_adaptive_smoothing_{stage_key}_enabled": False,
+                f"bass_adaptive_smoothing_{stage_key}_avg_w_20_200": 0.0,
+                f"bass_adaptive_smoothing_{stage_key}_delta_rms_db_20_200": 0.0,
+                f"bass_adaptive_smoothing_{stage_key}_delta_max_db_20_200": 0.0,
+                f"bass_adaptive_smoothing_{stage_key}_delta_max_hz_20_200": None,
+            },
+        )
+    except (TypeError, ValueError):
+        pass
+
+
+def _confidence_adaptive_bass_smoothing_stats(
+    base: np.ndarray,
+    out: np.ndarray,
+    f: np.ndarray,
+    w_eff: np.ndarray,
+) -> tuple[float, float, float | None, float]:
+    b20 = (f >= 20.0) & (f <= 200.0)
+    delta = out - base
+    if not np.any(b20):
+        return 0.0, 0.0, None, 0.0
+    d_rms = float(np.sqrt(np.mean(delta[b20] * delta[b20])))
+    ad = np.abs(delta[b20])
+    d_max = float(np.max(ad))
+    fb = np.asarray(f[b20], dtype=float)
+    d_hz = float(fb[int(np.argmax(ad))]) if (fb.size == ad.size and ad.size) else None
+    w_avg = float(np.mean(w_eff[b20]))
+    return d_rms, d_max, d_hz, w_avg
+
+
+def _confidence_adaptive_bass_smoothing_run(
+    base: np.ndarray,
+    f: np.ndarray,
+    conf_arr: np.ndarray,
+    *,
+    cfg_reader: CfgReader,
+) -> tuple[np.ndarray, float, float, float | None, float, float] | None:
+    f_bass, conf_floor, sigma_scale, w_gamma, w_max = _resolve_bass_smoothing_params(cfg_reader)
+    w = _build_bass_smoothing_weights(conf_arr, conf_floor, w_gamma, w_max)
+    bass = (f > 0.0) & (f <= float(f_bass))
+    if not np.any(bass):
+        return None
+
+    sigma_hz = max(3.0, float(f_bass) / 24.0) * float(sigma_scale)
+    sigma_bins = _sigma_bins_from_hz(
+        f,
+        sigma_hz=float(sigma_hz),
+        fallback_bins=max(3.0, 6.0 * float(sigma_scale)),
+    )
+    sigma_bins = float(max(1.0, sigma_bins))
+    sm_more = scipy.ndimage.gaussian_filter1d(base, sigma=sigma_bins)
+    out = _blend_bass_smoothing(base, sm_more, bass, w)
+    w_eff = np.zeros_like(w, dtype=float)
+    w_eff[bass] = np.asarray(w[bass], dtype=float)
+    d_rms, d_max, d_hz, w_avg = _confidence_adaptive_bass_smoothing_stats(base, out, f, w_eff)
+
+    if d_rms < 5e-4 and w_avg > 0.10:
+        sigma_bins2 = float(max(1.0, sigma_bins * 2.0))
+        sm_more2 = scipy.ndimage.gaussian_filter1d(base, sigma=sigma_bins2)
+        out2 = _blend_bass_smoothing(base, sm_more2, bass, w)
+        d_rms2, d_max2, d_hz2, w_avg2 = _confidence_adaptive_bass_smoothing_stats(base, out2, f, w_eff)
+        if d_rms2 > d_rms:
+            out, d_rms, d_max, d_hz, w_avg, sigma_bins = out2, d_rms2, d_max2, d_hz2, w_avg2, sigma_bins2
+
+    return out, d_rms, d_max, d_hz, w_avg, sigma_bins
+
 
 def _apply_confidence_adaptive_bass_smoothing(
     curve_db: np.ndarray,
@@ -328,128 +457,23 @@ def _apply_confidence_adaptive_bass_smoothing(
     f = np.asarray(freq_axis, dtype=float)
     stage_key = str(stage_tag or "core").strip().lower()
     cfg_reader = CfgReader(cfg)
-
-    def _mark_disabled() -> np.ndarray:
-        try:
-            if isinstance(st, dict):
-                safe_put_many(
-                    st,
-                    {
-                        "bass_adaptive_smoothing_enabled": False,
-                        "bass_adaptive_smoothing_avg_w_20_200": 0.0,
-                        "bass_adaptive_smoothing_delta_rms_db_20_200": 0.0,
-                        "bass_adaptive_smoothing_delta_max_db_20_200": 0.0,
-                        "bass_adaptive_smoothing_delta_max_hz_20_200": None,
-                        "bass_adaptive_smoothing_delta_rms_db_20_200_stage_local": 0.0,
-                        "bass_adaptive_smoothing_delta_max_db_20_200_stage_local": 0.0,
-                        "bass_adaptive_smoothing_delta_max_hz_20_200_stage_local": None,
-                        f"bass_adaptive_smoothing_{stage_key}_enabled": False,
-                        f"bass_adaptive_smoothing_{stage_key}_avg_w_20_200": 0.0,
-                        f"bass_adaptive_smoothing_{stage_key}_delta_rms_db_20_200": 0.0,
-                        f"bass_adaptive_smoothing_{stage_key}_delta_max_db_20_200": 0.0,
-                        f"bass_adaptive_smoothing_{stage_key}_delta_max_hz_20_200": None,
-                    },
-                )
-        except (TypeError, ValueError):
-            pass
-        return base
-
     if not cfg_reader.bool("bass_smooth_adaptive", False):
-        return _mark_disabled()
+        _confidence_adaptive_bass_smoothing_mark_disabled(st, stage_key)
+        return base
 
     try:
         c = np.asarray(conf_mask, dtype=float)
     except (TypeError, ValueError):
         c = None
     if c is None or c.shape != f.shape:
-        return _mark_disabled()
+        _confidence_adaptive_bass_smoothing_mark_disabled(st, stage_key)
+        return base
 
-    f_bass = cfg_reader.float("bass_smooth_hz", 200.0)
-    if not np.isfinite(f_bass) or f_bass <= 0.0:
-        f_bass = 200.0
-
-    conf_floor = cfg_reader.float("bass_smooth_conf_floor", 0.3)
-    if not np.isfinite(conf_floor) or conf_floor <= 0.0:
-        conf_floor = 0.3
-
-    sigma_scale = cfg_reader.float("bass_smooth_sigma_scale", 1.4)
-    if (not np.isfinite(sigma_scale)) or sigma_scale < 1.0:
-        sigma_scale = 1.0
-    w_gamma = cfg_reader.float("bass_smooth_w_gamma", 2.0)
-    if (not np.isfinite(w_gamma)) or w_gamma <= 0.0:
-        w_gamma = 2.0
-    w_max = cfg_reader.float("bass_smooth_w_max", 0.55)
-    if not np.isfinite(w_max):
-        w_max = 0.55
-    w_max = float(np.clip(w_max, 0.0, 1.0))
-    try:
-        if isinstance(st, dict):
-            st["bass_adaptive_smoothing_sigma_scale"] = float(sigma_scale)
-            st["bass_adaptive_smoothing_conf_floor"] = float(conf_floor)
-            st["bass_adaptive_smoothing_w_gamma"] = float(w_gamma)
-            st["bass_adaptive_smoothing_w_max"] = float(w_max)
-    except (TypeError, ValueError):
-        pass
-
-    c = np.nan_to_num(c, nan=1.0, posinf=1.0, neginf=0.0)
-    c = np.clip(c, 0.0, 1.0)
-    w = np.clip((conf_floor - c) / max(conf_floor, 1e-9), 0.0, 1.0)
-    w = np.power(w, float(w_gamma))
-    w = np.minimum(w, float(w_max))
-    w = np.clip(w, 0.0, 1.0)
-
-    bass = (f > 0.0) & (f <= float(f_bass))
-    if not np.any(bass):
-        return _mark_disabled()
-
-    sigma_hz = max(3.0, float(f_bass) / 24.0) * float(sigma_scale)
-    sigma_bins = _sigma_bins_from_hz(
-        f,
-        sigma_hz=float(sigma_hz),
-        fallback_bins=max(3.0, 6.0 * float(sigma_scale)),
-    )
-    sigma_bins = float(max(1.0, sigma_bins))
-    sm_more = scipy.ndimage.gaussian_filter1d(base, sigma=sigma_bins)
-
-    out = base.copy()
-    # Explicit bass-only blend; keep out-of-band untouched.
-    w_eff = np.zeros_like(w, dtype=float)
-    w_eff[bass] = np.asarray(w[bass], dtype=float)
-    out[bass] = (out[bass] * (1.0 - w_eff[bass])) + (np.asarray(sm_more, dtype=float)[bass] * w_eff[bass])
-
-    b20 = (f >= 20.0) & (f <= 200.0)
-    delta = out - base
-    d_hz = None
-    if np.any(b20):
-        d_rms = float(np.sqrt(np.mean(delta[b20] * delta[b20])))
-        ad = np.abs(delta[b20])
-        d_max = float(np.max(ad))
-        fb = np.asarray(f[b20], dtype=float)
-        if fb.size == ad.size and ad.size:
-            d_hz = float(fb[int(np.argmax(ad))])
-        w_avg = float(np.mean(w_eff[b20]))
-    else:
-        d_rms, d_max, w_avg = 0.0, 0.0, 0.0
-
-    # If effect is numerically tiny, force a stronger fallback pass.
-    if d_rms < 5e-4 and w_avg > 0.10:
-        sigma_bins2 = float(max(1.0, sigma_bins * 2.0))
-        sm_more2 = scipy.ndimage.gaussian_filter1d(base, sigma=sigma_bins2)
-        out2 = base.copy()
-        out2[bass] = (out2[bass] * (1.0 - w_eff[bass])) + (np.asarray(sm_more2, dtype=float)[bass] * w_eff[bass])
-        delta2 = out2 - base
-        if np.any(b20):
-            d_rms2 = float(np.sqrt(np.mean(delta2[b20] * delta2[b20])))
-            ad2 = np.abs(delta2[b20])
-            d_max2 = float(np.max(ad2))
-            fb2 = np.asarray(f[b20], dtype=float)
-            d_hz2 = float(fb2[int(np.argmax(ad2))]) if (fb2.size == ad2.size and ad2.size) else None
-        else:
-            d_rms2, d_max2 = 0.0, 0.0
-            d_hz2 = None
-        if d_rms2 > d_rms:
-            out, d_rms, d_max, d_hz = out2, d_rms2, d_max2, d_hz2
-            sigma_bins = sigma_bins2
+    result = _confidence_adaptive_bass_smoothing_run(base, f, c, cfg_reader=cfg_reader)
+    if result is None:
+        _confidence_adaptive_bass_smoothing_mark_disabled(st, stage_key)
+        return base
+    out, d_rms, d_max, d_hz, w_avg, sigma_bins = result
 
     try:
         if isinstance(st, dict):
@@ -506,82 +530,45 @@ def _select_bass_adaptive_conf_mask(
 
     return None, "missing"
 
-def _apply_mid_refit_pre_slope(
-    gain_db: np.ndarray,
-    freq_axis: np.ndarray,
-    mask_c: np.ndarray,
-    *,
-    m_anal: np.ndarray,
-    target_mags: np.ndarray,
-    calc_offset_db: float,
-    conf_mask: np.ndarray | None,
-    cfg: Any,
+
+def _mid_refit_write_stats(
     st: Any,
-    logger: Any,
-) -> np.ndarray:
-    """Kevyt mid-band match-pass ennen slope-rajoja."""
-    out = np.asarray(gain_db, dtype=float).copy()
-    cfg_reader = CfgReader(cfg)
-
-    def _write_stats(
-        *,
-        enabled: bool,
-        k_used: float,
-        before_rms: float | None,
-        after_rms: float | None,
-        delta_rms: float | None,
-        conf_avg: float | None,
-        reason: str,
-    ) -> None:
-        try:
-            if isinstance(st, dict):
-                before_val = float(before_rms) if before_rms is not None and np.isfinite(float(before_rms)) else None
-                after_val = float(after_rms) if after_rms is not None and np.isfinite(float(after_rms)) else None
-                delta_val = float(delta_rms) if delta_rms is not None and np.isfinite(float(delta_rms)) else None
-                conf_val = float(conf_avg) if conf_avg is not None and np.isfinite(float(conf_avg)) else None
-                safe_put_many(
-                    st,
-                    {
-                        "mid_refit_enabled": bool(enabled),
-                        "mid_refit_k": float(k_used),
-                        "mid_refit_err_rms_before": before_val,
-                        "mid_refit_err_rms_after": after_val,
-                        "mid_refit_delta_rms": delta_val,
-                        "mid_refit_err_rms_before_stage_local": before_val,
-                        "mid_refit_err_rms_after_stage_local": after_val,
-                        "mid_refit_delta_rms_stage_local": delta_val,
-                        "mid_refit_conf_avg_200_2000": conf_val,
-                        "mid_refit_reason": str(reason),
-                    },
-                )
-        except (TypeError, ValueError):
-            pass
-
-    if not cfg_reader.bool("enable_mag_correction", False):
-        _write_stats(
-            enabled=False,
-            k_used=0.0,
-            before_rms=None,
-            after_rms=None,
-            delta_rms=None,
-            conf_avg=None,
-            reason="mag_off",
+    *,
+    enabled: bool,
+    k_used: float,
+    before_rms: float | None,
+    after_rms: float | None,
+    delta_rms: float | None,
+    conf_avg: float | None,
+    reason: str,
+) -> None:
+    try:
+        if not isinstance(st, dict):
+            return
+        before_val = float(before_rms) if before_rms is not None and np.isfinite(float(before_rms)) else None
+        after_val = float(after_rms) if after_rms is not None and np.isfinite(float(after_rms)) else None
+        delta_val = float(delta_rms) if delta_rms is not None and np.isfinite(float(delta_rms)) else None
+        conf_val = float(conf_avg) if conf_avg is not None and np.isfinite(float(conf_avg)) else None
+        safe_put_many(
+            st,
+            {
+                "mid_refit_enabled": bool(enabled),
+                "mid_refit_k": float(k_used),
+                "mid_refit_err_rms_before": before_val,
+                "mid_refit_err_rms_after": after_val,
+                "mid_refit_delta_rms": delta_val,
+                "mid_refit_err_rms_before_stage_local": before_val,
+                "mid_refit_err_rms_after_stage_local": after_val,
+                "mid_refit_delta_rms_stage_local": delta_val,
+                "mid_refit_conf_avg_200_2000": conf_val,
+                "mid_refit_reason": str(reason),
+            },
         )
-        return out
+    except (TypeError, ValueError):
+        pass
 
-    refit_on = cfg_reader.bool("mid_refit_enable", True)
-    if not refit_on:
-        _write_stats(
-            enabled=False,
-            k_used=0.0,
-            before_rms=None,
-            after_rms=None,
-            delta_rms=None,
-            conf_avg=None,
-            reason="disabled",
-        )
-        return out
 
+def _mid_refit_resolve_params(cfg_reader: CfgReader) -> tuple[float, float, float, float, float]:
     mid_lo = cfg_reader.float("mid_refit_hz_lo", 200.0)
     mid_hi = cfg_reader.float("mid_refit_hz_hi", 2000.0)
     if (not np.isfinite(mid_lo)) or mid_lo < 1.0:
@@ -595,17 +582,6 @@ def _apply_mid_refit_pre_slope(
     if not np.isfinite(k_refit):
         k_refit = 0.45
     k_refit = float(np.clip(k_refit, 0.0, 1.0))
-    if k_refit <= 0.0:
-        _write_stats(
-            enabled=False,
-            k_used=0.0,
-            before_rms=None,
-            after_rms=None,
-            delta_rms=None,
-            conf_avg=None,
-            reason="k<=0",
-        )
-        return out
 
     smooth_oct = cfg_reader.float("mid_refit_smooth_oct", 0.6)
     if (not np.isfinite(smooth_oct)) or smooth_oct <= 0.0:
@@ -617,24 +593,27 @@ def _apply_mid_refit_pre_slope(
     if not np.isfinite(conf_min_avg):
         conf_min_avg = 0.2
     conf_min_avg = float(np.clip(conf_min_avg, 0.0, 1.0))
+    return float(mid_lo), float(mid_hi), float(k_refit), float(smooth_value), float(conf_min_avg)
 
+
+def _mid_refit_prepare_arrays(
+    gain_db: np.ndarray,
+    freq_axis: np.ndarray,
+    mask_c: np.ndarray,
+    m_anal: np.ndarray,
+    target_mags: np.ndarray,
+    *,
+    mid_lo: float,
+    mid_hi: float,
+) -> tuple[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int] | None, str]:
     f = np.asarray(freq_axis, dtype=float).reshape(-1)
-    g = np.asarray(out, dtype=float).reshape(-1)
+    g = np.asarray(gain_db, dtype=float).reshape(-1)
     m = np.asarray(mask_c, dtype=bool).reshape(-1)
     meas = np.asarray(m_anal, dtype=float).reshape(-1)
     tgt = np.asarray(target_mags, dtype=float).reshape(-1)
     n = int(min(f.size, g.size, m.size, meas.size, tgt.size))
     if n < 32:
-        _write_stats(
-            enabled=False,
-            k_used=0.0,
-            before_rms=None,
-            after_rms=None,
-            delta_rms=None,
-            conf_avg=None,
-            reason="insufficient_data",
-        )
-        return out
+        return None, "insufficient_data"
 
     f = f[:n]
     g = g[:n]
@@ -644,30 +623,48 @@ def _apply_mid_refit_pre_slope(
     valid = np.isfinite(f) & np.isfinite(g) & np.isfinite(m) & np.isfinite(meas) & np.isfinite(tgt)
     mid = valid & m & (f >= float(mid_lo)) & (f <= float(mid_hi))
     if int(np.count_nonzero(mid)) < 8:
-        _write_stats(
-            enabled=False,
-            k_used=0.0,
-            before_rms=None,
-            after_rms=None,
-            delta_rms=None,
-            conf_avg=None,
-            reason="no_mid_bins",
-        )
-        return out
+        return None, "no_mid_bins"
+    return (f, g, m, meas, tgt, mid, n), "ok"
 
-    conf_avg = None
+
+def _mid_refit_measure_conf_avg(conf_mask: np.ndarray | None, n: int, mid: np.ndarray) -> float | None:
     try:
-        if conf_mask is not None:
-            c = np.asarray(conf_mask, dtype=float).reshape(-1)
-            if c.size >= n:
-                c = np.clip(np.nan_to_num(c[:n], nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
-                conf_avg = float(np.mean(c[mid])) if np.any(mid) else None
+        if conf_mask is None:
+            return None
+        c = np.asarray(conf_mask, dtype=float).reshape(-1)
+        if c.size < n:
+            return None
+        c = np.clip(np.nan_to_num(c[:n], nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
+        return float(np.mean(c[mid])) if np.any(mid) else None
     except (TypeError, ValueError, FloatingPointError, IndexError):
-        conf_avg = None
+        return None
+
+
+def _mid_refit_apply(
+    out: np.ndarray,
+    *,
+    f: np.ndarray,
+    g: np.ndarray,
+    mid: np.ndarray,
+    meas: np.ndarray,
+    tgt: np.ndarray,
+    calc_offset_db: float,
+    conf_mask: np.ndarray | None,
+    conf_min_avg: float,
+    k_refit: float,
+    smooth_value: float,
+    mid_lo: float,
+    mid_hi: float,
+    n: int,
+    st: Any,
+    logger: Any,
+) -> np.ndarray:
+    conf_avg = _mid_refit_measure_conf_avg(conf_mask, n, mid)
     if conf_avg is not None and conf_avg < float(conf_min_avg):
         err_before = tgt - ((meas - float(calc_offset_db)) + g)
         rms_before = float(np.sqrt(np.mean(err_before[mid] * err_before[mid])))
-        _write_stats(
+        _mid_refit_write_stats(
+            st,
             enabled=False,
             k_used=0.0,
             before_rms=rms_before,
@@ -689,7 +686,8 @@ def _apply_mid_refit_pre_slope(
     delta_rms = float(rms_before - rms_after)
 
     if delta_rms <= 0.0:
-        _write_stats(
+        _mid_refit_write_stats(
+            st,
             enabled=False,
             k_used=0.0,
             before_rms=rms_before,
@@ -701,7 +699,8 @@ def _apply_mid_refit_pre_slope(
         return out
 
     out[:n] = g_refit
-    _write_stats(
+    _mid_refit_write_stats(
+        st,
         enabled=True,
         k_used=float(k_refit),
         before_rms=rms_before,
@@ -714,7 +713,7 @@ def _apply_mid_refit_pre_slope(
         conf_txt = "n/a" if conf_avg is None else f"{float(conf_avg):.3f}"
         logger.info(
             "MidRefit: "
-            f"k={float(k_refit):.2f}, smooth_oct={float(smooth_oct):.2f}, "
+            f"k={float(k_refit):.2f}, smooth_oct={float(1.0 / smooth_value):.2f}, "
             f"conf_avg={conf_txt}, "
             f"rms_before={float(rms_before):.3f} dB, rms_after={float(rms_after):.3f} dB, "
             f"delta={float(delta_rms):.3f} dB, band={float(mid_lo):.0f}-{float(mid_hi):.0f} Hz"
@@ -722,6 +721,106 @@ def _apply_mid_refit_pre_slope(
     except (AttributeError, TypeError, ValueError):
         pass
     return out
+
+
+def _apply_mid_refit_pre_slope(
+    gain_db: np.ndarray,
+    freq_axis: np.ndarray,
+    mask_c: np.ndarray,
+    *,
+    m_anal: np.ndarray,
+    target_mags: np.ndarray,
+    calc_offset_db: float,
+    conf_mask: np.ndarray | None,
+    cfg: Any,
+    st: Any,
+    logger: Any,
+) -> np.ndarray:
+    """Kevyt mid-band match-pass ennen slope-rajoja."""
+    out = np.asarray(gain_db, dtype=float).copy()
+    cfg_reader = CfgReader(cfg)
+    if not cfg_reader.bool("enable_mag_correction", False):
+        _mid_refit_write_stats(
+            st,
+            enabled=False,
+            k_used=0.0,
+            before_rms=None,
+            after_rms=None,
+            delta_rms=None,
+            conf_avg=None,
+            reason="mag_off",
+        )
+        return out
+
+    refit_on = cfg_reader.bool("mid_refit_enable", True)
+    if not refit_on:
+        _mid_refit_write_stats(
+            st,
+            enabled=False,
+            k_used=0.0,
+            before_rms=None,
+            after_rms=None,
+            delta_rms=None,
+            conf_avg=None,
+            reason="disabled",
+        )
+        return out
+
+    mid_lo, mid_hi, k_refit, smooth_value, conf_min_avg = _mid_refit_resolve_params(cfg_reader)
+    if k_refit <= 0.0:
+        _mid_refit_write_stats(
+            st,
+            enabled=False,
+            k_used=0.0,
+            before_rms=None,
+            after_rms=None,
+            delta_rms=None,
+            conf_avg=None,
+            reason="k<=0",
+        )
+        return out
+
+    prepared, prep_reason = _mid_refit_prepare_arrays(
+        out,
+        freq_axis,
+        mask_c,
+        m_anal,
+        target_mags,
+        mid_lo=mid_lo,
+        mid_hi=mid_hi,
+    )
+    if prepared is None:
+        _mid_refit_write_stats(
+            st,
+            enabled=False,
+            k_used=0.0,
+            before_rms=None,
+            after_rms=None,
+            delta_rms=None,
+            conf_avg=None,
+            reason=prep_reason,
+        )
+        return out
+
+    f, g, m, meas, tgt, mid, n = prepared
+    return _mid_refit_apply(
+        out,
+        f=f,
+        g=g,
+        mid=mid,
+        meas=meas,
+        tgt=tgt,
+        calc_offset_db=calc_offset_db,
+        conf_mask=conf_mask,
+        conf_min_avg=conf_min_avg,
+        k_refit=k_refit,
+        smooth_value=smooth_value,
+        mid_lo=mid_lo,
+        mid_hi=mid_hi,
+        n=n,
+        st=st,
+        logger=logger,
+    )
 
 def _apply_bass_boost_post_restore(
     gain_db: np.ndarray,

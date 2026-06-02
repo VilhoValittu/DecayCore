@@ -368,7 +368,7 @@ def apply_post_limits_and_metrics(
     except (TypeError, ValueError, FloatingPointError):
         pass
 
-    _pre_excursion = np.asarray(gain_db, dtype=float).copy()
+    _pre_excursion = np.asarray(gain_db, dtype=float).copy() if gain_policy.exc_prot else gain_db
     if gain_policy.exc_prot:
         f_start = float(gain_policy.exc_freq)
         f_end = float(gain_policy.exc_soft_hz)
@@ -395,7 +395,7 @@ def apply_post_limits_and_metrics(
     )
 
     try:
-        _pre_wav_transition = np.asarray(gain_db, dtype=float).copy()
+        _pre_wav_transition = gain_db
         if cfg_reader.bool("is_wav_source", False) and np.any(mask_c):
             cmin = cfg_reader.float_allow_zero("mag_c_min", 0.0)
             cmax = cfg_reader.float_allow_zero("mag_c_max", 0.0)
@@ -407,8 +407,8 @@ def apply_post_limits_and_metrics(
                 f_hi = min(float(np.max(freq_axis)), cmax + max(45.0, 0.55 * tw))
                 zone = (freq_axis >= f_lo) & (freq_axis <= f_hi)
                 if int(np.count_nonzero(zone)) >= 8:
-                    _pre = gain_db.copy()
                     g0 = np.asarray(gain_db, dtype=float).copy()
+                    _pre_wav_transition = g0
                     g_sm = smooth_gain_fractional_octave(freq_axis, g0, 24.0)
                     span = max(1e-9, float(f_hi - f_lo))
                     x = np.clip((freq_axis - f_lo) / span, 0.0, 1.0)
@@ -419,7 +419,7 @@ def apply_post_limits_and_metrics(
                     w[zone] = ramp[zone] * focus[zone]
                     mix = 0.55
                     gain_db = g0 + (g_sm - g0) * (mix * w)
-                    _log_stage_stats("gain_db_post_wav_transition_smooth", gain_db, mask_c, ref=_pre, logger=logger, enabled=debug_stage_stats)
+                    _log_stage_stats("gain_db_post_wav_transition_smooth", gain_db, mask_c, ref=_pre_wav_transition, logger=logger, enabled=debug_stage_stats)
                     if isinstance(st, dict):
                         st["wav_transition_smoothing"] = True
                         st["wav_transition_smoothing_zone_hz"] = [float(f_lo), float(f_hi)]
@@ -483,7 +483,7 @@ def apply_post_limits_and_metrics(
         reason_codes=_hardclamp_reasons,
     )
     try:
-        _pre_wav_final = np.asarray(gain_db, dtype=float).copy()
+        _pre_wav_final = gain_db
         if cfg_reader.bool("is_wav_source", False) and np.any(mask_c):
             cmin = cfg_reader.float_allow_zero("mag_c_min", 0.0)
             cmax = cfg_reader.float_allow_zero("mag_c_max", 0.0)
@@ -495,8 +495,8 @@ def apply_post_limits_and_metrics(
                 f_hi = min(float(np.max(freq_axis)), cmax + 1.45 * tw)
                 zone = (freq_axis >= f_lo) & (freq_axis <= f_hi)
                 if int(np.count_nonzero(zone)) >= 8:
-                    _pre = gain_db.copy()
                     g0 = np.asarray(gain_db, dtype=float).copy()
+                    _pre_wav_final = g0
                     sigma_bins = _sigma_bins_from_hz(freq_axis, sigma_hz=8.0, fallback_bins=12.0)
                     g_sm = scipy.ndimage.gaussian_filter1d(g0, sigma=float(max(2.0, sigma_bins)))
                     x = np.zeros_like(g0, dtype=float)
@@ -514,7 +514,7 @@ def apply_post_limits_and_metrics(
                         cut_cap_db=cut_cap_db,
                         mask=mask_c,
                     )
-                    _log_stage_stats("gain_db_post_wav_final_ripple_polish", gain_db, mask_c, ref=_pre, logger=logger, enabled=debug_stage_stats)
+                    _log_stage_stats("gain_db_post_wav_final_ripple_polish", gain_db, mask_c, ref=_pre_wav_final, logger=logger, enabled=debug_stage_stats)
                     if isinstance(st, dict):
                         st["wav_final_ripple_polish"] = True
                         st["wav_final_ripple_polish_zone_hz"] = [float(f_lo), float(f_hi)]
@@ -533,8 +533,9 @@ def apply_post_limits_and_metrics(
     # Ensure bass boost changes can propagate to final filter (post-limits domain),
     # instead of being fully neutralized by conf-pull/slope interactions.
     try:
-        _pre_post_restore = np.asarray(gain_db, dtype=float).copy()
+        _pre_post_restore = gain_db
         if bool(bass_boost_post_restore_enable) and np.any(mask_c):
+            _pre_post_restore = np.asarray(gain_db, dtype=float).copy()
             restore_lo = float(max(20.0, float(low_hz) + 1e-6))
             restore_hi = float(max(restore_lo, bass_boost_cap_hz))
             tgt_restore = np.asarray(gain_apply, dtype=float).copy()
@@ -595,7 +596,7 @@ def apply_post_limits_and_metrics(
 
     # Final hard reapply: low-bass cuts-only policy must survive all smoothing/clamps.
     try:
-        _pre_lowbass_reapply = np.asarray(gain_db, dtype=float).copy()
+        _pre_lowbass_reapply = gain_db
         lf_guard_meta = {}
         if bool(low_cut_enable) and np.isfinite(float(low_hz)) and float(low_hz) > 0.0:
             low_mask_final = build_low_frequency_guard_mask(
@@ -605,6 +606,7 @@ def apply_post_limits_and_metrics(
                 include_exc_soft=False,
             )
             if np.any(mask_c & low_mask_final):
+                _pre_lowbass_reapply = np.asarray(gain_db, dtype=float).copy()
                 gain_db, lf_guard_meta = apply_cuts_only_guard(
                     gain_db,
                     mask=mask_c,

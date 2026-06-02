@@ -125,6 +125,102 @@ def _build_combined_fig(freq_hz, measured_db, predicted_db, title: str,
     return fig
 
 
+def _render_channel_plot(
+    *,
+    channel_key: str,
+    title: str,
+    f_ch,
+    m_ch,
+    p_ch,
+    imp_f,
+    st_f,
+    psl,
+    fs_v: int,
+    mixed_freq,
+) -> None:
+    from nicegui import ui
+
+    cache_key = (channel_key, psl)
+    fig = _PLOT_RENDER_CACHE.get(cache_key)
+    if fig is None:
+        try:
+            is_sub = channel_key == "sub"
+            result = plots.generate_prediction_plot(
+                f_ch,
+                m_ch,
+                p_ch,
+                imp_f,
+                fs_v,
+                title,
+                None,
+                st_f,
+                mixed_freq,
+                "low",
+                False,
+                True,
+                psl,
+                x_max_hz=500.0 if is_sub else 20000.0,
+                y_mag_range_db=20.0 if is_sub else None,
+            )
+            fig = result[1] if isinstance(result, tuple) else None
+        except (
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
+            logger.debug("Plot generation failed", exc_info=True)
+            fig = None
+        if fig is not None:
+            _PLOT_RENDER_CACHE[cache_key] = fig
+    if fig is not None:
+        ui.plotly(fig).classes("w-full")
+    else:
+        ui.label(t("results_plot_unavailable")).classes("text-gray-400")
+
+
+def _render_combined_plot(*, l_st_f: dict, psl, title: str) -> None:
+    from nicegui import ui
+
+    cache_key = ("combined", psl)
+    fig = _PLOT_RENDER_CACHE.get(cache_key)
+    if fig is None:
+        try:
+            fig = _build_combined_fig(
+                freq_hz=l_st_f["freq_axis"],
+                measured_db=l_st_f.get("direct_dac_sum_measured_mags"),
+                predicted_db=l_st_f.get("direct_dac_sum_predicted_mags"),
+                title=title,
+                target_db=l_st_f.get("target_mags"),
+            )
+        except (
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
+            logger.debug("Combined plot generation failed", exc_info=True)
+            fig = None
+        if fig is not None:
+            _PLOT_RENDER_CACHE[cache_key] = fig
+    if fig is not None:
+        ui.plotly(fig).classes("w-full")
+    else:
+        ui.label(t("results_plot_unavailable")).classes("text-gray-400")
+
+
 def _render_plots_and_export(
     *,
     data,
@@ -155,53 +251,6 @@ def _render_plots_and_export(
     mixed_freq = data.get("mixed_freq", 200.0)
     fs_v = int(data.get("fs", 48000) or 48000)
 
-    def _render_channel_plot(*, channel_key: str, title: str, f_ch, m_ch, p_ch, imp_f, st_f) -> None:
-        """Render channel plot, using the per-run figure cache."""
-        cache_key = (channel_key, psl)
-        fig = _PLOT_RENDER_CACHE.get(cache_key)
-        if fig is None:
-            try:
-                is_sub = channel_key == "sub"
-                result = plots.generate_prediction_plot(
-                    f_ch,
-                    m_ch,
-                    p_ch,
-                    imp_f,
-                    fs_v,
-                    title,
-                    None,
-                    st_f,
-                    mixed_freq,
-                    "low",
-                    False,
-                    True,
-                    psl,
-                    x_max_hz=500.0 if is_sub else 20000.0,
-                    y_mag_range_db=20.0 if is_sub else None,
-                )
-                fig = result[1] if isinstance(result, tuple) else None
-            except (
-
-                AttributeError,
-                TypeError,
-                ValueError,
-                KeyError,
-                IndexError,
-                RuntimeError,
-                OSError,
-                ImportError,
-                ModuleNotFoundError,
-                NameError,
-            ):
-                logger.debug("Plot generation failed", exc_info=True)
-                fig = None
-            if fig is not None:
-                _PLOT_RENDER_CACHE[cache_key] = fig
-        if fig is not None:
-            ui.plotly(fig).classes("w-full")
-        else:
-            ui.label(t("results_plot_unavailable")).classes("text-gray-400")
-
     sub_meas = dict(sub_meas_f or {})
     has_sub = (
         sub_imp_f is not None
@@ -229,6 +278,9 @@ def _render_plots_and_export(
                     title=t("results_left_channel"),
                     f_ch=f_l, m_ch=m_l, p_ch=p_l,
                     imp_f=l_imp_f, st_f=l_st_speaker,
+                    psl=psl,
+                    fs_v=fs_v,
+                    mixed_freq=mixed_freq,
                 )
 
             with ui.tab_panel(tab_right).classes("w-full"):
@@ -237,6 +289,9 @@ def _render_plots_and_export(
                     title=t("results_right_channel"),
                     f_ch=f_r, m_ch=m_r, p_ch=p_r,
                     imp_f=r_imp_f, st_f=r_st_speaker,
+                    psl=psl,
+                    fs_v=fs_v,
+                    mixed_freq=mixed_freq,
                 )
 
             if has_sub and tab_sub is not None:
@@ -246,42 +301,18 @@ def _render_plots_and_export(
                         title=t("results_sub_channel"),
                         f_ch=sub_meas["f_sub"], m_ch=sub_meas["m_sub"], p_ch=sub_meas["p_sub"],
                         imp_f=sub_imp_f, st_f=sub_st_f,
+                        psl=psl,
+                        fs_v=fs_v,
+                        mixed_freq=mixed_freq,
                     )
 
             if has_combined and tab_combined is not None:
                 with ui.tab_panel(tab_combined).classes("w-full"):
-                    cache_key = ("combined", psl)
-                    fig = _PLOT_RENDER_CACHE.get(cache_key)
-                    if fig is None:
-                        try:
-                            fig = _build_combined_fig(
-                                freq_hz=l_st_f["freq_axis"],
-                                measured_db=l_st_f.get("direct_dac_sum_measured_mags"),
-                                predicted_db=l_st_f.get("direct_dac_sum_predicted_mags"),
-                                title=t("results_combined_channel"),
-                                target_db=l_st_f.get("target_mags"),
-                            )
-                        except (
-
-                            AttributeError,
-                            TypeError,
-                            ValueError,
-                            KeyError,
-                            IndexError,
-                            RuntimeError,
-                            OSError,
-                            ImportError,
-                            ModuleNotFoundError,
-                            NameError,
-                        ):
-                            logger.debug("Combined plot generation failed", exc_info=True)
-                            fig = None
-                        if fig is not None:
-                            _PLOT_RENDER_CACHE[cache_key] = fig
-                    if fig is not None:
-                        ui.plotly(fig).classes("w-full")
-                    else:
-                        ui.label(t("results_plot_unavailable")).classes("text-gray-400")
+                    _render_combined_plot(
+                        l_st_f=l_st_f,
+                        psl=psl,
+                        title=t("results_combined_channel"),
+                    )
 
     with ui.row().classes("w-full items-center gap-4 mt-2"):
         if zip_buffer is not None and fname:

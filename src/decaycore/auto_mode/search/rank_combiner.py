@@ -55,94 +55,14 @@ def _rank_scale(v: float) -> float:
     return float(np.clip(float(g) * float(v) + float(b), 0.0, 100.0))
 
 
-def combine_rank_score(
-    l_st,
-    r_st,
-    result,
-    *,
-    focus_lo_hz,
-    focus_hi_hz,
-    base_data,
-    avg_score,
-    phase_benefit_bonus,
-    boost_pen,
-    event_pen,
-    lr_pen,
-    dsp_penalty,
-    bass_prering_penalty,
-    exc_penalty,
-    bass_integration_penalty,
-    bass_feasibility_penalty,
-    bass_preference_bonus,
-    decay_penalty,
-    residual_peak_penalty,
-    correction_sharpness_penalty,
-    dip_fill_risk_penalty,
-    channel_overfit_penalty,
-    target_tracking_penalty,
-    voice_clarity_penalty,
-    phase_risk_penalty,
-    phase_limit_penalty,
-    thd_boost_penalty,
-    stereo_coherence_penalty,
-    phantom_center_stability_penalty,
-    policy_divergence_penalty,
-    asymmetry_budget_overflow_penalty,
-    worst_channel_relief_bonus,
-    shared_preference_bias,
-    rt60_policy_pen,
-    harmonic_local_pen,
-) -> dict:
-    _focus_ripple_memo: dict = {}
-
-    def _cached_focus_ripple(st: dict, lo: float, hi: float) -> float | None:
-        key = (id(st), lo, hi)
-        if key not in _focus_ripple_memo:
-            _focus_ripple_memo[key] = _auto_focus_ripple_from_stats(st, focus_lo_hz=lo, focus_hi_hz=hi)
-        return _focus_ripple_memo[key]
-    _rt60_policy_pen = rt60_policy_pen
-    _harmonic_local_pen = harmonic_local_pen
-    base_rank_components = compute_rank_score_components(
-        avg_score=avg_score,
-        phase_benefit_bonus=phase_benefit_bonus,
-        boost_penalty=boost_pen,
-        event_penalty=event_pen,
-        lr_delta_penalty=lr_pen,
-        dsp_penalty=dsp_penalty,
-        bass_prering_penalty=bass_prering_penalty,
-        exc_penalty=exc_penalty,
-        bass_integration_penalty=bass_integration_penalty,
-        bass_feasibility_penalty=bass_feasibility_penalty,
-        bass_preference_bonus=bass_preference_bonus,
-        decay_penalty=decay_penalty,
-        residual_peak_penalty=residual_peak_penalty,
-        correction_sharpness_penalty=correction_sharpness_penalty,
-        dip_fill_risk_penalty=dip_fill_risk_penalty,
-        channel_overfit_penalty=channel_overfit_penalty,
-        target_tracking_penalty=target_tracking_penalty,
-        voice_clarity_penalty=voice_clarity_penalty,
-        phase_risk_penalty=phase_risk_penalty,
-        phase_limit_penalty=phase_limit_penalty,
-        stereo_coherence_penalty=stereo_coherence_penalty,
-        phantom_center_stability_penalty=phantom_center_stability_penalty,
-        policy_divergence_penalty=policy_divergence_penalty,
-        asymmetry_budget_overflow_penalty=asymmetry_budget_overflow_penalty,
-        worst_channel_relief_bonus=worst_channel_relief_bonus,
-        shared_preference_bias=shared_preference_bias,
-        gain=shared._auto_safe_float(shared.AUTO_MODE_RANK_SCORE_GAIN, 1.0),
-        bias=shared._auto_safe_float(shared.AUTO_MODE_RANK_SCORE_BIAS, 0.0),
-        context=OFFICIAL_RANK_SCORE_CONTEXT,
-    )
-    rank_raw = float(base_rank_components.get("rank_score_raw", 0.0))
-    rank_score_base = float(base_rank_components.get("rank_score", 0.0))
-    rank_score = float(rank_score_base)
+def _collect_rank_focus_metrics(l_st, r_st, *, focus_lo_hz, focus_hi_hz) -> dict:
     focus_ripple_l = None
     focus_ripple_r = None
     flo = shared._auto_safe_float(focus_lo_hz, float("nan"))
     fhi = shared._auto_safe_float(focus_hi_hz, float("nan"))
     if np.isfinite(flo) and np.isfinite(fhi) and float(fhi) > float(flo):
-        focus_ripple_l = _cached_focus_ripple(l_st, float(flo), float(fhi))
-        focus_ripple_r = _cached_focus_ripple(r_st, float(flo), float(fhi))
+        focus_ripple_l = _auto_focus_ripple_from_stats(l_st, focus_lo_hz=float(flo), focus_hi_hz=float(fhi))
+        focus_ripple_r = _auto_focus_ripple_from_stats(r_st, focus_lo_hz=float(flo), focus_hi_hz=float(fhi))
     if not (
         np.isfinite(shared._auto_safe_float(focus_ripple_l, float("nan")))
         or np.isfinite(shared._auto_safe_float(focus_ripple_r, float("nan")))
@@ -161,16 +81,29 @@ def combine_rank_score(
         if np.isfinite(x):
             focus_ripple_vals.append(float(x))
     focus_ripple = float(np.mean(np.asarray(focus_ripple_vals, dtype=float))) if focus_ripple_vals else 0.0
+    return {
+        "focus_ripple": focus_ripple,
+        "focus_ripple_l": focus_ripple_l,
+        "focus_ripple_r": focus_ripple_r,
+    }
 
-    top_modes = []
+
+def _collect_rank_base_metrics(base_rank_components: dict, mode_penalty: float) -> tuple[float, float]:
+    rank_raw = float(base_rank_components.get("rank_score_raw", 0.0))
+    rank_score = float(base_rank_components.get("rank_score", 0.0))
+    if mode_penalty > 0.0:
+        rank_raw = float(rank_raw - float(mode_penalty))
+        rank_score = float(_rank_scale(rank_raw))
+    return rank_raw, rank_score
+
+
+def _collect_rank_top_modes(result) -> list[float]:
     try:
         if bool(shared.AUTO_MODE_DUAL_MODE_ENABLED):
-            top_modes = _auto_get_top_modes_hz(result, top_n=int(shared.AUTO_MODE_DUAL_MODE_TOP_N))
-        else:
-            m1 = _auto_get_worst_mode_hz(result)
-            top_modes = [float(m1)] if m1 is not None else []
+            return _auto_get_top_modes_hz(result, top_n=int(shared.AUTO_MODE_DUAL_MODE_TOP_N))
+        m1 = _auto_get_worst_mode_hz(result)
+        return [float(m1)] if m1 is not None else []
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -182,55 +115,47 @@ def combine_rank_score(
         ModuleNotFoundError,
         NameError,
     ):
-        top_modes = []
+        return []
 
-    mode_hz = shared._auto_safe_float(
-        (top_modes[0] if len(top_modes) >= 1 else _auto_get_worst_mode_hz(result)),
-        float("nan"),
-    )
-    mode_band_lo = float("nan")
-    mode_band_hi = float("nan")
-    mode_ripple_db = float("nan")
-    mode2_hz = float("nan")
-    mode2_band_lo = float("nan")
-    mode2_band_hi = float("nan")
-    mode2_ripple_db = float("nan")
-    mode_band = _auto_mode_band(mode_hz, base_data=base_data) if np.isfinite(mode_hz) else None
-    if isinstance(mode_band, tuple) and len(mode_band) == 2:
-        mode_band_lo = float(shared._auto_safe_float(mode_band[0], float("nan")))
-        mode_band_hi = float(shared._auto_safe_float(mode_band[1], float("nan")))
-        if np.isfinite(mode_band_lo) and np.isfinite(mode_band_hi) and (mode_band_hi > mode_band_lo):
-            mr_l = _cached_focus_ripple(l_st, float(mode_band_lo), float(mode_band_hi))
-            mr_r = _cached_focus_ripple(r_st, float(mode_band_lo), float(mode_band_hi))
-            mr_vals = []
-            for mv in (mr_l, mr_r):
-                x = shared._auto_safe_float(mv, float("nan"))
-                if np.isfinite(x):
-                    mr_vals.append(float(x))
-            if mr_vals:
-                mode_ripple_db = float(np.mean(np.asarray(mr_vals, dtype=float)))
-    if (not np.isfinite(mode_ripple_db)) and np.isfinite(mode_hz):
-        mode_ripple_db = float(shared._auto_safe_float(focus_ripple, float("nan")))
 
-    if len(top_modes) >= 2:
-        mode2_hz = float(shared._auto_safe_float(top_modes[1], float("nan")))
-        mode2_band = _auto_mode_band(mode2_hz, base_data=base_data) if np.isfinite(mode2_hz) else None
-        if isinstance(mode2_band, tuple) and len(mode2_band) == 2:
-            mode2_band_lo = float(shared._auto_safe_float(mode2_band[0], float("nan")))
-            mode2_band_hi = float(shared._auto_safe_float(mode2_band[1], float("nan")))
-            if np.isfinite(mode2_band_lo) and np.isfinite(mode2_band_hi) and (mode2_band_hi > mode2_band_lo):
-                mr2_l = _cached_focus_ripple(l_st, float(mode2_band_lo), float(mode2_band_hi))
-                mr2_r = _cached_focus_ripple(r_st, float(mode2_band_lo), float(mode2_band_hi))
-                mr2_vals = []
-                for mv in (mr2_l, mr2_r):
-                    x = shared._auto_safe_float(mv, float("nan"))
-                    if np.isfinite(x):
-                        mr2_vals.append(float(x))
-                if mr2_vals:
-                    mode2_ripple_db = float(np.mean(np.asarray(mr2_vals, dtype=float)))
-        if (not np.isfinite(mode2_ripple_db)) and np.isfinite(mode2_hz):
-            mode2_ripple_db = float(shared._auto_safe_float(focus_ripple, float("nan")))
+def _collect_rank_cached_focus_ripple(st: dict, lo: float, hi: float) -> float | None:
+    key = (id(st), lo, hi)
+    if key not in _RANK_MODE_RIPPLE_MEMO:
+        _RANK_MODE_RIPPLE_MEMO[key] = _auto_focus_ripple_from_stats(st, focus_lo_hz=lo, focus_hi_hz=hi)
+    return _RANK_MODE_RIPPLE_MEMO[key]
 
+
+def _collect_rank_band_ripple(st: dict, band: tuple[float, float] | None, fallback: float) -> float:
+    if not (isinstance(band, tuple) and len(band) == 2):
+        return float(shared._auto_safe_float(fallback, float("nan")))
+
+    band_lo = float(shared._auto_safe_float(band[0], float("nan")))
+    band_hi = float(shared._auto_safe_float(band[1], float("nan")))
+    if not (np.isfinite(band_lo) and np.isfinite(band_hi) and band_hi > band_lo):
+        return float(shared._auto_safe_float(fallback, float("nan")))
+
+    ripple = _collect_rank_cached_focus_ripple(st, float(band_lo), float(band_hi))
+    ripple_f = shared._auto_safe_float(ripple, float("nan"))
+    if np.isfinite(ripple_f):
+        return float(ripple_f)
+    return float(shared._auto_safe_float(fallback, float("nan")))
+
+
+def _collect_rank_mode_band_info(
+    st: dict,
+    mode_hz: float,
+    *,
+    base_data,
+    fallback_ripple: float,
+) -> tuple[float, float, float]:
+    band = _auto_mode_band(mode_hz, base_data=base_data) if np.isfinite(mode_hz) else None
+    band_lo = float(shared._auto_safe_float(band[0], float("nan"))) if isinstance(band, tuple) and len(band) == 2 else float("nan")
+    band_hi = float(shared._auto_safe_float(band[1], float("nan"))) if isinstance(band, tuple) and len(band) == 2 else float("nan")
+    ripple_db = _collect_rank_band_ripple(st, band, fallback_ripple)
+    return band_lo, band_hi, ripple_db
+
+
+def _collect_rank_mode_combined_penalty(mode_ripple_db: float, mode2_ripple_db: float) -> tuple[float, float]:
     mode_r1 = shared._auto_safe_float(mode_ripple_db, float("nan"))
     mode_r2 = shared._auto_safe_float(mode2_ripple_db, float("nan"))
     mode_combined = float("nan")
@@ -248,46 +173,69 @@ def combine_rank_score(
             float(mode_combined) - float(shared.AUTO_MODE_MODE_RIPPLE_OK_DB),
         )
         mode_penalty = float(np.clip(mode_penalty, 0.0, 3.5))
+    return mode_combined, mode_penalty
 
-    if mode_penalty > 0.0:
-        rank_raw = float(rank_raw - float(mode_penalty))
-        rank_score = float(_rank_scale(rank_raw))
-    rank_components = compute_rank_score_components(
-        avg_score=avg_score,
-        phase_benefit_bonus=phase_benefit_bonus,
-        boost_penalty=boost_pen,
-        event_penalty=event_pen,
-        lr_delta_penalty=lr_pen,
-        dsp_penalty=dsp_penalty,
-        bass_prering_penalty=bass_prering_penalty,
-        exc_penalty=exc_penalty,
-        bass_integration_penalty=bass_integration_penalty,
-        bass_feasibility_penalty=bass_feasibility_penalty,
-        bass_preference_bonus=bass_preference_bonus,
-        mode_penalty=mode_penalty,
-        decay_penalty=decay_penalty,
-        residual_peak_penalty=residual_peak_penalty,
-        correction_sharpness_penalty=correction_sharpness_penalty,
-        dip_fill_risk_penalty=dip_fill_risk_penalty,
-        channel_overfit_penalty=channel_overfit_penalty,
-        target_tracking_penalty=target_tracking_penalty,
-        voice_clarity_penalty=voice_clarity_penalty,
-        phase_risk_penalty=phase_risk_penalty,
-        phase_limit_penalty=phase_limit_penalty,
-        thd_boost_penalty=thd_boost_penalty,
-        stereo_coherence_penalty=stereo_coherence_penalty,
-        phantom_center_stability_penalty=phantom_center_stability_penalty,
-        policy_divergence_penalty=policy_divergence_penalty,
-        asymmetry_budget_overflow_penalty=asymmetry_budget_overflow_penalty,
-        worst_channel_relief_bonus=worst_channel_relief_bonus,
-        shared_preference_bias=shared_preference_bias,
-        rt60_policy_penalty=_rt60_policy_pen,
-        harmonic_local_boost_penalty=_harmonic_local_pen,
-        gain=shared._auto_safe_float(shared.AUTO_MODE_RANK_SCORE_GAIN, 1.0),
-        bias=shared._auto_safe_float(shared.AUTO_MODE_RANK_SCORE_BIAS, 0.0),
-        context=OFFICIAL_RANK_SCORE_CONTEXT,
+
+def _collect_rank_mode_band_metrics(l_st, r_st, result, *, base_data, focus_ripple: float) -> dict:
+    top_modes = _collect_rank_top_modes(result)
+    mode_hz = shared._auto_safe_float((top_modes[0] if top_modes else _auto_get_worst_mode_hz(result)), float("nan"))
+    mode2_hz = shared._auto_safe_float((top_modes[1] if len(top_modes) >= 2 else float("nan")), float("nan"))
+    mode_band_lo, mode_band_hi, mode_ripple_db = _collect_rank_mode_band_info(
+        l_st,
+        mode_hz,
+        base_data=base_data,
+        fallback_ripple=focus_ripple,
     )
-    rank_score = float(rank_components.get("rank_score", rank_score))
+    mode2_band_lo, mode2_band_hi, mode2_ripple_db = _collect_rank_mode_band_info(
+        r_st,
+        mode2_hz,
+        base_data=base_data,
+        fallback_ripple=focus_ripple,
+    )
+    mode_combined, mode_penalty = _collect_rank_mode_combined_penalty(mode_ripple_db, mode2_ripple_db)
+
+    return {
+        "mode_hz": mode_hz,
+        "mode_band_lo": mode_band_lo,
+        "mode_band_hi": mode_band_hi,
+        "mode_ripple_db": mode_ripple_db,
+        "mode2_hz": mode2_hz,
+        "mode2_band_lo": mode2_band_lo,
+        "mode2_band_hi": mode2_band_hi,
+        "mode2_ripple_db": mode2_ripple_db,
+        "mode_combined": mode_combined,
+        "mode_penalty": mode_penalty,
+    }
+
+
+def _collect_rank_mode_metrics(
+    l_st,
+    r_st,
+    result,
+    *,
+    focus_lo_hz,
+    focus_hi_hz,
+    base_data,
+    base_rank_components: dict,
+) -> dict:
+    focus_metrics = _collect_rank_focus_metrics(l_st, r_st, focus_lo_hz=focus_lo_hz, focus_hi_hz=focus_hi_hz)
+    mode_metrics = _collect_rank_mode_band_metrics(
+        l_st,
+        r_st,
+        result,
+        base_data=base_data,
+        focus_ripple=float(focus_metrics["focus_ripple"]),
+    )
+    rank_raw, rank_score = _collect_rank_base_metrics(base_rank_components, float(mode_metrics["mode_penalty"]))
+    return {
+        **focus_metrics,
+        **mode_metrics,
+        "rank_raw": rank_raw,
+        "rank_score": rank_score,
+    }
+
+
+def _collect_rank_post_metrics(l_st, r_st) -> dict:
     realized_keys = (
         "post_to_ir_staged_shape_delta_rms_20_200_db",
         "post_to_ir_shape_delta_rms_20_200_db",
@@ -338,6 +286,148 @@ def combine_rank_score(
         pre_post_max = float(max(pre_post_vals))
 
     return {
+        "realized_rms_20_200": realized_rms_20_200,
+        "ripple_raw": ripple_raw,
+        "pre_post_l_f": pre_post_l_f,
+        "pre_post_r_f": pre_post_r_f,
+        "pre_post_max": pre_post_max,
+    }
+
+def combine_rank_score(
+    l_st,
+    r_st,
+    result,
+    *,
+    focus_lo_hz,
+    focus_hi_hz,
+    base_data,
+    avg_score,
+    phase_benefit_bonus,
+    boost_pen,
+    event_pen,
+    lr_pen,
+    dsp_penalty,
+    bass_prering_penalty,
+    exc_penalty,
+    bass_integration_penalty,
+    bass_feasibility_penalty,
+    bass_preference_bonus,
+    decay_penalty,
+    residual_peak_penalty,
+    correction_sharpness_penalty,
+    dip_fill_risk_penalty,
+    channel_overfit_penalty,
+    target_tracking_penalty,
+    voice_clarity_penalty,
+    phase_risk_penalty,
+    phase_limit_penalty,
+    thd_boost_penalty,
+    stereo_coherence_penalty,
+    phantom_center_stability_penalty,
+    policy_divergence_penalty,
+    asymmetry_budget_overflow_penalty,
+    worst_channel_relief_bonus,
+    shared_preference_bias,
+    rt60_policy_pen,
+    harmonic_local_pen,
+) -> dict:
+    _rt60_policy_pen = rt60_policy_pen
+    _harmonic_local_pen = harmonic_local_pen
+    base_rank_components = compute_rank_score_components(
+        avg_score=avg_score,
+        phase_benefit_bonus=phase_benefit_bonus,
+        boost_penalty=boost_pen,
+        event_penalty=event_pen,
+        lr_delta_penalty=lr_pen,
+        dsp_penalty=dsp_penalty,
+        bass_prering_penalty=bass_prering_penalty,
+        exc_penalty=exc_penalty,
+        bass_integration_penalty=bass_integration_penalty,
+        bass_feasibility_penalty=bass_feasibility_penalty,
+        bass_preference_bonus=bass_preference_bonus,
+        decay_penalty=decay_penalty,
+        residual_peak_penalty=residual_peak_penalty,
+        correction_sharpness_penalty=correction_sharpness_penalty,
+        dip_fill_risk_penalty=dip_fill_risk_penalty,
+        channel_overfit_penalty=channel_overfit_penalty,
+        target_tracking_penalty=target_tracking_penalty,
+        voice_clarity_penalty=voice_clarity_penalty,
+        phase_risk_penalty=phase_risk_penalty,
+        phase_limit_penalty=phase_limit_penalty,
+        stereo_coherence_penalty=stereo_coherence_penalty,
+        phantom_center_stability_penalty=phantom_center_stability_penalty,
+        policy_divergence_penalty=policy_divergence_penalty,
+        asymmetry_budget_overflow_penalty=asymmetry_budget_overflow_penalty,
+        worst_channel_relief_bonus=worst_channel_relief_bonus,
+        shared_preference_bias=shared_preference_bias,
+        gain=shared._auto_safe_float(shared.AUTO_MODE_RANK_SCORE_GAIN, 1.0),
+        bias=shared._auto_safe_float(shared.AUTO_MODE_RANK_SCORE_BIAS, 0.0),
+        context=OFFICIAL_RANK_SCORE_CONTEXT,
+    )
+    mode_metrics = _collect_rank_mode_metrics(
+        l_st,
+        r_st,
+        result,
+        focus_lo_hz=focus_lo_hz,
+        focus_hi_hz=focus_hi_hz,
+        base_data=base_data,
+        base_rank_components=base_rank_components,
+    )
+    post_metrics = _collect_rank_post_metrics(l_st, r_st)
+    rank_raw = float(mode_metrics["rank_raw"])
+    rank_score_base = float(base_rank_components.get("rank_score", 0.0))
+    rank_score = float(mode_metrics["rank_score"])
+    focus_ripple = float(mode_metrics["focus_ripple"])
+    focus_ripple_l = mode_metrics["focus_ripple_l"]
+    focus_ripple_r = mode_metrics["focus_ripple_r"]
+    mode_hz = mode_metrics["mode_hz"]
+    mode_band_lo = mode_metrics["mode_band_lo"]
+    mode_band_hi = mode_metrics["mode_band_hi"]
+    mode_ripple_db = mode_metrics["mode_ripple_db"]
+    mode2_hz = mode_metrics["mode2_hz"]
+    mode2_band_lo = mode_metrics["mode2_band_lo"]
+    mode2_band_hi = mode_metrics["mode2_band_hi"]
+    mode2_ripple_db = mode_metrics["mode2_ripple_db"]
+    mode_combined = mode_metrics["mode_combined"]
+    mode_penalty = mode_metrics["mode_penalty"]
+    rank_components = compute_rank_score_components(
+        avg_score=avg_score,
+        phase_benefit_bonus=phase_benefit_bonus,
+        boost_penalty=boost_pen,
+        event_penalty=event_pen,
+        lr_delta_penalty=lr_pen,
+        dsp_penalty=dsp_penalty,
+        bass_prering_penalty=bass_prering_penalty,
+        exc_penalty=exc_penalty,
+        bass_integration_penalty=bass_integration_penalty,
+        bass_feasibility_penalty=bass_feasibility_penalty,
+        bass_preference_bonus=bass_preference_bonus,
+        mode_penalty=mode_penalty,
+        decay_penalty=decay_penalty,
+        residual_peak_penalty=residual_peak_penalty,
+        correction_sharpness_penalty=correction_sharpness_penalty,
+        dip_fill_risk_penalty=dip_fill_risk_penalty,
+        channel_overfit_penalty=channel_overfit_penalty,
+        target_tracking_penalty=target_tracking_penalty,
+        voice_clarity_penalty=voice_clarity_penalty,
+        phase_risk_penalty=phase_risk_penalty,
+        phase_limit_penalty=phase_limit_penalty,
+        thd_boost_penalty=thd_boost_penalty,
+        stereo_coherence_penalty=stereo_coherence_penalty,
+        phantom_center_stability_penalty=phantom_center_stability_penalty,
+        policy_divergence_penalty=policy_divergence_penalty,
+        asymmetry_budget_overflow_penalty=asymmetry_budget_overflow_penalty,
+        worst_channel_relief_bonus=worst_channel_relief_bonus,
+        shared_preference_bias=shared_preference_bias,
+        rt60_policy_penalty=_rt60_policy_pen,
+        harmonic_local_boost_penalty=_harmonic_local_pen,
+        gain=shared._auto_safe_float(shared.AUTO_MODE_RANK_SCORE_GAIN, 1.0),
+        bias=shared._auto_safe_float(shared.AUTO_MODE_RANK_SCORE_BIAS, 0.0),
+        context=OFFICIAL_RANK_SCORE_CONTEXT,
+    )
+    rank_score = float(rank_components.get("rank_score", rank_score))
+
+    return {
         "rank_score": rank_score,
         "rank_score_base": rank_score_base,
         "rank_components": rank_components,
@@ -355,11 +445,11 @@ def combine_rank_score(
         "mode2_ripple_db": mode2_ripple_db,
         "mode_combined": mode_combined,
         "mode_penalty": mode_penalty,
-        "realized_rms_20_200": realized_rms_20_200,
-        "ripple_raw": ripple_raw,
-        "pre_post_l_f": pre_post_l_f,
-        "pre_post_r_f": pre_post_r_f,
-        "pre_post_max": pre_post_max,
+        "realized_rms_20_200": post_metrics["realized_rms_20_200"],
+        "ripple_raw": post_metrics["ripple_raw"],
+        "pre_post_l_f": post_metrics["pre_post_l_f"],
+        "pre_post_r_f": post_metrics["pre_post_r_f"],
+        "pre_post_max": post_metrics["pre_post_max"],
     }
 
 

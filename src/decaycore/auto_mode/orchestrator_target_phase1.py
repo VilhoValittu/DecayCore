@@ -52,6 +52,41 @@ from .orchestrator_target_trials import _run_target_trials, _prepare_target_tria
 logger = logging.getLogger("DecayCore")
 
 
+def _target_local_candidate_clip(
+    cand_in: dict,
+    *,
+    ref_profile: dict,
+    base_tc: dict,
+    filter_key: str,
+) -> dict:
+    cand = dict(cand_in or {})
+    mf = _auto_safe_float(cand.get("mixed_freq"), float("nan"))
+    if np.isfinite(mf):
+        cand["mixed_freq"] = _clip(
+            mf,
+            ref_profile["mixed_center"] - ref_profile["mixed_span"],
+            ref_profile["mixed_center"] + ref_profile["mixed_span"],
+        )
+    td = _auto_safe_float(cand.get("tdc_strength"), float("nan"))
+    if np.isfinite(td):
+        cand["tdc_strength"] = _clip(
+            td,
+            ref_profile["tdc_lo"],
+            ref_profile["tdc_hi"],
+        )
+    if str(filter_key) in ("linear", "asym"):
+        cand["phase_limit"] = round(
+            float(
+                _auto_phase_limit_clip(
+                    cand.get("phase_limit", base_tc.get("phase_limit", 400.0)),
+                    default=400.0,
+                )
+            ),
+            1,
+        )
+    return dict(cand)
+
+
 def _run_target_phase1_trials(
     *,
     runtime,
@@ -248,34 +283,6 @@ def _run_target_local_refine_trials(
             f"mode_ripple={p1_mode_txt}, boost={p1_boost_txt}, {p1_detail}"
         )
 
-    def _target_local_candidate_clip(cand_in: dict) -> dict:
-        cand = dict(cand_in or {})
-        mf = _auto_safe_float(cand.get("mixed_freq"), float("nan"))
-        if np.isfinite(mf):
-            cand["mixed_freq"] = _clip(
-                mf,
-                ref_profile["mixed_center"] - ref_profile["mixed_span"],
-                ref_profile["mixed_center"] + ref_profile["mixed_span"],
-            )
-        td = _auto_safe_float(cand.get("tdc_strength"), float("nan"))
-        if np.isfinite(td):
-            cand["tdc_strength"] = _clip(
-                td,
-                ref_profile["tdc_lo"],
-                ref_profile["tdc_hi"],
-            )
-        if str(filter_key) in ("linear", "asym"):
-            cand["phase_limit"] = round(
-                float(
-                    _auto_phase_limit_clip(
-                        cand.get("phase_limit", setup.base_tc.get("phase_limit", 400.0)),
-                        default=400.0,
-                    )
-                ),
-                1,
-            )
-        return dict(cand)
-
     local_shrink = float(
         _auto_adaptive_shrink_factor(
             top_list,
@@ -284,110 +291,17 @@ def _run_target_local_refine_trials(
         )
     )
     local_trial_total = int(AUTO_MODE_LOCAL_REFINE_TRIALS_PER_TOP)
-
-    # Build per-anchor configs upfront (do logging here, before parallel dispatch).
-    anchor_configs: list[dict] = []
-    for li, item in enumerate(top_list, start=1):
-        center = dict(item.get("preset", {}) or {})
-        c_mixed = _auto_safe_float(
-            center.get("mixed_freq", setup.base_tc.get("mixed_freq", float("nan"))),
-            float("nan"),
-        )
-        c_phase = _auto_safe_float(
-            center.get("phase_limit", setup.base_tc.get("phase_limit", float("nan"))),
-            float("nan"),
-        )
-        local_detail = None
-        if str(filter_key) == "mixed":
-            local_detail = f"mixed_freq={c_mixed:.1f} Hz"
-        elif str(filter_key) in ("linear", "asym"):
-            local_detail = (
-                f"phase refine phase_limit={c_phase:.1f} Hz"
-                if np.isfinite(c_phase)
-                else "phase refine phase_limit=n/a"
-            )
-        if local_detail is not None:
-            logger.info(
-                "Automatic mode target Local refine: target=%s, center #%d, %s",
-                str(setup.hc_name),
-                int(li),
-                str(local_detail),
-            )
-            if callable(status_cb):
-                status_cb(
-                    f"DecayCore automatic mode: Local refine target={setup.hc_name} "
-                    f"center #{li} {local_detail}"
-                )
-        seed_li = int(setup.seed_tc + li * 100003)
-        local_seed_presets = [
-            _target_local_candidate_clip(c)
-            for c in _build_auto_mode_candidates_local(
-                setup.base_tc,
-                center,
-                1,
-                seed_li,
-                shrink=float(local_shrink),
-                optimize_mag_low=bool(setup.base_tc.get("auto_optimize_low_bass_cut", True)),
-            )
-        ]
-        local_candidates = []
-        if not bool(setup.use_optuna_curve_trials):
-            local_candidates = [
-                _target_local_candidate_clip(c)
-                for c in _build_auto_mode_candidates_local(
-                    setup.base_tc,
-                    center,
-                    int(local_trial_total),
-                    seed_li,
-                    shrink=float(local_shrink),
-                    optimize_mag_low=bool(setup.base_tc.get("auto_optimize_low_bass_cut", True)),
-                )
-            ]
-        phase_tag = runtime.auto_optuna_scope_with_context(
-            f"local_center_{li}_u1",
-            center=dict(center or {}),
-            shrink=float(local_shrink),
-            extra={
-                "filter_key": str(filter_key),
-                "target_name": str(setup.hc_name),
-            },
-        )
-        optuna_builder = None
-        seed_to_params = None
-        if bool(setup.use_optuna_curve_trials):
-            _captured_base_tc = dict(setup.base_tc)
-            _captured_center = dict(center)
-            _captured_shrink = float(local_shrink)
-            optuna_builder = (
-                lambda tr,
-                _b=_captured_base_tc,
-                _c=_captured_center,
-                _s=_captured_shrink: _target_local_candidate_clip(
-                    _suggest_auto_mode_candidate_local_optuna(
-                        _b, _c, tr, shrink=_s,
-                        optimize_mag_low=bool(_b.get("auto_optimize_low_bass_cut", True)),
-                    )
-                )
-            )
-            seed_to_params = (
-                lambda preset,
-                _b=_captured_base_tc,
-                _c=_captured_center,
-                _s=_captured_shrink: _seed_auto_mode_candidate_local_optuna_params(
-                    _b, _c, preset, shrink=_s,
-                    optimize_mag_low=bool(_b.get("auto_optimize_low_bass_cut", True)),
-                )
-            )
-        anchor_configs.append({
-            "li": int(li),
-            "center": dict(center),
-            "local_seed_presets": list(local_seed_presets),
-            "local_candidates": list(local_candidates),
-            "phase_tag": str(phase_tag),
-            "optuna_builder": optuna_builder,
-            "seed_to_params": seed_to_params,
-        })
-        accumulator.trials_total_count += int(local_trial_total)
+    anchor_configs = _build_target_local_refine_anchor_configs(
+        top_list=top_list,
+        setup=setup,
+        filter_key=str(filter_key),
+        local_shrink=float(local_shrink),
+        local_trial_total=int(local_trial_total),
+        ref_profile=ref_profile,
+        status_cb=status_cb,
+        accumulator=accumulator,
+        runtime=runtime,
+    )
 
     def _run_one_anchor(acfg: dict) -> tuple[int, list[dict]]:
         return (
@@ -460,7 +374,152 @@ def _run_target_local_refine_trials(
                     )
                     anchor_results[li] = []
 
-    # Process results in deterministic order.
+    _apply_target_local_refine_results(
+        anchor_results=anchor_results,
+        accumulator=accumulator,
+        setup=setup,
+        local_trial_total=int(local_trial_total),
+    )
+    return accumulator
+
+
+def _build_target_local_refine_anchor_configs(
+    *,
+    top_list: list[dict],
+    setup: _TargetTrialSetup,
+    filter_key: str,
+    local_shrink: float,
+    local_trial_total: int,
+    ref_profile: dict,
+    status_cb,
+    accumulator: _TargetTrialAccumulator,
+    runtime,
+) -> list[dict]:
+    anchor_configs: list[dict] = []
+    for li, item in enumerate(top_list, start=1):
+        center = dict(item.get("preset", {}) or {})
+        c_mixed = _auto_safe_float(
+            center.get("mixed_freq", setup.base_tc.get("mixed_freq", float("nan"))),
+            float("nan"),
+        )
+        c_phase = _auto_safe_float(
+            center.get("phase_limit", setup.base_tc.get("phase_limit", float("nan"))),
+            float("nan"),
+        )
+        local_detail = None
+        if str(filter_key) == "mixed":
+            local_detail = f"mixed_freq={c_mixed:.1f} Hz"
+        elif str(filter_key) in ("linear", "asym"):
+            local_detail = (
+                f"phase refine phase_limit={c_phase:.1f} Hz"
+                if np.isfinite(c_phase)
+                else "phase refine phase_limit=n/a"
+            )
+        if local_detail is not None:
+            logger.info(
+                "Automatic mode target Local refine: target=%s, center #%d, %s",
+                str(setup.hc_name),
+                int(li),
+                str(local_detail),
+            )
+            if callable(status_cb):
+                status_cb(
+                    f"DecayCore automatic mode: Local refine target={setup.hc_name} "
+                    f"center #{li} {local_detail}"
+                )
+        seed_li = int(setup.seed_tc + li * 100003)
+        local_seed_presets = [
+            _target_local_candidate_clip(
+                c,
+                ref_profile=ref_profile,
+                base_tc=setup.base_tc,
+                filter_key=filter_key,
+            )
+            for c in _build_auto_mode_candidates_local(
+                setup.base_tc,
+                center,
+                1,
+                seed_li,
+                shrink=float(local_shrink),
+                optimize_mag_low=bool(setup.base_tc.get("auto_optimize_low_bass_cut", True)),
+            )
+        ]
+        local_candidates = []
+        if not bool(setup.use_optuna_curve_trials):
+            local_candidates = [
+                _target_local_candidate_clip(
+                    c,
+                    ref_profile=ref_profile,
+                    base_tc=setup.base_tc,
+                    filter_key=filter_key,
+                )
+                for c in _build_auto_mode_candidates_local(
+                    setup.base_tc,
+                    center,
+                    int(local_trial_total),
+                    seed_li,
+                    shrink=float(local_shrink),
+                    optimize_mag_low=bool(setup.base_tc.get("auto_optimize_low_bass_cut", True)),
+                )
+            ]
+        phase_tag = runtime.auto_optuna_scope_with_context(
+            f"local_center_{li}_u1",
+            center=dict(center or {}),
+            shrink=float(local_shrink),
+            extra={
+                "filter_key": str(filter_key),
+                "target_name": str(setup.hc_name),
+            },
+        )
+        optuna_builder = None
+        seed_to_params = None
+        if bool(setup.use_optuna_curve_trials):
+            _captured_base_tc = dict(setup.base_tc)
+            _captured_center = dict(center)
+            _captured_shrink = float(local_shrink)
+            optuna_builder = (
+                lambda tr,
+                _b=_captured_base_tc,
+                _c=_captured_center,
+                _s=_captured_shrink: _target_local_candidate_clip(
+                    _suggest_auto_mode_candidate_local_optuna(
+                        _b, _c, tr, shrink=_s,
+                        optimize_mag_low=bool(_b.get("auto_optimize_low_bass_cut", True)),
+                    ),
+                    ref_profile=ref_profile,
+                    base_tc=setup.base_tc,
+                    filter_key=filter_key,
+                )
+            )
+            seed_to_params = (
+                lambda preset,
+                _b=_captured_base_tc,
+                _c=_captured_center,
+                _s=_captured_shrink: _seed_auto_mode_candidate_local_optuna_params(
+                    _b, _c, preset, shrink=_s,
+                    optimize_mag_low=bool(_b.get("auto_optimize_low_bass_cut", True)),
+                )
+            )
+        anchor_configs.append({
+            "li": int(li),
+            "center": dict(center),
+            "local_seed_presets": list(local_seed_presets),
+            "local_candidates": list(local_candidates),
+            "phase_tag": str(phase_tag),
+            "optuna_builder": optuna_builder,
+            "seed_to_params": seed_to_params,
+        })
+        accumulator.trials_total_count += int(local_trial_total)
+    return anchor_configs
+
+
+def _apply_target_local_refine_results(
+    *,
+    anchor_results: dict[int, list[dict]],
+    accumulator: _TargetTrialAccumulator,
+    setup: _TargetTrialSetup,
+    local_trial_total: int,
+) -> None:
     for li in sorted(anchor_results.keys()):
         local_out = anchor_results[li]
         for lc_idx, out in enumerate(local_out, start=1):
@@ -493,7 +552,6 @@ def _run_target_local_refine_trials(
                     int(local_trial_total),
                     str(out.get("error", "unknown error") or "unknown error"),
                 )
-    return accumulator
 
 
 def _build_target_eval_core_result(

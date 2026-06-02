@@ -26,36 +26,139 @@ from .winner_polish_utils import _polish_metric_delta, _winner_polish_acceptance
 logger = logging.getLogger("DecayCore")
 
 
-def apply_residual_peak_winner_polish(
-    *,
-    best_preset: dict | None,
-    best_metrics: dict | None,
-    base_data_ref: dict | None,
-    phase_label: str,
+def _evaluate_residual_peak_guards(
+    cur_best_metrics: dict,
+    cand_metrics: dict,
+    min_peak_improve: float,
     goal: str,
-    enabled: bool,
-    max_variants: int,
-    min_improvement_db: float,
-    status_cb,
-    materialize_preset_result,
-    cache_ready_preset,
-    auto_is_better_refine=None,
-) -> tuple[dict, dict, bool, dict]:
-    cur_best_preset = dict(best_preset or {})
-    cur_best_metrics = dict(best_metrics or {})
+    _metric,
+) -> tuple[bool, str, list[str], list[str]]:
+    guard_values = _residual_peak_guard_values(cur_best_metrics, cand_metrics, _metric)
+    guard_flags = _residual_peak_guard_flags(guard_values, min_peak_improve=min_peak_improve, goal=goal)
+    reason = _residual_peak_guard_reason(
+        guard_flags,
+        hard_gate_reasons=guard_flags["hard_gate_reasons"],
+    )
+    return (
+        bool(guard_flags["better"]),
+        str(reason),
+        list(guard_flags["failed_guards"]),
+        list(guard_flags["hard_gate_reasons"]),
+    )
 
-    def _metric(src: dict | None, key: str, default: float = float("nan")) -> float:
-        return float(_auto_safe_float(dict(src or {}).get(key, default), default))
 
-    def _current_value(key: str, default: float) -> float:
-        return float(
-            _auto_safe_float(
-                cur_best_preset.get(key, dict(base_data_ref or {}).get(key, default)),
-                default,
+def _residual_peak_guard_values(cur_best_metrics: dict, cand_metrics: dict, _metric) -> dict:
+    cur_rank = _metric(cur_best_metrics, "rank_score")
+    cand_rank = _metric(cand_metrics, "rank_score")
+    cur_avg = _metric(cur_best_metrics, "avg_score")
+    cand_avg = _metric(cand_metrics, "avg_score")
+    cur_boost = _metric(cur_best_metrics, "max_net_boost_db")
+    cand_boost = _metric(cand_metrics, "max_net_boost_db")
+    cur_peak = _metric(cur_best_metrics, "worst_residual_peak_raw_db")
+    cand_peak = _metric(cand_metrics, "worst_residual_peak_raw_db")
+    if not np.isfinite(cur_peak):
+        cur_peak = _metric(cur_best_metrics, "worst_residual_peak_db")
+    if not np.isfinite(cand_peak):
+        cand_peak = _metric(cand_metrics, "worst_residual_peak_db")
+    return {
+        "cand_metrics": dict(cand_metrics or {}),
+        "cur_rank": float(cur_rank),
+        "cand_rank": float(cand_rank),
+        "cur_avg": float(cur_avg),
+        "cand_avg": float(cand_avg),
+        "cur_boost": float(cur_boost),
+        "cand_boost": float(cand_boost),
+        "cur_peak": float(cur_peak),
+        "cand_peak": float(cand_peak),
+        "cur_tracking": float(
+            max(
+                _metric(cur_best_metrics, "target_tracking_rms_20_200_db", 0.0),
+                _metric(cur_best_metrics, "target_tracking_rms_100_500_db", 0.0),
             )
-        )
+        ),
+        "cand_tracking": float(
+            max(
+                _metric(cand_metrics, "target_tracking_rms_20_200_db", 0.0),
+                _metric(cand_metrics, "target_tracking_rms_100_500_db", 0.0),
+            )
+        ),
+        "cur_under": float(_metric(cur_best_metrics, "bass_under_target_penalty", 0.0)),
+        "cand_under": float(_metric(cand_metrics, "bass_under_target_penalty", 0.0)),
+        "cur_sharp": float(_metric(cur_best_metrics, "correction_sharpness_penalty", 0.0)),
+        "cand_sharp": float(_metric(cand_metrics, "correction_sharpness_penalty", 0.0)),
+        "cur_dip": float(_metric(cur_best_metrics, "dip_fill_risk_penalty", 0.0)),
+        "cand_dip": float(_metric(cand_metrics, "dip_fill_risk_penalty", 0.0)),
+        "cur_overfit": float(_metric(cur_best_metrics, "channel_overfit_penalty", 0.0)),
+        "cand_overfit": float(_metric(cand_metrics, "channel_overfit_penalty", 0.0)),
+    }
 
-    meta = {
+
+def _residual_peak_guard_flags(values: dict, *, min_peak_improve: float, goal: str) -> dict:
+    rank_delta = float(values["cand_rank"] - values["cur_rank"]) if np.isfinite(values["cand_rank"]) and np.isfinite(values["cur_rank"]) else float("nan")
+    peak_improve = float(values["cur_peak"] - values["cand_peak"]) if np.isfinite(values["cur_peak"]) and np.isfinite(values["cand_peak"]) else float("nan")
+    rank_clear = bool(np.isfinite(rank_delta) and float(rank_delta) >= 0.05)
+    peak_clear = bool(np.isfinite(peak_improve) and float(peak_improve) >= float(min_peak_improve))
+    rank_guard = bool((not np.isfinite(rank_delta)) or float(rank_delta) >= -0.15)
+    avg_guard = bool((not (np.isfinite(values["cur_avg"]) and np.isfinite(values["cand_avg"]))) or float(values["cur_avg"] - values["cand_avg"]) <= 1.0)
+    boost_guard = bool((not (np.isfinite(values["cur_boost"]) and np.isfinite(values["cand_boost"]))) or float(values["cand_boost"]) <= float(values["cur_boost"]) + 1e-6)
+    tracking_guard = bool((not (np.isfinite(values["cur_tracking"]) and np.isfinite(values["cand_tracking"]))) or float(values["cand_tracking"]) <= float(values["cur_tracking"]) + 0.35)
+    under_guard = bool((not (np.isfinite(values["cur_under"]) and np.isfinite(values["cand_under"]))) or float(values["cand_under"]) <= float(values["cur_under"]) + 0.50)
+    sharpness_guard = bool((not (np.isfinite(values["cur_sharp"]) and np.isfinite(values["cand_sharp"]))) or float(values["cand_sharp"]) <= float(values["cur_sharp"]) + 0.35)
+    dip_guard = bool((not (np.isfinite(values["cur_dip"]) and np.isfinite(values["cand_dip"]))) or float(values["cand_dip"]) <= float(values["cur_dip"]) + 0.25)
+    overfit_guard = bool((not (np.isfinite(values["cur_overfit"]) and np.isfinite(values["cand_overfit"]))) or float(values["cand_overfit"]) <= float(values["cur_overfit"]) + 0.25)
+    peak_guard = bool((not (np.isfinite(values["cur_peak"]) and np.isfinite(values["cand_peak"]))) or float(values["cand_peak"]) <= float(values["cur_peak"]) + 0.10)
+    hard_gate_reasons = _auto_hard_gate_reasons(dict(values.get("cand_metrics", {})), goal=goal)
+    failed_guards = [
+        name
+        for ok, name in (
+            (rank_guard, "rank_drop"),
+            (avg_guard, "avg_drop"),
+            (boost_guard, "boost"),
+            (tracking_guard, "tracking"),
+            (under_guard, "bass_under"),
+            (sharpness_guard, "sharpness"),
+            (dip_guard, "dip_fill"),
+            (overfit_guard, "channel_overfit"),
+            (peak_guard, "peak_regression"),
+        )
+        if not ok
+    ]
+    better = bool(
+        (rank_clear or peak_clear)
+        and rank_guard
+        and avg_guard
+        and boost_guard
+        and tracking_guard
+        and under_guard
+        and sharpness_guard
+        and dip_guard
+        and overfit_guard
+        and peak_guard
+        and not hard_gate_reasons
+    )
+    return {
+        "rank_delta": rank_delta,
+        "peak_improve": peak_improve,
+        "rank_clear": rank_clear,
+        "peak_clear": peak_clear,
+        "better": better,
+        "failed_guards": failed_guards,
+        "hard_gate_reasons": list(hard_gate_reasons),
+    }
+
+
+def _residual_peak_guard_reason(values: dict, *, hard_gate_reasons: list[str]) -> str:
+    if hard_gate_reasons:
+        return "hard_gate:" + ",".join(hard_gate_reasons)
+    if values["rank_clear"]:
+        return "rank_score"
+    if values["peak_clear"]:
+        return "residual_peak"
+    return "guards:" + ",".join(values["failed_guards"] or ["no_clear_improvement"])
+
+
+def _residual_peak_initial_meta(*, enabled: bool, phase_label: str) -> dict:
+    return {
         "enabled": bool(enabled),
         "applicable": True,
         "phase_label": str(phase_label),
@@ -81,55 +184,42 @@ def apply_residual_peak_winner_polish(
         "avg_before": float("nan"),
         "avg_after": float("nan"),
     }
-    if not bool(enabled):
-        return cur_best_preset, cur_best_metrics, False, meta
-    if not isinstance(cur_best_metrics, dict) or not cur_best_metrics:
-        return cur_best_preset, cur_best_metrics, False, meta
 
-    threshold_db = _metric(cur_best_metrics, "residual_peak_threshold_db", 3.0)
-    if not np.isfinite(threshold_db):
-        threshold_db = 3.0
-    start_worst = _metric(cur_best_metrics, "worst_residual_peak_raw_db")
-    if not np.isfinite(start_worst):
-        start_worst = _metric(cur_best_metrics, "worst_residual_peak_db")
-    start_top3 = _metric(cur_best_metrics, "top3_residual_peak_mean_db")
-    meta["worst_peak_before_db"] = float(start_worst) if np.isfinite(start_worst) else float("nan")
-    meta["worst_peak_freq_hz"] = _metric(cur_best_metrics, "worst_residual_peak_hz")
-    meta["worst_peak_width_hz"] = _metric(cur_best_metrics, "worst_residual_peak_width_hz")
-    meta["worst_peak_width_oct"] = _metric(cur_best_metrics, "worst_residual_peak_width_oct")
-    modal_priority = float(np.clip(_metric(cur_best_metrics, "residual_peak_modal_priority", 0.0), 0.0, 1.0))
-    modal_support = float(np.clip(_metric(cur_best_metrics, "residual_peak_modal_support", 0.0), 0.0, 1.0))
-    meta["modal_support"] = float(modal_support)
-    meta["modal_priority"] = float(modal_priority)
-    meta["modal_max_severity"] = float(np.clip(_metric(cur_best_metrics, "residual_peak_modal_max_severity", 0.0), 0.0, 1.0))
-    meta["modal_confidence"] = float(np.clip(_metric(cur_best_metrics, "residual_peak_modal_confidence", 0.0), 0.0, 1.0))
-    dom_hz = dict(cur_best_metrics or {}).get("residual_peak_modal_dominant_freq_hz")
-    meta["modal_dominant_freq_hz"] = float(dom_hz) if dom_hz is not None and np.isfinite(_auto_safe_float(dom_hz, float("nan"))) else None
-    meta["threshold_db"] = float(threshold_db)
-    meta["top3_before_db"] = float(start_top3) if np.isfinite(start_top3) else float("nan")
-    meta["rank_before"] = _metric(cur_best_metrics, "rank_score")
-    meta["avg_before"] = _metric(cur_best_metrics, "avg_score")
-    if not np.isfinite(start_worst) or float(start_worst) <= float(threshold_db):
-        meta["worst_peak_after_db"] = meta["worst_peak_before_db"]
-        meta["top3_after_db"] = meta["top3_before_db"]
-        meta["rank_after"] = meta["rank_before"]
-        meta["avg_after"] = meta["avg_before"]
-        meta["rejected_reason"] = (
-            "no_peaks_above_threshold" if not np.isfinite(start_worst) else "worst_peak_below_threshold"
+
+def _residual_peak_candidate_signature(cand_test: dict) -> str:
+    try:
+        return json.dumps(cand_test, sort_keys=True, separators=(",", ":"), default=str)
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        return str(sorted(dict(cand_test or {}).items()))
+
+
+def _residual_peak_variant_factories(
+    *,
+    cur_best_preset: dict,
+    base_data_ref: dict | None,
+    modal_priority: float,
+) -> list:
+    def _current_value(key: str, default: float) -> float:
+        return float(
+            _auto_safe_float(
+                cur_best_preset.get(key, dict(base_data_ref or {}).get(key, default)),
+                default,
+            )
         )
-        return cur_best_preset, cur_best_metrics, False, meta
 
     slope_choices = [0.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0, 24.0, 36.0]
-    max_variants_eff = int(max(1, _auto_safe_float(max_variants, 8)))
-    min_peak_improve_base = float(max(0.0, _auto_safe_float(min_improvement_db, 0.75)))
-    if modal_priority >= 0.45:
-        min_peak_improve = float(max(0.35, min_peak_improve_base * (1.0 - 0.30 * modal_priority)))
-    elif modal_priority <= 0.10:
-        min_peak_improve = float(min_peak_improve_base + 0.10)
-    else:
-        min_peak_improve = float(min_peak_improve_base)
-    meta["min_peak_improvement_base_db"] = float(min_peak_improve_base)
-    meta["min_peak_improvement_effective_db"] = float(min_peak_improve)
 
     def _slope_variant(step_idx: int):
         current = _current_value("max_slope_cut_db_per_oct", 0.0)
@@ -180,6 +270,229 @@ def apply_residual_peak_winner_polish(
         )
     if modal_priority >= 0.45:
         variant_factories.append(lambda: _conf_pull_variant(-0.12))
+    return list(variant_factories)
+
+
+def _residual_peak_finalize_meta(meta: dict, cur_best_metrics: dict, _metric) -> dict:
+    meta["worst_peak_after_db"] = float(_metric(cur_best_metrics, "worst_residual_peak_raw_db", _metric(cur_best_metrics, "worst_residual_peak_db")))
+    meta["worst_peak_freq_hz"] = float(_metric(cur_best_metrics, "worst_residual_peak_hz"))
+    meta["worst_peak_width_hz"] = float(_metric(cur_best_metrics, "worst_residual_peak_width_hz"))
+    meta["worst_peak_width_oct"] = float(_metric(cur_best_metrics, "worst_residual_peak_width_oct"))
+    meta["top3_after_db"] = float(_metric(cur_best_metrics, "top3_residual_peak_mean_db"))
+    meta["rank_after"] = float(_metric(cur_best_metrics, "rank_score"))
+    meta["avg_after"] = float(_metric(cur_best_metrics, "avg_score"))
+    return dict(meta or {})
+
+
+def _apply_residual_peak_candidate_result(
+    *,
+    phase_label: str,
+    cur_best_preset: dict,
+    cur_best_metrics: dict,
+    cand_test: dict,
+    cand_metrics: dict,
+    variant_meta: dict,
+    meta: dict,
+    better: bool,
+    reason: str,
+    hard_gate_reasons: list[str],
+    cache_ready_preset,
+    status_cb,
+    _metric,
+) -> tuple[dict, dict, bool, dict]:
+    cur_peak = _metric(cur_best_metrics, "worst_residual_peak_raw_db")
+    if not np.isfinite(cur_peak):
+        cur_peak = _metric(cur_best_metrics, "worst_residual_peak_db")
+    cand_peak = _metric(cand_metrics, "worst_residual_peak_raw_db")
+    if not np.isfinite(cand_peak):
+        cand_peak = _metric(cand_metrics, "worst_residual_peak_db")
+    cur_rank = _metric(cur_best_metrics, "rank_score")
+    cand_rank = _metric(cand_metrics, "rank_score")
+    if not bool(better):
+        reject_reasons = dict(meta.get("reject_reasons", {}) or {})
+        reject_reasons[str(reason)] = int(reject_reasons.get(str(reason), 0) or 0) + 1
+        meta["reject_reasons"] = reject_reasons
+        meta["rejected_reason"] = str(reason)
+    meta["last_candidate_delta"] = _polish_metric_delta(cur_best_metrics, cand_metrics)
+    meta["last_candidate_hard_gate"] = {
+        "hard_gate_failed": bool(hard_gate_reasons),
+        "hard_gate_reasons": list(hard_gate_reasons),
+        "residual_peak_db": float(get_residual_peak_db(cand_metrics)),
+        "residual_peak_hard_gate_db": float(get_residual_peak_hard_gate_db(cand_metrics)),
+    }
+    logger.info(
+        "Automatic mode %s residual-peak candidate %d: %s, peak %.3f -> %.3f dB, rank %.3f -> %.3f, decision=%s (%s)",
+        str(phase_label),
+        int(meta["tested_count"]),
+        str(variant_meta),
+        float(cur_peak) if np.isfinite(cur_peak) else float("nan"),
+        float(cand_peak) if np.isfinite(cand_peak) else float("nan"),
+        float(cur_rank) if np.isfinite(cur_rank) else float("nan"),
+        float(cand_rank) if np.isfinite(cand_rank) else float("nan"),
+        "accept" if bool(better) else "reject",
+        str(reason),
+    )
+    if not bool(better):
+        return cur_best_preset, cur_best_metrics, False, meta
+
+    prev_best = dict(cur_best_metrics or {})
+    cur_best_metrics = dict(cand_metrics or {})
+    cur_best_preset = cache_ready_preset(cand_test, best_metrics=cur_best_metrics)
+    accepted = list(meta.get("accepted_variants", []) or [])
+    accepted_meta = dict(variant_meta or {})
+    accepted_meta["worst_peak_before_db"] = float(_metric(prev_best, "worst_residual_peak_raw_db", _metric(prev_best, "worst_residual_peak_db")))
+    accepted_meta["worst_peak_after_db"] = float(_metric(cur_best_metrics, "worst_residual_peak_raw_db", _metric(cur_best_metrics, "worst_residual_peak_db")))
+    accepted_meta["worst_peak_freq_hz"] = float(_metric(cur_best_metrics, "worst_residual_peak_hz"))
+    accepted_meta["worst_peak_width_hz"] = float(_metric(cur_best_metrics, "worst_residual_peak_width_hz"))
+    accepted_meta["worst_peak_width_oct"] = float(_metric(cur_best_metrics, "worst_residual_peak_width_oct"))
+    accepted_meta["rank_before"] = float(_metric(prev_best, "rank_score"))
+    accepted_meta["rank_after"] = float(_metric(cur_best_metrics, "rank_score"))
+    accepted_meta["reason"] = str(reason)
+    accepted.append(accepted_meta)
+    meta["accepted_variants"] = accepted
+    meta["accepted_reason"] = str(reason)
+    if callable(status_cb):
+        status_cb(
+            "DecayCore automatic mode: residual-peak polish improved "
+            f"(peak {_metric(prev_best, 'worst_residual_peak_raw_db', _metric(prev_best, 'worst_residual_peak_db')):.2f} -> "
+            f"{_metric(cur_best_metrics, 'worst_residual_peak_raw_db', _metric(cur_best_metrics, 'worst_residual_peak_db')):.2f} dB, "
+            f"rank {official_rank_score(cur_best_metrics):.3f})"
+    )
+    return cur_best_preset, cur_best_metrics, True, meta
+
+
+def _prepare_residual_peak_winner_polish_context(
+    *,
+    cur_best_metrics: dict,
+    cur_best_preset: dict,
+    best_metrics: dict | None,
+    base_data_ref: dict | None,
+    phase_label: str,
+    goal: str,
+    enabled: bool,
+    max_variants: int,
+    min_improvement_db: float,
+    _metric,
+) -> dict | None:
+    meta = _residual_peak_initial_meta(enabled=bool(enabled), phase_label=str(phase_label))
+    if not bool(enabled):
+        return {"meta": meta, "enabled": False}
+    if not isinstance(cur_best_metrics, dict) or not cur_best_metrics:
+        return {"meta": meta, "enabled": False}
+
+    threshold_db = _metric(cur_best_metrics, "residual_peak_threshold_db", 3.0)
+    if not np.isfinite(threshold_db):
+        threshold_db = 3.0
+    start_worst = _metric(cur_best_metrics, "worst_residual_peak_raw_db")
+    if not np.isfinite(start_worst):
+        start_worst = _metric(cur_best_metrics, "worst_residual_peak_db")
+    start_top3 = _metric(cur_best_metrics, "top3_residual_peak_mean_db")
+    meta["worst_peak_before_db"] = float(start_worst) if np.isfinite(start_worst) else float("nan")
+    meta["worst_peak_freq_hz"] = _metric(cur_best_metrics, "worst_residual_peak_hz")
+    meta["worst_peak_width_hz"] = _metric(cur_best_metrics, "worst_residual_peak_width_hz")
+    meta["worst_peak_width_oct"] = _metric(cur_best_metrics, "worst_residual_peak_width_oct")
+    modal_priority = float(np.clip(_metric(cur_best_metrics, "residual_peak_modal_priority", 0.0), 0.0, 1.0))
+    modal_support = float(np.clip(_metric(cur_best_metrics, "residual_peak_modal_support", 0.0), 0.0, 1.0))
+    meta["modal_support"] = float(modal_support)
+    meta["modal_priority"] = float(modal_priority)
+    meta["modal_max_severity"] = float(np.clip(_metric(cur_best_metrics, "residual_peak_modal_max_severity", 0.0), 0.0, 1.0))
+    meta["modal_confidence"] = float(np.clip(_metric(cur_best_metrics, "residual_peak_modal_confidence", 0.0), 0.0, 1.0))
+    dom_hz = dict(cur_best_metrics or {}).get("residual_peak_modal_dominant_freq_hz")
+    meta["modal_dominant_freq_hz"] = float(dom_hz) if dom_hz is not None and np.isfinite(_auto_safe_float(dom_hz, float("nan"))) else None
+    meta["threshold_db"] = float(threshold_db)
+    meta["top3_before_db"] = float(start_top3) if np.isfinite(start_top3) else float("nan")
+    meta["rank_before"] = _metric(cur_best_metrics, "rank_score")
+    meta["avg_before"] = _metric(cur_best_metrics, "avg_score")
+    if not np.isfinite(start_worst) or float(start_worst) <= float(threshold_db):
+        meta["worst_peak_after_db"] = meta["worst_peak_before_db"]
+        meta["top3_after_db"] = meta["top3_before_db"]
+        meta["rank_after"] = meta["rank_before"]
+        meta["avg_after"] = meta["avg_before"]
+        meta["rejected_reason"] = (
+            "no_peaks_above_threshold" if not np.isfinite(start_worst) else "worst_peak_below_threshold"
+        )
+        return {"meta": meta, "enabled": True, "short_circuit": True, "cur_best_preset": cur_best_preset, "cur_best_metrics": cur_best_metrics}
+
+    max_variants_eff = int(max(1, _auto_safe_float(max_variants, 8)))
+    min_peak_improve_base = float(max(0.0, _auto_safe_float(min_improvement_db, 0.75)))
+    if modal_priority >= 0.45:
+        min_peak_improve = float(max(0.35, min_peak_improve_base * (1.0 - 0.30 * modal_priority)))
+    elif modal_priority <= 0.10:
+        min_peak_improve = float(min_peak_improve_base + 0.10)
+    else:
+        min_peak_improve = float(min_peak_improve_base)
+    meta["min_peak_improvement_base_db"] = float(min_peak_improve_base)
+    meta["min_peak_improvement_effective_db"] = float(min_peak_improve)
+
+    variant_factories = _residual_peak_variant_factories(
+        cur_best_preset=cur_best_preset,
+        base_data_ref=base_data_ref,
+        modal_priority=float(modal_priority),
+    )
+    return {
+        "meta": meta,
+        "enabled": True,
+        "short_circuit": False,
+        "cur_best_preset": cur_best_preset,
+        "cur_best_metrics": cur_best_metrics,
+        "threshold_db": float(threshold_db),
+        "min_peak_improve": float(min_peak_improve),
+        "variant_factories": variant_factories,
+        "max_variants_eff": int(max_variants_eff),
+    }
+
+
+def _residual_peak_metric(src: dict | None, key: str, default: float = float("nan")) -> float:
+    return float(_auto_safe_float(dict(src or {}).get(key, default), default))
+
+
+def apply_residual_peak_winner_polish(
+    *,
+    best_preset: dict | None,
+    best_metrics: dict | None,
+    base_data_ref: dict | None,
+    phase_label: str,
+    goal: str,
+    enabled: bool,
+    max_variants: int,
+    min_improvement_db: float,
+    status_cb,
+    materialize_preset_result,
+    cache_ready_preset,
+    auto_is_better_refine=None,
+) -> tuple[dict, dict, bool, dict]:
+    cur_best_preset = dict(best_preset or {})
+    cur_best_metrics = dict(best_metrics or {})
+
+    state = _prepare_residual_peak_winner_polish_context(
+        cur_best_metrics=cur_best_metrics,
+        cur_best_preset=cur_best_preset,
+        best_metrics=best_metrics,
+        base_data_ref=base_data_ref,
+        phase_label=phase_label,
+        goal=goal,
+        enabled=enabled,
+        max_variants=max_variants,
+        min_improvement_db=min_improvement_db,
+        _metric=_residual_peak_metric,
+    )
+    meta = dict(state.get("meta", {}) or {}) if isinstance(state, dict) else {}
+    if not bool(state and state.get("enabled", False)):
+        return cur_best_preset, cur_best_metrics, False, meta
+    if bool(state.get("short_circuit", False)):
+        return (
+            dict(state.get("cur_best_preset", cur_best_preset)),
+            dict(state.get("cur_best_metrics", cur_best_metrics)),
+            False,
+            _residual_peak_finalize_meta(meta, dict(state.get("cur_best_metrics", cur_best_metrics)), _residual_peak_metric),
+        )
+
+    min_peak_improve = float(state.get("min_peak_improve", 0.75))
+    variant_factories = list(state.get("variant_factories", []) or [])
+    max_variants_eff = int(state.get("max_variants_eff", 1))
+    start_worst = _residual_peak_metric(cur_best_metrics, "worst_residual_peak_raw_db")
+    if not np.isfinite(start_worst):
+        start_worst = _residual_peak_metric(cur_best_metrics, "worst_residual_peak_db")
 
     improved = False
     tested_signatures: set[str] = set()
@@ -196,22 +509,7 @@ def apply_residual_peak_winner_polish(
             if made is None:
                 continue
             cand_test, variant_meta = made
-            try:
-                sig = json.dumps(cand_test, sort_keys=True, separators=(",", ":"), default=str)
-            except (
-
-                AttributeError,
-                TypeError,
-                ValueError,
-                KeyError,
-                IndexError,
-                RuntimeError,
-                OSError,
-                ImportError,
-                ModuleNotFoundError,
-                NameError,
-            ):
-                sig = str(sorted(dict(cand_test or {}).items()))
+            sig = _residual_peak_candidate_signature(cand_test)
             if sig in tested_signatures:
                 continue
             tested_signatures.add(str(sig))
@@ -250,173 +548,31 @@ def apply_residual_peak_winner_polish(
                 continue
 
             cand_metrics = dict(cand_metrics or {})
-            cur_rank = _metric(cur_best_metrics, "rank_score")
-            cand_rank = _metric(cand_metrics, "rank_score")
-            cur_avg = _metric(cur_best_metrics, "avg_score")
-            cand_avg = _metric(cand_metrics, "avg_score")
-            cur_boost = _metric(cur_best_metrics, "max_net_boost_db")
-            cand_boost = _metric(cand_metrics, "max_net_boost_db")
-            cur_peak = _metric(cur_best_metrics, "worst_residual_peak_raw_db")
-            cand_peak = _metric(cand_metrics, "worst_residual_peak_raw_db")
-            if not np.isfinite(cur_peak):
-                cur_peak = _metric(cur_best_metrics, "worst_residual_peak_db")
-            if not np.isfinite(cand_peak):
-                cand_peak = _metric(cand_metrics, "worst_residual_peak_db")
-            cur_tracking = max(
-                _metric(cur_best_metrics, "target_tracking_rms_20_200_db", 0.0),
-                _metric(cur_best_metrics, "target_tracking_rms_100_500_db", 0.0),
+            better, reason, failed_guards, hard_gate_reasons = _evaluate_residual_peak_guards(
+                cur_best_metrics,
+                cand_metrics,
+                min_peak_improve,
+                goal,
+                _metric,
             )
-            cand_tracking = max(
-                _metric(cand_metrics, "target_tracking_rms_20_200_db", 0.0),
-                _metric(cand_metrics, "target_tracking_rms_100_500_db", 0.0),
+            cur_best_preset, cur_best_metrics, accepted, meta = _apply_residual_peak_candidate_result(
+                phase_label=phase_label,
+                cur_best_preset=cur_best_preset,
+                cur_best_metrics=cur_best_metrics,
+                cand_test=cand_test,
+                cand_metrics=cand_metrics,
+                variant_meta=variant_meta,
+                meta=meta,
+                better=bool(better),
+                reason=str(reason),
+                hard_gate_reasons=list(hard_gate_reasons),
+                cache_ready_preset=cache_ready_preset,
+                status_cb=status_cb,
+                _metric=_residual_peak_metric,
             )
-            cur_under = _metric(cur_best_metrics, "bass_under_target_penalty", 0.0)
-            cand_under = _metric(cand_metrics, "bass_under_target_penalty", 0.0)
-            cur_sharp = _metric(cur_best_metrics, "correction_sharpness_penalty", 0.0)
-            cand_sharp = _metric(cand_metrics, "correction_sharpness_penalty", 0.0)
-            cur_dip = _metric(cur_best_metrics, "dip_fill_risk_penalty", 0.0)
-            cand_dip = _metric(cand_metrics, "dip_fill_risk_penalty", 0.0)
-            cur_overfit = _metric(cur_best_metrics, "channel_overfit_penalty", 0.0)
-            cand_overfit = _metric(cand_metrics, "channel_overfit_penalty", 0.0)
-
-            rank_delta = float(cand_rank - cur_rank) if np.isfinite(cand_rank) and np.isfinite(cur_rank) else float("nan")
-            peak_improve = float(cur_peak - cand_peak) if np.isfinite(cur_peak) and np.isfinite(cand_peak) else float("nan")
-            rank_clear = bool(np.isfinite(rank_delta) and float(rank_delta) >= 0.05)
-            peak_clear = bool(np.isfinite(peak_improve) and float(peak_improve) >= float(min_peak_improve))
-            rank_guard = bool((not np.isfinite(rank_delta)) or float(rank_delta) >= -0.15)
-            avg_guard = bool(
-                (not (np.isfinite(cur_avg) and np.isfinite(cand_avg)))
-                or float(cur_avg - cand_avg) <= 1.0
-            )
-            boost_guard = bool(
-                (not (np.isfinite(cur_boost) and np.isfinite(cand_boost)))
-                or float(cand_boost) <= float(cur_boost) + 1e-6
-            )
-            tracking_guard = bool(
-                (not (np.isfinite(cur_tracking) and np.isfinite(cand_tracking)))
-                or float(cand_tracking) <= float(cur_tracking) + 0.35
-            )
-            under_guard = bool(
-                (not (np.isfinite(cur_under) and np.isfinite(cand_under)))
-                or float(cand_under) <= float(cur_under) + 0.50
-            )
-            sharpness_guard = bool(
-                (not (np.isfinite(cur_sharp) and np.isfinite(cand_sharp)))
-                or float(cand_sharp) <= float(cur_sharp) + 0.35
-            )
-            dip_guard = bool(
-                (not (np.isfinite(cur_dip) and np.isfinite(cand_dip)))
-                or float(cand_dip) <= float(cur_dip) + 0.25
-            )
-            overfit_guard = bool(
-                (not (np.isfinite(cur_overfit) and np.isfinite(cand_overfit)))
-                or float(cand_overfit) <= float(cur_overfit) + 0.25
-            )
-            peak_guard = bool(
-                (not (np.isfinite(cur_peak) and np.isfinite(cand_peak)))
-                or float(cand_peak) <= float(cur_peak) + 0.10
-            )
-            hard_gate_reasons = _auto_hard_gate_reasons(cand_metrics, goal=goal)
-            better = bool(
-                (rank_clear or peak_clear)
-                and rank_guard
-                and avg_guard
-                and boost_guard
-                and tracking_guard
-                and under_guard
-                and sharpness_guard
-                and dip_guard
-                and overfit_guard
-                and peak_guard
-            )
-            if hard_gate_reasons:
-                better = False
-            failed_guards = []
-            if not rank_guard:
-                failed_guards.append("rank_drop")
-            if not avg_guard:
-                failed_guards.append("avg_drop")
-            if not boost_guard:
-                failed_guards.append("boost")
-            if not tracking_guard:
-                failed_guards.append("tracking")
-            if not under_guard:
-                failed_guards.append("bass_under")
-            if not sharpness_guard:
-                failed_guards.append("sharpness")
-            if not dip_guard:
-                failed_guards.append("dip_fill")
-            if not overfit_guard:
-                failed_guards.append("channel_overfit")
-            if not peak_guard:
-                failed_guards.append("peak_regression")
-            reason = (
-                "hard_gate:" + ",".join(hard_gate_reasons)
-                if hard_gate_reasons
-                else "rank_score"
-                if rank_clear
-                else "residual_peak"
-                if peak_clear
-                else "guards:" + ",".join(failed_guards or ["no_clear_improvement"])
-            )
-            if not bool(better):
-                reject_reasons = dict(meta.get("reject_reasons", {}) or {})
-                reject_reasons[str(reason)] = int(reject_reasons.get(str(reason), 0) or 0) + 1
-                meta["reject_reasons"] = reject_reasons
-                meta["rejected_reason"] = str(reason)
-            meta["last_candidate_delta"] = _polish_metric_delta(cur_best_metrics, cand_metrics)
-            meta["last_candidate_hard_gate"] = {
-                "hard_gate_failed": bool(hard_gate_reasons),
-                "hard_gate_reasons": list(hard_gate_reasons),
-                "residual_peak_db": float(get_residual_peak_db(cand_metrics)),
-                "residual_peak_hard_gate_db": float(get_residual_peak_hard_gate_db(cand_metrics)),
-            }
-            logger.info(
-                "Automatic mode %s residual-peak candidate %d: %s, peak %.3f -> %.3f dB, rank %.3f -> %.3f, decision=%s (%s)",
-                str(phase_label),
-                int(meta["tested_count"]),
-                str(variant_meta),
-                float(cur_peak) if np.isfinite(cur_peak) else float("nan"),
-                float(cand_peak) if np.isfinite(cand_peak) else float("nan"),
-                float(cur_rank) if np.isfinite(cur_rank) else float("nan"),
-                float(cand_rank) if np.isfinite(cand_rank) else float("nan"),
-                "accept" if bool(better) else "reject",
-                str(reason),
-            )
-            if not bool(better):
+            if not bool(accepted):
                 continue
-
-            prev_best = dict(cur_best_metrics or {})
-            cur_best_metrics = dict(cand_metrics or {})
-            cur_best_preset = cache_ready_preset(cand_test, best_metrics=cur_best_metrics)
             improved = True
-            accepted = list(meta.get("accepted_variants", []) or [])
-            accepted_meta = dict(variant_meta or {})
-            accepted_meta["worst_peak_before_db"] = float(_metric(prev_best, "worst_residual_peak_raw_db", _metric(prev_best, "worst_residual_peak_db")))
-            accepted_meta["worst_peak_after_db"] = float(_metric(cur_best_metrics, "worst_residual_peak_raw_db", _metric(cur_best_metrics, "worst_residual_peak_db")))
-            accepted_meta["worst_peak_freq_hz"] = float(_metric(cur_best_metrics, "worst_residual_peak_hz"))
-            accepted_meta["worst_peak_width_hz"] = float(_metric(cur_best_metrics, "worst_residual_peak_width_hz"))
-            accepted_meta["worst_peak_width_oct"] = float(_metric(cur_best_metrics, "worst_residual_peak_width_oct"))
-            accepted_meta["rank_before"] = float(_metric(prev_best, "rank_score"))
-            accepted_meta["rank_after"] = float(_metric(cur_best_metrics, "rank_score"))
-            accepted_meta["reason"] = str(reason)
-            accepted.append(accepted_meta)
-            meta["accepted_variants"] = accepted
-            meta["accepted_reason"] = str(reason)
-            if callable(status_cb):
-                status_cb(
-                    "DecayCore automatic mode: residual-peak polish improved "
-                    f"(peak {_metric(prev_best, 'worst_residual_peak_raw_db', _metric(prev_best, 'worst_residual_peak_db')):.2f} -> "
-                    f"{_metric(cur_best_metrics, 'worst_residual_peak_raw_db', _metric(cur_best_metrics, 'worst_residual_peak_db')):.2f} dB, "
-                    f"rank {official_rank_score(cur_best_metrics):.3f})"
-                )
 
     meta["applied"] = bool(improved)
-    meta["worst_peak_after_db"] = float(_metric(cur_best_metrics, "worst_residual_peak_raw_db", _metric(cur_best_metrics, "worst_residual_peak_db")))
-    meta["worst_peak_freq_hz"] = float(_metric(cur_best_metrics, "worst_residual_peak_hz"))
-    meta["worst_peak_width_hz"] = float(_metric(cur_best_metrics, "worst_residual_peak_width_hz"))
-    meta["worst_peak_width_oct"] = float(_metric(cur_best_metrics, "worst_residual_peak_width_oct"))
-    meta["top3_after_db"] = float(_metric(cur_best_metrics, "top3_residual_peak_mean_db"))
-    meta["rank_after"] = float(_metric(cur_best_metrics, "rank_score"))
-    meta["avg_after"] = float(_metric(cur_best_metrics, "avg_score"))
-    return cur_best_preset, cur_best_metrics, bool(improved), dict(meta or {})
+    return cur_best_preset, cur_best_metrics, bool(improved), _residual_peak_finalize_meta(meta, cur_best_metrics, _residual_peak_metric)

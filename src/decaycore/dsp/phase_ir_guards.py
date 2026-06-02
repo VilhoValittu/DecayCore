@@ -55,7 +55,34 @@ def _resolve_guard_split_index(x: np.ndarray, cfg, st) -> int:
     return int(_resolve_ir_energy_split(x, int(np.argmax(np.abs(x)))))
 
 
-def _pre_energy_guard(ir, cfg, st) -> tuple[np.ndarray, dict[str, Any]]:
+def _store_pre_energy_guard_info(st, info: dict[str, Any]) -> None:
+    try:
+        if isinstance(st, dict):
+            st["ir_pre_energy_guard_enabled"] = bool(info["enabled"])
+            st["ir_pre_energy_guard_triggered"] = bool(info["triggered"])
+            st["ir_pre_energy_guard_scale"] = float(info["scale"])
+            st["ir_pre_energy_guard_before_db"] = float(info["before_db"])
+            st["ir_pre_energy_guard_after_db"] = float(info["after_db"])
+            st["ir_pre_energy_guard_before_ratio"] = float(info["before_ratio"])
+            st["ir_pre_energy_guard_after_ratio"] = float(info["after_ratio"])
+            st["ir_pre_energy_guard_ratio_max"] = float(info["ratio_max"])
+            st["ir_pre_energy_guard_strength"] = float(info["strength"])
+            st["ir_pre_energy_guard_split_samples"] = int(info["split_samples"])
+            st["ir_pre_energy_guard_reason"] = str(info["reason"])
+    except (TypeError, ValueError):
+        pass
+
+
+def _pre_energy_guard_setup(cfg, ir, st) -> tuple[
+    np.ndarray,
+    float,
+    float,
+    int,
+    float,
+    float,
+    float,
+    dict[str, Any],
+]:
     x = np.asarray(ir, dtype=float)
     try:
         ratio_max = float(getattr(cfg, "pre_energy_ratio_max", 0.25) or 0.25)
@@ -101,47 +128,77 @@ def _pre_energy_guard(ir, cfg, st) -> tuple[np.ndarray, dict[str, Any]]:
         "triggered": False,
         "reason": "not_triggered",
     }
-
-    def _store_guard_info() -> None:
-        try:
-            if isinstance(st, dict):
-                st["ir_pre_energy_guard_enabled"] = bool(info["enabled"])
-                st["ir_pre_energy_guard_triggered"] = bool(info["triggered"])
-                st["ir_pre_energy_guard_scale"] = float(info["scale"])
-                st["ir_pre_energy_guard_before_db"] = float(info["before_db"])
-                st["ir_pre_energy_guard_after_db"] = float(info["after_db"])
-                st["ir_pre_energy_guard_before_ratio"] = float(info["before_ratio"])
-                st["ir_pre_energy_guard_after_ratio"] = float(info["after_ratio"])
-                st["ir_pre_energy_guard_ratio_max"] = float(info["ratio_max"])
-                st["ir_pre_energy_guard_strength"] = float(info["strength"])
-                st["ir_pre_energy_guard_split_samples"] = int(info["split_samples"])
-                st["ir_pre_energy_guard_reason"] = str(info["reason"])
-        except (TypeError, ValueError):
-            pass
-
-    if not info["enabled"]:
-        info["reason"] = "disabled"
-        _store_guard_info()
-        return x, info
     try:
         limit_db = float(getattr(cfg, "max_pre_ringing_db", -35.0) or -35.0)
     except (AttributeError, TypeError, ValueError):
         limit_db = -35.0
+    return x, float(ratio_max), float(strength), int(split_idx), float(min_pre_scale), float(taper_floor), float(taper_power), info, float(limit_db)
+
+
+def _pre_energy_guard_apply_trigger(
+    x: np.ndarray,
+    *,
+    split: int,
+    strength: float,
+    min_pre_scale: float,
+    taper_floor: float,
+    taper_power: float,
+    ratio_target: float,
+    info: dict[str, Any],
+) -> tuple[np.ndarray, float, float]:
+    y = x.copy()
+    full_scale = float(np.clip(np.sqrt(ratio_target / max(float(_pre_post_energy_ratio(x, split=split, eps=1e-20)), 1e-30)), min_pre_scale, 1.0))
+    y_full = x.copy()
+    y_full[:split] *= full_scale
+    if split > 1:
+        progress = np.linspace(0.0, 1.0, split, endpoint=True, dtype=float)
+        taper = (0.5 + 0.5 * np.cos(np.pi * progress)).astype(float)
+        taper = np.clip(taper, taper_floor, 1.0)
+        taper = taper**taper_power
+        y_full[:split] *= taper
+    y[:split] = (1.0 - strength) * y[:split] + strength * y_full[:split]
+    ratio_after = float(_pre_post_energy_ratio(y, split=split, eps=1e-20))
+    if np.isfinite(ratio_after) and ratio_after > ratio_target:
+        extra = float(np.clip(np.sqrt(ratio_target / max(ratio_after, 1e-30)), min_pre_scale, 1.0))
+        y[:split] *= extra
+        ratio_after = float(_pre_post_energy_ratio(y, split=split, eps=1e-20))
+        info["scale"] = float(extra)
+    in_pre_rms = float(np.sqrt(np.mean(x[:split] * x[:split])))
+    out_pre_rms = float(np.sqrt(np.mean(y[:split] * y[:split])))
+    if in_pre_rms > 1e-20:
+        info["scale"] = float(out_pre_rms / in_pre_rms)
+    if np.all(np.abs(y[:split]) < 1e-15):
+        y[:split] = (1.0 - min_pre_scale) * y[:split] + min_pre_scale * x[:split]
+        ratio_after = float(_pre_post_energy_ratio(y, split=split, eps=1e-20))
+    return y, float(ratio_after), float(full_scale)
+
+
+def _pre_energy_guard(ir, cfg, st) -> tuple[np.ndarray, dict[str, Any]]:
+    x, ratio_max, strength, split_idx, min_pre_scale, taper_floor, taper_power, info, limit_db = _pre_energy_guard_setup(
+        cfg,
+        ir,
+        st,
+    )
+
+    if not info["enabled"]:
+        info["reason"] = "disabled"
+        _store_pre_energy_guard_info(st, info)
+        return x, info
     if not np.isfinite(limit_db):
         info["reason"] = "bad_limit_db"
-        _store_guard_info()
+        _store_pre_energy_guard_info(st, info)
         return x, info
     limit_db = float(min(limit_db, 0.0))
     split = int(split_idx)
     if split <= 0 or split >= int(x.size):
         info["reason"] = "split<=0"
-        _store_guard_info()
+        _store_pre_energy_guard_info(st, info)
         return x, info
     ratio_now = float(_pre_post_energy_ratio(x, split=split, eps=1e-20))
     before_db = float(_pre_ringing_db(x, split=split))
     if (not np.isfinite(ratio_now)) or (not np.isfinite(before_db)):
         info["reason"] = "missing_data"
-        _store_guard_info()
+        _store_pre_energy_guard_info(st, info)
         return x, info
     info["before_db"] = before_db
     info["before_ratio"] = float(ratio_now)
@@ -154,31 +211,16 @@ def _pre_energy_guard(ir, cfg, st) -> tuple[np.ndarray, dict[str, Any]]:
     info["ratio_max"] = float(ratio_target)
     trigger = bool(ratio_now > ratio_target)
     if trigger:
-        full_scale = float(np.clip(np.sqrt(ratio_target / max(ratio_now, 1e-30)), min_pre_scale, 1.0))
-        y = x.copy()
-        y_full = x.copy()
-        y_full[:split] *= full_scale
-        if split > 1:
-            progress = np.linspace(0.0, 1.0, split, endpoint=True, dtype=float)
-            taper = (0.5 + 0.5 * np.cos(np.pi * progress)).astype(float)
-            taper = np.clip(taper, taper_floor, 1.0)
-            taper = taper**taper_power
-            y_full[:split] *= taper
-        y[:split] = (1.0 - strength) * y[:split] + strength * y_full[:split]
-        ratio_after = float(_pre_post_energy_ratio(y, split=split, eps=1e-20))
-        if np.isfinite(ratio_after) and ratio_after > ratio_target:
-            extra = float(np.clip(np.sqrt(ratio_target / max(ratio_after, 1e-30)), min_pre_scale, 1.0))
-            y[:split] *= extra
-            ratio_after = float(_pre_post_energy_ratio(y, split=split, eps=1e-20))
-            info["scale"] = float(extra)
-        in_pre_rms = float(np.sqrt(np.mean(x[:split] * x[:split])))
-        out_pre_rms = float(np.sqrt(np.mean(y[:split] * y[:split])))
-        if in_pre_rms > 1e-20:
-            info["scale"] = float(out_pre_rms / in_pre_rms)
-        # Guard should not hard-zero pre segment unless input was already zero there.
-        if np.all(np.abs(y[:split]) < 1e-15):
-            y[:split] = (1.0 - min_pre_scale) * y[:split] + min_pre_scale * x[:split]
-            ratio_after = float(_pre_post_energy_ratio(y, split=split, eps=1e-20))
+        y, ratio_after, full_scale = _pre_energy_guard_apply_trigger(
+            x,
+            split=split,
+            strength=strength,
+            min_pre_scale=min_pre_scale,
+            taper_floor=taper_floor,
+            taper_power=taper_power,
+            ratio_target=ratio_target,
+            info=info,
+        )
         info["triggered"] = True
         info["after_ratio"] = float(ratio_after)
         info["after_db"] = float(_pre_ringing_db(y, split=split))
@@ -186,11 +228,11 @@ def _pre_energy_guard(ir, cfg, st) -> tuple[np.ndarray, dict[str, Any]]:
             info["reason"] = "applied_floor_limited"
         else:
             info["reason"] = "applied"
-        _store_guard_info()
+        _store_pre_energy_guard_info(st, info)
         return y, info
     info["after_db"] = float(before_db)
     info["reason"] = "within_limit"
-    _store_guard_info()
+    _store_pre_energy_guard_info(st, info)
     return x, info
 
 

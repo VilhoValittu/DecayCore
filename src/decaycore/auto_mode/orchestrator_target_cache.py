@@ -224,6 +224,306 @@ def _cached_target_matches_current_hc(base_data: dict, cached_hc: str | None) ->
     return bool(cached_name and str(cached_name) == str(current_hc))
 
 
+def _cached_target_optuna_summary_name(summary) -> str:
+    try:
+        return str(getattr(summary, "study_name", "") or "").strip()
+    except _RECOVERABLE_CACHE_EXCEPTIONS:
+        return ""
+
+
+def _cached_target_optuna_summary_attrs(
+    *,
+    summary,
+    study_name: str,
+    storage,
+    load_study,
+) -> tuple[dict, object | None]:
+    study = None
+    attrs = dict(getattr(summary, "user_attrs", {}) or {})
+    if not attrs and study_name:
+        try:
+            study = load_study(study_name=str(study_name), storage=storage)
+            attrs = dict(getattr(study, "user_attrs", {}) or {})
+        except _RECOVERABLE_CACHE_EXCEPTIONS:
+            attrs = {}
+    return attrs, study
+
+
+def _cached_target_optuna_summary_score(summary, study) -> float:
+    try:
+        trial_obj = getattr(summary, "best_trial", None)
+        if trial_obj is None and study is not None:
+            trial_obj = getattr(study, "best_trial", None)
+        return float(getattr(trial_obj, "value", float("nan")))
+    except _RECOVERABLE_CACHE_EXCEPTIONS:
+        return float("nan")
+
+
+def _cached_target_optuna_summary_candidate(
+    *,
+    setup: _TargetSelectionSetup,
+    summary,
+    storage,
+    load_study,
+    target_study_sig: str,
+) -> tuple[str | None, str | None, float] | None:
+    study_name = _cached_target_optuna_summary_name(summary)
+    attrs, study = _cached_target_optuna_summary_attrs(
+        summary=summary,
+        study_name=study_name,
+        storage=storage,
+        load_study=load_study,
+    )
+    if attrs.get("decaycore_kind") != "target_search":
+        return None
+    if str(attrs.get("decaycore_target_study_sig", "") or "") != target_study_sig:
+        return None
+    if (
+        str(attrs.get("decaycore_filter_key", "") or "").strip().lower()
+        != str(setup.filter_key or "").strip().lower()
+    ):
+        return None
+    hc_name = _auto_builtin_target_name(attrs.get("decaycore_target_name", ""))
+    if not _cache_target_valid(setup.runtime, hc_name):
+        return None
+    score_value = _cached_target_optuna_summary_score(summary=summary, study=study)
+    if not np.isfinite(score_value):
+        return None
+    return str(hc_name), str(study_name), float(score_value)
+
+
+def _cached_target_optuna_best_match(
+    *,
+    setup: _TargetSelectionSetup,
+    base_data: dict,
+    storage,
+    get_summaries,
+    load_study,
+    target_study_sig: str,
+) -> tuple[str | None, str | None, float]:
+    best_hc = None
+    best_study_name = None
+    best_value = float("-inf")
+    try:
+        summaries = list(get_summaries(storage=storage) or [])
+    except _RECOVERABLE_CACHE_EXCEPTIONS:
+        summaries = []
+    for summary in summaries:
+        candidate = _cached_target_optuna_summary_candidate(
+            setup=setup,
+            summary=summary,
+            storage=storage,
+            load_study=load_study,
+            target_study_sig=target_study_sig,
+        )
+        if not candidate:
+            continue
+        hc_name, study_name, score_value = candidate
+        if float(score_value) < float(best_value):
+            continue
+        best_hc = str(hc_name)
+        best_study_name = str(study_name)
+        best_value = float(score_value)
+    return best_hc, best_study_name, float(best_value)
+
+
+def _cached_target_optuna_best_preset(
+    *,
+    load_study,
+    storage,
+    study_name: str,
+    runtime,
+) -> dict:
+    best_preset = {}
+    try:
+        study = load_study(study_name=str(study_name), storage=storage)
+        best_trial = getattr(study, "best_trial", None)
+        best_preset = runtime.auto_optuna_trial_payload_preset(
+            dict(getattr(best_trial, "user_attrs", {}) or {})
+        )
+        if not isinstance(best_preset, dict) or not best_preset:
+            best_preset = dict(getattr(best_trial, "params", {}) or {})
+    except _RECOVERABLE_CACHE_EXCEPTIONS:
+        best_preset = {}
+    return dict(best_preset or {})
+
+
+def _resolve_cached_target_state_from_measurement_global_cache(
+    *,
+    setup: _TargetSelectionSetup,
+    measurements: dict,
+):
+    cached_target_entry = None
+    try:
+        cached_target_entry = setup.runtime.auto_cache_get_target_for_measurements_global(
+            measurements,
+            goal=setup.goal,
+            compat_version=setup.compat_version,
+        )
+    except _RECOVERABLE_CACHE_EXCEPTIONS:
+        cached_target_entry = None
+    if isinstance(cached_target_entry, dict):
+        fk = str(setup.filter_key or "").strip()
+        seed_map = cached_target_entry.get("filter_seed_presets", {})
+        metric_map = cached_target_entry.get("filter_seed_metrics", {})
+        if isinstance(seed_map, dict):
+            cached_preset = dict(seed_map.get(fk, {}) or {})
+        else:
+            cached_preset = {}
+        cached_metrics = dict(metric_map.get(fk, {}) or {}) if isinstance(metric_map, dict) else {}
+        if cached_preset:
+            return cached_target_entry, "cache_measurement_global_filter_seed", "measurement global filter seed", cached_preset, cached_metrics
+    return None, "cache_measurement_global", "measurement global", {}, {}
+
+
+def _resolve_cached_target_state_from_measurement_local_cache(
+    *,
+    setup: _TargetSelectionSetup,
+    measurements: dict,
+):
+    cached_target_entry = None
+    try:
+        cached_target_entry = setup.runtime.auto_cache_get_target_for_measurements(
+            measurements,
+            goal=setup.goal,
+            filter_key=setup.filter_key,
+            compat_version=setup.compat_version,
+        )
+    except _RECOVERABLE_CACHE_EXCEPTIONS:
+        cached_target_entry = None
+    if isinstance(cached_target_entry, dict):
+        return (
+            cached_target_entry,
+            "cache_measurement",
+            "measurement",
+            _cached_target_seed_preset(cached_target_entry),
+            dict(cached_target_entry.get("best_metrics", {}) or {}),
+        )
+    return None, "cache_measurement", "measurement", {}, {}
+
+
+def _resolve_cached_target_state_from_measurement_cache(
+    *,
+    setup: _TargetSelectionSetup,
+    base_data: dict,
+    measurements: dict,
+    status_cb,
+    state: _TargetCacheState,
+) -> tuple[_TargetCacheState, dict | None]:
+    cached_target_entry, cached_source, cached_status, cached_preset, cached_metrics = (
+        _resolve_cached_target_state_from_measurement_global_cache(
+            setup=setup,
+            measurements=measurements,
+        )
+    )
+    if not isinstance(cached_target_entry, dict):
+        cached_target_entry, cached_source, cached_status, cached_preset, cached_metrics = (
+            _resolve_cached_target_state_from_measurement_local_cache(
+                setup=setup,
+                measurements=measurements,
+            )
+        )
+    if isinstance(cached_target_entry, dict):
+        cached_hc_measurement = str(
+            cached_target_entry.get(
+                "best_target_curve",
+                cached_target_entry.get("best_hc_mode", ""),
+            )
+            or ""
+        ).strip()
+        if _cached_target_matches_current_hc(base_data, cached_hc_measurement):
+            _set_cached_target_state(
+                state,
+                runtime=setup.runtime,
+                cached_hc=cached_hc_measurement,
+                cached_preset=dict(cached_preset or {}),
+                cached_metrics=dict(cached_metrics or {}),
+                source=str(cached_source),
+                status_label=str(cached_status),
+                status_cb=status_cb,
+            )
+        else:
+            logger.info(
+                "Automatic mode target select: measurement cache target=%s skipped; current target=%s",
+                str(cached_hc_measurement or "n/a"),
+                str(base_data.get("hc_mode", "n/a") or "n/a"),
+            )
+    return state, cached_target_entry
+
+
+def _resolve_cached_target_state_from_signature_cache(
+    *,
+    setup: _TargetSelectionSetup,
+    base_data: dict,
+    measurements: dict,
+    fs_v: int,
+    taps_v: int,
+    xos: list,
+    hpf: dict | None,
+    status_cb,
+    state: _TargetCacheState,
+) -> _TargetCacheState:
+    if not bool(AUTO_MODE_CACHE_ENABLED):
+        return state
+    try:
+        sig_target = _auto_signature(
+            base_data=base_data,
+            measurements=measurements,
+            fs_v=int(fs_v),
+            taps_v=int(taps_v),
+            xos=xos,
+            hpf=hpf,
+            hc_mode=None,
+            include_hc_mode=False,
+        )
+        cached_entry = setup.runtime.auto_cache_get_entry(
+            sig_target,
+            filter_key=setup.filter_key,
+            compat_version=setup.compat_version,
+        )
+        cached_entry = dict(cached_entry or {}) if isinstance(cached_entry, dict) else {}
+        cached_hc = _auto_builtin_target_name(
+            str(
+                cached_entry.get(
+                    "best_target_curve",
+                    cached_entry.get("best_hc_mode", ""),
+                )
+                or ""
+            ).strip()
+        )
+        cached_preset = _cached_target_seed_preset(cached_entry)
+        if (
+            _cache_target_valid(setup.runtime, cached_hc)
+            and _cached_target_matches_current_hc(base_data, cached_hc)
+            and (
+                bool(cached_preset)
+                or not _cached_target_has_exact_preset(
+                    runtime=setup.runtime,
+                    cache_state=state,
+                )
+            )
+        ):
+            _set_cached_target_state(
+                state,
+                runtime=setup.runtime,
+                cached_hc=cached_hc,
+                cached_preset=dict(cached_preset or {}),
+                cached_metrics=dict(cached_entry.get("best_metrics", {}) or {}),
+                source="cache_signature",
+                status_label="signature",
+                status_cb=status_cb,
+            )
+        elif _cache_target_valid(setup.runtime, cached_hc):
+            logger.info(
+                "Automatic mode target select: signature cache target=%s skipped; current target=%s",
+                str(cached_hc or "n/a"),
+                str(base_data.get("hc_mode", "n/a") or "n/a"),
+            )
+    except _RECOVERABLE_CACHE_EXCEPTIONS:
+        logger.exception("cache signature target state set")
+    return state
+
+
 def _auto_target_mode_locks_hc(base_data: dict | None) -> bool:
     target_mode = str(dict(base_data or {}).get("auto_target_mode", "auto") or "auto").strip().lower()
     return bool(target_mode in ("selected", "manual", "fixed", "user"))
@@ -263,52 +563,14 @@ def _cached_target_state_from_optuna_study(
     target_study_sig = str(setup.target_study_sig or "").strip()
     if not target_study_sig:
         return None
-
-    best_hc = None
-    best_study_name = None
-    best_value = float("-inf")
-    try:
-        summaries = list(get_summaries(storage=storage) or [])
-    except _RECOVERABLE_CACHE_EXCEPTIONS:
-        summaries = []
-    for summary in summaries:
-        study = None
-        study_name = ""
-        try:
-            study_name = str(getattr(summary, "study_name", "") or "").strip()
-        except _RECOVERABLE_CACHE_EXCEPTIONS:
-            study_name = ""
-        attrs = dict(getattr(summary, "user_attrs", {}) or {})
-        if not attrs and study_name:
-            try:
-                study = load_study(study_name=str(study_name), storage=storage)
-                attrs = dict(getattr(study, "user_attrs", {}) or {})
-            except _RECOVERABLE_CACHE_EXCEPTIONS:
-                attrs = {}
-        if attrs.get("decaycore_kind") != "target_search":
-            continue
-        if str(attrs.get("decaycore_target_study_sig", "") or "") != target_study_sig:
-            continue
-        if (
-            str(attrs.get("decaycore_filter_key", "") or "").strip().lower()
-            != str(setup.filter_key or "").strip().lower()
-        ):
-            continue
-        hc_name = _auto_builtin_target_name(attrs.get("decaycore_target_name", ""))
-        if not _cache_target_valid(setup.runtime, hc_name):
-            continue
-        try:
-            trial_obj = getattr(summary, "best_trial", None)
-            if trial_obj is None and study is not None:
-                trial_obj = getattr(study, "best_trial", None)
-            score_value = float(getattr(trial_obj, "value", float("nan")))
-        except _RECOVERABLE_CACHE_EXCEPTIONS:
-            score_value = float("nan")
-        if not np.isfinite(score_value) or float(score_value) < float(best_value):
-            continue
-        best_hc = str(hc_name)
-        best_study_name = str(study_name)
-        best_value = float(score_value)
+    best_hc, best_study_name, best_value = _cached_target_optuna_best_match(
+        setup=setup,
+        base_data=base_data,
+        storage=storage,
+        get_summaries=get_summaries,
+        load_study=load_study,
+        target_study_sig=target_study_sig,
+    )
 
     if not best_hc or not best_study_name:
         return None
@@ -320,17 +582,12 @@ def _cached_target_state_from_optuna_study(
         )
         return None
 
-    best_preset = {}
-    try:
-        study = load_study(study_name=str(best_study_name), storage=storage)
-        best_trial = getattr(study, "best_trial", None)
-        best_preset = setup.runtime.auto_optuna_trial_payload_preset(
-            dict(getattr(best_trial, "user_attrs", {}) or {})
-        )
-        if not isinstance(best_preset, dict) or not best_preset:
-            best_preset = dict(getattr(best_trial, "params", {}) or {})
-    except _RECOVERABLE_CACHE_EXCEPTIONS:
-        best_preset = {}
+    best_preset = _cached_target_optuna_best_preset(
+        load_study=load_study,
+        storage=storage,
+        study_name=best_study_name,
+        runtime=setup.runtime,
+    )
 
     state = _TargetCacheState()
     if not _set_cached_target_state(
@@ -365,131 +622,24 @@ def _resolve_cached_target_state(
     status_cb,
 ) -> _TargetCacheState:
     state = _TargetCacheState()
-    cached_target_entry = None
-    try:
-        cached_target_entry = setup.runtime.auto_cache_get_target_for_measurements_global(
-            measurements,
-            goal=setup.goal,
-            compat_version=setup.compat_version,
-        )
-    except _RECOVERABLE_CACHE_EXCEPTIONS:
-        cached_target_entry = None
-    cached_source = "cache_measurement_global"
-    cached_status = "measurement global"
-    cached_preset = {}
-    cached_metrics = {}
-    if isinstance(cached_target_entry, dict):
-        fk = str(setup.filter_key or "").strip()
-        seed_map = cached_target_entry.get("filter_seed_presets", {})
-        metric_map = cached_target_entry.get("filter_seed_metrics", {})
-        if isinstance(seed_map, dict):
-            cached_preset = dict(seed_map.get(fk, {}) or {})
-        if isinstance(metric_map, dict):
-            cached_metrics = dict(metric_map.get(fk, {}) or {})
-        if cached_preset:
-            cached_source = "cache_measurement_global_filter_seed"
-            cached_status = "measurement global filter seed"
-        else:
-            cached_target_entry = None
-            cached_preset = {}
-            cached_metrics = {}
-    if not isinstance(cached_target_entry, dict):
-        try:
-            cached_target_entry = setup.runtime.auto_cache_get_target_for_measurements(
-                measurements,
-                goal=setup.goal,
-                filter_key=setup.filter_key,
-                compat_version=setup.compat_version,
-            )
-        except _RECOVERABLE_CACHE_EXCEPTIONS:
-            cached_target_entry = None
-        cached_source = "cache_measurement"
-        cached_status = "measurement"
-        if isinstance(cached_target_entry, dict):
-            cached_preset = _cached_target_seed_preset(cached_target_entry)
-            cached_metrics = dict(cached_target_entry.get("best_metrics", {}) or {})
-    if isinstance(cached_target_entry, dict):
-        cached_hc_measurement = str(
-            cached_target_entry.get(
-                "best_target_curve",
-                cached_target_entry.get("best_hc_mode", ""),
-            )
-            or ""
-        ).strip()
-        if _cached_target_matches_current_hc(base_data, cached_hc_measurement):
-            _set_cached_target_state(
-                state,
-                runtime=setup.runtime,
-                cached_hc=cached_hc_measurement,
-                cached_preset=dict(cached_preset or {}),
-                cached_metrics=dict(cached_metrics or {}),
-                source=str(cached_source),
-                status_label=str(cached_status),
-                status_cb=status_cb,
-            )
-        else:
-            logger.info(
-                "Automatic mode target select: measurement cache target=%s skipped; current target=%s",
-                str(cached_hc_measurement or "n/a"),
-                str(base_data.get("hc_mode", "n/a") or "n/a"),
-            )
-    if bool(AUTO_MODE_CACHE_ENABLED):
-        try:
-            sig_target = _auto_signature(
-                base_data=base_data,
-                measurements=measurements,
-                fs_v=int(fs_v),
-                taps_v=int(taps_v),
-                xos=xos,
-                hpf=hpf,
-                hc_mode=None,
-                include_hc_mode=False,
-            )
-            cached_entry = setup.runtime.auto_cache_get_entry(
-                sig_target,
-                filter_key=setup.filter_key,
-                compat_version=setup.compat_version,
-            )
-            cached_entry = dict(cached_entry or {}) if isinstance(cached_entry, dict) else {}
-            cached_hc = _auto_builtin_target_name(
-                str(
-                    cached_entry.get(
-                        "best_target_curve",
-                        cached_entry.get("best_hc_mode", ""),
-                    )
-                    or ""
-                ).strip()
-            )
-            cached_preset = _cached_target_seed_preset(cached_entry)
-            if (
-                _cache_target_valid(setup.runtime, cached_hc)
-                and _cached_target_matches_current_hc(base_data, cached_hc)
-                and (
-                    bool(cached_preset)
-                    or not _cached_target_has_exact_preset(
-                        runtime=setup.runtime,
-                        cache_state=state,
-                    )
-                )
-            ):
-                _set_cached_target_state(
-                    state,
-                    runtime=setup.runtime,
-                    cached_hc=cached_hc,
-                    cached_preset=dict(cached_preset or {}),
-                    cached_metrics=dict(cached_entry.get("best_metrics", {}) or {}),
-                    source="cache_signature",
-                    status_label="signature",
-                    status_cb=status_cb,
-                )
-            elif _cache_target_valid(setup.runtime, cached_hc):
-                logger.info(
-                    "Automatic mode target select: signature cache target=%s skipped; current target=%s",
-                    str(cached_hc or "n/a"),
-                    str(base_data.get("hc_mode", "n/a") or "n/a"),
-                )
-        except _RECOVERABLE_CACHE_EXCEPTIONS:
-            logger.exception("cache signature target state set")
+    state, cached_target_entry = _resolve_cached_target_state_from_measurement_cache(
+        setup=setup,
+        base_data=base_data,
+        measurements=measurements,
+        status_cb=status_cb,
+        state=state,
+    )
+    state = _resolve_cached_target_state_from_signature_cache(
+        setup=setup,
+        base_data=base_data,
+        measurements=measurements,
+        fs_v=fs_v,
+        taps_v=taps_v,
+        xos=xos,
+        hpf=hpf,
+        status_cb=status_cb,
+        state=state,
+    )
     if not _cached_target_has_exact_preset(runtime=setup.runtime, cache_state=state):
         optuna_state = _cached_target_state_from_optuna_study(
             setup=setup,

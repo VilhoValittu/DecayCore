@@ -166,6 +166,232 @@ def _sync_auto_hpf_runtime_fields(
     out["hpf_slope"] = int(max(6, int(order) * 6))
     return out
 
+def _build_materialize_bass_integration_metrics(
+    final_data: dict,
+    final_measurements: dict,
+    ctx: AutoModeMaterializeContext,
+    result: Any,
+) -> dict | None:
+    if not bool(final_measurements.get("bass_integration_enabled", False)):
+        return None
+    bundle = final_measurements.get("bass_integration_bundle", None)
+    if bundle is None:
+        return None
+    fc_hz = _auto_safe_float(
+        final_data.get("avr_crossover_hz", final_measurements.get("avr_crossover_hz", 80.0)),
+        80.0,
+    )
+    profile = _auto_bass_integration_profile_norm(
+        final_data.get(
+            "bass_integration_profile",
+            final_measurements.get("bass_integration_profile", "safe"),
+        )
+    )
+    bi_mode = "direct_dac"
+    try:
+        xo_order = max(1, int(round(float(final_data.get("sub_crossover_slope", 24) or 24.0))) // 6)
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        xo_order = 4
+    try:
+        sub_hpf_hz = float(final_data.get("sub_hpf_freq", 20.0) or 20.0)
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        sub_hpf_hz = 20.0
+    try:
+        sub_hpf_order = max(1, int(round(float(final_data.get("sub_hpf_slope", 12) or 12.0))) // 6)
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        sub_hpf_order = 2
+    sub_allpass_freq_hz = None
+    sub_allpass_q = None
+    if bi_mode == "direct_dac" and bool(final_data.get("bass_integration_allpass_auto_applied", False)):
+        sub_allpass_freq_hz = _auto_safe_float(
+            final_data.get("bass_integration_allpass_freq_hz", 0.0),
+            0.0,
+        )
+        sub_allpass_q = _auto_safe_float(
+            final_data.get("bass_integration_allpass_q", 0.707),
+            0.707,
+        )
+    try:
+        _m_slpf: float | None = float(final_data.get("direct_dac_sub_lpf_hz") or fc_hz)
+        if not (_m_slpf and _m_slpf >= fc_hz):
+            _m_slpf = None
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        _m_slpf = None
+    return compute_bass_integration_metric_payload(
+        bundle,
+        fc_hz,
+        profile,
+        mode=bi_mode,
+        main_hpf_order=int(xo_order),
+        sub_lpf_order=int(xo_order),
+        sub_hpf_hz=float(sub_hpf_hz),
+        sub_hpf_order=int(sub_hpf_order),
+        sub_combine_mode=str(final_data.get("bass_integration_sub_combine_mode", "average") or "average"),
+        sub_delay_ms=_auto_safe_float(final_data.get("bass_integration_sub_delay_ms", 0.0), 0.0),
+        sub_polarity_invert=bool(final_data.get("bass_integration_sub_polarity_invert", False)),
+        sub_gain_trim_db=_auto_safe_float(final_data.get("bass_integration_sub_gain_trim_db", 0.0), 0.0),
+        sub_lpf_hz=_m_slpf,
+        sub_allpass_freq_hz=sub_allpass_freq_hz,
+        sub_allpass_q=sub_allpass_q,
+        guard_lo_ratio=_auto_safe_float(
+            final_data.get("bass_integration_guard_lo_ratio", AUTO_MODE_BASS_INTEGRATION_GUARD_LO_RATIO),
+            AUTO_MODE_BASS_INTEGRATION_GUARD_LO_RATIO,
+        ),
+        guard_hi_ratio=_auto_safe_float(
+            final_data.get("bass_integration_guard_hi_ratio", AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO),
+            AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO,
+        ),
+    )
+
+def _collect_residual_shortlist(
+    best_preset: dict,
+    best_metrics: dict,
+    candidate_items: list[dict] | None,
+    base_data_ref: dict,
+    ctx: AutoModeMaterializeContext,
+    _cache_ready_preset,
+    _preset_signature_ignoring_residual,
+) -> list[dict]:
+    top_k = int(max(1, _auto_safe_int(ctx.residual_top_k, 3)))
+    rank_eps = float(max(0.0, _auto_safe_float(ctx.residual_rank_eps, 0.35)))
+    best_rank = _auto_safe_float(best_metrics.get("rank_score"), float("nan"))
+    seen: set[str] = set()
+    shortlist: list[dict] = []
+
+    def _maybe_add_candidate(preset: dict | None, metrics: dict | None, *, source: str) -> None:
+        if len(shortlist) >= int(top_k):
+            return
+        cand_preset = _cache_ready_preset(
+            dict(preset or {}),
+            best_metrics=dict(metrics or {}),
+        )
+        if bool(cand_preset.get("enable_residual_pass", False)):
+            return
+        sig = _preset_signature_ignoring_residual(cand_preset)
+        if sig in seen:
+            return
+        rank_v = _auto_safe_float(dict(metrics or {}).get("rank_score"), float("nan"))
+        if np.isfinite(best_rank) and np.isfinite(rank_v):
+            if float(best_rank - rank_v) > float(rank_eps):
+                return
+        seen.add(sig)
+        shortlist.append(
+            {
+                "preset": dict(cand_preset or {}),
+                "metrics": dict(metrics or {}),
+                "source": str(source),
+            }
+        )
+
+    _maybe_add_candidate(best_preset, best_metrics, source="current_best")
+    ranked_items = sorted(
+        [dict(it or {}) for it in list(candidate_items or []) if isinstance(it, dict)],
+        key=lambda it: ctx.auto_rank_key_fn(dict(it.get("metrics", {}) or {})),
+    )
+    for item in ranked_items:
+        _maybe_add_candidate(
+            dict(item.get("preset", {}) or {}),
+            dict(item.get("metrics", {}) or {}),
+            source=str(item.get("phase", item.get("source", "candidate")) or "candidate"),
+        )
+    return shortlist
+
+def _evaluate_residual_finalist_items(
+    shortlist: list[dict],
+    best_preset: dict,
+    best_metrics: dict,
+    base_data_ref: dict,
+    goal: str,
+    status_cb,
+    ctx: AutoModeMaterializeContext,
+    _materialize_preset_result,
+    _cache_ready_preset,
+) -> tuple[dict, dict, bool]:
+    improved = False
+    cur_best_preset = dict(best_preset or {})
+    cur_best_metrics = dict(best_metrics or {})
+    logger.info(
+        "Automatic mode residual tie-break: testing %d finalist preset(s) within rank window.",
+        int(len(shortlist)),
+    )
+    for idx, item in enumerate(shortlist, start=1):
+        cand_base = dict(item.get("preset", {}) or {})
+        cand_test = dict(cand_base or {})
+        cand_test["enable_residual_pass"] = True
+        try:
+            _residual_result, residual_metrics, _residual_data = _materialize_preset_result(
+                cand_test,
+                include_response_arrays=False,
+                summarize=False,
+                base_data_override=base_data_ref,
+            )
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
+            logger.warning(
+                "Automatic mode residual tie-break failed for finalist %d/%d (%s): %s",
+                int(idx),
+                int(len(shortlist)),
+                str(item.get("source", "candidate")),
+                f"{type(exc).__name__}: {exc}",
+            )
+            continue
+
+        residual_metrics = dict(residual_metrics or {})
+        decision = ctx.auto_is_better_refine_fn(
+            residual_metrics,
+            cur_best_metrics,
+            goal,
+            return_reason=True,
+        )
+        if isinstance(decision, tuple):
+            better, reason = decision
+        else:
+            better, reason = bool(decision), ""
+        if bool(better):
+            prev_avg = _auto_safe_float(cur_best_metrics.get("avg_score"), float("nan"))
+            new_avg = _auto_safe_float(residual_metrics.get("avg_score"), float("nan"))
+            if np.isfinite(prev_avg) and np.isfinite(new_avg):
+                avg_drop = float(prev_avg - new_avg)
+                if avg_drop > 3.0:
+                    better = False
+                    reason = "avg_score_guard"
+                    logger.info(
+                        "Automatic mode residual tie-break: rejected finalist %d/%d due to avg_score drop %.1f",
+                        int(idx), int(len(shortlist)), float(avg_drop),
+                    )
+                    continue
+        base_rank = _auto_safe_float(dict(item.get("metrics", {}) or {}).get("rank_score"), float("nan"))
+        new_rank = _auto_safe_float(residual_metrics.get("rank_score"), float("nan"))
+        logger.info(
+            "Automatic mode residual tie-break finalist %d/%d (%s): base_rank=%.3f -> residual_rank=%.3f, decision=%s",
+            int(idx),
+            int(len(shortlist)),
+            str(item.get("source", "candidate")),
+            float(base_rank) if np.isfinite(base_rank) else float("nan"),
+            float(new_rank) if np.isfinite(new_rank) else float("nan"),
+            "accept" if bool(better) else "reject",
+        )
+        if not bool(better):
+            continue
+
+        prev_best = dict(cur_best_metrics or {})
+        cur_best_metrics = dict(residual_metrics or {})
+        cur_best_preset = _cache_ready_preset(cand_test, best_metrics=cur_best_metrics)
+        improved = True
+        logger.info(
+            "Automatic mode residual tie-break accepted finalist %d/%d: rank %.3f -> %.3f",
+            int(idx),
+            int(len(shortlist)),
+            _auto_safe_float(prev_best.get("rank_score"), 0.0),
+            _auto_safe_float(cur_best_metrics.get("rank_score"), 0.0),
+        )
+        if callable(status_cb):
+            status_cb(
+                "DecayCore automatic mode: residual tie-break improved "
+                f"(rank {official_rank_score(cur_best_metrics):.3f})"
+            )
+
+    return cur_best_preset, cur_best_metrics, bool(improved)
+
 def build_materialize_helpers(ctx: AutoModeMaterializeContext):
     cfg = ctx.cfg
     cache_base_data = dict(ctx.cache_base_data or {})
@@ -271,14 +497,14 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
             payload = str(sorted(payload_data.items()))
         return str(payload)
 
-    def _materialize_preset_result(
+    def _materialize_prepare_preset_result(
         preset: dict | None,
         *,
         include_response_arrays: bool,
         summarize: bool,
         base_data_override: dict | None = None,
         best_metrics_override: dict | None = None,
-    ) -> tuple[object, dict, dict]:
+    ) -> dict:
         ready_preset = _cache_ready_preset(
             preset,
             best_metrics=(
@@ -322,16 +548,21 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
                     "score_only_cache_misses": int(score_only_cache_stats.get("misses", 0) or 0),
                     "score_only_cache_stores": int(score_only_cache_stats.get("stores", 0) or 0),
                 }
-                return (
-                    cached_result,
-                    dict(cached_metrics_out or {}),
-                    dict(cached_final_data or {}),
-                )
+                return {
+                    "cached": (
+                        cached_result,
+                        dict(cached_metrics_out or {}),
+                        dict(cached_final_data or {}),
+                    ),
+                    "final_data": dict(final_data or {}),
+                    "final_measurements": dict(final_measurements or {}),
+                    "trial_hc_f": ctx.hc_f,
+                    "trial_hc_m": ctx.hc_m,
+                    "use_score_only_cache": bool(use_score_only_cache),
+                    "score_only_cache_key": score_only_cache_key,
+                }
             score_only_cache_stats["misses"] = int(score_only_cache_stats.get("misses", 0) or 0) + 1
 
-        # Per-trial adaptive target synthesis: if the candidate specifies
-        # synth_tilt_frac and the context target was synthesized from measurements,
-        # re-synthesize with the trial's tilt fraction.
         trial_hc_f = ctx.hc_f
         trial_hc_m = ctx.hc_m
         preset_tilt_frac = final_data.get("synth_tilt_frac")
@@ -354,6 +585,24 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
                 except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
                     pass  # Fallback to context target
 
+        return {
+            "cached": None,
+            "final_data": dict(final_data or {}),
+            "final_measurements": dict(final_measurements or {}),
+            "trial_hc_f": trial_hc_f,
+            "trial_hc_m": trial_hc_m,
+            "use_score_only_cache": bool(use_score_only_cache),
+            "score_only_cache_key": score_only_cache_key,
+        }
+
+    def _materialize_build_and_run_preset_result(
+        final_data: dict,
+        final_measurements: dict,
+        trial_hc_f,
+        trial_hc_m,
+        *,
+        include_response_arrays: bool,
+    ):
         with profiled_section("materialize.build_config"):
             cfg_final = ctx.build_config_fn(
                 final_data,
@@ -378,79 +627,28 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
                 include_response_arrays=bool(include_response_arrays),
             )
         try:
-            if bool(final_measurements.get("bass_integration_enabled", False)):
-                bundle = final_measurements.get("bass_integration_bundle", None)
-                if bundle is not None:
-                    fc_hz = _auto_safe_float(
-                        final_data.get("avr_crossover_hz", final_measurements.get("avr_crossover_hz", 80.0)),
-                        80.0,
-                    )
-                    profile = _auto_bass_integration_profile_norm(
-                        final_data.get(
-                            "bass_integration_profile",
-                            final_measurements.get("bass_integration_profile", "safe"),
-                        )
-                    )
-                    bi_mode = "direct_dac"
-                    try:
-                        xo_order = max(1, int(round(float(final_data.get("sub_crossover_slope", 24) or 24.0))) // 6)
-                    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-                        xo_order = 4
-                    try:
-                        sub_hpf_hz = float(final_data.get("sub_hpf_freq", 20.0) or 20.0)
-                    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-                        sub_hpf_hz = 20.0
-                    try:
-                        sub_hpf_order = max(1, int(round(float(final_data.get("sub_hpf_slope", 12) or 12.0))) // 6)
-                    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-                        sub_hpf_order = 2
-                    sub_allpass_freq_hz = None
-                    sub_allpass_q = None
-                    if bi_mode == "direct_dac" and bool(final_data.get("bass_integration_allpass_auto_applied", False)):
-                        sub_allpass_freq_hz = _auto_safe_float(
-                            final_data.get("bass_integration_allpass_freq_hz", 0.0),
-                            0.0,
-                        )
-                        sub_allpass_q = _auto_safe_float(
-                            final_data.get("bass_integration_allpass_q", 0.707),
-                            0.707,
-                        )
-                    try:
-                        _m_slpf: float | None = float(final_data.get("direct_dac_sub_lpf_hz") or fc_hz)
-                        if not (_m_slpf and _m_slpf >= fc_hz):
-                            _m_slpf = None
-                    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-                        _m_slpf = None
-                    metrics_update = compute_bass_integration_metric_payload(
-                        bundle,
-                        fc_hz,
-                        profile,
-                        mode=bi_mode,
-                        main_hpf_order=int(xo_order),
-                        sub_lpf_order=int(xo_order),
-                        sub_hpf_hz=float(sub_hpf_hz),
-                        sub_hpf_order=int(sub_hpf_order),
-                        sub_combine_mode=str(final_data.get("bass_integration_sub_combine_mode", "average") or "average"),
-                        sub_delay_ms=_auto_safe_float(final_data.get("bass_integration_sub_delay_ms", 0.0), 0.0),
-                        sub_polarity_invert=bool(final_data.get("bass_integration_sub_polarity_invert", False)),
-                        sub_gain_trim_db=_auto_safe_float(final_data.get("bass_integration_sub_gain_trim_db", 0.0), 0.0),
-                        sub_lpf_hz=_m_slpf,
-                        sub_allpass_freq_hz=sub_allpass_freq_hz,
-                        sub_allpass_q=sub_allpass_q,
-                        guard_lo_ratio=_auto_safe_float(
-                            final_data.get("bass_integration_guard_lo_ratio", AUTO_MODE_BASS_INTEGRATION_GUARD_LO_RATIO),
-                            AUTO_MODE_BASS_INTEGRATION_GUARD_LO_RATIO,
-                        ),
-                        guard_hi_ratio=_auto_safe_float(
-                            final_data.get("bass_integration_guard_hi_ratio", AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO),
-                            AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO,
-                        ),
-                    )
-                    metrics_obj = getattr(result, "metrics", None)
-                    if isinstance(metrics_obj, dict):
-                        metrics_obj.update(dict(metrics_update or {}))
+            metrics_update = _build_materialize_bass_integration_metrics(
+                final_data,
+                final_measurements,
+                ctx,
+                result,
+            )
+            if isinstance(metrics_update, dict):
+                metrics_obj = getattr(result, "metrics", None)
+                if isinstance(metrics_obj, dict):
+                    metrics_obj.update(dict(metrics_update or {}))
         except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
             logger.debug("Bass integration materialize metrics failed: %s: %s", type(exc).__name__, exc)
+        return result
+
+    def _materialize_finalize_preset_result(
+        result,
+        *,
+        final_data: dict,
+        use_score_only_cache: bool,
+        score_only_cache_key,
+        summarize: bool,
+    ) -> dict:
         if bool(summarize):
             with profiled_section("materialize.summarize_run"):
                 result.metrics["summary"] = ctx.summarize_run_fn(result)
@@ -486,6 +684,42 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
                 dict(metrics or {}),
                 dict(final_data or {}),
             )
+        return dict(metrics or {})
+
+    def _materialize_preset_result(
+        preset: dict | None,
+        *,
+        include_response_arrays: bool,
+        summarize: bool,
+        base_data_override: dict | None = None,
+        best_metrics_override: dict | None = None,
+    ) -> tuple[object, dict, dict]:
+        prepared = _materialize_prepare_preset_result(
+            preset,
+            include_response_arrays=include_response_arrays,
+            summarize=summarize,
+            base_data_override=base_data_override,
+            best_metrics_override=best_metrics_override,
+        )
+        cached = prepared.get("cached")
+        if cached is not None:
+            return cached
+        final_data = dict(prepared.get("final_data") or {})
+        final_measurements = dict(prepared.get("final_measurements") or {})
+        result = _materialize_build_and_run_preset_result(
+            final_data,
+            final_measurements,
+            prepared.get("trial_hc_f"),
+            prepared.get("trial_hc_m"),
+            include_response_arrays=include_response_arrays,
+        )
+        metrics = _materialize_finalize_preset_result(
+            result,
+            final_data=final_data,
+            use_score_only_cache=bool(prepared.get("use_score_only_cache")),
+            score_only_cache_key=prepared.get("score_only_cache_key"),
+            summarize=summarize,
+        )
         return result, dict(metrics or {}), dict(final_data or {})
 
     def _preset_signature_ignoring_residual(preset: dict | None) -> str:
@@ -521,140 +755,30 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
 
         with profiled_section("residual_tiebreak"):
             logger.debug("Automatic mode residual tie-break starting (%s)", phase_label)
-            top_k = int(max(1, _auto_safe_int(ctx.residual_top_k, 3)))
-            rank_eps = float(max(0.0, _auto_safe_float(ctx.residual_rank_eps, 0.35)))
-            best_rank = _auto_safe_float(cur_best_metrics.get("rank_score"), float("nan"))
-            seen: set[str] = set()
-            shortlist: list[dict] = []
-
-            def _maybe_add_candidate(preset: dict | None, metrics: dict | None, *, source: str) -> None:
-                if len(shortlist) >= int(top_k):
-                    return
-                cand_preset = _cache_ready_preset(
-                    dict(preset or {}),
-                    best_metrics=dict(metrics or {}),
-                )
-                if bool(cand_preset.get("enable_residual_pass", False)):
-                    return
-                sig = _preset_signature_ignoring_residual(cand_preset)
-                if sig in seen:
-                    return
-                rank_v = _auto_safe_float(dict(metrics or {}).get("rank_score"), float("nan"))
-                if np.isfinite(best_rank) and np.isfinite(rank_v):
-                    if float(best_rank - rank_v) > float(rank_eps):
-                        return
-                seen.add(sig)
-                shortlist.append(
-                    {
-                        "preset": dict(cand_preset or {}),
-                        "metrics": dict(metrics or {}),
-                        "source": str(source),
-                    }
-                )
-
-            _maybe_add_candidate(cur_best_preset, cur_best_metrics, source="current_best")
-            ranked_items = sorted(
-                [dict(it or {}) for it in list(candidate_items or []) if isinstance(it, dict)],
-                key=lambda it: ctx.auto_rank_key_fn(dict(it.get("metrics", {}) or {})),
+            shortlist = _collect_residual_shortlist(
+                cur_best_preset,
+                cur_best_metrics,
+                candidate_items,
+                base_data_ref,
+                ctx,
+                _cache_ready_preset,
+                _preset_signature_ignoring_residual,
             )
-            for item in ranked_items:
-                _maybe_add_candidate(
-                    dict(item.get("preset", {}) or {}),
-                    dict(item.get("metrics", {}) or {}),
-                    source=str(item.get("phase", item.get("source", "candidate")) or "candidate"),
-                )
 
             if not shortlist:
                 return cur_best_preset, cur_best_metrics, False
 
-            improved = False
-            logger.info(
-                "Automatic mode residual tie-break: testing %d finalist preset(s) within %.2f rank window.",
-                int(len(shortlist)),
-                float(rank_eps),
+            cur_best_preset, cur_best_metrics, improved = _evaluate_residual_finalist_items(
+                shortlist,
+                cur_best_preset,
+                cur_best_metrics,
+                base_data_ref,
+                goal,
+                status_cb,
+                ctx,
+                _materialize_preset_result,
+                _cache_ready_preset,
             )
-            for idx, item in enumerate(shortlist, start=1):
-                cand_base = dict(item.get("preset", {}) or {})
-                cand_test = dict(cand_base or {})
-                cand_test["enable_residual_pass"] = True
-                try:
-                    _residual_result, residual_metrics, _residual_data = _materialize_preset_result(
-                        cand_test,
-                        include_response_arrays=False,
-                        summarize=False,
-                        base_data_override=base_data_ref,
-                    )
-                except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
-                    logger.warning(
-                        "Automatic mode residual tie-break failed for finalist %d/%d (%s): %s",
-                        int(idx),
-                        int(len(shortlist)),
-                        str(item.get("source", "candidate")),
-                        f"{type(exc).__name__}: {exc}",
-                    )
-                    continue
-
-                residual_metrics = dict(residual_metrics or {})
-                decision = ctx.auto_is_better_refine_fn(
-                    residual_metrics,
-                    cur_best_metrics,
-                    goal,
-                    return_reason=True,
-                )
-                if isinstance(decision, tuple):
-                    better, reason = decision
-                else:
-                    better, reason = bool(decision), ""
-                # Guard: reject residual if avg_score drops significantly
-                if bool(better):
-                    prev_avg = _auto_safe_float(cur_best_metrics.get("avg_score"), float("nan"))
-                    new_avg = _auto_safe_float(residual_metrics.get("avg_score"), float("nan"))
-                    if np.isfinite(prev_avg) and np.isfinite(new_avg):
-                        avg_drop = float(prev_avg - new_avg)
-                        if avg_drop > 3.0:
-                            better = False
-                            reason = "avg_score_guard"
-                            logger.info(
-                                "Automatic mode residual tie-break: rejected finalist %d/%d due to "
-                                "avg_score drop %.1f (%.1f -> %.1f)",
-                                int(idx), int(len(shortlist)),
-                                float(avg_drop), float(prev_avg), float(new_avg),
-                            )
-                            continue
-                base_rank = _auto_safe_float(dict(item.get("metrics", {}) or {}).get("rank_score"), float("nan"))
-                new_rank = _auto_safe_float(residual_metrics.get("rank_score"), float("nan"))
-                logger.info(
-                    "Automatic mode residual tie-break finalist %d/%d (%s): base_rank=%.3f -> residual_rank=%.3f, decision=%s (%s)",
-                    int(idx),
-                    int(len(shortlist)),
-                    str(item.get("source", "candidate")),
-                    float(base_rank) if np.isfinite(base_rank) else float("nan"),
-                    float(new_rank) if np.isfinite(new_rank) else float("nan"),
-                    "accept" if bool(better) else "reject",
-                    str(reason),
-                )
-                if not bool(better):
-                    continue
-
-                prev_best = dict(cur_best_metrics or {})
-                cur_best_metrics = dict(residual_metrics or {})
-                cur_best_preset = _cache_ready_preset(cand_test, best_metrics=cur_best_metrics)
-                improved = True
-                logger.info(
-                    "Automatic mode residual tie-break accepted finalist %d/%d: rank %.3f -> %.3f, avg %.3f -> %.3f",
-                    int(idx),
-                    int(len(shortlist)),
-                    _auto_safe_float(prev_best.get("rank_score"), 0.0),
-                    _auto_safe_float(cur_best_metrics.get("rank_score"), 0.0),
-                    _auto_safe_float(prev_best.get("avg_score"), 0.0),
-                    _auto_safe_float(cur_best_metrics.get("avg_score"), 0.0),
-                )
-                if callable(status_cb):
-                    status_cb(
-                        "DecayCore automatic mode: residual tie-break improved "
-                        f"(rank {official_rank_score(cur_best_metrics):.3f}, "
-                        f"avg {_auto_safe_float(cur_best_metrics.get('avg_score'), 0.0):.3f})"
-                    )
 
             return cur_best_preset, cur_best_metrics, bool(improved)
 

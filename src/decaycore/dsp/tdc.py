@@ -264,6 +264,226 @@ def _compute_tdc_reduction_stats(freq_axis: Any, tdc_reduction_db: np.ndarray) -
     }
 
 
+def _tdc_normalized_modal_events(modal_events, tdc_hi_hz: float) -> list[dict[str, Any]]:
+    return [
+        n
+        for me in (modal_events or [])
+        if (n := _normalize_modal_event(me)) is not None and n["freq_hz"] <= tdc_hi_hz
+    ]
+
+
+def _tdc_event_rt60(rt60_info, f_res: float) -> float | None:
+    if not _has_rt60_data(rt60_info):
+        logger.info(
+            "TDC: skipping event at %.1f Hz — no reliable RT60 data available",
+            f_res,
+        )
+        return None
+    ref_rt60 = _rt60_at(rt60_info, f_res)
+    if not (np.isfinite(ref_rt60) and ref_rt60 > 0.0):
+        logger.warning(
+            "TDC: rt60_at(%.1f Hz) returned invalid/missing value (%.3g); "
+            "falling back to 0.4 s — TDC severity may be unreliable",
+            f_res,
+            ref_rt60,
+        )
+        ref_rt60 = 0.4
+    return float(ref_rt60)
+
+
+def _tdc_reflection_event_result(
+    rev,
+    rt60_info,
+    normalized_modal_events: list[dict[str, Any]],
+    *,
+    tdc_hi_hz: float,
+    strength: float,
+) -> tuple[str, dict[str, Any] | None]:
+    try:
+        f_res = float(rev.get("freq", np.nan))
+        error_ms = float(rev.get("gd_error", rev.get("error_ms", np.nan)))
+    except (TypeError, ValueError):
+        return "ignore", None
+    if not (np.isfinite(f_res) and np.isfinite(error_ms)):
+        return "ignore", None
+    if f_res <= 0.0 or error_ms <= 0.0:
+        return "ignore", None
+    ref_rt60 = _tdc_event_rt60(rt60_info, f_res)
+    if ref_rt60 is None:
+        return "ignore", None
+
+    node_type = str(rev.get("type", "") or "").strip().lower()
+    is_resonance = bool(node_type == "resonance" or (not node_type and f_res <= 200.0))
+    if f_res > tdc_hi_hz or (node_type == "reflection" and f_res > 200.0):
+        return "skip_high", None
+
+    severity = _compute_reflection_severity(f_res, error_ms, ref_rt60, is_resonance=is_resonance)
+    if severity <= 0.0:
+        return "ignore", None
+
+    dynamic_mult = float(np.clip(severity * strength, 0.0, 2.0))
+    reduction_db = dynamic_mult * 3.5
+    if not np.isfinite(reduction_db) or reduction_db <= 0.0:
+        return "ignore", None
+
+    width_oct = float(
+        np.clip(
+            0.18 - 0.04 * min(severity, 2.0) + (0.04 if not is_resonance else 0.0),
+            0.07,
+            0.24,
+        )
+    )
+
+    modal_event = _modal_event_match(f_res, normalized_modal_events)
+    voice_used = False
+    modal_support = 0.0
+    if modal_event is not None:
+        reduction_db, width_oct, voice_used = _apply_modal_adjustment(reduction_db, width_oct, f_res, modal_event)
+        modal_support = float(modal_event.get("modal_support", 0.0) if modal_event else 0.0)
+
+    return "used", {
+        "freq_hz": float(f_res),
+        "error_ms": float(error_ms),
+        "node_type": str(node_type or ("resonance" if is_resonance else "reflection")),
+        "severity": float(severity),
+        "reduction_db": float(reduction_db),
+        "width_oct": float(width_oct),
+        "modal_support": float(modal_support),
+        "modal_used": bool(modal_event is not None),
+        "modal_voice_used": bool(voice_used),
+    }
+
+
+def _tdc_apply_reflection_events(
+    reflections,
+    rt60_info,
+    normalized_modal_events: list[dict[str, Any]],
+    *,
+    f_axis: np.ndarray,
+    strength: float,
+    tdc_hi_hz: float,
+) -> tuple[np.ndarray, int, int, int, int, int, dict[str, Any] | None]:
+    tdc_reduction_db = np.zeros_like(f_axis, dtype=float)
+    events_seen = events_used = skipped_high = 0
+    modal_events_used = modal_voice_events_used = 0
+    strongest_event: dict | None = None
+    strongest_reduction = 0.0
+
+    for rev in reflections or []:
+        if not isinstance(rev, dict):
+            continue
+        events_seen += 1
+        status, event = _tdc_reflection_event_result(
+            rev,
+            rt60_info,
+            normalized_modal_events,
+            tdc_hi_hz=tdc_hi_hz,
+            strength=strength,
+        )
+        if status == "skip_high":
+            skipped_high += 1
+            continue
+        if status != "used" or event is None:
+            continue
+
+        f_res = float(event["freq_hz"])
+        reduction_db = float(event["reduction_db"])
+        width_oct = float(event["width_oct"])
+        if bool(event["modal_used"]):
+            modal_events_used += 1
+        if bool(event["modal_voice_used"]):
+            modal_voice_events_used += 1
+        tdc_reduction_db += _gaussian_kernel(f_axis, f_res, width_oct) * reduction_db
+        events_used += 1
+
+        if reduction_db > strongest_reduction:
+            strongest_reduction = float(reduction_db)
+            strongest_event = {
+                "tdc_strongest_event_freq_hz": float(event["freq_hz"]),
+                "tdc_strongest_event_gd_error_ms": float(event["error_ms"]),
+                "tdc_strongest_event_type": str(event["node_type"]),
+                "tdc_strongest_event_severity": float(event["severity"]),
+                "tdc_strongest_event_reduction_db": float(reduction_db),
+                "tdc_strongest_event_width_oct": float(width_oct),
+                "tdc_strongest_event_modal_support": float(event["modal_support"]),
+            }
+
+    return (
+        tdc_reduction_db,
+        events_seen,
+        events_used,
+        skipped_high,
+        modal_events_used,
+        modal_voice_events_used,
+        strongest_event,
+    )
+
+
+def _tdc_apply_reflection_events(
+    reflections,
+    rt60_info,
+    normalized_modal_events: list[dict[str, Any]],
+    *,
+    f_axis: np.ndarray,
+    strength: float,
+    tdc_hi_hz: float,
+) -> tuple[np.ndarray, int, int, int, int, int, dict[str, Any] | None]:
+    tdc_reduction_db = np.zeros_like(f_axis, dtype=float)
+    events_seen = events_used = skipped_high = 0
+    modal_events_used = modal_voice_events_used = 0
+    strongest_event: dict | None = None
+    strongest_reduction = 0.0
+
+    for rev in reflections or []:
+        if not isinstance(rev, dict):
+            continue
+        events_seen += 1
+        status, event = _tdc_reflection_event_result(
+            rev,
+            rt60_info,
+            normalized_modal_events,
+            tdc_hi_hz=tdc_hi_hz,
+            strength=strength,
+        )
+        if status == "skip_high":
+            skipped_high += 1
+            continue
+        if status != "used" or event is None:
+            continue
+
+        f_res = float(event["freq_hz"])
+        reduction_db = float(event["reduction_db"])
+        width_oct = float(event["width_oct"])
+        if bool(event["modal_used"]):
+            modal_events_used += 1
+        if bool(event["modal_voice_used"]):
+            modal_voice_events_used += 1
+        tdc_reduction_db += _gaussian_kernel(f_axis, f_res, width_oct) * reduction_db
+        events_used += 1
+
+        if reduction_db > strongest_reduction:
+            strongest_reduction = float(reduction_db)
+            strongest_event = {
+                "tdc_strongest_event_freq_hz": float(event["freq_hz"]),
+                "tdc_strongest_event_gd_error_ms": float(event["error_ms"]),
+                "tdc_strongest_event_type": str(event["node_type"]),
+                "tdc_strongest_event_severity": float(event["severity"]),
+                "tdc_strongest_event_reduction_db": float(reduction_db),
+                "tdc_strongest_event_width_oct": float(width_oct),
+                "tdc_strongest_event_modal_support": float(event["modal_support"]),
+            }
+
+    return (
+        tdc_reduction_db,
+        events_seen,
+        events_used,
+        skipped_high,
+        modal_events_used,
+        modal_voice_events_used,
+        strongest_event,
+    )
+
+
 def apply_smart_tdc(
     freq_axis,
     target_mags,
@@ -328,91 +548,24 @@ def apply_smart_tdc(
         _emit_telemetry(reason="invalid_axis")
         return adjusted_target
 
-    normalized_modal_events: list[dict[str, Any]] = [
-        n for me in (modal_events or [])
-        if (n := _normalize_modal_event(me)) is not None and n["freq_hz"] <= tdc_hi_hz
-    ]
+    normalized_modal_events = _tdc_normalized_modal_events(modal_events, tdc_hi_hz)
 
-    events_seen = events_used = skipped_high = 0
-    modal_events_used = modal_voice_events_used = 0
-    strongest_event: dict | None = None
-    strongest_reduction = 0.0
-
-    for rev in reflections or []:
-        if not isinstance(rev, dict):
-            continue
-        try:
-            f_res = float(rev.get("freq", np.nan))
-            error_ms = float(rev.get("gd_error", rev.get("error_ms", np.nan)))
-        except (TypeError, ValueError):
-            continue
-        if not (np.isfinite(f_res) and np.isfinite(error_ms)):
-            continue
-        events_seen += 1
-        if f_res <= 0.0 or error_ms <= 0.0:
-            continue
-        if f_res > tdc_hi_hz:
-            skipped_high += 1
-            continue
-
-        node_type = str(rev.get("type", "") or "").strip().lower()
-        is_resonance = bool(node_type == "resonance" or (not node_type and f_res <= 200.0))
-        if node_type == "reflection" and f_res > 200.0:
-            skipped_high += 1
-            continue
-
-        if not _has_rt60_data(rt60_info):
-            logger.info(
-                "TDC: skipping event at %.1f Hz — no reliable RT60 data available",
-                f_res,
-            )
-            continue
-
-        ref_rt60 = _rt60_at(rt60_info, f_res)
-        if not (np.isfinite(ref_rt60) and ref_rt60 > 0.0):
-            logger.warning(
-                "TDC: rt60_at(%.1f Hz) returned invalid/missing value (%.3g); "
-                "falling back to 0.4 s — TDC severity may be unreliable",
-                f_res, ref_rt60,
-            )
-            ref_rt60 = 0.4
-
-        severity = _compute_reflection_severity(f_res, error_ms, ref_rt60, is_resonance=is_resonance)
-        if severity <= 0.0:
-            continue
-
-        dynamic_mult = float(np.clip(severity * strength, 0.0, 2.0))
-        reduction_db = dynamic_mult * 3.5
-        if not np.isfinite(reduction_db) or reduction_db <= 0.0:
-            continue
-
-        width_oct = float(np.clip(
-            0.18 - 0.04 * min(severity, 2.0) + (0.04 if not is_resonance else 0.0), 0.07, 0.24
-        ))
-
-        modal_event = _modal_event_match(f_res, normalized_modal_events)
-        if modal_event is not None:
-            reduction_db, width_oct, voice_used = _apply_modal_adjustment(reduction_db, width_oct, f_res, modal_event)
-            modal_events_used += 1
-            if voice_used:
-                modal_voice_events_used += 1
-
-        tdc_reduction_db += _gaussian_kernel(f_axis, f_res, width_oct) * reduction_db
-        events_used += 1
-
-        if reduction_db > strongest_reduction:
-            strongest_reduction = float(reduction_db)
-            strongest_event = {
-                "tdc_strongest_event_freq_hz": float(f_res),
-                "tdc_strongest_event_gd_error_ms": float(error_ms),
-                "tdc_strongest_event_type": str(node_type or ("resonance" if is_resonance else "reflection")),
-                "tdc_strongest_event_severity": float(severity),
-                "tdc_strongest_event_reduction_db": float(reduction_db),
-                "tdc_strongest_event_width_oct": float(width_oct),
-                "tdc_strongest_event_modal_support": float(
-                    modal_event.get("modal_support", 0.0) if modal_event else 0.0
-                ),
-            }
+    (
+        tdc_reduction_db,
+        events_seen,
+        events_used,
+        skipped_high,
+        modal_events_used,
+        modal_voice_events_used,
+        strongest_event,
+    ) = _tdc_apply_reflection_events(
+        reflections,
+        rt60_info,
+        normalized_modal_events,
+        f_axis=f_axis,
+        strength=strength,
+        tdc_hi_hz=tdc_hi_hz,
+    )
 
     tdc_reduction_db = _apply_tdc_slope_limit(freq_axis, tdc_reduction_db, max_red, max_slope_db_per_oct)
     adjusted_target -= tdc_reduction_db

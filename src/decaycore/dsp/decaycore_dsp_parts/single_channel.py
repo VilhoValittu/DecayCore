@@ -90,6 +90,26 @@ def _normalize_impulse_if_requested(impulse: np.ndarray, cfg: FilterConfig) -> t
     except (TypeError, ValueError, FloatingPointError):
         return float(max_peak), 0.0
 
+
+def _add_response_payload_fields(
+    stats: dict,
+    *,
+    include_response_arrays: bool,
+    m_anal: np.ndarray,
+    gain_db: np.ndarray,
+    mask_c: np.ndarray,
+) -> None:
+    if not bool(include_response_arrays):
+        return
+    stats["measured_mags_raw"] = np.asarray(m_anal, dtype=float).tolist()
+    stats["fir_only_predicted_filter_mags"] = np.asarray(gain_db, dtype=float).tolist()
+    stats["mag_mask"] = np.asarray(mask_c, dtype=float).tolist()
+
+
+def _authority_array_mode(include_response_arrays: bool) -> bool | str:
+    return True if bool(include_response_arrays) else "scoring"
+
+
 def generate_filter(
     freqs,
     meas_mags,
@@ -175,14 +195,11 @@ def generate_filter(
         'mag_c_min': float(getattr(cfg, 'mag_c_min', 0.0) or 0.0),
         'mag_c_max': float(getattr(cfg, 'mag_c_max', 0.0) or 0.0),
         'target_mags': target_mags.tolist(),
-        'measured_mags_raw': m_anal.tolist(),
         'measured_mags': (m_anal - calc_offset_db).tolist(),
         'predicted_filter_mags': combined_gain_db.tolist(),
         'predicted_filter_mags_source': "hybrid_iir_plus_mag_post_limits_pre_ir" if hybrid_iir_active else "mag_post_limits_pre_ir",
         'filter_mags': combined_gain_db.tolist(),
         'filter_mags_source': "hybrid_iir_plus_mag_post_limits_pre_ir" if hybrid_iir_active else "mag_post_limits_pre_ir",
-        'fir_only_predicted_filter_mags': np.asarray(gain_db, dtype=float).tolist(),
-        'mag_mask': np.asarray(mask_c, dtype=float).tolist(),
         'confidence_mask': conf_mask.tolist(),
         'afdw_active': bool(afdw_on),
         'reflections': reflections,
@@ -325,6 +342,13 @@ def generate_filter(
 
     }
 
+    _add_response_payload_fields(
+        stats,
+        include_response_arrays=bool(include_response_arrays),
+        m_anal=m_anal,
+        gain_db=gain_db,
+        mask_c=mask_c,
+    )
 
     safe_stats_update(stats, st)
     if hybrid_iir_stats:
@@ -338,6 +362,7 @@ def generate_filter(
         freq_axis=freq_axis,
         m_anal=m_anal,
         calc_offset_db=float(calc_offset_db),
+        include_raw=bool(include_response_arrays),
     )
     apply_afdw_stats(
         stats,
@@ -380,7 +405,7 @@ def generate_filter(
             mag_c_max=float(getattr(cfg, "mag_c_max", 300.0) or 300.0),
             phase_limit_hz=float(getattr(cfg, "phase_c_max", 600.0) or 600.0),
         )
-        stats.update(acoustic_authority_to_stats(authority, include_arrays=True))
+        stats.update(acoustic_authority_to_stats(authority, include_arrays=_authority_array_mode(bool(include_response_arrays))))
     except (
 
         AttributeError,

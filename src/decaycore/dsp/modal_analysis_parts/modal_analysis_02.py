@@ -312,6 +312,140 @@ def _classify_event(
         return "room_mode", tuple(reasons)
     return "uncertain", tuple(reasons or ["limited_support"])
 
+
+def _build_room_mode_event(
+    *,
+    freq: np.ndarray,
+    conf: np.ndarray,
+    gd_ms: np.ndarray,
+    left_mag: np.ndarray,
+    right_mag: np.ndarray,
+    rt60_by_band,
+    geom: dict,
+    pos: int,
+    idx: int,
+    min_peak_db: float,
+    min_width_oct: float,
+    max_width: float,
+) -> RoomModeEvent | None:
+    peak_db = float(geom["peak_db"][pos])
+    left_idx = int(geom["left"][pos])
+    right_idx = int(geom["right"][pos])
+    low_f = float(geom["low_f"][pos])
+    high_f = float(geom["high_f"][pos])
+    if not (np.isfinite(low_f) and np.isfinite(high_f)) or high_f <= low_f:
+        return None
+    width_hz = float(geom["width_hz"][pos])
+    width_oct = float(geom["width_oct"][pos])
+    if width_oct > max_width or width_oct < min_width_oct * 0.35:
+        return None
+
+    seg = slice(left_idx, right_idx + 1)
+    area_db_oct = float(geom["area_db_oct"][pos])
+    q_estimate = float(geom["q_estimate"][pos])
+    conf_mean = float(np.clip(np.nanmean(conf[seg]) if conf[seg].size else conf[idx], 0.0, 1.0))
+
+    gd_excess = 0.0
+    if gd_ms.size == freq.size:
+        gd_vals = np.maximum(0.0, gd_ms[seg])
+        gd_vals = gd_vals[np.isfinite(gd_vals)]
+        if gd_vals.size:
+            gd_excess = float(np.percentile(gd_vals, 90.0))
+    gd_excess = float(np.clip(gd_excess, 0.0, 250.0))
+    gd_decay_severity = float(np.clip(gd_excess / 60.0, 0.0, 1.0))
+    rt60_decay_severity = _decay_severity_at(rt60_by_band, float(freq[idx]))
+    decay_severity = float(max(gd_decay_severity, rt60_decay_severity))
+    lr_consistency = _lr_consistency_at(freq, left_mag, right_mag, float(freq[idx]), peak_db, width_oct)
+    kind, reasons = _classify_event(
+        peak_db=peak_db,
+        width_oct=width_oct,
+        confidence=conf_mean,
+        gd_excess_ms=gd_excess,
+        area_db_oct=area_db_oct,
+        lr_consistency=lr_consistency,
+        min_width_oct=min_width_oct,
+    )
+    if _voice_weight(float(freq[idx])) > 0.0 and "voice_band" not in reasons:
+        reasons = tuple([*reasons, "voice_band"])
+
+    normalized_peak = float(np.clip(peak_db / 8.0, 0.0, 1.0))
+    normalized_area = float(np.clip(area_db_oct / 2.0, 0.0, 1.0))
+    normalized_gd = float(np.clip(gd_excess / 60.0, 0.0, 1.0))
+    normalized_decay = float(np.clip(decay_severity, 0.0, 1.0))
+    voice = _voice_weight(float(freq[idx]))
+    severity = float(
+        np.clip(
+            0.42 * normalized_peak
+            + 0.18 * normalized_area
+            + 0.18 * normalized_gd
+            + 0.12 * normalized_decay
+            + 0.10 * voice,
+            0.0,
+            1.0,
+        )
+    )
+    kind_factor = {
+        "room_mode": 1.00,
+        "broad_buildup": 0.70,
+        "uncertain": 0.35,
+        "local_comb": 0.10,
+    }.get(kind, 0.20)
+    lr_factor = 1.0 if left_mag.size != freq.size else float(0.65 + 0.35 * lr_consistency)
+    correction_priority = float(np.clip(severity * conf_mean * kind_factor * lr_factor, 0.0, 1.0))
+    cut_priority = float(np.clip(correction_priority * (0.65 + 0.35 * normalized_gd), 0.0, 1.0))
+    safe_cut_db = float(np.clip(peak_db * (0.30 + 0.40 * correction_priority), 0.0, min(6.0, peak_db)))
+    safe_width_oct = float(np.clip(width_oct * 1.25, 1.0 / 36.0, 1.0 / 2.0))
+    voice_clarity_risk = float(np.clip(severity * conf_mean * voice, 0.0, 1.0))
+    return RoomModeEvent(
+        freq_hz=float(freq[idx]),
+        peak_db=float(peak_db),
+        width_hz=float(width_hz),
+        width_oct=float(width_oct),
+        q_estimate=float(q_estimate),
+        area_db_oct=float(max(0.0, area_db_oct)),
+        gd_excess_ms=float(gd_excess),
+        decay_severity=float(decay_severity),
+        confidence=float(conf_mean),
+        lr_consistency=float(lr_consistency),
+        severity=float(severity),
+        correction_priority=float(correction_priority),
+        cut_priority=float(cut_priority),
+        safe_cut_db=float(safe_cut_db),
+        safe_width_oct=float(safe_width_oct),
+        voice_clarity_risk=float(voice_clarity_risk),
+        kind=str(kind),
+        reasons=tuple(str(r) for r in reasons),
+    )
+
+
+def _finalize_room_mode_events(events: list[RoomModeEvent]) -> ModalAnalysisResult:
+    if not events:
+        return _empty_result()
+    events = sorted(events, key=lambda ev: (-float(ev.severity), -float(ev.peak_db), float(ev.freq_hz)))
+    deduped: list[RoomModeEvent] = []
+    for event in events:
+        if any(abs(np.log2(max(event.freq_hz, 1e-9) / max(kept.freq_hz, 1e-9))) < 0.08 for kept in deduped):
+            continue
+        deduped.append(event)
+    events_tuple = tuple(deduped)
+    modal_area = float(sum(max(0.0, ev.area_db_oct) for ev in events_tuple))
+    voice_risk = float(
+        np.clip(
+            sum(ev.severity * ev.confidence * _voice_weight(ev.freq_hz) for ev in events_tuple),
+            0.0,
+            1.0,
+        )
+    )
+    worst = events_tuple[0]
+    return ModalAnalysisResult(
+        events=events_tuple,
+        worst_mode_hz=float(worst.freq_hz),
+        worst_mode_severity=float(worst.severity),
+        mode_count=int(len(events_tuple)),
+        modal_area_db_oct=float(modal_area),
+        voice_band_modal_risk=float(voice_risk),
+    )
+
 def detect_room_modes(
     freq_axis,
     measured_mag_db,
@@ -373,124 +507,24 @@ def detect_room_modes(
         geom = _modal_candidate_geometry(freq, excess, candidate_idxs, float(min_peak_db))
         for pos, raw_idx in enumerate(geom["idx"]):
             idx = int(raw_idx)
-            peak_db = float(geom["peak_db"][pos])
-            left_idx = int(geom["left"][pos])
-            right_idx = int(geom["right"][pos])
-            low_f = float(geom["low_f"][pos])
-            high_f = float(geom["high_f"][pos])
-            if not (np.isfinite(low_f) and np.isfinite(high_f)) or high_f <= low_f:
-                continue
-            width_hz = float(geom["width_hz"][pos])
-            width_oct = float(geom["width_oct"][pos])
-            if width_oct > max_width or width_oct < min_width * 0.35:
-                continue
-
-            seg = slice(left_idx, right_idx + 1)
-            area_db_oct = float(geom["area_db_oct"][pos])
-            q_estimate = float(geom["q_estimate"][pos])
-            conf_mean = float(np.clip(np.nanmean(conf[seg]) if conf[seg].size else conf[idx], 0.0, 1.0))
-
-            gd_excess = 0.0
-            if gd_ms.size == freq.size:
-                gd_vals = np.maximum(0.0, gd_ms[seg])
-                gd_vals = gd_vals[np.isfinite(gd_vals)]
-                if gd_vals.size:
-                    gd_excess = float(np.percentile(gd_vals, 90.0))
-            gd_excess = float(np.clip(gd_excess, 0.0, 250.0))
-            gd_decay_severity = float(np.clip(gd_excess / 60.0, 0.0, 1.0))
-            rt60_decay_severity = _decay_severity_at(rt60_by_band, float(freq[idx]))
-            decay_severity = float(max(gd_decay_severity, rt60_decay_severity))
-            lr_consistency = _lr_consistency_at(freq, left_mag, right_mag, float(freq[idx]), peak_db, width_oct)
-            kind, reasons = _classify_event(
-                peak_db=peak_db,
-                width_oct=width_oct,
-                confidence=conf_mean,
-                gd_excess_ms=gd_excess,
-                area_db_oct=area_db_oct,
-                lr_consistency=lr_consistency,
-                min_width_oct=min_width_oct,
+            event = _build_room_mode_event(
+                freq=freq,
+                conf=conf,
+                gd_ms=gd_ms,
+                left_mag=left_mag,
+                right_mag=right_mag,
+                rt60_by_band=rt60_by_band,
+                geom=geom,
+                pos=pos,
+                idx=idx,
+                min_peak_db=float(min_peak_db),
+                min_width_oct=min_width,
+                max_width=max_width,
             )
-            if _voice_weight(float(freq[idx])) > 0.0 and "voice_band" not in reasons:
-                reasons = tuple([*reasons, "voice_band"])
+            if event is not None:
+                events.append(event)
 
-            normalized_peak = float(np.clip(peak_db / 8.0, 0.0, 1.0))
-            normalized_area = float(np.clip(area_db_oct / 2.0, 0.0, 1.0))
-            normalized_gd = float(np.clip(gd_excess / 60.0, 0.0, 1.0))
-            normalized_decay = float(np.clip(decay_severity, 0.0, 1.0))
-            voice = _voice_weight(float(freq[idx]))
-            severity = float(
-                np.clip(
-                    0.42 * normalized_peak
-                    + 0.18 * normalized_area
-                    + 0.18 * normalized_gd
-                    + 0.12 * normalized_decay
-                    + 0.10 * voice,
-                    0.0,
-                    1.0,
-                )
-            )
-            kind_factor = {
-                "room_mode": 1.00,
-                "broad_buildup": 0.70,
-                "uncertain": 0.35,
-                "local_comb": 0.10,
-            }.get(kind, 0.20)
-            lr_factor = 1.0 if left_mag.size != freq.size else float(0.65 + 0.35 * lr_consistency)
-            correction_priority = float(np.clip(severity * conf_mean * kind_factor * lr_factor, 0.0, 1.0))
-            cut_priority = float(np.clip(correction_priority * (0.65 + 0.35 * normalized_gd), 0.0, 1.0))
-            safe_cut_db = float(np.clip(peak_db * (0.30 + 0.40 * correction_priority), 0.0, min(6.0, peak_db)))
-            safe_width_oct = float(np.clip(width_oct * 1.25, 1.0 / 36.0, 1.0 / 2.0))
-            voice_clarity_risk = float(np.clip(severity * conf_mean * voice, 0.0, 1.0))
-
-            events.append(
-                RoomModeEvent(
-                    freq_hz=float(freq[idx]),
-                    peak_db=float(peak_db),
-                    width_hz=float(width_hz),
-                    width_oct=float(width_oct),
-                    q_estimate=float(q_estimate),
-                    area_db_oct=float(max(0.0, area_db_oct)),
-                    gd_excess_ms=float(gd_excess),
-                    decay_severity=float(decay_severity),
-                    confidence=float(conf_mean),
-                    lr_consistency=float(lr_consistency),
-                    severity=float(severity),
-                    correction_priority=float(correction_priority),
-                    cut_priority=float(cut_priority),
-                    safe_cut_db=float(safe_cut_db),
-                    safe_width_oct=float(safe_width_oct),
-                    voice_clarity_risk=float(voice_clarity_risk),
-                    kind=str(kind),
-                    reasons=tuple(str(r) for r in reasons),
-                )
-            )
-
-        if not events:
-            return _empty_result()
-        events = sorted(events, key=lambda ev: (-float(ev.severity), -float(ev.peak_db), float(ev.freq_hz)))
-        deduped: list[RoomModeEvent] = []
-        for event in events:
-            if any(abs(np.log2(max(event.freq_hz, 1e-9) / max(kept.freq_hz, 1e-9))) < 0.08 for kept in deduped):
-                continue
-            deduped.append(event)
-        events_tuple = tuple(deduped)
-        modal_area = float(sum(max(0.0, ev.area_db_oct) for ev in events_tuple))
-        voice_risk = float(
-            np.clip(
-                sum(ev.severity * ev.confidence * _voice_weight(ev.freq_hz) for ev in events_tuple),
-                0.0,
-                1.0,
-            )
-        )
-        worst = events_tuple[0]
-        return ModalAnalysisResult(
-            events=events_tuple,
-            worst_mode_hz=float(worst.freq_hz),
-            worst_mode_severity=float(worst.severity),
-            mode_count=int(len(events_tuple)),
-            modal_area_db_oct=float(modal_area),
-            voice_band_modal_risk=float(voice_risk),
-        )
+        return _finalize_room_mode_events(events)
     except (
 
         AttributeError,

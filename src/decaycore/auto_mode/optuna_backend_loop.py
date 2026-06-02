@@ -26,6 +26,19 @@ from .shared import AutoModeConfig
 
 logger = logging.getLogger("DecayCore")
 
+_OPTUNA_RECOVERABLE_EXC_TYPES = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    KeyError,
+    IndexError,
+    RuntimeError,
+    OSError,
+    ImportError,
+    ModuleNotFoundError,
+    NameError,
+)
+
 
 @dataclass(slots=True)
 class _OptunaEvalContext:
@@ -142,6 +155,12 @@ def _optuna_pruned_result(*, idx: int) -> dict:
         "error": "optuna trial pruned",
         "pruned": True,
     }
+
+
+def _optuna_parallel_recoverable_exc_types(*, trial_pruned_cls):
+    if trial_pruned_cls is None:
+        return _OPTUNA_RECOVERABLE_EXC_TYPES
+    return (trial_pruned_cls,) + _OPTUNA_RECOVERABLE_EXC_TYPES
 
 
 def _run_optuna_seed_trials(
@@ -349,6 +368,84 @@ def _handle_serial_pruned_trial(
     return "continue"
 
 
+def _optuna_parallel_build_chunk(
+    *,
+    idx_cursor: int,
+    total: int,
+    chunk_size: int,
+    ask_new_trial,
+):
+    chunk_items = []
+    idx_cursor_eff = int(idx_cursor)
+    while idx_cursor_eff <= int(total) and len(chunk_items) < int(chunk_size):
+        trial_obj, preset, params_sig, ask_error = ask_new_trial()
+        if trial_obj is None:
+            chunk_items.append(
+                (
+                    int(idx_cursor_eff),
+                    None,
+                    {},
+                    "",
+                    {
+                        "idx": int(idx_cursor_eff),
+                        "ok": False,
+                        "error": str(ask_error or "no unique optuna candidate available"),
+                    },
+                )
+            )
+            idx_cursor_eff += 1
+            continue
+        chunk_items.append((int(idx_cursor_eff), trial_obj, dict(preset), str(params_sig), None))
+        idx_cursor_eff += 1
+    return chunk_items, int(idx_cursor_eff)
+
+
+def _optuna_parallel_future_out(
+    *,
+    fut,
+    idx: int,
+    trial_obj,
+    params_sig: str,
+    trial_pruned_cls,
+):
+    out = None
+    exc = None
+    try:
+        out = fut.result()
+    except _optuna_parallel_recoverable_exc_types(trial_pruned_cls=trial_pruned_cls) as recoverable_exc:
+        exc = recoverable_exc
+    if exc is None:
+        if not isinstance(out, dict):
+            out = {"idx": int(idx), "ok": False, "error": "invalid worker result"}
+        return out, None
+    if trial_pruned_cls is not None and isinstance(exc, trial_pruned_cls):
+        return None, exc
+    return {"idx": int(idx), "ok": False, "error": f"{type(exc).__name__}: {exc}"}, None
+
+
+def _optuna_parallel_consume_chunk(
+    *,
+    chunk_items,
+    chunk_out: dict[int, dict],
+    consume_one,
+    finalize_telemetry,
+) -> dict | None:
+    for idx, _trial_obj, _preset, _params_sig, pre_out in chunk_items:
+        if isinstance(pre_out, dict):
+            out = dict(pre_out or {})
+        else:
+            out = dict(
+                chunk_out.get(
+                    int(idx),
+                    {"idx": int(idx), "ok": False, "error": "missing worker result"},
+                )
+                or {}
+            )
+        if consume_one(int(idx), out):
+            return dict(finalize_telemetry() or {})
+    return None
+
+
 def _run_optuna_parallel_trials(
     *,
     idx_next: int,
@@ -368,27 +465,12 @@ def _run_optuna_parallel_trials(
     with ThreadPoolExecutor(max_workers=int(workers)) as ex:
         idx_cursor = int(idx_next)
         while idx_cursor <= int(total):
-            chunk_items = []
-            while idx_cursor <= int(total) and len(chunk_items) < int(chunk_size):
-                trial_obj, preset, params_sig, ask_error = ask_new_trial()
-                if trial_obj is None:
-                    chunk_items.append(
-                        (
-                            int(idx_cursor),
-                            None,
-                            {},
-                            "",
-                            {
-                                "idx": int(idx_cursor),
-                                "ok": False,
-                                "error": str(ask_error or "no unique optuna candidate available"),
-                            },
-                        )
-                    )
-                    idx_cursor += 1
-                    continue
-                chunk_items.append((int(idx_cursor), trial_obj, dict(preset), str(params_sig), None))
-                idx_cursor += 1
+            chunk_items, idx_cursor = _optuna_parallel_build_chunk(
+                idx_cursor=idx_cursor,
+                total=total,
+                chunk_size=chunk_size,
+                ask_new_trial=ask_new_trial,
+            )
             if not chunk_items:
                 break
 
@@ -400,86 +482,46 @@ def _run_optuna_parallel_trials(
             chunk_out: dict[int, dict] = {}
             for fut in as_completed(list(fut_map.keys())):
                 idx, trial_obj, params_sig = fut_map.get(fut, (0, None, ""))
-                out = None
-                exc = None
-                if trial_pruned_cls is not None:
-                    try:
-                        out = fut.result()
-                    except trial_pruned_cls as pruned_exc:
-                        exc = pruned_exc
-                    except (
-
-                        AttributeError,
-                        TypeError,
-                        ValueError,
-                        KeyError,
-                        IndexError,
-                        RuntimeError,
-                        OSError,
-                        ImportError,
-                        ModuleNotFoundError,
-                        NameError,
-                    ) as recoverable_exc:
-                        exc = recoverable_exc
-                else:
-                    try:
-                        out = fut.result()
-                    except (
-
-                        AttributeError,
-                        TypeError,
-                        ValueError,
-                        KeyError,
-                        IndexError,
-                        RuntimeError,
-                        OSError,
-                        ImportError,
-                        ModuleNotFoundError,
-                        NameError,
-                    ) as recoverable_exc:
-                        exc = recoverable_exc
+                out, exc = _optuna_parallel_future_out(
+                    fut=fut,
+                    idx=int(idx),
+                    trial_obj=trial_obj,
+                    params_sig=str(params_sig),
+                    trial_pruned_cls=trial_pruned_cls,
+                )
                 if exc is not None:
-                    if trial_pruned_cls is not None and isinstance(exc, trial_pruned_cls):
-                        if trial_obj is not None and pruned_state is not None:
-                            try:
-                                study.tell(trial_obj, state=pruned_state)
-                            except (
+                    if trial_obj is not None and pruned_state is not None:
+                        try:
+                            study.tell(trial_obj, state=pruned_state)
+                        except (
 
-                                AttributeError,
-                                TypeError,
-                                ValueError,
-                                KeyError,
-                                IndexError,
-                                RuntimeError,
-                                OSError,
-                                ImportError,
-                                ModuleNotFoundError,
-                                NameError,
-                            ):
-                                logger.exception("optuna tell pruned trial in parallel")
-                        if params_sig:
-                            reserved_signatures.discard(str(params_sig))
-                        chunk_out[int(idx)] = _optuna_pruned_result(idx=int(idx))
-                        continue
-                    out = {"idx": int(idx), "ok": False, "error": f"{type(exc).__name__}: {exc}"}
-                if not isinstance(out, dict):
-                    out = {"idx": int(idx), "ok": False, "error": "invalid worker result"}
+                            AttributeError,
+                            TypeError,
+                            ValueError,
+                            KeyError,
+                            IndexError,
+                            RuntimeError,
+                            OSError,
+                            ImportError,
+                            ModuleNotFoundError,
+                            NameError,
+                        ):
+                            logger.exception("optuna tell pruned trial in parallel")
+                    if params_sig:
+                        reserved_signatures.discard(str(params_sig))
+                    chunk_out[int(idx)] = _optuna_pruned_result(idx=int(idx))
+                    continue
                 tell_trial(trial_obj, out, params_sig=params_sig, source="optuna")
                 chunk_out[int(idx)] = dict(out or {})
 
-            for idx, _trial_obj, _preset, _params_sig, pre_out in chunk_items:
-                if isinstance(pre_out, dict):
-                    out = dict(pre_out or {})
-                else:
-                    out = dict(
-                        chunk_out.get(
-                            int(idx),
-                            {"idx": int(idx), "ok": False, "error": "missing worker result"},
-                        )
-                        or {}
-                    )
-                if consume_one(int(idx), out):
-                    return dict(finalize_telemetry() or {})
+            consumed = _optuna_parallel_consume_chunk(
+                chunk_items=chunk_items,
+                chunk_out=chunk_out,
+                consume_one=consume_one,
+                finalize_telemetry=finalize_telemetry,
+            )
+            if consumed is not None:
+                return consumed
     return None
 
 

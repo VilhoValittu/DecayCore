@@ -122,27 +122,149 @@ def _prepare_boost_caps(
         and isinstance(conf_mask, np.ndarray)
         and conf_mask.shape == gain_db.shape
     ):
-        try:
-            c = np.asarray(conf_mask, dtype=float)
-            c = np.clip(np.nan_to_num(c, nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
-            w = np.clip(
-                (c - float(bass_boost_cap_conf_min)) / max(1e-9, 1.0 - float(bass_boost_cap_conf_min)),
-                0.0,
-                1.0,
+        bass_boost_cap_mask, bass_boost_cap_enabled = _prepare_boost_caps_confidence_cap(
+            conf_mask=conf_mask,
+            mask_c=mask_c,
+            freq_axis=freq_axis,
+            gain_db=gain_db,
+            boost_cap_db=boost_cap_db,
+            max_boost_db_base=max_boost_db_base,
+            bass_boost_cap_conf_min=bass_boost_cap_conf_min,
+            bass_boost_cap_extra_db=bass_boost_cap_extra_db,
+            bass_boost_cap_hz=bass_boost_cap_hz,
+        )
+    _prepare_boost_caps_write_stats(
+        st,
+        mask_c=mask_c,
+        freq_axis=freq_axis,
+        max_boost_db_base=max_boost_db_base,
+        bass_adaptive_isolation_mode=bass_adaptive_isolation_mode,
+        bass_boost_cap_enabled=bass_boost_cap_enabled,
+        bass_boost_cap_hz=bass_boost_cap_hz,
+        bass_boost_cap_conf_min=bass_boost_cap_conf_min,
+        bass_boost_cap_extra_db=bass_boost_cap_extra_db,
+        bass_boost_post_restore_enable=bass_boost_post_restore_enable,
+        bass_boost_post_restore_strength=bass_boost_post_restore_strength,
+        boost_cap_db=boost_cap_db,
+        logger=logger,
+        gain_policy=gain_policy,
+        cfg_reader=cfg_reader,
+        max_cut_db=max_cut_db,
+    )
+    return {
+        "max_cut_db": float(max_cut_db),
+        "max_boost_db_base": float(max_boost_db_base),
+        "boost_cap_db": np.asarray(boost_cap_db, dtype=float),
+        "bass_boost_cap_hz": float(bass_boost_cap_hz),
+        "bass_boost_post_restore_enable": bool(bass_boost_post_restore_enable),
+        "bass_boost_post_restore_strength": float(bass_boost_post_restore_strength),
+    }
+
+
+def _prepare_boost_caps_confidence_cap(
+    *,
+    conf_mask: np.ndarray,
+    mask_c: np.ndarray,
+    freq_axis: np.ndarray,
+    gain_db: np.ndarray,
+    boost_cap_db: np.ndarray,
+    max_boost_db_base: float,
+    bass_boost_cap_conf_min: float,
+    bass_boost_cap_extra_db: float,
+    bass_boost_cap_hz: float,
+) -> tuple[np.ndarray, bool]:
+    try:
+        c = np.asarray(conf_mask, dtype=float)
+        c = np.clip(np.nan_to_num(c, nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
+        w = np.clip(
+            (c - float(bass_boost_cap_conf_min)) / max(1e-9, 1.0 - float(bass_boost_cap_conf_min)),
+            0.0,
+            1.0,
+        )
+        bass_boost_cap_mask = mask_c & (freq_axis >= 20.0) & (freq_axis <= float(bass_boost_cap_hz))
+        if np.any(bass_boost_cap_mask):
+            local_cap = (
+                float(max_boost_db_base)
+                + float(bass_boost_cap_extra_db) * np.asarray(w[bass_boost_cap_mask], dtype=float)
             )
-            bass_boost_cap_mask = mask_c & (freq_axis >= 20.0) & (freq_axis <= float(bass_boost_cap_hz))
-            if np.any(bass_boost_cap_mask):
-                local_cap = (
-                    float(max_boost_db_base)
-                    + float(bass_boost_cap_extra_db) * np.asarray(w[bass_boost_cap_mask], dtype=float)
-                )
-                boost_cap_db[bass_boost_cap_mask] = np.minimum(local_cap, float(max_boost_db_base))
-                bass_boost_cap_enabled = bool(
-                    np.any(boost_cap_db[bass_boost_cap_mask] > (max_boost_db_base + 1e-6))
-                )
-        except (TypeError, ValueError, FloatingPointError, IndexError):
-            bass_boost_cap_mask = np.zeros_like(mask_c, dtype=bool)
-            bass_boost_cap_enabled = False
+            boost_cap_db[bass_boost_cap_mask] = np.minimum(local_cap, float(max_boost_db_base))
+            bass_boost_cap_enabled = bool(np.any(boost_cap_db[bass_boost_cap_mask] > (max_boost_db_base + 1e-6)))
+            return bass_boost_cap_mask, bass_boost_cap_enabled
+    except (TypeError, ValueError, FloatingPointError, IndexError):
+        pass
+    return np.zeros_like(mask_c, dtype=bool), False
+
+
+def _prepare_boost_caps_write_stats(
+    st,
+    *,
+    mask_c: np.ndarray,
+    freq_axis: np.ndarray,
+    max_boost_db_base: float,
+    bass_adaptive_isolation_mode: bool,
+    bass_boost_cap_enabled: bool,
+    bass_boost_cap_hz: float,
+    bass_boost_cap_conf_min: float,
+    bass_boost_cap_extra_db: float,
+    bass_boost_post_restore_enable: bool,
+    bass_boost_post_restore_strength: float,
+    boost_cap_db: np.ndarray,
+    logger,
+    gain_policy,
+    cfg_reader: CfgReader,
+    max_cut_db: float,
+) -> None:
+    _prepare_boost_caps_store_stats(
+        st,
+        mask_c=mask_c,
+        freq_axis=freq_axis,
+        max_boost_db_base=max_boost_db_base,
+        bass_adaptive_isolation_mode=bass_adaptive_isolation_mode,
+        bass_boost_cap_enabled=bass_boost_cap_enabled,
+        bass_boost_cap_hz=bass_boost_cap_hz,
+        bass_boost_cap_conf_min=bass_boost_cap_conf_min,
+        bass_boost_cap_extra_db=bass_boost_cap_extra_db,
+        bass_boost_post_restore_enable=bass_boost_post_restore_enable,
+        bass_boost_post_restore_strength=bass_boost_post_restore_strength,
+        boost_cap_db=boost_cap_db,
+    )
+    _prepare_boost_caps_log_diagnostics(
+        logger=logger,
+        gain_policy=gain_policy,
+        cfg_reader=cfg_reader,
+        max_cut_db=max_cut_db,
+        max_boost_db_base=max_boost_db_base,
+        bass_adaptive_isolation_mode=bass_adaptive_isolation_mode,
+        bass_boost_cap_enabled=bass_boost_cap_enabled,
+        bass_boost_cap_hz=bass_boost_cap_hz,
+        bass_boost_cap_conf_min=bass_boost_cap_conf_min,
+        bass_boost_cap_extra_db=bass_boost_cap_extra_db,
+        bass_boost_post_restore_enable=bass_boost_post_restore_enable,
+        bass_boost_post_restore_strength=bass_boost_post_restore_strength,
+    )
+    _prepare_boost_caps_harmonic_risk(
+        st,
+        freq_axis=freq_axis,
+        mask_c=mask_c,
+        boost_cap_db=boost_cap_db,
+    )
+
+
+def _prepare_boost_caps_store_stats(
+    st,
+    *,
+    mask_c: np.ndarray,
+    freq_axis: np.ndarray,
+    max_boost_db_base: float,
+    bass_adaptive_isolation_mode: bool,
+    bass_boost_cap_enabled: bool,
+    bass_boost_cap_hz: float,
+    bass_boost_cap_conf_min: float,
+    bass_boost_cap_extra_db: float,
+    bass_boost_post_restore_enable: bool,
+    bass_boost_post_restore_strength: float,
+    boost_cap_db: np.ndarray,
+) -> None:
     try:
         if isinstance(st, dict):
             b20 = mask_c & (freq_axis >= 20.0) & (freq_axis <= 200.0)
@@ -168,6 +290,23 @@ def _prepare_boost_caps(
             )
     except (TypeError, ValueError):
         pass
+
+
+def _prepare_boost_caps_log_diagnostics(
+    *,
+    logger,
+    gain_policy,
+    cfg_reader: CfgReader,
+    max_cut_db: float,
+    max_boost_db_base: float,
+    bass_adaptive_isolation_mode: bool,
+    bass_boost_cap_enabled: bool,
+    bass_boost_cap_hz: float,
+    bass_boost_cap_conf_min: float,
+    bass_boost_cap_extra_db: float,
+    bass_boost_post_restore_enable: bool,
+    bass_boost_post_restore_strength: float,
+) -> None:
     try:
         logger.info(
             "Diagnostic: "
@@ -187,8 +326,15 @@ def _prepare_boost_caps(
         )
     except (AttributeError, TypeError, ValueError):
         pass
-    # Harmonic-risk-based local boost cap reduction (Patch 5).
-    # Only reduces the cap — never increases it. Effect is bounded (max 3 dB reduction).
+
+
+def _prepare_boost_caps_harmonic_risk(
+    st,
+    *,
+    freq_axis: np.ndarray,
+    mask_c: np.ndarray,
+    boost_cap_db: np.ndarray,
+) -> None:
     _hrisk_cap_enabled = False
     _hrisk_peak = 0.0
     _hrisk_peak_hz = float("nan")
@@ -211,7 +357,6 @@ def _prepare_boost_caps(
                     left=0.0,
                     right=0.0,
                 )
-                # Only apply in 20–800 Hz where harmonic risk is meaningful.
                 _hrisk_band = mask_c & (freq_axis >= 20.0) & (freq_axis <= 800.0)
                 _max_local_reduction_db = 2.0
                 _cap_reduction = np.zeros_like(freq_axis, dtype=float)
@@ -250,14 +395,6 @@ def _prepare_boost_caps(
             )
     except (TypeError, ValueError):
         pass
-    return {
-        "max_cut_db": float(max_cut_db),
-        "max_boost_db_base": float(max_boost_db_base),
-        "boost_cap_db": np.asarray(boost_cap_db, dtype=float),
-        "bass_boost_cap_hz": float(bass_boost_cap_hz),
-        "bass_boost_post_restore_enable": bool(bass_boost_post_restore_enable),
-        "bass_boost_post_restore_strength": float(bass_boost_post_restore_strength),
-    }
 
 def _stats_array(st, keys: tuple[str, ...], shape: tuple[int, ...]) -> tuple[np.ndarray | None, str]:
     if not isinstance(st, dict):

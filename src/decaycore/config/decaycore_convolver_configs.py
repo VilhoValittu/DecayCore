@@ -223,6 +223,409 @@ def _normalize_camilladsp_biquads(value) -> list[dict[str, float]]:
     return out
 
 
+def _coerce_optional_float(value, default: float = float("nan")) -> float:
+    try:
+        if value is None:
+            return float(default)
+        result = float(value)
+    except _NUMERIC_PARSE_EXCEPTIONS:
+        return float(default)
+    return result if math.isfinite(result) else float(default)
+
+
+def _is_positive_finite(value: float) -> bool:
+    return math.isfinite(float(value)) and float(value) > 0.0
+
+
+def _resolve_raspberry_yaml_context(
+    fs,
+    ft_short,
+    file_ts,
+    *,
+    master_gain_db: float,
+    irw_tag: str,
+    target_curve_tag: str,
+    layout: str | None,
+    program_version: str | None,
+    winner_rank_score: float | None,
+    include_sub: bool,
+    sub_allpass_freq_hz: float | None,
+    sub_allpass_q: float | None,
+    sub_delay_ms: float | None,
+    sub_polarity_invert: bool,
+    sub_gain_trim_db: float | None,
+    main_hpf_hz: float | None,
+    sub_hpf_hz: float | None,
+    sub_lpf_hz: float | None,
+    main_hpf_order: int | float | str | None,
+    sub_hpf_order: int | float | str | None,
+    sub_lpf_order: int | float | str | None,
+    device_format: str,
+    left_iir_biquads,
+    right_iir_biquads,
+) -> dict:
+    if device_format not in ("S32_LE", "S16_LE"):
+        raise ValueError(f"device_format must be 'S32_LE' or 'S16_LE', got {device_format!r}")
+
+    include_sub = bool(include_sub)
+    ap_freq_hz = _coerce_optional_float(sub_allpass_freq_hz)
+    ap_q = _coerce_optional_float(sub_allpass_q)
+    raw_sub_delay_ms = _coerce_optional_float(sub_delay_ms, 0.0)
+    sub_gain_db = _coerce_optional_float(sub_gain_trim_db, 0.0)
+    main_hpf = _coerce_optional_float(main_hpf_hz)
+    sub_hpf = _coerce_optional_float(sub_hpf_hz)
+    sub_lpf = _coerce_optional_float(sub_lpf_hz)
+    sub_polarity_invert = bool(sub_polarity_invert)
+
+    use_main_hpf = bool(include_sub and _is_positive_finite(main_hpf))
+    use_sub_hpf = bool(include_sub and _is_positive_finite(sub_hpf))
+    use_sub_lpf = bool(include_sub and _is_positive_finite(sub_lpf))
+    use_sub_allpass = bool(include_sub and _is_positive_finite(ap_freq_hz) and _is_positive_finite(ap_q))
+
+    # Delay filters only accept non-negative values. Preserve the requested
+    # relative main/sub timing by shifting the mains when the sub needs
+    # an effective phase advance.
+    main_delay_ms = float(max(0.0, -raw_sub_delay_ms)) if include_sub else 0.0
+    sub_delay_pos_ms = float(max(0.0, raw_sub_delay_ms + main_delay_ms)) if include_sub else 0.0
+    use_main_delay = bool(include_sub and main_delay_ms > 1e-9)
+    use_sub_delay = bool(include_sub and sub_delay_pos_ms > 1e-9)
+    use_sub_gain = bool(include_sub and (abs(sub_gain_db) > 1e-9 or sub_polarity_invert))
+
+    main_hpf_order_i = _camilladsp_crossover_order(main_hpf_order, 2)
+    sub_hpf_order_i = _camilladsp_crossover_order(sub_hpf_order, 2)
+    sub_lpf_order_i = _camilladsp_crossover_order(sub_lpf_order, 2)
+
+    left_iir = _normalize_camilladsp_biquads(left_iir_biquads)
+    right_iir = _normalize_camilladsp_biquads(right_iir_biquads)
+    spec = filter_wav_export_spec(
+        "$samplerate$",
+        ft_short,
+        file_ts,
+        irw_tag=irw_tag,
+        target_curve_tag=target_curve_tag,
+        layout=layout,
+        prefix="../coeffs/",
+    )
+    sub_spec = sub_filter_wav_export_spec(
+        "$samplerate$",
+        ft_short,
+        file_ts,
+        irw_tag=irw_tag,
+        prefix="../coeffs/",
+    )
+    return {
+        "device_format": str(device_format).replace("_", "_"),
+        "include_sub": include_sub,
+        "master_gain_db": float(master_gain_db),
+        "title_meta": _title_suffix(program_version=program_version, winner_rank_score=winner_rank_score),
+        "tc": _tc_segment(target_curve_tag),
+        "sub_polarity_invert": sub_polarity_invert,
+        "l_wav": str(spec["left_filename"]),
+        "r_wav": str(spec["right_filename"]),
+        "l_ch": int(spec["left_channel"]),
+        "r_ch": int(spec["right_channel"]),
+        "sub_wav": str(sub_spec["filename"]),
+        "sub_ch": int(sub_spec["channel"]),
+        "ap_freq_hz": float(ap_freq_hz),
+        "ap_q": float(ap_q),
+        "raw_sub_delay_ms": float(raw_sub_delay_ms),
+        "sub_delay_pos_ms": float(sub_delay_pos_ms),
+        "sub_gain_db": float(sub_gain_db),
+        "main_hpf": float(main_hpf),
+        "sub_hpf": float(sub_hpf),
+        "sub_lpf": float(sub_lpf),
+        "use_main_hpf": use_main_hpf,
+        "use_sub_hpf": use_sub_hpf,
+        "use_sub_lpf": use_sub_lpf,
+        "use_sub_allpass": use_sub_allpass,
+        "use_main_delay": use_main_delay,
+        "use_sub_delay": use_sub_delay,
+        "use_sub_gain": use_sub_gain,
+        "main_delay_ms": float(main_delay_ms),
+        "main_hpf_order_i": main_hpf_order_i,
+        "sub_hpf_order_i": sub_hpf_order_i,
+        "sub_lpf_order_i": sub_lpf_order_i,
+        "left_iir": left_iir,
+        "right_iir": right_iir,
+        "playback_channels": 3 if include_sub else 2,
+        "layout": _normalize_layout(layout),
+    }
+
+
+def _build_raspberry_yaml_core_filter_lines(ctx: dict) -> list[str]:
+    lines = [
+        "",
+        "  ir_left:",
+        "    type: Conv",
+        "    parameters:",
+        "      type: Wav",
+        f"      filename: {ctx['l_wav']}",
+        f"      channel: {ctx['l_ch']}",
+        "",
+        "  ir_right:",
+        "    type: Conv",
+        "    parameters:",
+        "      type: Wav",
+        f"      filename: {ctx['r_wav']}",
+        f"      channel: {ctx['r_ch']}",
+    ]
+    for idx, biquad in enumerate(ctx["left_iir"], start=1):
+        lines.extend(
+            [
+                "",
+                f"  l_hybrid_iir_{idx}:",
+                "    type: Biquad",
+                "    parameters:",
+                "      type: Peaking",
+                f"      freq: {float(biquad['freq']):.3f}",
+                f"      q: {float(biquad['q']):.6f}",
+                f"      gain: {float(biquad['gain']):.3f}",
+            ]
+        )
+    for idx, biquad in enumerate(ctx["right_iir"], start=1):
+        lines.extend(
+            [
+                "",
+                f"  r_hybrid_iir_{idx}:",
+                "    type: Biquad",
+                "    parameters:",
+                "      type: Peaking",
+                f"      freq: {float(biquad['freq']):.3f}",
+                f"      q: {float(biquad['q']):.6f}",
+                f"      gain: {float(biquad['gain']):.3f}",
+            ]
+        )
+    return lines
+
+
+def _build_raspberry_yaml_sub_filter_lines(ctx: dict) -> list[str]:
+    lines: list[str] = []
+    if ctx["include_sub"]:
+        lines.extend(
+            [
+                "",
+                "  ir_sub:",
+                "    type: Conv",
+                "    parameters:",
+                "      type: Wav",
+                f"      filename: {ctx['sub_wav']}",
+                f"      channel: {ctx['sub_ch']}",
+            ]
+        )
+        if ctx["use_sub_allpass"]:
+            lines.extend(
+                [
+                    "",
+                    "  sub_allpass:",
+                    "    type: Biquad",
+                    "    parameters:",
+                    "      type: Allpass",
+                    f"      freq: {ctx['ap_freq_hz']:.3f}",
+                    f"      q: {ctx['ap_q']:.6f}",
+                ]
+            )
+        if ctx["use_sub_hpf"]:
+            _extend_camilladsp_crossover_filter(
+                lines,
+                name="sub_hpf",
+                kind="Highpass",
+                freq_hz=ctx["sub_hpf"],
+                order=ctx["sub_hpf_order_i"],
+            )
+        if ctx["use_sub_lpf"]:
+            _extend_camilladsp_crossover_filter(
+                lines,
+                name="sub_lpf",
+                kind="Lowpass",
+                freq_hz=ctx["sub_lpf"],
+                order=ctx["sub_lpf_order_i"],
+            )
+    return lines
+
+
+def _build_raspberry_yaml_aux_filter_lines(ctx: dict) -> list[str]:
+    lines: list[str] = []
+    if ctx["use_main_hpf"]:
+        _extend_camilladsp_crossover_filter(
+            lines,
+            name="main_hpf",
+            kind="Highpass",
+            freq_hz=ctx["main_hpf"],
+            order=ctx["main_hpf_order_i"],
+        )
+    if ctx["use_main_delay"]:
+        lines.extend(
+            [
+                "",
+                "  main_delay:",
+                "    type: Delay",
+                "    parameters:",
+                f"      delay: {ctx['main_delay_ms']:.3f}",
+                "      unit: ms",
+                "      subsample: true",
+            ]
+        )
+    if ctx["use_sub_gain"]:
+        lines.extend(
+            [
+                "",
+                "  sub_gain:",
+                "    type: Gain",
+                "    parameters:",
+                f"      gain: {ctx['sub_gain_db']:.3f}",
+                "      scale: dB",
+                f"      inverted: {'true' if ctx['sub_polarity_invert'] else 'false'}",
+            ]
+        )
+    if ctx["use_sub_delay"]:
+        lines.extend(
+            [
+                "",
+                "  sub_delay:",
+                "    type: Delay",
+                "    parameters:",
+                f"      delay: {ctx['sub_delay_pos_ms']:.3f}",
+                "      unit: ms",
+                "      subsample: true",
+            ]
+        )
+    return lines
+
+
+def _build_raspberry_yaml_filter_lines(ctx: dict) -> list[str]:
+    lines = [
+        "",
+        "filters:",
+    ]
+    lines.extend(_build_raspberry_yaml_core_filter_lines(ctx))
+    lines.extend(_build_raspberry_yaml_sub_filter_lines(ctx))
+    lines.extend(_build_raspberry_yaml_aux_filter_lines(ctx))
+    lines.extend(
+        [
+            "",
+            "  mastergain:",
+            "    type: Gain",
+            "    parameters:",
+            "      gain: -6",
+        ]
+    )
+    return lines
+
+
+def _build_raspberry_yaml_mixer_lines(ctx: dict) -> list[str]:
+    lines = [
+        "",
+        "mixers:",
+        "  stereo:",
+        "    channels:",
+        "      in: 2",
+        f"      out: {ctx['playback_channels']}",
+        "    mapping:",
+        "      - dest: 0",
+        "        sources:",
+        "          - channel: 0",
+        "            gain: 0",
+        "      - dest: 1",
+        "        sources:",
+        "          - channel: 1",
+        "            gain: 0",
+    ]
+    if ctx["include_sub"]:
+        lines.extend(
+            [
+                "      - dest: 2",
+                "        sources:",
+                "          - channel: 0",
+                "            gain: 0",
+                "          - channel: 1",
+                "            gain: 0",
+            ]
+        )
+    return lines
+
+
+def _build_raspberry_yaml_pipeline_lines(ctx: dict) -> list[str]:
+    left_filter_names = ["mastergain"]
+    right_filter_names = ["mastergain"]
+    if ctx["use_main_delay"]:
+        left_filter_names.append("main_delay")
+        right_filter_names.append("main_delay")
+    if ctx["use_main_hpf"]:
+        left_filter_names.append("main_hpf")
+        right_filter_names.append("main_hpf")
+    left_filter_names.extend([f"l_hybrid_iir_{idx}" for idx in range(1, len(ctx["left_iir"]) + 1)])
+    right_filter_names.extend([f"r_hybrid_iir_{idx}" for idx in range(1, len(ctx["right_iir"]) + 1)])
+    left_filter_names.append("ir_left")
+    right_filter_names.append("ir_right")
+
+    sub_filter_names = ["mastergain"]
+    if ctx["use_sub_gain"]:
+        sub_filter_names.append("sub_gain")
+    if ctx["use_sub_delay"]:
+        sub_filter_names.append("sub_delay")
+    if ctx["use_sub_hpf"]:
+        sub_filter_names.append("sub_hpf")
+    if ctx["use_sub_lpf"]:
+        sub_filter_names.append("sub_lpf")
+    if ctx["use_sub_allpass"]:
+        sub_filter_names.append("sub_allpass")
+    sub_filter_names.append("ir_sub")
+
+    lines = [
+        "",
+        "pipeline:",
+        "  - type: Mixer",
+        "    name: stereo",
+        "  - type: Filter",
+        "    channels: [0]",
+        f"    names: [{', '.join(left_filter_names)}]",
+        "  - type: Filter",
+        "    channels: [1]",
+        f"    names: [{', '.join(right_filter_names)}]",
+    ]
+    if ctx["include_sub"]:
+        lines.extend(
+            [
+                "  - type: Filter",
+                "    channels: [2]",
+                f"    names: [{', '.join(sub_filter_names)}]",
+            ]
+        )
+    return lines
+
+
+def _build_raspberry_yaml_text(ctx: dict) -> str:
+    lines = [
+        "description: null",
+        "devices:",
+        "  capture:",
+        "    type: Stdin",
+        "    channels: 2",
+        f"    format: {ctx['device_format']}",
+        "  playback:",
+        "    type: Alsa",
+        "    device: plughw:0,0",
+        f"    channels: {ctx['playback_channels']}",
+        f"    format: {ctx['device_format']}",
+        f"  samplerate: {int(ctx['fs'])}",
+        "  enable_rate_adjust: true",
+        "  chunksize: 2048",
+        "  queuelimit: 1",
+        "  volume_ramp_time: 150",
+    ]
+    lines.extend(_build_raspberry_yaml_filter_lines(ctx))
+    lines.extend(_build_raspberry_yaml_mixer_lines(ctx))
+    lines.extend(_build_raspberry_yaml_pipeline_lines(ctx))
+    lines.extend(
+        [
+            "",
+            "processors: null",
+            f"title: {ctx['ft_short']} Window {ctx['irw_tag']}{ctx['tc']} {ctx['file_ts']} {ctx['title_meta']}",
+        ]
+    )
+    return "\n".join(lines).strip()
+
+
 def generate_raspberry_yaml(
     fs,
     ft_short,
@@ -249,329 +652,41 @@ def generate_raspberry_yaml(
     left_iir_biquads=None,
     right_iir_biquads=None,
 ):
-    if device_format not in ("S32_LE", "S16_LE"):
-        raise ValueError(f"device_format must be 'S32_LE' or 'S16_LE', got {device_format!r}")
-    yaml_device_format = str(device_format).replace("_", "_")
-    tc = _tc_segment(target_curve_tag)
-    title_meta = _title_suffix(program_version=program_version, winner_rank_score=winner_rank_score)
-    spec = filter_wav_export_spec(
-        "$samplerate$",
+    ctx = _resolve_raspberry_yaml_context(
+        fs,
         ft_short,
         file_ts,
+        master_gain_db=master_gain_db,
         irw_tag=irw_tag,
         target_curve_tag=target_curve_tag,
         layout=layout,
-        prefix="../coeffs/",
+        program_version=program_version,
+        winner_rank_score=winner_rank_score,
+        include_sub=include_sub,
+        sub_allpass_freq_hz=sub_allpass_freq_hz,
+        sub_allpass_q=sub_allpass_q,
+        sub_delay_ms=sub_delay_ms,
+        sub_polarity_invert=sub_polarity_invert,
+        sub_gain_trim_db=sub_gain_trim_db,
+        main_hpf_hz=main_hpf_hz,
+        sub_hpf_hz=sub_hpf_hz,
+        sub_lpf_hz=sub_lpf_hz,
+        main_hpf_order=main_hpf_order,
+        sub_hpf_order=sub_hpf_order,
+        sub_lpf_order=sub_lpf_order,
+        device_format=device_format,
+        left_iir_biquads=left_iir_biquads,
+        right_iir_biquads=right_iir_biquads,
     )
-    l_wav = str(spec["left_filename"])
-    r_wav = str(spec["right_filename"])
-    l_ch = int(spec["left_channel"])
-    r_ch = int(spec["right_channel"])
-    sub_spec = sub_filter_wav_export_spec(
-        "$samplerate$",
-        ft_short,
-        file_ts,
-        irw_tag=irw_tag,
-        prefix="../coeffs/",
+    return _build_raspberry_yaml_text(
+        {
+            **ctx,
+            "fs": fs,
+            "ft_short": ft_short,
+            "irw_tag": irw_tag,
+            "file_ts": file_ts,
+        }
     )
-    sub_wav = str(sub_spec["filename"])
-    sub_ch = int(sub_spec["channel"])
-
-    include_sub = bool(include_sub)
-    try:
-        ap_freq_hz = float(sub_allpass_freq_hz) if sub_allpass_freq_hz is not None else float("nan")
-    except _NUMERIC_PARSE_EXCEPTIONS:
-        ap_freq_hz = float("nan")
-    try:
-        ap_q = float(sub_allpass_q) if sub_allpass_q is not None else float("nan")
-    except _NUMERIC_PARSE_EXCEPTIONS:
-        ap_q = float("nan")
-    try:
-        raw_sub_delay_ms = float(sub_delay_ms) if sub_delay_ms is not None else 0.0
-    except _NUMERIC_PARSE_EXCEPTIONS:
-        raw_sub_delay_ms = 0.0
-    if not (raw_sub_delay_ms == raw_sub_delay_ms) or abs(raw_sub_delay_ms) == float("inf"):
-        raw_sub_delay_ms = 0.0
-    try:
-        sub_gain_db = float(sub_gain_trim_db) if sub_gain_trim_db is not None else 0.0
-    except _NUMERIC_PARSE_EXCEPTIONS:
-        sub_gain_db = 0.0
-    if not (sub_gain_db == sub_gain_db) or abs(sub_gain_db) == float("inf"):
-        sub_gain_db = 0.0
-    try:
-        main_hpf = float(main_hpf_hz) if main_hpf_hz is not None else float("nan")
-    except _NUMERIC_PARSE_EXCEPTIONS:
-        main_hpf = float("nan")
-    try:
-        sub_hpf = float(sub_hpf_hz) if sub_hpf_hz is not None else float("nan")
-    except _NUMERIC_PARSE_EXCEPTIONS:
-        sub_hpf = float("nan")
-    try:
-        sub_lpf = float(sub_lpf_hz) if sub_lpf_hz is not None else float("nan")
-    except _NUMERIC_PARSE_EXCEPTIONS:
-        sub_lpf = float("nan")
-    sub_polarity_invert = bool(sub_polarity_invert)
-    use_main_hpf = bool(include_sub and main_hpf == main_hpf and abs(main_hpf) != float("inf") and main_hpf > 0.0)
-    use_sub_hpf = bool(include_sub and sub_hpf == sub_hpf and abs(sub_hpf) != float("inf") and sub_hpf > 0.0)
-    use_sub_lpf = bool(include_sub and sub_lpf == sub_lpf and abs(sub_lpf) != float("inf") and sub_lpf > 0.0)
-    use_sub_allpass = bool(
-        include_sub
-        and ap_freq_hz == ap_freq_hz
-        and ap_q == ap_q
-        and abs(ap_freq_hz) != float("inf")
-        and abs(ap_q) != float("inf")
-        and ap_freq_hz > 0.0
-        and ap_q > 0.0
-    )
-    # Delay filters only accept non-negative values. Preserve the requested
-    # relative main/sub timing by shifting the mains when the sub needs
-    # an effective phase advance.
-    main_delay_ms = float(max(0.0, -raw_sub_delay_ms)) if include_sub else 0.0
-    sub_delay_pos_ms = float(max(0.0, raw_sub_delay_ms + main_delay_ms)) if include_sub else 0.0
-    use_main_delay = bool(include_sub and main_delay_ms > 1e-9)
-    use_sub_delay = bool(include_sub and sub_delay_pos_ms > 1e-9)
-    use_sub_gain = bool(include_sub and (abs(sub_gain_db) > 1e-9 or sub_polarity_invert))
-    main_hpf_order_i = _camilladsp_crossover_order(main_hpf_order, 2)
-    sub_hpf_order_i = _camilladsp_crossover_order(sub_hpf_order, 2)
-    sub_lpf_order_i = _camilladsp_crossover_order(sub_lpf_order, 2)
-    left_iir = _normalize_camilladsp_biquads(left_iir_biquads)
-    right_iir = _normalize_camilladsp_biquads(right_iir_biquads)
-
-    playback_channels = 3 if include_sub else 2
-    left_filter_names = ["mastergain"]
-    right_filter_names = ["mastergain"]
-    if use_main_delay:
-        left_filter_names.append("main_delay")
-        right_filter_names.append("main_delay")
-    if use_main_hpf:
-        left_filter_names.append("main_hpf")
-        right_filter_names.append("main_hpf")
-    left_filter_names.extend([f"l_hybrid_iir_{idx}" for idx in range(1, len(left_iir) + 1)])
-    right_filter_names.extend([f"r_hybrid_iir_{idx}" for idx in range(1, len(right_iir) + 1)])
-    left_filter_names.append("ir_left")
-    right_filter_names.append("ir_right")
-
-    sub_filter_names = ["mastergain"]
-    if use_sub_gain:
-        sub_filter_names.append("sub_gain")
-    if use_sub_delay:
-        sub_filter_names.append("sub_delay")
-    if use_sub_hpf:
-        sub_filter_names.append("sub_hpf")
-    if use_sub_lpf:
-        sub_filter_names.append("sub_lpf")
-    if use_sub_allpass:
-        sub_filter_names.append("sub_allpass")
-    sub_filter_names.append("ir_sub")
-
-    lines = [
-        "description: null",
-        "devices:",
-        "  capture:",
-        "    type: Stdin",
-        "    channels: 2",
-        f"    format: {yaml_device_format}",
-        "  playback:",
-        "    type: Alsa",
-        "    device: plughw:0,0",
-        f"    channels: {playback_channels}",
-        f"    format: {yaml_device_format}",
-        f"  samplerate: {int(fs)}",
-        "  enable_rate_adjust: true",
-        "  chunksize: 2048",
-        "  queuelimit: 1",
-        "  volume_ramp_time: 150",
-        "",
-        "filters:",
-        "  ir_left:",
-        "    type: Conv",
-        "    parameters:",
-        "      type: Wav",
-        f"      filename: {l_wav}",
-        f"      channel: {l_ch}",
-        "",
-        "  ir_right:",
-        "    type: Conv",
-        "    parameters:",
-        "      type: Wav",
-        f"      filename: {r_wav}",
-        f"      channel: {r_ch}",
-    ]
-    for idx, biquad in enumerate(left_iir, start=1):
-        lines.extend(
-            [
-                "",
-                f"  l_hybrid_iir_{idx}:",
-                "    type: Biquad",
-                "    parameters:",
-                "      type: Peaking",
-                f"      freq: {float(biquad['freq']):.3f}",
-                f"      q: {float(biquad['q']):.6f}",
-                f"      gain: {float(biquad['gain']):.3f}",
-            ]
-        )
-    for idx, biquad in enumerate(right_iir, start=1):
-        lines.extend(
-            [
-                "",
-                f"  r_hybrid_iir_{idx}:",
-                "    type: Biquad",
-                "    parameters:",
-                "      type: Peaking",
-                f"      freq: {float(biquad['freq']):.3f}",
-                f"      q: {float(biquad['q']):.6f}",
-                f"      gain: {float(biquad['gain']):.3f}",
-            ]
-        )
-    if include_sub:
-        lines.extend(
-            [
-                "",
-                "  ir_sub:",
-                "    type: Conv",
-                "    parameters:",
-                "      type: Wav",
-                f"      filename: {sub_wav}",
-                f"      channel: {sub_ch}",
-            ]
-        )
-        if use_sub_allpass:
-            lines.extend(
-                [
-                    "",
-                    "  sub_allpass:",
-                    "    type: Biquad",
-                    "    parameters:",
-                    "      type: Allpass",
-                    f"      freq: {ap_freq_hz:.3f}",
-                    f"      q: {ap_q:.6f}",
-                ]
-            )
-        if use_sub_hpf:
-            _extend_camilladsp_crossover_filter(
-                lines,
-                name="sub_hpf",
-                kind="Highpass",
-                freq_hz=sub_hpf,
-                order=sub_hpf_order_i,
-            )
-        if use_sub_lpf:
-            _extend_camilladsp_crossover_filter(
-                lines,
-                name="sub_lpf",
-                kind="Lowpass",
-                freq_hz=sub_lpf,
-                order=sub_lpf_order_i,
-            )
-    if use_main_hpf:
-        _extend_camilladsp_crossover_filter(
-            lines,
-            name="main_hpf",
-            kind="Highpass",
-            freq_hz=main_hpf,
-            order=main_hpf_order_i,
-        )
-    if use_main_delay:
-        lines.extend(
-            [
-                "",
-                "  main_delay:",
-                "    type: Delay",
-                "    parameters:",
-                f"      delay: {main_delay_ms:.3f}",
-                "      unit: ms",
-                "      subsample: true",
-            ]
-        )
-    if use_sub_gain:
-        lines.extend(
-            [
-                "",
-                "  sub_gain:",
-                "    type: Gain",
-                "    parameters:",
-                f"      gain: {sub_gain_db:.3f}",
-                "      scale: dB",
-                f"      inverted: {'true' if sub_polarity_invert else 'false'}",
-            ]
-        )
-    if use_sub_delay:
-        lines.extend(
-            [
-                "",
-                "  sub_delay:",
-                "    type: Delay",
-                "    parameters:",
-                f"      delay: {sub_delay_pos_ms:.3f}",
-                "      unit: ms",
-                "      subsample: true",
-            ]
-        )
-    lines.extend(
-        [
-            "",
-            "  mastergain:",
-            "    type: Gain",
-            "    parameters:",
-            "      gain: -6",
-            "",
-            "mixers:",
-            "  stereo:",
-            "    channels:",
-            "      in: 2",
-            f"      out: {playback_channels}",
-            "    mapping:",
-            "      - dest: 0",
-            "        sources:",
-            "          - channel: 0",
-            "            gain: 0",
-            "      - dest: 1",
-            "        sources:",
-            "          - channel: 1",
-            "            gain: 0",
-        ]
-    )
-    if include_sub:
-        lines.extend(
-            [
-                "      - dest: 2",
-                "        sources:",
-                "          - channel: 0",
-                "            gain: 0",
-                "          - channel: 1",
-                "            gain: 0",
-            ]
-        )
-    lines.extend(
-        [
-            "",
-            "pipeline:",
-            "  - type: Mixer",
-            "    name: stereo",
-            "  - type: Filter",
-            "    channels: [0]",
-            f"    names: [{', '.join(left_filter_names)}]",
-            "  - type: Filter",
-            "    channels: [1]",
-            f"    names: [{', '.join(right_filter_names)}]",
-        ]
-    )
-    if include_sub:
-        lines.extend(
-            [
-                "  - type: Filter",
-                "    channels: [2]",
-                f"    names: [{', '.join(sub_filter_names)}]",
-            ]
-        )
-    lines.extend(
-        [
-            "",
-            "processors: null",
-            f"title: {ft_short} Window {irw_tag}{tc} {file_ts} {title_meta}",
-        ]
-    )
-    return "\n".join(lines).strip()
 
 
 

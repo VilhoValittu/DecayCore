@@ -83,9 +83,7 @@ def _gd_zone_limit_ms_per_oct(base_limit: float, peak_hz: float | None) -> float
     return float(base_limit * ((30.0 + t * (15.0 - 30.0)) / 30.0))
 
 
-def gd_grad_limiter(ir, cfg, st, *, freq_axis=None, phase_mask=None, limiter_fn=None) -> tuple[np.ndarray, dict[str, Any]]:
-    in_phase = np.asarray(ir, dtype=float).copy()
-    out = in_phase.copy()
+def _gd_grad_limiter_info(cfg, lim_cfg: float) -> dict[str, Any]:
     info = {
         "enabled": False,
         "applied": False,
@@ -102,62 +100,113 @@ def gd_grad_limiter(ir, cfg, st, *, freq_axis=None, phase_mask=None, limiter_fn=
         "units_note": "gd_ms=-dphi/d(2*pi*f)*1e3; gd_grad=np.gradient(gd_ms, log2(f))",
         "limit_input": None,
     }
+    info["limit_input"] = float(lim_cfg)
+    info["limit_ms_per_oct"] = float(lim_cfg) if lim_cfg > 0.0 else 0.0
+    info["enabled"] = bool(lim_cfg > 0.0)
+    info["reason"] = "applied" if info["enabled"] else "limit<=0"
+    return info
+
+
+def _gd_grad_limiter_measure(freq_axis, phase, phase_mask, info: dict[str, Any], *, before: bool) -> None:
+    try:
+        metrics = gd_grad_metrics(np.asarray(freq_axis, dtype=float), phase, mask=phase_mask)
+    except (TypeError, ValueError, FloatingPointError, IndexError):
+        return
+    prefix = "before" if bool(before) else "after"
+    info[f"max_grad_{prefix}_ms_per_oct"] = float(metrics.get("max_ms_per_oct", 0.0) or 0.0)
+    info[f"max_grad_{prefix}_hz"] = metrics.get("at_hz", None)
+    if bool(before):
+        info["used_x_axis"] = str(metrics.get("used_x_axis", "log2(f)") or "log2(f)")
+        info["df_min"] = metrics.get("df_min", None)
+        info["df_max"] = metrics.get("df_max", None)
+        info["phase_wrapped"] = bool(metrics.get("phase_wrapped", False))
+        info["units_note"] = str(metrics.get("units_note", info["units_note"]) or info["units_note"])
+
+
+def _gd_grad_limiter_apply(
+    freq_axis,
+    in_phase: np.ndarray,
+    phase_mask,
+    limiter_fn,
+    cfg,
+    lim_cfg: float,
+    info: dict[str, Any],
+) -> np.ndarray:
+    if not (info["enabled"] and limiter_fn is not None and freq_axis is not None):
+        return in_phase
+    try:
+        f_arr = np.asarray(freq_axis, dtype=float)
+        valid_f = np.isfinite(f_arr) & (f_arr > 0.0)
+        if phase_mask is not None:
+            valid_f &= np.asarray(phase_mask, dtype=bool)
+        if np.count_nonzero(valid_f) >= 4:
+            f_lo = float(np.min(f_arr[valid_f]))
+            f_hi = float(np.max(f_arr[valid_f]))
+        else:
+            base = f_arr[np.isfinite(f_arr) & (f_arr > 0.0)]
+            f_lo = float(np.min(base))
+            f_hi = float(np.max(base))
+        try:
+            gd_sigma = float(getattr(cfg, "gd_grad_smooth_sigma", 0.8) or 0.8)
+        except (AttributeError, TypeError, ValueError):
+            gd_sigma = 0.8
+        gd_sigma = gd_sigma if np.isfinite(gd_sigma) else 0.8
+        lim_effective = _gd_zone_limit_ms_per_oct(lim_cfg, info.get("max_grad_before_hz"))
+        info["limit_ms_per_oct"] = float(lim_effective)
+        out = limiter_fn(
+            f_arr,
+            in_phase,
+            mask=phase_mask,
+            max_grad_ms_per_oct=float(lim_effective),
+            f_min=float(f_lo),
+            f_max=float(f_hi),
+            grad_smooth_sigma=float(max(0.0, gd_sigma)),
+            soft_limit=True,
+        )
+        info["applied"] = True
+        return out
+    except (TypeError, ValueError, FloatingPointError, IndexError):
+        info["enabled"] = False
+        info["reason"] = "missing data"
+        return in_phase
+
+
+def _gd_grad_limiter_revert_if_needed(in_phase: np.ndarray, out: np.ndarray, info: dict[str, Any]) -> np.ndarray:
+    try:
+        gb = info["max_grad_before_ms_per_oct"]
+        ga = info["max_grad_after_ms_per_oct"]
+        if info.get("applied", False) and gb is not None and ga is not None and np.isfinite(float(gb)) and np.isfinite(float(ga)) and (float(ga) > (float(gb) * 1.001)):
+            info["applied"] = False
+            info["enabled"] = False
+            info["reason"] = "reverted_non_monotonic"
+            info["reverted_non_monotonic"] = True
+            info["max_grad_after_ms_per_oct"] = float(gb)
+            info["max_grad_after_hz"] = info["max_grad_before_hz"]
+            _logger.warning(
+                "gd_grad_limiter: reverted — GD gradient increased after limiting "
+                "(before=%.2f ms/oct → after=%.2f ms/oct); phase correction discarded",
+                float(gb),
+                float(ga),
+            )
+            return in_phase.copy()
+    except (TypeError, ValueError, FloatingPointError):
+        pass
+    return out
+
+
+def gd_grad_limiter(ir, cfg, st, *, freq_axis=None, phase_mask=None, limiter_fn=None) -> tuple[np.ndarray, dict[str, Any]]:
+    in_phase = np.asarray(ir, dtype=float).copy()
+    out = in_phase.copy()
     try:
         lim_cfg = float(getattr(cfg, "gd_grad_limit_ms_per_oct", getattr(cfg, "gd_limiter_limit_ms_per_oct", 30.0)) or 0.0)
     except (AttributeError, TypeError, ValueError):
         lim_cfg = 0.0
     lim_cfg = float(max(0.0, lim_cfg if np.isfinite(lim_cfg) else 0.0))
-    info["limit_input"] = float(lim_cfg)
-    info["limit_ms_per_oct"] = float(lim_cfg) if lim_cfg > 0.0 else 0.0
-    info["enabled"] = bool(lim_cfg > 0.0)
-    info["reason"] = "applied" if info["enabled"] else "limit<=0"
+    info = _gd_grad_limiter_info(cfg, lim_cfg)
     if freq_axis is not None:
-        try:
-            before = gd_grad_metrics(np.asarray(freq_axis, dtype=float), in_phase, mask=phase_mask)
-            info["max_grad_before_ms_per_oct"] = float(before.get("max_ms_per_oct", 0.0) or 0.0)
-            info["max_grad_before_hz"] = before.get("at_hz", None)
-            info["used_x_axis"] = str(before.get("used_x_axis", "log2(f)") or "log2(f)")
-            info["df_min"] = before.get("df_min", None)
-            info["df_max"] = before.get("df_max", None)
-            info["phase_wrapped"] = bool(before.get("phase_wrapped", False))
-            info["units_note"] = str(before.get("units_note", info["units_note"]) or info["units_note"])
-        except (TypeError, ValueError, FloatingPointError, IndexError):
-            pass
-    if info["enabled"] and limiter_fn is not None and freq_axis is not None:
-        try:
-            f_arr = np.asarray(freq_axis, dtype=float)
-            valid_f = np.isfinite(f_arr) & (f_arr > 0.0)
-            if phase_mask is not None:
-                valid_f &= np.asarray(phase_mask, dtype=bool)
-            if np.count_nonzero(valid_f) >= 4:
-                f_lo = float(np.min(f_arr[valid_f]))
-                f_hi = float(np.max(f_arr[valid_f]))
-            else:
-                base = f_arr[np.isfinite(f_arr) & (f_arr > 0.0)]
-                f_lo = float(np.min(base))
-                f_hi = float(np.max(base))
-            try:
-                gd_sigma = float(getattr(cfg, "gd_grad_smooth_sigma", 0.8) or 0.8)
-            except (AttributeError, TypeError, ValueError):
-                gd_sigma = 0.8
-            gd_sigma = gd_sigma if np.isfinite(gd_sigma) else 0.8
-            lim_effective = _gd_zone_limit_ms_per_oct(lim_cfg, info.get("max_grad_before_hz"))
-            info["limit_ms_per_oct"] = float(lim_effective)
-            out = limiter_fn(
-                f_arr,
-                in_phase,
-                mask=phase_mask,
-                max_grad_ms_per_oct=float(lim_effective),
-                f_min=float(f_lo),
-                f_max=float(f_hi),
-                grad_smooth_sigma=float(max(0.0, gd_sigma)),
-                soft_limit=True,
-            )
-            info["applied"] = True
-        except (TypeError, ValueError, FloatingPointError, IndexError):
-            info["enabled"] = False
-            info["reason"] = "missing data"
-    elif info["enabled"]:
+        _gd_grad_limiter_measure(freq_axis, in_phase, phase_mask, info, before=True)
+    out = _gd_grad_limiter_apply(freq_axis, in_phase, phase_mask, limiter_fn, cfg, lim_cfg, info)
+    if info["enabled"] and limiter_fn is None and freq_axis is not None:
         if info["max_grad_before_ms_per_oct"] is not None and info["limit_ms_per_oct"] is not None:
             if float(info["max_grad_before_ms_per_oct"]) > float(info["limit_ms_per_oct"]):
                 _logger.warning(
@@ -168,33 +217,11 @@ def gd_grad_limiter(ir, cfg, st, *, freq_axis=None, phase_mask=None, limiter_fn=
         info["enabled"] = False
         info["reason"] = "missing data"
     if freq_axis is not None:
-        try:
-            after = gd_grad_metrics(np.asarray(freq_axis, dtype=float), out, mask=phase_mask)
-            info["max_grad_after_ms_per_oct"] = float(after.get("max_ms_per_oct", 0.0) or 0.0)
-            info["max_grad_after_hz"] = after.get("at_hz", None)
-        except (TypeError, ValueError, FloatingPointError, IndexError):
-            pass
+        _gd_grad_limiter_measure(freq_axis, out, phase_mask, info, before=False)
     elif info["max_grad_before_ms_per_oct"] is not None:
         info["max_grad_after_ms_per_oct"] = info["max_grad_before_ms_per_oct"]
         info["max_grad_after_hz"] = info["max_grad_before_hz"]
-    try:
-        gb = info["max_grad_before_ms_per_oct"]
-        ga = info["max_grad_after_ms_per_oct"]
-        if info.get("applied", False) and gb is not None and ga is not None and np.isfinite(float(gb)) and np.isfinite(float(ga)) and (float(ga) > (float(gb) * 1.001)):
-            out = in_phase.copy()
-            info["applied"] = False
-            info["enabled"] = False
-            info["reason"] = "reverted_non_monotonic"
-            info["reverted_non_monotonic"] = True
-            info["max_grad_after_ms_per_oct"] = float(gb)
-            info["max_grad_after_hz"] = info["max_grad_before_hz"]
-            _logger.warning(
-                "gd_grad_limiter: reverted — GD gradient increased after limiting "
-                "(before=%.2f ms/oct → after=%.2f ms/oct); phase correction discarded",
-                float(gb), float(ga),
-            )
-    except (TypeError, ValueError, FloatingPointError):
-        pass
+    out = _gd_grad_limiter_revert_if_needed(in_phase, out, info)
     try:
         if isinstance(st, dict):
             st["gd_limiter_enabled"] = bool(info["enabled"])

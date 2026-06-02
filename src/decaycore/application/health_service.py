@@ -241,105 +241,95 @@ def _health_toast_color(level: str, mode_u: str) -> Optional[str]:
     return None
 
 
-def compute_health(data: Dict[str, Any], mode: str) -> HealthResult:
+def _health_bass_integration_issues(data: Dict[str, Any], mode_u: str) -> List[Issue]:
     issues: List[Issue] = []
-    mode_u = str(mode or "BASIC").strip().upper()
-    bass_integration_on = bool(data.get("bass_integration_enable", False))
+    bi_mode = "direct_dac"
+    is_direct_dac = bi_mode == "direct_dac"
 
-    if bass_integration_on:
-        bi_mode = "direct_dac"
-        is_direct_dac = bi_mode == "direct_dac"
+    if mode_u != "AUTO":
+        issues.append(Issue("crit", _tr("health_bass_integration_auto_only")))
 
-        if mode_u != "AUTO":
-            issues.append(
-                Issue(
-                    "crit",
-                    _tr("health_bass_integration_auto_only"),
-                )
-            )
+    bi_required_slots = [
+        ("file_l_main", "local_path_l_main"),
+        ("file_r_main", "local_path_r_main"),
+        ("file_l_sub", "local_path_l_sub"),
+    ]
+    bi_optional_slots = [("file_r_sub", "local_path_r_sub")] if is_direct_dac else []
+    if not is_direct_dac:
+        bi_required_slots.append(("file_r_sub", "local_path_r_sub"))
 
-        bi_required_slots = [
-            ("file_l_main", "local_path_l_main"),
-            ("file_r_main", "local_path_r_main"),
-            ("file_l_sub", "local_path_l_sub"),
-        ]
-        bi_optional_slots = [("file_r_sub", "local_path_r_sub")] if is_direct_dac else []
-        if not is_direct_dac:
-            bi_required_slots.append(("file_r_sub", "local_path_r_sub"))
-
-        required_all_wav = all(
-            _has_wav_measurement_source(data, file_key=file_key, path_key=path_key)
-            for file_key, path_key in bi_required_slots
-        )
-        optional_valid_or_missing = all(
-            (not _has_any_measurement_source(data, file_key=file_key, path_key=path_key))
-            or _has_wav_measurement_source(data, file_key=file_key, path_key=path_key)
-            for file_key, path_key in bi_optional_slots
-        )
-        any_source = any(
-            _has_any_measurement_source(data, file_key=file_key, path_key=path_key)
-            for file_key, path_key in [*bi_required_slots, *bi_optional_slots]
-        )
-        if required_all_wav and optional_valid_or_missing:
-            issues.append(
-                Issue(
-                    "ok",
-                    _tr("health_bass_integration_measurements"),
-                    _tr("health_upload_source_provided"),
-                )
-            )
-        elif any_source:
-            issues.append(
-                Issue(
-                    "crit",
-                    _tr("health_bass_integration_measurements"),
-                    _tr("health_bass_integration_wav_only_missing"),
-                )
-            )
-        else:
-            issues.append(
-                Issue(
-                    "crit",
-                    _tr("health_bass_integration_measurements"),
-                    _tr("health_bass_integration_missing"),
-                )
-            )
-
-        avr_fc = _as_float(data.get("avr_crossover_hz", None))
-        if avr_fc is None or avr_fc <= 0.0:
-            issues.append(Issue("crit", _tr("health_main_hpf_invalid")))
-        elif avr_fc < 30.0 or avr_fc > 250.0:
-            issues.append(Issue("warn", _tr("health_main_hpf_unusual"), f"{avr_fc:.1f} Hz"))
-        else:
-            issues.append(Issue("ok", _tr("health_main_hpf"), f"{avr_fc:.1f} Hz"))
-
+    required_all_wav = all(
+        _has_wav_measurement_source(data, file_key=file_key, path_key=path_key)
+        for file_key, path_key in bi_required_slots
+    )
+    optional_valid_or_missing = all(
+        (not _has_any_measurement_source(data, file_key=file_key, path_key=path_key))
+        or _has_wav_measurement_source(data, file_key=file_key, path_key=path_key)
+        for file_key, path_key in bi_optional_slots
+    )
+    any_source = any(
+        _has_any_measurement_source(data, file_key=file_key, path_key=path_key)
+        for file_key, path_key in [*bi_required_slots, *bi_optional_slots]
+    )
+    if required_all_wav and optional_valid_or_missing:
+        issues.append(Issue("ok", _tr("health_bass_integration_measurements"), _tr("health_upload_source_provided")))
+    elif any_source:
         issues.append(
             Issue(
-                "ok",
-                _tr("health_bass_integration_playback_match_title"),
-                _tr("health_bass_integration_playback_match"),
+                "crit",
+                _tr("health_bass_integration_measurements"),
+                _tr("health_bass_integration_wav_only_missing"),
             )
         )
     else:
-        raw_up_l = _has_uploaded_file_name(data.get("file_l", None))
-        raw_up_r = _has_uploaded_file_name(data.get("file_r", None))
-        up_l = _has_uploaded_file(data.get("file_l", None))
-        up_r = _has_uploaded_file(data.get("file_r", None))
-        raw_lp_l = _has_path_text(data.get("local_path_l", None))
-        raw_lp_r = _has_path_text(data.get("local_path_r", None))
-        lp_l = _valid_path(data.get("local_path_l", None))
-        lp_r = _valid_path(data.get("local_path_r", None))
+        issues.append(
+            Issue(
+                "crit",
+                _tr("health_bass_integration_measurements"),
+                _tr("health_bass_integration_missing"),
+            )
+        )
 
-        has_upload_pair = bool(up_l and up_r)
-        has_local_pair = bool(lp_l and lp_r)
+    avr_fc = _as_float(data.get("avr_crossover_hz", None))
+    if avr_fc is None or avr_fc <= 0.0:
+        issues.append(Issue("crit", _tr("health_main_hpf_invalid")))
+    elif avr_fc < 30.0 or avr_fc > 250.0:
+        issues.append(Issue("warn", _tr("health_main_hpf_unusual"), f"{avr_fc:.1f} Hz"))
+    else:
+        issues.append(Issue("ok", _tr("health_main_hpf"), f"{avr_fc:.1f} Hz"))
 
-        if has_upload_pair or has_local_pair:
-            issues.append(Issue("ok", _tr("health_measurements"), _tr("health_upload_source_provided")))
-        elif raw_up_l or raw_up_r or raw_lp_l or raw_lp_r:
-            issues.append(Issue("warn", _tr("health_measurements"), _tr("health_measurements_missing_pair")))
-        else:
-            issues.append(Issue("warn", _tr("health_measurements"), _tr("health_measurements_missing")))
+    issues.append(
+        Issue(
+            "ok",
+            _tr("health_bass_integration_playback_match_title"),
+            _tr("health_bass_integration_playback_match"),
+        )
+    )
+    return issues
 
+
+def _health_standard_measurement_issues(data: Dict[str, Any]) -> List[Issue]:
+    raw_up_l = _has_uploaded_file_name(data.get("file_l", None))
+    raw_up_r = _has_uploaded_file_name(data.get("file_r", None))
+    up_l = _has_uploaded_file(data.get("file_l", None))
+    up_r = _has_uploaded_file(data.get("file_r", None))
+    raw_lp_l = _has_path_text(data.get("local_path_l", None))
+    raw_lp_r = _has_path_text(data.get("local_path_r", None))
+    lp_l = _valid_path(data.get("local_path_l", None))
+    lp_r = _valid_path(data.get("local_path_r", None))
+
+    has_upload_pair = bool(up_l and up_r)
+    has_local_pair = bool(lp_l and lp_r)
+
+    if has_upload_pair or has_local_pair:
+        return [Issue("ok", _tr("health_measurements"), _tr("health_upload_source_provided"))]
+    if raw_up_l or raw_up_r or raw_lp_l or raw_lp_r:
+        return [Issue("warn", _tr("health_measurements"), _tr("health_measurements_missing_pair"))]
+    return [Issue("warn", _tr("health_measurements"), _tr("health_measurements_missing"))]
+
+
+def _health_target_curve_issues(data: Dict[str, Any]) -> List[Issue]:
+    issues: List[Issue] = []
     hc_mode = str(data.get("hc_mode") or "").strip()
     if hc_mode.lower() == "upload":
         upload_ok = _has_uploaded_file(data.get("hc_custom_file", None))
@@ -358,7 +348,11 @@ def compute_health(data: Dict[str, Any], mode: str) -> HealthResult:
         issues.append(Issue("ok", _tr("health_target_curve"), hc_mode))
     else:
         issues.append(Issue("warn", _tr("health_target_curve"), _tr("health_not_set")))
+    return issues
 
+
+def _health_correction_issues(data: Dict[str, Any]) -> List[Issue]:
+    issues: List[Issue] = []
     mag_on = bool(data.get("mag_correct", True))
     fmin = _as_float(data.get("mag_c_min", None))
     fmax = _as_float(data.get("mag_c_max", None))
@@ -373,7 +367,11 @@ def compute_health(data: Dict[str, Any], mode: str) -> HealthResult:
                 issues.append(Issue("warn", _tr("health_correction_max_very_high")))
     else:
         issues.append(Issue("warn", _tr("health_correction_range_set_bounds")))
+    return issues
 
+
+def _health_engine_issues(data: Dict[str, Any]) -> List[Issue]:
+    issues: List[Issue] = []
     fs = _as_int(data.get("fs", None))
     taps = _as_int(data.get("taps", None))
     if fs and taps and fs > 0 and taps > 0:
@@ -395,7 +393,11 @@ def compute_health(data: Dict[str, Any], mode: str) -> HealthResult:
             issues.append(Issue("warn", _tr("health_taps_count_high")))
     else:
         issues.append(Issue("warn", _tr("health_engine_metrics_set")))
+    return issues
 
+
+def _health_leveling_issues(data: Dict[str, Any]) -> List[Issue]:
+    issues: List[Issue] = []
     lvl_min = _as_float(data.get("lvl_min", None))
     lvl_max = _as_float(data.get("lvl_max", None))
     if (lvl_min is not None) and (lvl_max is not None):
@@ -403,7 +405,11 @@ def compute_health(data: Dict[str, Any], mode: str) -> HealthResult:
             issues.append(Issue("crit", _tr("health_leveling_range_invalid")))
         elif (lvl_max - lvl_min) < 200.0:
             issues.append(Issue("warn", _tr("health_leveling_range_narrow")))
+    return issues
 
+
+def _health_boost_phase_issues(data: Dict[str, Any]) -> List[Issue]:
+    issues: List[Issue] = []
     max_boost = _as_float(data.get("max_boost", None))
     if max_boost is None:
         issues.append(Issue("ok", _tr("health_max_boost"), _tr("health_default")))
@@ -415,7 +421,11 @@ def compute_health(data: Dict[str, Any], mode: str) -> HealthResult:
     phase_limit = _as_float(data.get("phase_limit", None))
     if (phase_limit is not None) and (phase_limit > 800.0):
         issues.append(Issue("warn", _tr("health_phase_limit_high"), f"{phase_limit:.0f} Hz"))
+    return issues
 
+
+def _health_protection_issues(data: Dict[str, Any]) -> List[Issue]:
+    issues: List[Issue] = []
     exc_on = bool(data.get("exc_prot", False))
     if not exc_on:
         issues.append(Issue("warn", _tr("health_excursion_protection_off")))
@@ -424,6 +434,7 @@ def compute_health(data: Dict[str, Any], mode: str) -> HealthResult:
 
     hpf_on = bool(data.get("hpf_enable", False))
     if hpf_on:
+        fs = _as_int(data.get("fs", None))
         hpf_f = _as_float(data.get("hpf_freq", None))
         hpf_s = _as_float(data.get("hpf_slope", None))
         if (hpf_f is None) or (hpf_f <= 0.0):
@@ -433,9 +444,14 @@ def compute_health(data: Dict[str, Any], mode: str) -> HealthResult:
 
         if (hpf_s is None) or (hpf_s <= 0.0):
             issues.append(Issue("crit", _tr("health_hpf_slope_invalid")))
+    return issues
 
+
+def _health_mixed_issues(data: Dict[str, Any]) -> List[Issue]:
+    issues: List[Issue] = []
     ftype = str(data.get("filter_type") or "").lower()
     if "mixed" in ftype:
+        fs = _as_int(data.get("fs", None))
         mixed_f = _as_float(data.get("mixed_freq", None))
         trans_w = _as_float(data.get("trans_width", None))
 
@@ -451,6 +467,26 @@ def compute_health(data: Dict[str, Any], mode: str) -> HealthResult:
             issues.append(Issue("crit", _tr("health_transition_width_nonnegative")))
         if (mixed_f is not None) and (mixed_f > 0.0) and (trans_w is not None) and (trans_w > mixed_f):
             issues.append(Issue("warn", _tr("health_transition_width_wider")))
+    return issues
+
+
+def compute_health(data: Dict[str, Any], mode: str) -> HealthResult:
+    issues: List[Issue] = []
+    mode_u = str(mode or "BASIC").strip().upper()
+    bass_integration_on = bool(data.get("bass_integration_enable", False))
+
+    if bass_integration_on:
+        issues.extend(_health_bass_integration_issues(data, mode_u))
+    else:
+        issues.extend(_health_standard_measurement_issues(data))
+
+    issues.extend(_health_target_curve_issues(data))
+    issues.extend(_health_correction_issues(data))
+    issues.extend(_health_engine_issues(data))
+    issues.extend(_health_leveling_issues(data))
+    issues.extend(_health_boost_phase_issues(data))
+    issues.extend(_health_protection_issues(data))
+    issues.extend(_health_mixed_issues(data))
 
     has_crit = any(i.level == "crit" for i in issues)
     has_warn = any(i.level == "warn" for i in issues)
