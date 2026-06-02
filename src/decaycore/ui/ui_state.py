@@ -112,6 +112,8 @@ def _compact_auto_status_legacy_progress(after: str) -> str | None:
         return "Micro-refining · done"
     if low.startswith("micro refine fallback") or low.startswith("micro refine"):
         return "Micro-refining"
+    if low.startswith("phase 3 skipped"):
+        return "Micro-refining · skipped"
     return None
 
 
@@ -460,6 +462,9 @@ def _humanize_auto_status_detail(msg: str) -> str:
             m = re.search(r"optuna run=(\d+), ok=(\d+)", after, re.IGNORECASE)
             if m:
                 return _f("auto_detail_phase2_summary", run=m.group(1), ok=m.group(2))
+
+        if low.startswith("phase 3 skipped"):
+            return _f("auto_detail_phase3_skipped")
 
         if low.startswith("hpf winner polish improved"):
             m = re.match(r"hpf winner polish improved \(([^,]+), rank ([\d.]+)", after, re.IGNORECASE)

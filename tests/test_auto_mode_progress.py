@@ -167,6 +167,18 @@ def test_auto_status_details_keep_full_run_history():
     assert "120/120" in body
 
 
+def test_auto_status_details_humanize_phase3_skip_notice():
+    ui_state.reset_auto_status_details()
+    ui_state.update_status("DecayCore automatic mode: phase 3 skipped")
+
+    snap = ui_state.get_status_snapshot()
+    details = snap["auto_status_details"]
+    body = snap["auto_status_detail_body"]
+
+    assert len(details) == 1
+    assert "Phase 3 skipped" in body
+
+
 def test_phase2_pareto_front_vectorized_matches_scalar_fallback(monkeypatch):
     vectors = [
         (1.0, 1.0, 1.0, 1.0, 1.0, -1.0, 1.0),

@@ -1077,6 +1077,7 @@ def test_auto_search_v2_executor_cache_plan_runs_micro_refine_only(monkeypatch):
     from decaycore.auto_mode.search_v2 import executor
 
     calls = []
+    messages = []
     context = SimpleNamespace(search_base_data={})
     decision = AutoSearchPlanDecision(
         plan=AutoSearchPlan.CACHE_MICRO_REFINE,
@@ -1089,11 +1090,38 @@ def test_auto_search_v2_executor_cache_plan_runs_micro_refine_only(monkeypatch):
         fallback_reasons=(),
     )
 
+    context.status_cb = messages.append
+    context.cache_base_data = {}
+    context.measurements = {}
+    context.fs_v = 48000
+    context.taps_v = 65536
+    context.xos = []
+    context.hpf = None
+    context.hc_f = None
+    context.hc_m = None
+    context.pin_obj = None
+    context.cfg = SimpleNamespace()
+    context.goal = "balanced"
+    context.filter_key = "mixed"
+    context.compat_version = "am15"
+    context.optimizer_backend = "builtin"
+    context.optuna_mod = None
+    context.seed = 1
+    context.optuna_search_sig = "sig"
+    context.cache_ready_preset = {}
+    context.materialize_preset_result = lambda *args, **kwargs: None
+    context.runtime = SimpleNamespace()
+    context.winner_target_name = "Harman8"
+    context.prior_seed_preset = {}
+    context.use_optuna_trials = False
+    context.candidates = []
+    context.status_prefix = "DecayCore automatic mode [Harman8]"
+    context.search_state = SimpleNamespace()
+
     monkeypatch.setattr(executor, "build_execution_context", lambda **kwargs: context)
     monkeypatch.setattr(
-        executor,
-        "run_micro_refine_from_seed",
-        lambda ctx, dec: calls.append("micro") or {"best_preset": {}, "best_metrics": {}},
+        "decaycore.auto_mode.orchestrator_refine.run_exact_cache_micro_refine",
+        lambda **kwargs: calls.append("micro") or {"best_preset": {}, "best_metrics": {}},
     )
     monkeypatch.setattr(
         executor,
@@ -1123,6 +1151,7 @@ def test_auto_search_v2_executor_cache_plan_runs_micro_refine_only(monkeypatch):
 
     assert result == {"auto_mode_debug": {}}
     assert calls == ["micro", "finalize_cache"]
+    assert messages == ["DecayCore automatic mode: phase 3 skipped"]
 
 
 def test_auto_search_v2_executor_legacy_reuse_valid_result_runs_finalize_only(monkeypatch):

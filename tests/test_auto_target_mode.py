@@ -1718,7 +1718,7 @@ def test_search_refine_stages_use_canonical_order_with_seed(monkeypatch):
 
     def _summary_probe(*, summary):
         calls.append("summary")
-        return dict(summary.result or {})
+        return {}
 
     monkeypatch.setattr(orchestrator_refine, "_run_phase1_search", _phase1_search_probe)
     monkeypatch.setattr(orchestrator_refine, "_run_phase1_coarse_search", _phase1_probe)
@@ -1756,6 +1756,81 @@ def test_search_refine_stages_use_canonical_order_with_seed(monkeypatch):
 
     assert result == {"ok": True}
     assert calls == ["build_context", "phase1", "phase2", "micro", "summary"]
+
+
+def test_search_refine_stages_emit_phase3_skip_notice_once(monkeypatch):
+    calls = []
+    messages = []
+    search_state = SimpleNamespace(best_preset={"preset_id": "best"})
+
+    def _phase1_search_probe(**kwargs):
+        return orchestrator_refine._SearchRefineContext(
+            params={
+                "cfg": kwargs.get("cfg"),
+                "goal": kwargs.get("goal"),
+                "search_state": kwargs.get("search_state"),
+                "status_cb": kwargs.get("status_cb"),
+                "runtime": kwargs.get("runtime"),
+            }
+        )
+
+    def _phase1_probe(*, context):
+        calls.append("phase1")
+        params = dict(context.params or {})
+        params["_phase1_state"] = orchestrator_refine._SearchPhase1State(ctx=SimpleNamespace())
+        return orchestrator_refine._SearchRefineContext(params=params)
+
+    def _phase2_probe(*, context):
+        calls.append("phase2")
+        params = dict(context.params or {})
+        params["_phase2_state"] = orchestrator_refine._SearchPhase2State(phase2_improved_any=False)
+        return orchestrator_refine._SearchRefineContext(params=params)
+
+    def _summary_probe(*, summary):
+        calls.append("summary")
+        return dict(summary.result or {})
+
+    monkeypatch.setattr(orchestrator_refine, "_run_phase1_search", _phase1_search_probe)
+    monkeypatch.setattr(orchestrator_refine, "_run_phase1_coarse_search", _phase1_probe)
+    monkeypatch.setattr(orchestrator_refine, "_run_phase2_local_refine", _phase2_probe)
+    monkeypatch.setattr(orchestrator_refine, "_assemble_refine_summary", _summary_probe)
+
+    result = orchestrator_refine.run_search_refine_stages(
+        search_base_data={},
+        measurements={},
+        fs_v=44100,
+        taps_v=65536,
+        xos=[],
+        hpf=None,
+        hc_f=None,
+        hc_m=None,
+        pin_obj=None,
+        status_cb=messages.append,
+        cfg=SimpleNamespace(phase3_micro_enabled=True, adaptive_shrink_max=0.5),
+        goal="balanced",
+        filter_key="asym",
+        optimizer_backend="builtin",
+        optuna_mod=None,
+        seed=1,
+        optuna_search_sig="sig",
+        status_prefix="DecayCore automatic mode [Harman8]",
+        winner_target_name="Harman8",
+        search_state=search_state,
+        n_trials_eff=1,
+        candidates=[],
+        prior_seed_preset=None,
+        use_optuna_trials=False,
+        runtime=SimpleNamespace(
+            auto_optuna_telemetry_rollup=lambda items: {},
+            auto_optuna_telemetry_text=lambda tel: "",
+        ),
+    )
+
+    assert result["phase1_ok"] == 0
+    assert result["phase2_ok"] == 0
+    assert result["phase3_micro_optuna_tel"] == {}
+    assert calls == ["phase1", "phase2", "summary"]
+    assert messages == ["DecayCore automatic mode: phase 3 skipped"]
 
 
 def test_auto_target_curve_selection_uses_optuna_target_study_without_recomputing(monkeypatch):
@@ -2790,7 +2865,6 @@ def test_finalize_injects_phase1_top_into_empty_phase2_pool(monkeypatch):
             lambda best_preset, best_metrics, **_kw: (best_preset, best_metrics, False, {}),
         )
 
-    from decaycore.auto_mode.stereo_policy_refine import apply_stereo_policy_refine
     monkeypatch.setattr(
         _polish_mod,
         "apply_stereo_policy_refine",

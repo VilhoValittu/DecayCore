@@ -28,6 +28,7 @@ from .candidate_generation import (
 )
 from .rank_score import official_rank_score
 from .refine_eval import RefineEvalContext, run_candidate_phase
+from .phase3_status import emit_phase3_skip_notice
 from .scoring_ranking import (
     _auto_adaptive_shrink_factor,
     _auto_build_refine_profile,
@@ -758,15 +759,21 @@ def _run_search_refine_micro_core(
     phase1: _SearchPhase1State,
     phase2: _SearchPhase2State,
 ) -> _SearchPhase2State:
-    if not (
-        bool(cfg.phase3_micro_enabled)
-        and _auto_goal_uses_local_refine(goal)
-        and isinstance(search_state.best_preset, dict)
-        and bool(search_state.best_preset)
-    ):
+    if not bool(cfg.phase3_micro_enabled):
+        logger.info("Automatic mode: skipping micro refine — phase 3 disabled")
+        emit_phase3_skip_notice(status_cb)
+        return phase2
+    if not _auto_goal_uses_local_refine(goal):
+        logger.info("Automatic mode: skipping micro refine — goal %s does not use local refine", str(goal or "n/a"))
+        emit_phase3_skip_notice(status_cb)
+        return phase2
+    if not isinstance(search_state.best_preset, dict) or not bool(search_state.best_preset):
+        logger.info("Automatic mode: skipping micro refine — missing best preset")
+        emit_phase3_skip_notice(status_cb)
         return phase2
     if not phase2.phase2_improved_any:
         logger.info("Automatic mode: skipping micro refine — phase 2 made no improvement over phase 1")
+        emit_phase3_skip_notice(status_cb)
         return phase2
     micro_shrink = float(
         _auto_adaptive_shrink_factor(

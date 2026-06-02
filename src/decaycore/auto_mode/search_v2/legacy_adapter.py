@@ -20,6 +20,7 @@ import logging
 
 from .. import orchestrator_refine
 from ..auto_mode_profile import active_profiler_scope
+from ..phase3_status import emit_phase3_skip_notice
 from .context import AutoSearchExecutionContext, _nullctx, build_execution_context
 from .finalize_adapter import (
     attach_auto_search_fallbacks,
@@ -61,6 +62,7 @@ def run_micro_refine_from_seed(
     seed_source = str(getattr(decision, "seed_source", "") or "").strip()
     if not seed_source:
         seed_source = "last_best" if str(getattr(getattr(decision, "plan", None), "value", "")) == "last_best_micro_refine" else "exact_cache"
+    emit_phase3_skip_notice(context.status_cb)
     return orchestrator_refine.run_exact_cache_micro_refine(
         cache_base_data=context.cache_base_data,
         measurements=context.measurements,
