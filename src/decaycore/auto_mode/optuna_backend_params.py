@@ -19,6 +19,7 @@ import logging
 import numpy as np
 
 from .cache_signature import _auto_compat_version
+from .candidate_base import _derive_adaptive_freq_bounds
 from .shared import (
     AUTO_MODE_LOW_BASS_MAX_HZ,
     AUTO_MODE_LOW_BASS_MIN_HZ,
@@ -339,8 +340,11 @@ def _auto_optuna_sanitize_enqueued_params(params: dict | None, *, base_data: dic
     out = dict(params or {})
     if not out:
         return out
+    adaptive = _derive_adaptive_freq_bounds(dict(base_data or {}))
+    mag_hi = float(adaptive.get("mag_c_max_hi", 400.0))
     for key, lo, hi in (
         ("mag_c_min", float(AUTO_MODE_MAG_C_MIN_MIN_HZ), float(AUTO_MODE_MAG_C_MIN_MAX_HZ)),
+        ("mag_c_max", float(AUTO_MODE_MAG_C_MAX_MIN_HZ), float(mag_hi)),
         ("low_bass_cut_hz", float(AUTO_MODE_LOW_BASS_MIN_HZ), float(AUTO_MODE_LOW_BASS_MAX_HZ)),
     ):
         if key not in out:

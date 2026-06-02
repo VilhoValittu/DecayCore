@@ -17,12 +17,10 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 from .shared import (
-    AUTO_MODE_GOAL_FLAT,
     AUTO_MODE_MAG_C_MAX_MIN_HZ,
     AUTO_MODE_PHASE_LIMIT_MAX_HZ,
     AUTO_MODE_PHASE_LIMIT_MIN_HZ,
     _auto_is_phase_search_filter,
-    _auto_goal,
     _auto_output_tilt_bounds,
     _auto_phase_limit_center,
     _auto_safe_float,
@@ -65,7 +63,6 @@ def _suggest_auto_mode_candidate_optuna(
     keep_tdc = bool(base_data.get("enable_tdc", True))
     keep_afdw = bool(base_data.get("enable_afdw", True))
     keep_bass_first = bool(base_data.get("bass_first_ai", True))
-    prefer_bass = bool(_auto_goal(base_data) == AUTO_MODE_GOAL_FLAT)
     bool_search = bool(_auto_phase1_bool_search_enabled(base_data))
     max_boost_hi = float(_auto_phase1_max_boost_hi(base_data))
     ft = str(base_data.get("filter_type", "") or "").strip().lower()
@@ -277,8 +274,10 @@ def _seed_auto_mode_candidate_optuna_params(
     output_tilt_lo, output_tilt_hi = _auto_output_tilt_bounds(base_data)
     p = dict(base_data or {})
     p.update(dict(preset or {}))
+    adaptive = _derive_adaptive_freq_bounds(base_data)
 
     mag_lo, mag_hi, low_lo, low_hi = _mag_low_search_bounds(base_data)
+    mag_c_max_hi = float(adaptive.get("mag_c_max_hi", 400.0))
     mag_c_min = float(np.clip(_auto_safe_float(p.get("mag_c_min", 25.0), 25.0), mag_lo, mag_hi))
     low_bass_cut_hz = float(np.clip(_auto_safe_float(p.get("low_bass_cut_hz", 40.0), 40.0), low_lo, low_hi))
 
@@ -325,7 +324,12 @@ def _seed_auto_mode_candidate_optuna_params(
             hi=float(_auto_phase1_max_boost_hi(base_data)),
             step=0.01,
         ),
-        "mag_c_max": _auto_optuna_snap_to_step(_auto_safe_float(p.get("mag_c_max", 220.0), 220.0), lo=170.0, hi=300.0, step=0.1),
+        "mag_c_max": _auto_optuna_snap_to_step(
+            _auto_safe_float(p.get("mag_c_max", 220.0), 220.0),
+            lo=float(AUTO_MODE_MAG_C_MAX_MIN_HZ),
+            hi=float(mag_c_max_hi),
+            step=0.1,
+        ),
         "trans_width": _auto_optuna_snap_to_step(_auto_safe_float(p.get("trans_width", 100.0), 100.0), lo=70.0, hi=150.0, step=0.1),
         "filter_smooth": 96,
         "bass_first_mode_max_hz": _auto_optuna_snap_to_step(

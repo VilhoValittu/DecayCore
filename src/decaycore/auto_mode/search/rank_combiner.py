@@ -49,6 +49,8 @@ from ..runtime_context import (
 
 from .metric_penalties import _auto_focus_ripple_from_stats
 
+_RANK_MODE_RIPPLE_MEMO: dict[tuple[int, float, float], float | None] = {}
+
 def _rank_scale(v: float) -> float:
     g = float(shared._auto_safe_float(shared.AUTO_MODE_RANK_SCORE_GAIN, 1.0))
     b = float(shared._auto_safe_float(shared.AUTO_MODE_RANK_SCORE_BIAS, 0.0))
@@ -374,7 +376,6 @@ def combine_rank_score(
         base_rank_components=base_rank_components,
     )
     post_metrics = _collect_rank_post_metrics(l_st, r_st)
-    rank_raw = float(mode_metrics["rank_raw"])
     rank_score_base = float(base_rank_components.get("rank_score", 0.0))
     rank_score = float(mode_metrics["rank_score"])
     focus_ripple = float(mode_metrics["focus_ripple"])

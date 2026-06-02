@@ -54,8 +54,11 @@ from decaycore.auto_mode.optuna_backend import (
     _auto_optuna_scope_for_filter,
     _auto_optuna_study_records,
 )
+from decaycore.auto_mode.optuna_backend_params import _auto_optuna_sanitize_enqueued_params
+from decaycore.auto_mode.candidate_base import _derive_adaptive_freq_bounds
 from decaycore.auto_mode.materialize import AutoModeMaterializeContext, build_materialize_helpers
 from decaycore.auto_mode.rank_score import compute_rank_score_components
+from decaycore.auto_mode.search.rank_combiner import _collect_rank_cached_focus_ripple
 from decaycore.auto_mode.scoring_ranking import (
     _auto_hard_gate_reasons,
     _auto_is_better_refine,
@@ -2387,6 +2390,48 @@ def test_optuna_candidate_mag_c_max_floor_is_170_hz():
 
     assert trial.ranges["mag_c_max"][0] == float(AUTO_MODE_MAG_C_MAX_MIN_HZ)
     assert float(candidate["mag_c_max"]) >= float(AUTO_MODE_MAG_C_MAX_MIN_HZ)
+
+
+def test_optuna_seed_params_clamp_mag_c_max_to_adaptive_bounds():
+    base = {
+        "filter_type": "Linear",
+        "harmonic_freq_hz_l": [20.0, 40.0],
+        "harmonic_freq_hz_r": [20.0, 40.0],
+        "measured_rt60_l": 0.32,
+        "measured_rt60_r": 0.32,
+    }
+    expected_hi = float(_derive_adaptive_freq_bounds(base)["mag_c_max_hi"])
+
+    params = _seed_auto_mode_candidate_optuna_params(
+        base,
+        {"mag_c_max": 300.0},
+    )
+
+    assert float(params["mag_c_max"]) == pytest.approx(expected_hi, abs=0.05)
+    assert float(params["mag_c_max"]) < 300.0
+
+
+def test_optuna_sanitize_enqueued_params_clamp_mag_c_max_to_adaptive_bounds():
+    base = {
+        "filter_type": "Linear",
+        "harmonic_freq_hz_l": [20.0, 40.0],
+        "harmonic_freq_hz_r": [20.0, 40.0],
+        "measured_rt60_l": 0.32,
+        "measured_rt60_r": 0.32,
+    }
+    expected_hi = float(_derive_adaptive_freq_bounds(base)["mag_c_max_hi"])
+
+    params = _auto_optuna_sanitize_enqueued_params(
+        {"mag_c_max": 300.0},
+        base_data=base,
+    )
+
+    assert float(params["mag_c_max"]) == pytest.approx(expected_hi, abs=0.05)
+    assert float(params["mag_c_max"]) < 300.0
+
+
+def test_rank_combiner_focus_ripple_cache_is_initialized():
+    assert _collect_rank_cached_focus_ripple({}, 20.0, 80.0) is None
 
 
 def test_auto_select_best_scored_rejects_too_low_auto_mag_c_max():
