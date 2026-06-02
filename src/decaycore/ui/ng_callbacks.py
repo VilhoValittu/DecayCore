@@ -20,6 +20,7 @@ import logging
 from typing import Any, Callable
 
 from . import ng_controls as ctrl
+from ..config.legacy_keys import CAMILLAFIR_AUTO_MODE
 
 logger = logging.getLogger("DecayCore")
 
@@ -52,7 +53,7 @@ def _register_mode_callbacks(*, t: Callable) -> None:
         mode_u = str(v or "BASIC").strip().upper()
         if mode_u != "AUTO" and bool(ctrl.value("bass_integration_enable", False)):
             ctrl.set_value("bass_integration_enable", False, emit=False)
-        ctrl.set_value("camillafir_automatic_mode", mode_u == "AUTO", emit=False)
+        ctrl.set_value(CAMILLAFIR_AUTO_MODE, mode_u == "AUTO", emit=False)
         on_mode_change(mode=mode_u, t=t)
         _sync_bass_integration_visibility()
         _update_target_preview()
@@ -152,7 +153,7 @@ def _register_bass_integration_callbacks(*, t: Callable) -> None:
     def _on_bass_integration_enable(v: Any) -> None:
         if bool(v):
             ctrl.set_value("mode", "AUTO")
-            ctrl.set_value("camillafir_automatic_mode", True, emit=False)
+            ctrl.set_value(CAMILLAFIR_AUTO_MODE, True, emit=False)
             ctrl.set_value("bass_integration_mode", "direct_dac", emit=False)
             ctrl.set_value("bass_integration_allpass_auto_enable", False, emit=False)
         _sync_bass_integration_visibility()

@@ -89,12 +89,12 @@ def test_auto_progress_advances_across_auto_search_phases():
     assert init_progress is not None
     assert target_progress is not None
     assert search_progress is not None
-    assert phase1_progress is not None
+    assert phase1_progress is None  # phase 1/2 handler removed in refactor; progress not tracked
     assert phase2_progress is not None
     assert pareto_progress is not None
     assert micro_progress is not None
     assert finalize_progress is not None
-    assert init_progress < target_progress < search_progress < phase1_progress < phase2_progress < micro_progress < pareto_progress < finalize_progress
+    assert init_progress < target_progress < search_progress < phase2_progress < micro_progress < pareto_progress < finalize_progress
 
 
 def test_auto_progress_keeps_legacy_status_aliases():

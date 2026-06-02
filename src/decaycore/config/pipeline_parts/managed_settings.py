@@ -15,6 +15,7 @@ import logging
 import math
 import numpy as np
 
+from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from ...auto_mode.filter_priors import get_auto_mode_filter_auto_defaults
 from ...auto_mode.shared import (
     AUTO_MODE_GOAL_FLAT,
@@ -232,7 +233,7 @@ def _apply_auto_mode_managed_settings(data: Dict[str, Any]) -> None:
 
     forced = {
         "mode": "AUTO",
-        "camillafir_automatic_mode": True,
+        CAMILLAFIR_AUTO_MODE: True,
         "auto_mode_workers": 0,
         "mag_correct": True,
         "gain": 0.10,

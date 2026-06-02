@@ -37,7 +37,10 @@ def _base_data_with_plan_seed(base_data: dict, decision) -> dict:
     if not seed:
         return data
     data["_auto_target_seed_preset"] = dict(seed)
+    _hc_mode_before = data.get("hc_mode")
     data.update(seed)
+    if _hc_mode_before is not None:
+        data["hc_mode"] = _hc_mode_before
     cache_record = dict(getattr(decision, "cache_record", {}) or {})
     seed_metrics = dict(cache_record.get("winner_metrics", cache_record.get("best_metrics", {})) or {})
     if seed_metrics:

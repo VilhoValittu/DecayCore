@@ -15,6 +15,7 @@ import os
 logger = logging.getLogger("DecayCore")
 
 from ..app_paths import default_measurements_dir
+from .legacy_keys import CAMILLAFIR_AUTO_MODE
 from ..common.measurement_defaults import (
     DEFAULT_MEASUREMENT_SAMPLE_RATE,
     DEFAULT_OUTPUT_GAIN_DB,
@@ -104,7 +105,7 @@ def _coerce_legacy_boolean_lists(saved: dict) -> None:
         "bass_integration_alignment_auto_applied",
         "bass_integration_allpass_auto_enable",
         "bass_integration_allpass_auto_applied",
-        "camillafir_automatic_mode",
+        CAMILLAFIR_AUTO_MODE,
     ]:
         if key in saved and isinstance(saved[key], list):
             saved[key] = bool(saved[key])
@@ -159,7 +160,7 @@ def _resolve_runtime_mode(default_conf: dict, *, saved_mode_explicit: bool) -> s
     except _RECOVERABLE_CONFIG_EXCEPTIONS:
         mode_u = "AUTO"
     try:
-        legacy_auto = bool(default_conf.get("camillafir_automatic_mode", False))
+        legacy_auto = bool(default_conf.get(CAMILLAFIR_AUTO_MODE, False))
     except _RECOVERABLE_CONFIG_EXCEPTIONS:
         legacy_auto = False
     if legacy_auto and not saved_mode_explicit:
@@ -204,7 +205,7 @@ def load_config() -> dict:
         "hc_mode": "Harman6",
         "mag_correct": True,
         "unsafe_raw_dsp": False,
-        "camillafir_automatic_mode": True,
+        CAMILLAFIR_AUTO_MODE: True,
         "plot_smoothing_level": "Psychoacoustic",
         "filter_smooth": 96,
         "bass_smooth_adaptive": True,
@@ -375,7 +376,7 @@ def load_config() -> dict:
     mode_u = _resolve_runtime_mode(default_conf, saved_mode_explicit=saved_mode_explicit)
 
     default_conf["mode"] = mode_u
-    default_conf["camillafir_automatic_mode"] = bool(mode_u == "AUTO")
+    default_conf[CAMILLAFIR_AUTO_MODE] = bool(mode_u == "AUTO")
     if mode_u == "AUTO":
         default_conf["hpf_enable"] = True
     default_conf["layout"] = normalize_layout_value(default_conf.get("layout", LAYOUT_MONO))

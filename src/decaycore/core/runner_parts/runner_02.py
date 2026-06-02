@@ -29,6 +29,7 @@ from typing import Any
 import numpy as np
 
 from ...application.run_request import RunRequest
+from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
 
 
 def _convert_ir_for_export(ir: np.ndarray, fmt: str) -> np.ndarray:
@@ -501,7 +502,7 @@ def _normalize_headless_config(config: dict, *, config_dir: Path, output_dir: Pa
     data["_headless"] = True
     data["mode"] = str(config.get("mode", data.get("mode", "auto")) or "auto").strip().upper()
     if data["mode"] == "AUTO":
-        data["camillafir_automatic_mode"] = True
+        data[CAMILLAFIR_AUTO_MODE] = True
     data["program_version"] = str(VERSION)
     data["auto_mode_compat_version"] = str(AUTO_MODE_COMPAT_VERSION)
     data["output_dir"] = str(output_dir)

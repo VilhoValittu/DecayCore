@@ -18,6 +18,7 @@ from datetime import datetime
 
 import numpy as np
 
+from ...config.legacy_keys import is_auto_mode
 from ...application.health_service import compute_health
 from ...application.house_curve_service import load_house_curve
 from ...application.run_request import RunRequest
@@ -124,7 +125,7 @@ def _compute_direct_dac_prepare_recommendation(bundle: object, data: dict, callb
 
     backend_key = str(data.get("bass_integration_prepare_backend", "auto") or "auto").strip().lower()
     _mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
-    _auto_active = bool(_mode_u == "AUTO" or data.get("camillafir_automatic_mode", False))
+    _auto_active = is_auto_mode(data, _mode_u)
 
     profile = str(data.get("bass_integration_profile", "safe") or "safe")
     xo_order, sub_hpf_hz, sub_hpf_order = _direct_dac_filter_params(data)

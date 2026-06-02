@@ -553,7 +553,7 @@ def apply_residual_peak_winner_polish(
                 cand_metrics,
                 min_peak_improve,
                 goal,
-                _metric,
+                _residual_peak_metric,
             )
             cur_best_preset, cur_best_metrics, accepted, meta = _apply_residual_peak_candidate_result(
                 phase_label=phase_label,

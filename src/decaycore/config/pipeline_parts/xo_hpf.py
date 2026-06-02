@@ -15,6 +15,7 @@ import logging
 import math
 import numpy as np
 
+from ...config.legacy_keys import is_auto_mode as _is_auto_mode_active_helper
 from ...auto_mode.filter_priors import get_auto_mode_filter_auto_defaults
 from ...auto_mode.shared import AUTO_MODE_GOAL_FLAT, _auto_bass_integration_profile_norm, _auto_goal_norm
 from ...config.mode_policy import MODE_DEFAULTS
@@ -150,7 +151,7 @@ def _slope_to_order(slope_db_oct: int) -> int:
 
 def _auto_mode_active(data: Dict[str, Any]) -> bool:
     mode_u = _safe_mode_upper(data, key="mode", default="BASIC")
-    return bool(mode_u == "AUTO" or data.get("camillafir_automatic_mode", False))
+    return _is_auto_mode_active_helper(data, mode_u)
 
 
 def _is_direct_dac_bass_integration(data: Dict[str, Any]) -> bool:

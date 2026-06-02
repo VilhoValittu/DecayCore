@@ -31,6 +31,7 @@ from typing import Any
 # ---------------------------------------------------------------------------
 _PLOT_RENDER_CACHE: dict = {}
 
+from ...config.legacy_keys import is_auto_mode
 from ...resources.i8n.decaycore_i18n import t
 from ...auto_mode.rank_score import calibrated_auto_quality
 from .. import decaycore_plot as plots
@@ -595,7 +596,7 @@ def _append_auto_polish_to_status_log(*, data: dict) -> None:
         NameError,
     ):
         return
-    auto_enabled = bool(mode_u == "AUTO" or data.get("camillafir_automatic_mode", False))
+    auto_enabled = is_auto_mode(data, mode_u)
     auto_meta = data.get("_auto_mode_meta", None)
     if not (auto_enabled and isinstance(auto_meta, dict)):
         return
@@ -661,7 +662,7 @@ def _render_auto_diagnostics(*, data: dict) -> None:
         NameError,
     ):
         mode_u = "BASIC"
-    auto_enabled = bool(mode_u == "AUTO" or data.get("camillafir_automatic_mode", False))
+    auto_enabled = is_auto_mode(data, mode_u)
     auto_meta = data.get("_auto_mode_meta", None)
     if not (auto_enabled and isinstance(auto_meta, dict)):
         return

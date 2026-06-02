@@ -29,6 +29,7 @@ from typing import Any
 import numpy as np
 
 from ...application.run_request import RunRequest
+from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from ...auto_mode.api import AUTO_MODE_COMPAT_VERSION
 from ...auto_mode.rank_score import attach_official_rank_score, official_rank_score
 from ...config.decaycore_config import load_config
@@ -252,7 +253,7 @@ def _safe_filename_token(value: Any, default: str = "v0") -> str:
 
 def _headless_winner_rank_score(data: dict | None) -> float:
     try:
-        if not bool((data or {}).get("camillafir_automatic_mode", False)):
+        if not bool((data or {}).get(CAMILLAFIR_AUTO_MODE, False)):
             return float("nan")
         auto_meta = dict((data or {}).get("_auto_mode_meta", {}) or {})
         best_metrics = attach_official_rank_score(auto_meta.get("best_metrics", {}))

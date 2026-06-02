@@ -15,6 +15,7 @@ import logging
 import math
 import numpy as np
 
+from ...config.legacy_keys import is_auto_mode
 from ...auto_mode.filter_priors import get_auto_mode_filter_auto_defaults
 from ...auto_mode.shared import AUTO_MODE_GOAL_FLAT, _auto_bass_integration_profile_norm, _auto_goal_norm
 from ...config.mode_policy import MODE_DEFAULTS
@@ -234,7 +235,7 @@ def _filter_config_control_values(data: Dict[str, Any]) -> dict:
         lvl_mode = lvl_mode_legacy_name(LVL_MODE_AUTO)
     return {
         "mode_u": mode_u,
-        "is_auto_mode": bool(mode_u == "AUTO" or data.get("camillafir_automatic_mode", False)),
+        "is_auto_mode": is_auto_mode(data, mode_u),
         "lb_hz": float(lb_hz),
         "df_smoothing": _cfg_as_bool_default(data.get("df_smoothing", False), False),
         "bass_smooth_adaptive": _cfg_as_bool_default(data.get("bass_smooth_adaptive", True), True),

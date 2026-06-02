@@ -17,6 +17,7 @@ import numpy as np
 
 from ...auto_mode.filter_priors import get_auto_mode_filter_auto_defaults
 from ...auto_mode.shared import AUTO_MODE_GOAL_FLAT, _auto_bass_integration_profile_norm, _auto_goal_norm
+from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from ...config.mode_policy import MODE_DEFAULTS
 from ...config.models import StereoAutoPolicyConfig
 from ...dsp.bass_integration import normalize_sub_combine_mode
@@ -154,7 +155,7 @@ _UI_PIN_KEYS = [
     "file_l", "file_r",
     "file_l_main", "file_r_main", "file_l_sub", "file_r_sub",
     "unsafe_raw_dsp",
-    "camillafir_automatic_mode",
+    CAMILLAFIR_AUTO_MODE,
 ]
 
 _LIST_BOOL_KEYS = [
@@ -175,7 +176,7 @@ _LIST_BOOL_KEYS = [
     "bass_integration_allpass_auto_enable",
     "bass_integration_allpass_auto_applied",
     "sub_crossover_manual_override",
-    "camillafir_automatic_mode",
+    CAMILLAFIR_AUTO_MODE,
 ]
 
 _HIDDEN_CONF_DEFAULTS_ADVANCED = {
@@ -246,20 +247,20 @@ def _normalize_mode_and_auto_flags(data: Dict[str, Any]) -> Tuple[str, bool]:
     is_auto_mode = mode_u == "AUTO"
     if not mode_explicit and not is_auto_mode:
         try:
-            is_auto_mode = bool(data.get("camillafir_automatic_mode", False))
+            is_auto_mode = bool(data.get(CAMILLAFIR_AUTO_MODE, False))
         except _UI_PARSE_EXCEPTIONS:
             is_auto_mode = False
 
     if is_auto_mode:
         mode_u = "AUTO"
         data["mode"] = "AUTO"
-    data["camillafir_automatic_mode"] = bool(is_auto_mode)
+    data[CAMILLAFIR_AUTO_MODE] = bool(is_auto_mode)
 
     if bool(data.get("bass_integration_enable", False)):
         mode_u = "AUTO"
         is_auto_mode = True
         data["mode"] = "AUTO"
-        data["camillafir_automatic_mode"] = True
+        data[CAMILLAFIR_AUTO_MODE] = True
     return mode_u, is_auto_mode
 
 

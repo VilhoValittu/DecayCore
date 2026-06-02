@@ -13,6 +13,7 @@ import math
 import sys
 
 from ...config.decaycore_pipeline import filter_type_supports_xo_phase_model
+from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
 
 logger = logging.getLogger(__name__)
 from ...dsp.smoothing import AFDW_BW_MAX_OCT, AFDW_BW_MIN_OCT
@@ -111,7 +112,7 @@ def _append_dsp_effective_base_summary(summary_content, data, fs_v):
 def _append_dsp_effective_auto_mode_summary(summary_content, data):
     try:
         auto_meta = data.get("_auto_mode_meta", None)
-        if bool(data.get("camillafir_automatic_mode", False)) and isinstance(auto_meta, dict):
+        if bool(data.get(CAMILLAFIR_AUTO_MODE, False)) and isinstance(auto_meta, dict):
             bm = attach_official_rank_score(auto_meta.get("best_metrics", {}))
             bp = dict(auto_meta.get("best_preset", {}) or {})
             tc = dict(data.get("_auto_target_curve_meta", {}) or {})

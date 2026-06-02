@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Callable
 
 from . import ng_controls as ctrl
+from ..config.legacy_keys import CAMILLAFIR_AUTO_MODE
 
 _FS_OPTS = [44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000]
 _TAPS_OPTS = [512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576]
@@ -69,7 +70,7 @@ def build_basic_tab(*, t: Callable, get_val: Callable, max_safe_boost: float) ->
     mode_value = str(get_val("mode", "AUTO") or "AUTO").strip().upper()
     if mode_value not in ("BASIC", "ADVANCED", "AUTO"):
         mode_value = "AUTO"
-    if bool(get_val("camillafir_automatic_mode", False)):
+    if bool(get_val(CAMILLAFIR_AUTO_MODE, False)):
         mode_value = "AUTO"
     if bool(get_val("bass_integration_enable", False)):
         mode_value = "AUTO"

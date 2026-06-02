@@ -28,6 +28,7 @@ from ...application.run_contracts import (
     copy_source_ui_data,
 )
 from ...common.result_postprocess import _irwin_tag
+from ...config.legacy_keys import is_auto_mode
 from ...config.decaycore_config import save_config
 from ...config.decaycore_pipeline import (
     build_xos_hpf,
@@ -65,7 +66,7 @@ def _prepare_target_curve_bass_integration_context(
     bi_mode = "direct_dac"
     data["bass_integration_mode"] = bi_mode
     _mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
-    _auto_active = bool(_mode_u == "AUTO" or data.get("camillafir_automatic_mode", False))
+    _auto_active = is_auto_mode(data, _mode_u)
 
     if _auto_active:
         _status(callbacks, "DecayCore automatic mode: bass integration prepare init")
@@ -397,7 +398,7 @@ def _prepare_target_curve_and_run_context(
         forced_plot_fs_hz=int(support.force_single_plot_fs_hz),
     )
     mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
-    auto_mode_enabled = bool(mode_u == "AUTO" or data.get("camillafir_automatic_mode", False))
+    auto_mode_enabled = is_auto_mode(data, mode_u)
     zip_dashboards_on = False
 
     ts = datetime.now().strftime("%d%m%y_%H%M")

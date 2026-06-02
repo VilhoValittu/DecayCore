@@ -26,6 +26,7 @@ from .export_summary_text import (
 from ..app_paths import program_version_token
 from ..common.result_postprocess import _irwin_tag
 from ..config.decaycore_convolver_configs import generate_hlc_config, generate_raspberry_yaml
+from ..config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from ..config.results import FilterResult
 from ..auto_mode.rank_score import attach_official_rank_score, official_rank_score
 from ..ui_i18n import layout_legacy_name
@@ -156,7 +157,7 @@ def _export_version_tag(data: dict | None, *, program_version: str | None = None
 
 def _export_winner_rank_score(data: dict | None) -> float:
     try:
-        auto_used = bool((data or {}).get("camillafir_automatic_mode", False))
+        auto_used = bool((data or {}).get(CAMILLAFIR_AUTO_MODE, False))
     except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
         auto_used = False
     if not auto_used:

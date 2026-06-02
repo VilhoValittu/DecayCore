@@ -12,6 +12,7 @@
 
 import numpy as np
 from ..common.house_curves import _normalize_hc_mode_key, get_house_curve_by_name, adapt_house_curve_to_rt60
+from ..config.legacy_keys import is_auto_mode
 
 MANUAL_TARGET_TILT_PIVOT_HZ = 1000.0
 
@@ -34,7 +35,7 @@ def _prefer_bass_hpf_freq_hz(data: dict) -> float:
             mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
         except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
             mode_u = "BASIC"
-        auto_mode_active = bool(mode_u == "AUTO" or data.get("camillafir_automatic_mode", False))
+        auto_mode_active = is_auto_mode(data, mode_u)
         enabled = bool(data.get("hpf_enable", False)) or bool(auto_mode_active)
         try:
             bi_mode = str(data.get("bass_integration_mode", "") or "").strip().lower()

@@ -15,6 +15,7 @@ import time
 import typing
 
 from ..auto_mode.api import AUTO_MODE_COMPAT_VERSION, _auto_optuna_storage_path, get_auto_mode_cache_path
+from ..config.legacy_keys import is_auto_mode
 
 if typing.TYPE_CHECKING:
     from .process_run_flow import ProcessRunSupport
@@ -45,7 +46,7 @@ def _resolve_mode_upper(data: dict) -> str:
 
 def _resolve_auto_cache_and_optuna_paths(data: dict) -> tuple[str | None, str | None]:
     mode_u = _resolve_mode_upper(data)
-    if not bool(mode_u == "AUTO" or data.get("camillafir_automatic_mode", False)):
+    if not is_auto_mode(data, mode_u):
         return None, None
     auto_cache_path = None
     optuna_storage_path = None

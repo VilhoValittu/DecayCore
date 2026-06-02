@@ -17,6 +17,7 @@ from typing import Any, Callable
 
 import numpy as np
 
+from ...config.legacy_keys import is_auto_mode
 from ...dsp.bass_integration import compute_bass_integration_metric_payload
 from ...dsp.target_synthesis import synthesize_target_from_measurements
 from ..auto_mode_profile import profiled_section
@@ -112,7 +113,7 @@ def _sync_auto_hpf_runtime_fields(
         mode_u = str(out.get("mode", "BASIC") or "BASIC").strip().upper()
     except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         mode_u = "BASIC"
-    auto_mode_active = bool(mode_u == "AUTO" or out.get("camillafir_automatic_mode", False))
+    auto_mode_active = is_auto_mode(out, mode_u)
     try:
         bi_mode = str(out.get("bass_integration_mode", "") or "").strip().lower()
     except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):

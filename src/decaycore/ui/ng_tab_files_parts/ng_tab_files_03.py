@@ -23,6 +23,7 @@ from typing import Any, Callable
 logger = logging.getLogger("DecayCore")
 
 from .. import ng_controls as ctrl
+from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from ...app_paths import default_measurements_dir
 from ...io.measurements_loader import _try_load_harmonic_sidecar, _try_load_rt60_sidecar
 from ...ui_i18n import (
@@ -389,7 +390,7 @@ def _suggest_measurement_library_matches(
 def build_files_tab(*, t: Callable, get_val: Callable) -> None:
     from nicegui import ui
     mode_value = str(get_val("mode", "BASIC") or "BASIC").strip().upper()
-    if bool(get_val("camillafir_automatic_mode", False)):
+    if bool(get_val(CAMILLAFIR_AUTO_MODE, False)):
         mode_value = "AUTO"
     bass_integration_visible = bool(mode_value == "AUTO")
     bass_integration_enabled = bool(get_val("bass_integration_enable", False))
@@ -508,7 +509,7 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:
 
     def _current_measurement_path_keys() -> list[str]:
         mode_current = str(ctrl.value("mode", mode_value) or mode_value).strip().upper()
-        auto_current = bool(mode_current == "AUTO" or ctrl.value("camillafir_automatic_mode", False))
+        auto_current = bool(mode_current == "AUTO" or ctrl.value(CAMILLAFIR_AUTO_MODE, False))
         bass_integration_current = bool(ctrl.value("bass_integration_enable", bass_integration_enabled))
         if auto_current and bass_integration_current:
             return [

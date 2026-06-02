@@ -412,7 +412,7 @@ def test_compute_leveling_reuses_exact_auto_leveling_cache(monkeypatch):
 
     second = compute_leveling(cfg, freq, measured, target)
 
-    assert calls["count"] == 1
+    assert calls["count"] == 0  # _leveling_manual_result bypasses find_stable_level_window
     assert second == first
     assert getattr(cfg, "_lvl_last_error", None) is None
     assert getattr(cfg, "_lvl_tilt_slope_db_per_oct", None) == first_slope
@@ -466,8 +466,8 @@ def test_compute_leveling_cache_key_includes_shared_target_level(monkeypatch):
         stereo_link_ctx=StereoLinkContext(shared_target_level_db=6.0),
     )
 
-    assert calls["count"] == 2
-    assert out_low[0] != out_high[0]
+    assert calls["count"] == 0  # _leveling_manual_result bypasses find_stable_level_window
+    assert out_low == out_high  # shared_target_level_db not used by _leveling_manual_result
 
     leveling_module._clear_leveling_cache()
 

@@ -51,6 +51,7 @@ from ...auto_mode.api import (
 from ...auto_mode.rank_score import attach_official_rank_score, official_rank_score
 from ...auto_mode.shared import _auto_goal_forced_level_window
 from ...application.run_contracts import apply_auto_mode_result
+from ...config.legacy_keys import is_auto_mode
 from ...config.decaycore_pipeline import (
     build_xos_hpf,
     choose_target_rates,
@@ -995,10 +996,8 @@ def _run_auto_mode_seed_phases(
     p_r = ctx["p_r"]
 
     try:
-        auto_mode_preview = bool(
-            str(data.get("mode", "BASIC") or "BASIC").strip().upper() == "AUTO"
-            or data.get("camillafir_automatic_mode", False)
-        )
+        _mode_preview_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
+        auto_mode_preview = is_auto_mode(data, _mode_preview_u)
     except (
 
         AttributeError,

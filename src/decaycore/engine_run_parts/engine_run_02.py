@@ -217,50 +217,21 @@ def _inject_direct_dac_summed_prediction_for_plot(
     except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         logger.debug("Direct-DAC summed plot prediction injection failed", exc_info=True)
 
-def run_pipeline(
-    cfg: FilterConfig,
-    measurements: dict,
+def _generate_main_filters(
+    cfg,
+    f_l, m_l, p_l,
+    f_r, m_r, p_r,
+    _mctx_l,
+    _mctx_r,
     *,
-    debug: bool = False,
-    include_response_arrays: bool = True,
-) -> FilterResult:
-    """
-    Execute one DSP pipeline run and return normalized results.
-
-    `measurements` must contain L/R frequency, magnitude and phase arrays:
-    `f_l,m_l,p_l,f_r,m_r,p_r`.
-    """
-    if not isinstance(measurements, dict):
-        raise TypeError("measurements must be a dict")
-
-    f_l, m_l, p_l, f_r, m_r, p_r = _extract_lr_measurement_axes(measurements)
-    if min(f_l.size, m_l.size, p_l.size, f_r.size, m_r.size, p_r.size) == 0:
-        raise ValueError("Incomplete measurement data for pipeline run")
-
-    data = dict(measurements.get("ui_data") or {})
-    hc_f = measurements.get("hc_f")
-    hc_m = measurements.get("hc_m")
-    comparison_mode = bool(data.get("comparison_mode", getattr(cfg, "comparison_mode", False)))
-
-    warnings: list[str] = []
-    sub_st: dict | None = None
-    sub_target_meta: dict[str, Any] = {}
-
-    _mctx_l = _build_measurement_side_ctx(measurements, "l")
-    _mctx_r = _build_measurement_side_ctx(measurements, "r")
-
+    include_response_arrays: bool,
+):
     with profiled_section("run_pipeline.generate_filters"):
         if bool(getattr(cfg, "stereo_link", False)):
             set_measurement_ctx(_mctx_l)
             try:
                 l_imp, l_st, r_imp, r_st = _call_generate_filter_pair(
-                    f_l,
-                    m_l,
-                    p_l,
-                    f_r,
-                    m_r,
-                    p_r,
-                    cfg,
+                    f_l, m_l, p_l, f_r, m_r, p_r, cfg,
                     include_response_arrays=bool(include_response_arrays),
                 )
             finally:
@@ -269,10 +240,7 @@ def run_pipeline(
             set_measurement_ctx(_mctx_l)
             try:
                 l_imp, l_st = _call_generate_filter(
-                    f_l,
-                    m_l,
-                    p_l,
-                    cfg,
+                    f_l, m_l, p_l, cfg,
                     include_response_arrays=bool(include_response_arrays),
                 )
             finally:
@@ -280,133 +248,149 @@ def run_pipeline(
             set_measurement_ctx(_mctx_r)
             try:
                 r_imp, r_st = _call_generate_filter(
-                    f_r,
-                    m_r,
-                    p_r,
-                    cfg,
+                    f_r, m_r, p_r, cfg,
                     include_response_arrays=bool(include_response_arrays),
                 )
             finally:
                 clear_measurement_ctx()
+    return l_imp, l_st, r_imp, r_st
 
+
+def _generate_sub_ir(
+    cfg,
+    measurements,
+    data,
+    f_l, m_l, p_l,
+    f_r, m_r, p_r,
+    warnings: list,
+    *,
+    is_direct_dac_bi: bool,
+    include_response_arrays: bool,
+):
     sub_ir: np.ndarray | None = None
     sub_f: np.ndarray | None = None
     sub_m: np.ndarray | None = None
     sub_p: np.ndarray | None = None
-    is_direct_dac_bi = bool(
-        getattr(cfg, "bass_integration_enable", False)
-        and str(getattr(cfg, "bass_integration_mode", "") or "").strip().lower() == "direct_dac"
-    )
-    if bool(getattr(cfg, "sub_integration_enable", False)) and \
-       bool(getattr(cfg, "sub_generate_ir", False)):
+    sub_st: dict | None = None
+    sub_target_meta: dict[str, Any] = {}
+
+    if not (bool(getattr(cfg, "sub_integration_enable", False)) and
+            bool(getattr(cfg, "sub_generate_ir", False))):
+        return sub_ir, sub_f, sub_m, sub_p, sub_st, sub_target_meta
+
+    try:
+        f_sub, m_sub, p_sub = _resolve_sub_measurement_for_filter(
+            measurements,
+            f_l=f_l,
+            m_l=m_l,
+            p_l=p_l,
+            f_r=f_r,
+            m_r=m_r,
+            p_r=p_r,
+        )
+
+        sub_xo_hz = float(getattr(cfg, "sub_crossover_hz", 80.0))
+        sub_xo_order = int(getattr(cfg, "sub_crossover_order", 4))
         try:
-            f_sub, m_sub, p_sub = _resolve_sub_measurement_for_filter(
-                measurements,
-                f_l=f_l,
-                m_l=m_l,
-                p_l=p_l,
-                f_r=f_r,
-                m_r=m_r,
-                p_r=p_r,
+            sub_lpf_hz = float(getattr(cfg, "direct_dac_sub_lpf_hz", sub_xo_hz) or sub_xo_hz)
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+            sub_lpf_hz = sub_xo_hz
+        if not np.isfinite(sub_lpf_hz) or sub_lpf_hz <= 0.0:
+            sub_lpf_hz = sub_xo_hz
+        if (
+            bool(getattr(cfg, "bass_integration_enable", False))
+            and str(getattr(cfg, "bass_integration_mode", "") or "").strip().lower() == "direct_dac"
+        ):
+            sub_lpf_hz = max(float(sub_xo_hz), float(sub_lpf_hz))
+        sub_hpf_freq = float(getattr(cfg, "sub_hpf_freq", 20.0))
+        sub_hpf_order = int(getattr(cfg, "sub_hpf_order", 2))
+
+        if is_direct_dac_bi:
+            sub_target = build_subwoofer_target_with_lpf(
+                getattr(cfg, "house_freqs", None),
+                getattr(cfg, "house_mags", None),
             )
-
-            sub_xo_hz = float(getattr(cfg, "sub_crossover_hz", 80.0))
-            sub_xo_order = int(getattr(cfg, "sub_crossover_order", 4))
-            try:
-                sub_lpf_hz = float(getattr(cfg, "direct_dac_sub_lpf_hz", sub_xo_hz) or sub_xo_hz)
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-                sub_lpf_hz = sub_xo_hz
-            if not np.isfinite(sub_lpf_hz) or sub_lpf_hz <= 0.0:
-                sub_lpf_hz = sub_xo_hz
-            if (
-                bool(getattr(cfg, "bass_integration_enable", False))
-                and str(getattr(cfg, "bass_integration_mode", "") or "").strip().lower() == "direct_dac"
-            ):
-                sub_lpf_hz = max(float(sub_xo_hz), float(sub_lpf_hz))
-            sub_hpf_freq = float(getattr(cfg, "sub_hpf_freq", 20.0))
-            sub_hpf_order = int(getattr(cfg, "sub_hpf_order", 2))
-
-            if is_direct_dac_bi:
-                sub_target = build_subwoofer_target_with_lpf(
-                    getattr(cfg, "house_freqs", None),
-                    getattr(cfg, "house_mags", None),
-                )
-                sub_target_meta = subwoofer_target_metadata(sub_target)
-                sub_cfg = dataclasses.replace(
-                    cfg,
-                    lpf_settings=None,
-                    hpf_settings=None,
-                    crossovers=[],
-                    house_freqs=sub_target.house_freqs,
-                    house_mags=sub_target.house_mags,
-                    mag_c_min=20.0,
-                    mag_c_max=200.0,
-                    lvl_min=20.0,
-                    lvl_max=200.0,
-                    stereo_link=False,
-                    sub_integration_enable=False,
-                    sub_generate_ir=False,
-                )
-                if isinstance(data, dict):
-                    data.update(sub_target_meta)
-                    bi_meta = data.setdefault("_bass_integration_meta", {})
-                    if isinstance(bi_meta, dict):
-                        bi_meta.update(sub_target_meta)
-            else:
-                sub_cfg = dataclasses.replace(
-                    cfg,
-                    lpf_settings={"enabled": True, "freq": sub_lpf_hz, "order": sub_xo_order},
-                    hpf_settings={"enabled": True, "freq": sub_hpf_freq, "order": sub_hpf_order},
-                    crossovers=[{"freq": sub_lpf_hz, "order": sub_xo_order,
-                                 "slope": sub_xo_order * 6, "idx": 0}],
-                    mag_c_min=max(5.0, float(sub_hpf_freq)),
-                    mag_c_max=sub_lpf_hz,
-                    lvl_min=20.0,
-                    lvl_max=200.0,
-                    stereo_link=False,
-                    sub_integration_enable=False,
-                    sub_generate_ir=False,
-                )
-            sub_imp, sub_st = _call_generate_filter(
-                f_sub,
-                m_sub,
-                p_sub,
-                sub_cfg,
-                include_response_arrays=bool(include_response_arrays),
+            sub_target_meta = subwoofer_target_metadata(sub_target)
+            sub_cfg = dataclasses.replace(
+                cfg,
+                lpf_settings=None,
+                hpf_settings=None,
+                crossovers=[],
+                house_freqs=sub_target.house_freqs,
+                house_mags=sub_target.house_mags,
+                mag_c_min=20.0,
+                mag_c_max=200.0,
+                lvl_min=20.0,
+                lvl_max=200.0,
+                stereo_link=False,
+                sub_integration_enable=False,
+                sub_generate_ir=False,
             )
-            sub_ir = np.asarray(sub_imp, dtype=float)
-            sub_f = np.asarray(f_sub, dtype=float)
-            sub_m = np.asarray(m_sub, dtype=float)
-            sub_p = np.asarray(p_sub, dtype=float)
-            if is_direct_dac_bi and isinstance(sub_st, dict):
-                sub_st.update(sub_target_meta)
-            if is_direct_dac_bi:
-                logger.info(
-                    "Sub pass: Direct-DAC full-band FIR, sub target LPF %.0f Hz / %.0f dB/oct, "
-                    "correction scan 20-200 Hz; "
-                    "XO/HPF/LPF applied in CamillaDSP YAML"
-                    % (
-                        float(sub_target_meta.get("sub_target_lpf_hz", 200.0) or 200.0),
-                        float(sub_target_meta.get("sub_target_lpf_slope_db_per_oct", 96.0) or 96.0),
-                    )
+            if isinstance(data, dict):
+                data.update(sub_target_meta)
+                bi_meta = data.setdefault("_bass_integration_meta", {})
+                if isinstance(bi_meta, dict):
+                    bi_meta.update(sub_target_meta)
+        else:
+            sub_cfg = dataclasses.replace(
+                cfg,
+                lpf_settings={"enabled": True, "freq": sub_lpf_hz, "order": sub_xo_order},
+                hpf_settings={"enabled": True, "freq": sub_hpf_freq, "order": sub_hpf_order},
+                crossovers=[{"freq": sub_lpf_hz, "order": sub_xo_order,
+                             "slope": sub_xo_order * 6, "idx": 0}],
+                mag_c_min=max(5.0, float(sub_hpf_freq)),
+                mag_c_max=sub_lpf_hz,
+                lvl_min=20.0,
+                lvl_max=200.0,
+                stereo_link=False,
+                sub_integration_enable=False,
+                sub_generate_ir=False,
+            )
+        sub_imp, sub_st = _call_generate_filter(
+            f_sub,
+            m_sub,
+            p_sub,
+            sub_cfg,
+            include_response_arrays=bool(include_response_arrays),
+        )
+        sub_ir = np.asarray(sub_imp, dtype=float)
+        sub_f = np.asarray(f_sub, dtype=float)
+        sub_m = np.asarray(m_sub, dtype=float)
+        sub_p = np.asarray(p_sub, dtype=float)
+        if is_direct_dac_bi and isinstance(sub_st, dict):
+            sub_st.update(sub_target_meta)
+        if is_direct_dac_bi:
+            logger.info(
+                "Sub pass: Direct-DAC full-band FIR, sub target LPF %.0f Hz / %.0f dB/oct, "
+                "correction scan 20-200 Hz; "
+                "XO/HPF/LPF applied in CamillaDSP YAML"
+                % (
+                    float(sub_target_meta.get("sub_target_lpf_hz", 200.0) or 200.0),
+                    float(sub_target_meta.get("sub_target_lpf_slope_db_per_oct", 96.0) or 96.0),
                 )
-            elif abs(float(sub_lpf_hz) - float(sub_xo_hz)) >= 0.5:
-                logger.info(
-                    f"Sub pass: main HPF={sub_xo_hz:.0f} Hz, "
-                    f"sub LPF={sub_lpf_hz:.0f} Hz (order {sub_xo_order}), "
-                    f"HPF={sub_hpf_freq:.0f} Hz (order {sub_hpf_order})"
-                )
-            else:
-                logger.info(
-                    f"Sub pass: xo={sub_xo_hz:.0f} Hz (order {sub_xo_order}), "
-                    f"HPF={sub_hpf_freq:.0f} Hz (order {sub_hpf_order})"
-                )
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
-            warnings.append(f"sub_pass_failed: {exc}")
-            logger.warning(f"Sub DSP pass failed: {exc}")
-            sub_ir = None
+            )
+        elif abs(float(sub_lpf_hz) - float(sub_xo_hz)) >= 0.5:
+            logger.info(
+                f"Sub pass: main HPF={sub_xo_hz:.0f} Hz, "
+                f"sub LPF={sub_lpf_hz:.0f} Hz (order {sub_xo_order}), "
+                f"HPF={sub_hpf_freq:.0f} Hz (order {sub_hpf_order})"
+            )
+        else:
+            logger.info(
+                f"Sub pass: xo={sub_xo_hz:.0f} Hz (order {sub_xo_order}), "
+                f"HPF={sub_hpf_freq:.0f} Hz (order {sub_hpf_order})"
+            )
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
+        warnings.append(f"sub_pass_failed: {exc}")
+        logger.warning(f"Sub DSP pass failed: {exc}")
+        sub_ir = None
 
-    is_wav = bool(measurements.get("is_wav_source", getattr(cfg, "is_wav_source", False)))
+    return sub_ir, sub_f, sub_m, sub_p, sub_st, sub_target_meta
+
+
+def _apply_rt60_and_alignment_checks(
+    l_st, r_st, measurements, data, cfg, *, is_wav: bool
+) -> None:
     rt_rel = 1.0 if is_wav else 0.25
     rt_src = "WAV" if is_wav else "TXT/REW"
     if isinstance(l_st, dict):
@@ -475,19 +459,10 @@ def run_pipeline(
         if _ir_align_sub:
             r_st["ir_align_sub"] = dict(_ir_align_sub)
 
-    with profiled_section("run_pipeline.ensure_scoring_keys"):
-        l_st = _ensure_scoring_keys(l_st, f_l, m_l, hc_f, hc_m)
-        r_st = _ensure_scoring_keys(r_st, f_r, m_r, hc_f, hc_m)
 
-    if comparison_mode:
-        with profiled_section("run_pipeline.comparison_stats"):
-            try:
-                l_st = _make_comparison_stats(l_st, int(cfg.fs), int(cfg.num_taps))
-                r_st = _make_comparison_stats(r_st, int(cfg.fs), int(cfg.num_taps))
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
-                warnings.append(f"comparison_stats_failed: {exc}")
-                logger.warning(f"Comparison-mode stats failed: {exc}")
-
+def _align_lr_and_sub(
+    l_imp, r_imp, sub_ir, l_st, r_st, data, cfg, *, is_direct_dac_bi: bool
+):
     with profiled_section("run_pipeline.align"):
         align_method = "peak"
         d_peak = int(np.argmax(np.abs(l_imp)) - np.argmax(np.abs(r_imp)))
@@ -556,45 +531,227 @@ def run_pipeline(
                 sub_ir = _shift_zeropad_1d(sub_imp, int(d_sub))
                 logger.info(f"Sub alignment applied: {int(d_sub)} samples")
 
-    wav_like_fft_grid = False
+    return l_imp, r_imp, sub_ir, d_s, d_peak, d_delay, align_method
+
+
+def _detect_wav_like_grid(f_l: np.ndarray) -> bool:
     try:
         fx = np.asarray(f_l if f_l is not None else [], dtype=float)
         if fx.size > 1024 and abs(float(fx[0])) < 1e-9:
             df = float(np.median(np.diff(fx[: min(int(fx.size), 4096)])))
             if np.isfinite(df) and (0.0 < df < 2.0):
-                wav_like_fft_grid = True
+                return True
     except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-        wav_like_fft_grid = False
+        pass
+    return False
 
-    if bool(is_wav) or bool(wav_like_fft_grid):
-        with profiled_section("run_pipeline.wav_postpolish"):
+
+def _apply_wav_postpolish(
+    l_imp, r_imp, cfg, data, warnings: list, *, is_wav: bool, wav_like_fft_grid: bool
+):
+    if not (bool(is_wav) or bool(wav_like_fft_grid)):
+        return l_imp, r_imp
+    with profiled_section("run_pipeline.wav_postpolish"):
+        try:
+            mc_min = _as_float(getattr(cfg, "mag_c_min", data.get("mag_c_min", 10.0)), 10.0)
+            mc_max = _as_float(getattr(cfg, "mag_c_max", data.get("mag_c_max", 230.0)), 230.0)
+            tr_w = _as_float(getattr(cfg, "trans_width", data.get("trans_width", 100.0)), 100.0)
+
+            l_imp = _postpolish_wav_filter_ir(
+                l_imp,
+                int(cfg.fs),
+                mag_c_min=mc_min,
+                mag_c_max=mc_max,
+                trans_width=tr_w,
+            )
+            r_imp = _postpolish_wav_filter_ir(
+                r_imp,
+                int(cfg.fs),
+                mag_c_min=mc_min,
+                mag_c_max=mc_max,
+                trans_width=tr_w,
+            )
+            logger.info(
+                f"WAV final IR polish applied at {int(cfg.fs)} Hz "
+                f"(zone approx {max(mc_min, mc_max - 0.95 * tr_w):.0f}-{mc_max + 1.45 * tr_w:.0f} Hz, "
+                f"is_wav={bool(is_wav)}, wav_like_fft_grid={bool(wav_like_fft_grid)})"
+            )
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
+            warnings.append(f"wav_postpolish_failed: {exc}")
+            logger.warning(f"WAV final IR polish failed: {exc}")
+    return l_imp, r_imp
+
+
+def _build_response_arrays(
+    l_st, r_st, l_imp, r_imp, sub_ir, sub_st, f_l, f_r, cfg, measurements, data, *,
+    include_response_arrays: bool,
+):
+    if not bool(include_response_arrays):
+        return (
+            np.asarray([], dtype=float),
+            np.asarray([], dtype=float),
+            np.asarray([], dtype=float),
+            np.asarray([], dtype=float),
+            np.asarray([], dtype=float),
+        )
+
+    with profiled_section("run_pipeline.response_arrays"):
+        _inject_filter_mags_for_ui(l_st, l_imp, int(cfg.fs))
+        _inject_filter_mags_for_ui(r_st, r_imp, int(cfg.fs))
+
+        if (
+            sub_ir is not None
+            and bool(getattr(cfg, "sub_integration_enable", False))
+            and bool(getattr(cfg, "sub_generate_ir", False))
+            and str(getattr(cfg, "bass_integration_mode", "") or "").strip().lower() == "direct_dac"
+        ):
+            bundle = measurements.get("bass_integration_bundle", None)
+            if bundle is not None:
+                try:
+                    sub_total_transfer, _diag = build_bundle_combined_sub_transfer(
+                        bundle,
+                        channel="l",
+                        label="Direct-DAC sub total",
+                    )
+                    candidate = direct_dac_candidate_from_data(data, cfg)
+                    sub_total_transfer = apply_direct_dac_export_branch_model(
+                        sub_total_transfer,
+                        hpf_hz=float(candidate.sub_hpf_hz),
+                        hpf_order=int(candidate.sub_hpf_order),
+                        lpf_hz=float(candidate.sub_lpf_hz),
+                        lpf_order=int(candidate.sub_lpf_order),
+                        gain_trim_db=float(candidate.sub_gain_trim_db),
+                        delay_ms=float(candidate.sub_delay_ms),
+                        polarity_invert=bool(candidate.sub_polarity_invert),
+                        allpass_freq_hz=(float(candidate.sub_allpass_freq_hz) if candidate.sub_allpass_enabled else None),
+                        allpass_q=(float(candidate.sub_allpass_q) if candidate.sub_allpass_enabled else None),
+                        label="Direct-DAC final sub branch for plot",
+                    )
+                    _inject_direct_dac_summed_prediction_for_plot(
+                        st=l_st,
+                        main_transfer=apply_direct_dac_export_branch_model(
+                            bundle.l_main,
+                            hpf_hz=float(candidate.main_hpf_hz),
+                            hpf_order=int(candidate.main_hpf_order),
+                            label="L Direct-DAC final main branch for plot",
+                        ),
+                        sub_transfer=sub_total_transfer,
+                        main_ir=np.asarray(l_imp, dtype=float),
+                        sub_ir=np.asarray(sub_ir, dtype=float),
+                        sub_st=sub_st,
+                        fs=int(cfg.fs),
+                    )
+                    _inject_direct_dac_summed_prediction_for_plot(
+                        st=r_st,
+                        main_transfer=apply_direct_dac_export_branch_model(
+                            bundle.r_main,
+                            hpf_hz=float(candidate.main_hpf_hz),
+                            hpf_order=int(candidate.main_hpf_order),
+                            label="R Direct-DAC final main branch for plot",
+                        ),
+                        sub_transfer=sub_total_transfer,
+                        main_ir=np.asarray(r_imp, dtype=float),
+                        sub_ir=np.asarray(sub_ir, dtype=float),
+                        sub_st=sub_st,
+                        fs=int(cfg.fs),
+                    )
+                except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+                    logger.debug("Direct-DAC summed prediction build failed", exc_info=True)
+
+        l_mode = str((l_st or {}).get("analysis_mode", "native")).lower()
+        r_mode = str((r_st or {}).get("analysis_mode", "native")).lower()
+        l_fk = "cmp_freq_axis" if l_mode == "comparison" else "freq_axis"
+        r_fk = "cmp_freq_axis" if r_mode == "comparison" else "freq_axis"
+        l_gk = "cmp_filter_mags" if l_mode == "comparison" else "filter_mags"
+        r_gk = "cmp_filter_mags" if r_mode == "comparison" else "filter_mags"
+
+        l_freq = _to_axis((l_st or {}).get(l_fk), f_l)
+        r_freq = _to_axis((r_st or {}).get(r_fk), f_r)
+        freq_axis = l_freq if l_freq.size >= r_freq.size else r_freq
+        if freq_axis.size == 0:
+            freq_axis = f_l if f_l.size else f_r
+
+        l_mag = _resample_to_axis((l_st or {}).get(l_gk), l_freq, freq_axis)
+        r_mag = _resample_to_axis((r_st or {}).get(r_gk), r_freq, freq_axis)
+        l_phase = _phase_from_ir(np.asarray(l_imp, dtype=float), int(cfg.fs), freq_axis)
+        r_phase = _phase_from_ir(np.asarray(r_imp, dtype=float), int(cfg.fs), freq_axis)
+
+    return freq_axis, l_mag, r_mag, l_phase, r_phase
+
+
+def run_pipeline(
+    cfg: FilterConfig,
+    measurements: dict,
+    *,
+    debug: bool = False,
+    include_response_arrays: bool = True,
+) -> FilterResult:
+    """
+    Execute one DSP pipeline run and return normalized results.
+
+    `measurements` must contain L/R frequency, magnitude and phase arrays:
+    `f_l,m_l,p_l,f_r,m_r,p_r`.
+    """
+    if not isinstance(measurements, dict):
+        raise TypeError("measurements must be a dict")
+
+    f_l, m_l, p_l, f_r, m_r, p_r = _extract_lr_measurement_axes(measurements)
+    if min(f_l.size, m_l.size, p_l.size, f_r.size, m_r.size, p_r.size) == 0:
+        raise ValueError("Incomplete measurement data for pipeline run")
+
+    data = dict(measurements.get("ui_data") or {})
+    hc_f = measurements.get("hc_f")
+    hc_m = measurements.get("hc_m")
+    comparison_mode = bool(data.get("comparison_mode", getattr(cfg, "comparison_mode", False)))
+
+    warnings: list[str] = []
+    sub_st: dict | None = None
+    sub_target_meta: dict[str, Any] = {}
+
+    _mctx_l = _build_measurement_side_ctx(measurements, "l")
+    _mctx_r = _build_measurement_side_ctx(measurements, "r")
+
+    l_imp, l_st, r_imp, r_st = _generate_main_filters(
+        cfg, f_l, m_l, p_l, f_r, m_r, p_r, _mctx_l, _mctx_r,
+        include_response_arrays=bool(include_response_arrays),
+    )
+
+    is_direct_dac_bi = bool(
+        getattr(cfg, "bass_integration_enable", False)
+        and str(getattr(cfg, "bass_integration_mode", "") or "").strip().lower() == "direct_dac"
+    )
+    sub_ir, sub_f, sub_m, sub_p, sub_st, sub_target_meta = _generate_sub_ir(
+        cfg, measurements, data, f_l, m_l, p_l, f_r, m_r, p_r, warnings,
+        is_direct_dac_bi=is_direct_dac_bi,
+        include_response_arrays=bool(include_response_arrays),
+    )
+
+    is_wav = bool(measurements.get("is_wav_source", getattr(cfg, "is_wav_source", False)))
+    _apply_rt60_and_alignment_checks(l_st, r_st, measurements, data, cfg, is_wav=is_wav)
+
+    with profiled_section("run_pipeline.ensure_scoring_keys"):
+        l_st = _ensure_scoring_keys(l_st, f_l, m_l, hc_f, hc_m)
+        r_st = _ensure_scoring_keys(r_st, f_r, m_r, hc_f, hc_m)
+
+    if comparison_mode:
+        with profiled_section("run_pipeline.comparison_stats"):
             try:
-                mc_min = _as_float(getattr(cfg, "mag_c_min", data.get("mag_c_min", 10.0)), 10.0)
-                mc_max = _as_float(getattr(cfg, "mag_c_max", data.get("mag_c_max", 230.0)), 230.0)
-                tr_w = _as_float(getattr(cfg, "trans_width", data.get("trans_width", 100.0)), 100.0)
-
-                l_imp = _postpolish_wav_filter_ir(
-                    l_imp,
-                    int(cfg.fs),
-                    mag_c_min=mc_min,
-                    mag_c_max=mc_max,
-                    trans_width=tr_w,
-                )
-                r_imp = _postpolish_wav_filter_ir(
-                    r_imp,
-                    int(cfg.fs),
-                    mag_c_min=mc_min,
-                    mag_c_max=mc_max,
-                    trans_width=tr_w,
-                )
-                logger.info(
-                    f"WAV final IR polish applied at {int(cfg.fs)} Hz "
-                    f"(zone approx {max(mc_min, mc_max - 0.95 * tr_w):.0f}-{mc_max + 1.45 * tr_w:.0f} Hz, "
-                    f"is_wav={bool(is_wav)}, wav_like_fft_grid={bool(wav_like_fft_grid)})"
-                )
+                l_st = _make_comparison_stats(l_st, int(cfg.fs), int(cfg.num_taps))
+                r_st = _make_comparison_stats(r_st, int(cfg.fs), int(cfg.num_taps))
             except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
-                warnings.append(f"wav_postpolish_failed: {exc}")
-                logger.warning(f"WAV final IR polish failed: {exc}")
+                warnings.append(f"comparison_stats_failed: {exc}")
+                logger.warning(f"Comparison-mode stats failed: {exc}")
+
+    l_imp, r_imp, sub_ir, d_s, d_peak, d_delay, align_method = _align_lr_and_sub(
+        l_imp, r_imp, sub_ir, l_st, r_st, data, cfg,
+        is_direct_dac_bi=is_direct_dac_bi,
+    )
+
+    wav_like_fft_grid = _detect_wav_like_grid(f_l)
+    l_imp, r_imp = _apply_wav_postpolish(
+        l_imp, r_imp, cfg, data, warnings,
+        is_wav=is_wav, wav_like_fft_grid=wav_like_fft_grid,
+    )
 
     if isinstance(l_st, dict) and isinstance(r_st, dict):
         try:
@@ -626,93 +783,10 @@ def run_pipeline(
         sub_st=sub_st if isinstance(sub_st, dict) else None,
     )
 
-    if bool(include_response_arrays):
-        with profiled_section("run_pipeline.response_arrays"):
-            _inject_filter_mags_for_ui(l_st, l_imp, int(cfg.fs))
-            _inject_filter_mags_for_ui(r_st, r_imp, int(cfg.fs))
-
-            if (
-                sub_ir is not None
-                and bool(getattr(cfg, "sub_integration_enable", False))
-                and bool(getattr(cfg, "sub_generate_ir", False))
-                and str(getattr(cfg, "bass_integration_mode", "") or "").strip().lower() == "direct_dac"
-            ):
-                bundle = measurements.get("bass_integration_bundle", None)
-                if bundle is not None:
-                    try:
-                        sub_total_transfer, _diag = build_bundle_combined_sub_transfer(
-                            bundle,
-                            channel="l",
-                            label="Direct-DAC sub total",
-                        )
-                        candidate = direct_dac_candidate_from_data(data, cfg)
-                        sub_total_transfer = apply_direct_dac_export_branch_model(
-                            sub_total_transfer,
-                            hpf_hz=float(candidate.sub_hpf_hz),
-                            hpf_order=int(candidate.sub_hpf_order),
-                            lpf_hz=float(candidate.sub_lpf_hz),
-                            lpf_order=int(candidate.sub_lpf_order),
-                            gain_trim_db=float(candidate.sub_gain_trim_db),
-                            delay_ms=float(candidate.sub_delay_ms),
-                            polarity_invert=bool(candidate.sub_polarity_invert),
-                            allpass_freq_hz=(float(candidate.sub_allpass_freq_hz) if candidate.sub_allpass_enabled else None),
-                            allpass_q=(float(candidate.sub_allpass_q) if candidate.sub_allpass_enabled else None),
-                            label="Direct-DAC final sub branch for plot",
-                        )
-                        _inject_direct_dac_summed_prediction_for_plot(
-                            st=l_st,
-                            main_transfer=apply_direct_dac_export_branch_model(
-                                bundle.l_main,
-                                hpf_hz=float(candidate.main_hpf_hz),
-                                hpf_order=int(candidate.main_hpf_order),
-                                label="L Direct-DAC final main branch for plot",
-                            ),
-                            sub_transfer=sub_total_transfer,
-                            main_ir=np.asarray(l_imp, dtype=float),
-                            sub_ir=np.asarray(sub_ir, dtype=float),
-                            sub_st=sub_st,
-                            fs=int(cfg.fs),
-                        )
-                        _inject_direct_dac_summed_prediction_for_plot(
-                            st=r_st,
-                            main_transfer=apply_direct_dac_export_branch_model(
-                                bundle.r_main,
-                                hpf_hz=float(candidate.main_hpf_hz),
-                                hpf_order=int(candidate.main_hpf_order),
-                                label="R Direct-DAC final main branch for plot",
-                            ),
-                            sub_transfer=sub_total_transfer,
-                            main_ir=np.asarray(r_imp, dtype=float),
-                            sub_ir=np.asarray(sub_ir, dtype=float),
-                            sub_st=sub_st,
-                            fs=int(cfg.fs),
-                        )
-                    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
-                        logger.debug("Direct-DAC summed prediction build failed", exc_info=True)
-
-            l_mode = str((l_st or {}).get("analysis_mode", "native")).lower()
-            r_mode = str((r_st or {}).get("analysis_mode", "native")).lower()
-            l_fk = "cmp_freq_axis" if l_mode == "comparison" else "freq_axis"
-            r_fk = "cmp_freq_axis" if r_mode == "comparison" else "freq_axis"
-            l_gk = "cmp_filter_mags" if l_mode == "comparison" else "filter_mags"
-            r_gk = "cmp_filter_mags" if r_mode == "comparison" else "filter_mags"
-
-            l_freq = _to_axis((l_st or {}).get(l_fk), f_l)
-            r_freq = _to_axis((r_st or {}).get(r_fk), f_r)
-            freq_axis = l_freq if l_freq.size >= r_freq.size else r_freq
-            if freq_axis.size == 0:
-                freq_axis = f_l if f_l.size else f_r
-
-            l_mag = _resample_to_axis((l_st or {}).get(l_gk), l_freq, freq_axis)
-            r_mag = _resample_to_axis((r_st or {}).get(r_gk), r_freq, freq_axis)
-            l_phase = _phase_from_ir(np.asarray(l_imp, dtype=float), int(cfg.fs), freq_axis)
-            r_phase = _phase_from_ir(np.asarray(r_imp, dtype=float), int(cfg.fs), freq_axis)
-    else:
-        freq_axis = np.asarray([], dtype=float)
-        l_mag = np.asarray([], dtype=float)
-        r_mag = np.asarray([], dtype=float)
-        l_phase = np.asarray([], dtype=float)
-        r_phase = np.asarray([], dtype=float)
+    freq_axis, l_mag, r_mag, l_phase, r_phase = _build_response_arrays(
+        l_st, r_st, l_imp, r_imp, sub_ir, sub_st, f_l, f_r, cfg, measurements, data,
+        include_response_arrays=bool(include_response_arrays),
+    )
 
     if sub_target_meta and isinstance(data, dict):
         data.update(sub_target_meta)

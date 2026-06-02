@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Callable
 
 from ..config.decaycore_pipeline import filter_type_supports_xo_phase_model
+from ..config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from . import ng_controls as ctrl
 
 _SLOPE_OPTS = [6, 12, 18, 24, 36, 48]
@@ -26,7 +27,7 @@ def build_xo_tab(*, t: Callable, get_val: Callable) -> None:
     from nicegui import ui
 
     mode_value = str(get_val("mode", "BASIC") or "BASIC").strip().upper()
-    if bool(get_val("camillafir_automatic_mode", False)):
+    if bool(get_val(CAMILLAFIR_AUTO_MODE, False)):
         mode_value = "AUTO"
     bass_integration_visible = bool(
         mode_value == "AUTO" and bool(get_val("bass_integration_enable", False))

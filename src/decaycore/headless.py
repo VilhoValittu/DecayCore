@@ -18,6 +18,7 @@ import traceback
 from pathlib import Path
 from typing import Any
 
+from .config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from .core.runner import ConsoleProgressSink, prepare_headless_config, run_batch
 from .version import VERSION
 
@@ -93,7 +94,7 @@ def run_headless(config_path: Path, output_dir: Path, args: argparse.Namespace) 
         )
         if getattr(args, "mode", None):
             data["mode"] = str(args.mode).upper()
-            data["camillafir_automatic_mode"] = data["mode"] == "AUTO"
+            data[CAMILLAFIR_AUTO_MODE] = data["mode"] == "AUTO"
         data["language"] = str(getattr(args, "language", "en") or "en")
         data["_progress_sink"] = ConsoleProgressSink()
         logger.info("Selected mode: %s", data.get("mode"))
