@@ -22,7 +22,7 @@ from ..export_scoring import _pick_metric, _safe_float
 
 _AUTO_ASYM_PHASE1_SEARCH_SPACE_EST = 1877500016615829065655090169509480
 
-def _append_bass_integration_summary(summary_content: str, data: dict | None) -> str:
+def _append_bass_integration_summary(summary_content: str, data: dict | None) -> str:  # noqa: C901 - legacy summary keeps detailed compatibility branches
     try:
         ui_data = dict(data or {})
         bi_meta = dict(ui_data.get("_bass_integration_meta", {}) or {})

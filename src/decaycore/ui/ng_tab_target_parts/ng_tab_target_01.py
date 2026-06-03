@@ -436,7 +436,7 @@ def _on_target_preview_relayout(e) -> None:
     ctrl.set_value("lvl_manual_db", new_db, emit=False)
     _schedule_target_preview_refresh()
 
-def _build_target_preview_fig():
+def _build_target_preview_fig():  # noqa: C901 - target preview figure is assembled from many UI states
     """Build the target curve preview Plotly figure from current ctrl values.
 
     Returns a Plotly dict plus the base points of the draggable target curve and tilt handle.

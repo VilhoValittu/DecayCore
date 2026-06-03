@@ -70,6 +70,7 @@ def build_auto_mode_orchestrator_runtime() -> dict:
         "residual_peak_winner_polish_min_improvement_db": auto_api.AUTO_MODE_RESIDUAL_PEAK_WINNER_POLISH_MIN_IMPROVEMENT_DB,
         "mag_c_min_winner_polish_enabled": auto_api.AUTO_MODE_MAG_C_MIN_WINNER_POLISH_ENABLED,
         "mag_c_min_winner_polish_max_down_hz": auto_api.AUTO_MODE_MAG_C_MIN_WINNER_POLISH_MAX_DOWN_HZ,
+        "mag_c_min_winner_polish_max_up_hz": auto_api.AUTO_MODE_MAG_C_MIN_WINNER_POLISH_MAX_UP_HZ,
         "mag_c_min_winner_polish_step_hz": auto_api.AUTO_MODE_MAG_C_MIN_WINNER_POLISH_STEP_HZ,
         "hpf_winner_polish_enabled": auto_api.AUTO_MODE_HPF_WINNER_POLISH_ENABLED,
         "excess_phase_strength_winner_polish_enabled": auto_api.AUTO_MODE_EXCESS_PHASE_STRENGTH_WINNER_POLISH_ENABLED,

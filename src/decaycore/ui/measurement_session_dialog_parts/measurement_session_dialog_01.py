@@ -27,7 +27,7 @@ def _format_session_progress_percent(completed_steps: int, total_steps: int) -> 
     ratio = min(1.0, max(0.0, float(completed) / float(total)))
     return f"{ratio * 100.0:.0f}%"
 
-def build_measurement_session_dialog(
+def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentionally coordinates many UI callbacks
     *,
     t: Callable[[str], str],
     build_request_for_role: Callable[[str], MeasurementRequest],

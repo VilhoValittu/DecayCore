@@ -387,7 +387,7 @@ def _suggest_measurement_library_matches(
             break
     return suggestions
 
-def build_files_tab(*, t: Callable, get_val: Callable) -> None:
+def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - file tab coordinates upload, library, and path syncing
     from nicegui import ui
     mode_value = str(get_val("mode", "BASIC") or "BASIC").strip().upper()
     if bool(get_val(CAMILLAFIR_AUTO_MODE, False)):

@@ -107,7 +107,7 @@ def _resolve_magnitude_display_offset_db(
             return float(ref_db)
     return 0.0
 
-def generate_prediction_plot(
+def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnostic composition in one place
     orig_freqs,
     orig_mags,
     orig_phases,

@@ -254,7 +254,7 @@ def make_cfg(fs: int, filter_type: str, residual_on: bool, normalize_on: bool) -
     return cfg
 
 
-def run_one_case(
+def run_one_case(  # noqa: C901 - DSP smoke case exercises many parameter combinations
     *,
     fs: int,
     n: int,

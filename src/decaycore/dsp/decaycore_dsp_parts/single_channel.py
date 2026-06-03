@@ -110,7 +110,7 @@ def _authority_array_mode(include_response_arrays: bool) -> bool | str:
     return True if bool(include_response_arrays) else "scoring"
 
 
-def generate_filter(
+def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limits, and stats in one place
     freqs,
     meas_mags,
     raw_phases,

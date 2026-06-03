@@ -145,7 +145,7 @@ def _auto_mag_c_min_prepare_channel(ff: np.ndarray, mm: np.ndarray, *, default_h
     return {
         "ff": np.asarray(ff[lf_mask], dtype=float),
         "m_env": np.maximum.accumulate(np.asarray(mm_use[lf_mask], dtype=float)),
-        "ref_db": float(np.quantile(ref_slice, 0.75)),
+        "ref_db": float(np.quantile(ref_slice, 0.50)),
         "default_hz": float(default_hz),
     }
 

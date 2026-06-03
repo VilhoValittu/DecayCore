@@ -250,7 +250,7 @@ def _measurement_summary_html(
         html += f"<div><b>{t('measurement_timing_mode')}</b>: {mode_label}{corr_txt}</div>"
     return html
 
-def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
+def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - tab builder stays explicit for UX wiring
     from nicegui import ui
 
     backend_message_state: dict[str, str | None] = {"value": None}

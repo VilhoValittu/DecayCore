@@ -1633,7 +1633,7 @@ def test_auto_optuna_completed_trial_accepts_full_seed_param_space():
     assert float(trial.params["synth_tilt_frac"]) == 0.31
 
 
-def test_auto_run_optuna_eval_loop_feeds_seed_trials_into_study():
+def test_auto_run_optuna_eval_loop_feeds_seed_trials_into_study():  # noqa: C901 - optuna integration test intentionally covers many control paths
     class _FakeTrial:
         def __init__(self, fixed=None):
             self.fixed = dict(fixed or {})
@@ -1721,7 +1721,7 @@ def test_auto_run_optuna_eval_loop_feeds_seed_trials_into_study():
     assert seen[0][1]["reg_strength"] == 22.5
 
 
-def test_auto_run_optuna_eval_loop_uses_persistent_study_when_available():
+def test_auto_run_optuna_eval_loop_uses_persistent_study_when_available():  # noqa: C901 - optuna integration test intentionally covers many control paths
     class _FakeTrial:
         def suggest_float(self, name, low, high):
             return float(low)
@@ -1799,7 +1799,7 @@ def test_auto_run_optuna_eval_loop_uses_persistent_study_when_available():
     assert "storage" in calls[0]
 
 
-def test_auto_run_optuna_eval_loop_keeps_per_run_startup_for_existing_persistent_study():
+def test_auto_run_optuna_eval_loop_keeps_per_run_startup_for_existing_persistent_study():  # noqa: C901 - optuna integration test intentionally covers many control paths
     class _ExistingTrial:
         user_attrs = {}
         params = {}
@@ -1909,7 +1909,7 @@ def test_auto_run_optuna_eval_loop_keeps_per_run_startup_for_existing_persistent
     assert pruner.prune(None, SimpleNamespace(number=12)) is True
 
 
-def test_auto_run_optuna_eval_loop_skips_duplicate_trials_from_existing_study():
+def test_auto_run_optuna_eval_loop_skips_duplicate_trials_from_existing_study():  # noqa: C901 - optuna integration test intentionally covers many control paths
     class _FrozenTrial:
         def __init__(self, params, value):
             self.params = dict(params or {})
@@ -1995,7 +1995,7 @@ def test_auto_run_optuna_eval_loop_skips_duplicate_trials_from_existing_study():
     assert float(study.told[1]["value"]) == 82.0
 
 
-def test_auto_run_optuna_eval_loop_consumes_pruned_trials_in_parallel():
+def test_auto_run_optuna_eval_loop_consumes_pruned_trials_in_parallel():  # noqa: C901 - optuna integration test intentionally covers many control paths
     class _TrialPruned(Exception):
         pass
 
@@ -3146,6 +3146,7 @@ def test_finalize_search_result_keeps_rank_best_winner_when_pareto_differs(monke
             mag_c_min_winner_polish_enabled=False,
             mag_c_min_winner_polish_step_hz=2.0,
             mag_c_min_winner_polish_max_down_hz=40.0,
+            mag_c_min_winner_polish_max_up_hz=4.0,
             hpf_winner_polish_enabled=False,
             excess_phase_strength_winner_polish_enabled=False,
             excess_phase_strength_winner_polish_step=0.05,
@@ -3271,6 +3272,7 @@ def test_finalize_search_result_applies_residual_peak_safety_override(monkeypatc
             mag_c_min_winner_polish_enabled=False,
             mag_c_min_winner_polish_step_hz=2.0,
             mag_c_min_winner_polish_max_down_hz=40.0,
+            mag_c_min_winner_polish_max_up_hz=4.0,
             hpf_winner_polish_enabled=False,
             excess_phase_strength_winner_polish_enabled=False,
             excess_phase_strength_winner_polish_step=0.05,

@@ -80,13 +80,6 @@ def _prepare_target_curve_bass_integration_context(
     data["bass_integration_sub_gain_trim_db"] = float(data.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0)
     data["bass_integration_alignment_auto_applied"] = False
     data["bass_integration_alignment_reason"] = ""
-    data["bass_integration_allpass_auto_enable"] = bool(
-        data.get("bass_integration_allpass_auto_enable", False)
-    )
-    data["bass_integration_allpass_auto_applied"] = False
-    data["bass_integration_allpass_freq_hz"] = float(data.get("bass_integration_allpass_freq_hz", 0.0) or 0.0)
-    data["bass_integration_allpass_q"] = float(data.get("bass_integration_allpass_q", 0.707) or 0.707)
-    data["bass_integration_allpass_reason"] = ""
     data["bass_integration_allpass_auto_enable"] = False
     data["bass_integration_allpass_auto_applied"] = False
     data["bass_integration_allpass_freq_hz"] = 0.0

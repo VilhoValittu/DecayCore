@@ -18,7 +18,7 @@ import numpy as np
 import scipy.signal
 
 from decaycore.auto_mode.auto_mode_profile import profiled_section
-from decaycore.common.measurement_features import estimate_schroeder_hz
+from decaycore.common.measurement_features import estimate_schroeder_hz, median_rt60_mid_band
 
 from ._measurement_ctx_local import get_measurement_ctx
 from .correction_types import (
@@ -233,7 +233,7 @@ def _apply_uniform_target_shift_leveling(
     return shifted_target, float(updated_offset_db), float(updated_target_level_db_window)
 
 
-def _prepare_correction_baseline(
+def _prepare_correction_baseline(  # noqa: C901 - baseline assembly intentionally keeps all safety gates together
     *,
     cfg,
     freq_axis,
@@ -289,14 +289,7 @@ def _prepare_correction_baseline(
         else:
             rt60_bands = {}
         band_avg = 0.0
-        if rt60_bands:
-            ks = np.array(sorted(rt60_bands.keys()), dtype=float)
-            vs = np.array([rt60_bands[k] for k in ks], dtype=float)
-            mid = (ks >= 125.0) & (ks <= 4000.0) & (vs > 0.05) & (vs < 5.0)
-            if np.any(mid):
-                band_avg = float(np.median(vs[mid]))
-            else:
-                band_avg = float(np.median(vs))
+        band_avg = median_rt60_mid_band(rt60_bands)
         # Populate cache so Optuna re-trials that share the same measurement
         # also benefit from the early-exit path.
         with _RT60_CACHE_LOCK:
@@ -309,15 +302,7 @@ def _prepare_correction_baseline(
             rt_ir = get_min_phase_impulse(m_rt_lin, 131072)
             current_rt60 = calculate_rt60(rt_ir, cfg.fs)
             rt60_bands = calculate_rt60_bands(rt_ir, cfg.fs, f_min=31.5, f_max=8000.0, order=4)
-            band_avg = 0.0
-            if rt60_bands:
-                ks = np.array(sorted(rt60_bands.keys()), dtype=float)
-                vs = np.array([rt60_bands[k] for k in ks], dtype=float)
-                mid = (ks >= 125.0) & (ks <= 4000.0) & (vs > 0.05) & (vs < 5.0)
-                if np.any(mid):
-                    band_avg = float(np.median(vs[mid]))
-                else:
-                    band_avg = float(np.median(vs))
+            band_avg = median_rt60_mid_band(rt60_bands)
         with _RT60_CACHE_LOCK:
             _RT60_CACHE[_rt60_key] = (float(current_rt60), dict(rt60_bands), float(band_avg))
 

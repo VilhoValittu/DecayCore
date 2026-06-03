@@ -22,6 +22,7 @@ from ..resources.i8n.decaycore_i18n import t
 Level = Literal["ok", "warn", "crit"]
 _TOAST_LAST_SHOWN: Dict[str, float] = {}
 _TOAST_EDGE_STATE: Dict[str, bool] = {}
+_TOAST_CALLABLE: Optional[callable] = None
 
 
 def _prune_toast_cache(
@@ -177,7 +178,12 @@ def _has_any_measurement_source(data: Dict[str, Any], *, file_key: str, path_key
 
 
 def _get_toast_callable():
-    return None
+    return _TOAST_CALLABLE
+
+
+def set_toast_callable(fn: Optional[callable]) -> None:
+    global _TOAST_CALLABLE
+    _TOAST_CALLABLE = fn
 
 
 def show_toast(

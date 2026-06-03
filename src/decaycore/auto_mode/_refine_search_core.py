@@ -745,7 +745,7 @@ def _carry_forward_phase1_best_core(
     )
 
 
-def _run_search_refine_micro_core(
+def _run_search_refine_micro_core(  # noqa: C901 - central auto-mode orchestration is intentionally branchy
     *,
     search_base_data: dict,
     cfg,

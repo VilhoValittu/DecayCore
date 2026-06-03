@@ -221,6 +221,7 @@ def _finalize_cached_result(
                 enabled=bool(runtime.mag_c_min_winner_polish_enabled),
                 step_hz=float(runtime.mag_c_min_winner_polish_step_hz),
                 max_down_hz=float(runtime.mag_c_min_winner_polish_max_down_hz),
+                max_up_hz=float(runtime.mag_c_min_winner_polish_max_up_hz),
                 status_cb=status_cb,
                 materialize_preset_result=_materialize_preset_result,
                 cache_ready_preset=_cache_ready_preset,

@@ -52,7 +52,7 @@ __all__ = [
     'format_summary_content',
 ]
 
-def _format_summary_content_legacy(settings, l_stats, r_stats):
+def _format_summary_content_legacy(settings, l_stats, r_stats):  # noqa: C901 - legacy summary formatting preserves compatibility branches
     """Jasentaa tai muotoilee: format summary content."""
     from datetime import datetime
     import numpy as np

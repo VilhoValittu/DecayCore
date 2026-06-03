@@ -74,6 +74,22 @@ def serialize_rt60_bands(bands) -> dict[str, float] | None:
     return {f"{freq:g}": rt for freq, rt in norm.items()}
 
 
+def median_rt60_mid_band(bands) -> float:
+    """Return median RT60 in the 125–4000 Hz mid band, or overall median if empty.
+
+    Used for control flow decisions. Returns 0.0 if bands is empty or invalid.
+    """
+    norm = normalize_rt60_bands(bands)
+    if not norm:
+        return 0.0
+    ks = np.array(sorted(norm.keys()), dtype=float)
+    vs = np.array([norm[k] for k in ks], dtype=float)
+    mid = (ks >= 125.0) & (ks <= 4000.0) & (vs > 0.05) & (vs < 5.0)
+    if np.any(mid):
+        return float(np.median(vs[mid]))
+    return float(np.median(vs)) if vs.size > 0 else 0.0
+
+
 # ---------------------------------------------------------------------------
 # RT60 summary
 # ---------------------------------------------------------------------------
@@ -210,9 +226,10 @@ def _harmonic_boost_risk_collect_orders(freq: np.ndarray, harmonic_magnitudes_db
             continue
         if not np.any(np.isfinite(a)):
             continue
-        h_arrays.append(a)
-        if order == 3 and len(h_arrays) == 0:
+        # Require H2 before accepting H3 and later
+        if order > 2 and not h_arrays:
             break
+        h_arrays.append(a)
     return h_arrays
 
 

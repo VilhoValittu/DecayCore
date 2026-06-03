@@ -237,7 +237,7 @@ WARN = "WARN"
 FAIL = "FAIL"
 
 
-def _report(file_a: str, file_b: str,
+def _report(file_a: str, file_b: str,  # noqa: C901 - report aggregates multiple independent checks
             timing: dict, polarity: dict, level: dict, phase: dict) -> int:
     problems = 0
 

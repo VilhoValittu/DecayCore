@@ -393,7 +393,7 @@ def _evaluate_residual_finalist_items(
 
     return cur_best_preset, cur_best_metrics, bool(improved)
 
-def build_materialize_helpers(ctx: AutoModeMaterializeContext):
+def build_materialize_helpers(ctx: AutoModeMaterializeContext):  # noqa: C901 - helper factory for materialization workflow
     cfg = ctx.cfg
     cache_base_data = dict(ctx.cache_base_data or {})
     measurements = dict(ctx.measurements or {})
@@ -567,17 +567,21 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):
         trial_hc_f = ctx.hc_f
         trial_hc_m = ctx.hc_m
         preset_tilt_frac = final_data.get("synth_tilt_frac")
-        if preset_tilt_frac is not None:
+        preset_bass_frac = final_data.get("synth_bass_frac")
+        preset_hf_frac = final_data.get("synth_hf_frac")
+        if preset_tilt_frac is not None or preset_bass_frac is not None or preset_hf_frac is not None:
             atm = str(final_data.get("auto_target_mode", "") or "").strip().lower()
             if atm == "adaptive" and ctx.hc_f is not None:
                 try:
                     tilt_val = float(_auto_safe_float(preset_tilt_frac, AUTO_MODE_SYNTH_TARGET_TILT_COMP_FRAC_DEFAULT))
+                    bass_val = float(_auto_safe_float(preset_bass_frac, AUTO_MODE_SYNTH_TARGET_BASS_COMP_FRAC))
+                    hf_val = float(_auto_safe_float(preset_hf_frac, AUTO_MODE_SYNTH_TARGET_HF_COMP_FRAC))
                     synth_result = get_or_build_synth_target(
                         final_measurements,
                         tilt_comp_frac=tilt_val,
-                        bass_comp_frac=float(AUTO_MODE_SYNTH_TARGET_BASS_COMP_FRAC),
+                        bass_comp_frac=bass_val,
                         bass_comp_ref_db=float(AUTO_MODE_SYNTH_TARGET_BASS_COMP_REF_DB),
-                        hf_comp_frac=float(AUTO_MODE_SYNTH_TARGET_HF_COMP_FRAC),
+                        hf_comp_frac=hf_val,
                         smooth_oct=float(AUTO_MODE_SYNTH_TARGET_SMOOTH_OCT),
                         synth_fn=synthesize_target_from_measurements,
                     )

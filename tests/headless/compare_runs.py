@@ -192,7 +192,7 @@ def _delta_tag(key: str, before: float, after: float, threshold: float) -> str:
     return _c(tag + " ✗", RED)
 
 
-def cmd_compare(before_root: Path, after_root: Path, threshold: float, json_out: Path | None) -> int:
+def cmd_compare(before_root: Path, after_root: Path, threshold: float, json_out: Path | None) -> int:  # noqa: C901 - CLI compare walks multiple report branches
     before_runs = _collect(before_root)
     after_runs  = _collect(after_root)
 

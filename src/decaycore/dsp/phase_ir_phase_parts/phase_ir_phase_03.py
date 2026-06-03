@@ -195,7 +195,7 @@ def _pre_ringing_band_protection_floor(f: np.ndarray) -> np.ndarray:
     # >=200 Hz stays at 0.05 (initialization value)
     return np.clip(floor, 0.0, 1.0)
 
-def _apply_phase_model(
+def _apply_phase_model(  # noqa: C901 - phase containment and spike suppression are kept explicit
     freq_axis, cfg, st, phase_components: _PhaseComponents
 ) -> np.ndarray:
     f = np.asarray(freq_axis, dtype=float)

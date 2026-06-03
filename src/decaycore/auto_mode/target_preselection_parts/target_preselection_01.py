@@ -502,6 +502,9 @@ def _auto_target_insert_cached_wildcard(
         "reason": "inserted",
     }
 
+_SYNTH_TILT_VARIANTS = (0.15, 0.30, 0.45)
+
+
 def _auto_build_synth_target_candidate(
     data: dict,
     *,
@@ -511,24 +514,10 @@ def _auto_build_synth_target_candidate(
     m_r,
     measurements: dict | None = None,
 ) -> dict | None:
-    """Build and score a synthesized adaptive target candidate from measurements."""
-    try:
-        _ms = dict(measurements or {})
-        _ms.update({"f_l": f_l, "m_l": m_l, "f_r": f_r, "m_r": m_r})
-        synth = get_or_build_synth_target(
-            _ms,
-            tilt_comp_frac=float(AUTO_MODE_SYNTH_TARGET_TILT_COMP_FRAC),
-            bass_comp_frac=float(AUTO_MODE_SYNTH_TARGET_BASS_COMP_FRAC),
-            bass_comp_ref_db=float(AUTO_MODE_SYNTH_TARGET_BASS_COMP_REF_DB),
-            hf_comp_frac=float(AUTO_MODE_SYNTH_TARGET_HF_COMP_FRAC),
-            smooth_oct=float(AUTO_MODE_SYNTH_TARGET_SMOOTH_OCT),
-            synth_fn=synthesize_target_from_measurements,
-        )
-        if synth is None:
-            return None
-        hf, hm = synth
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
-        return None
+    """Build and score a synthesized adaptive target candidate from measurements.
+
+    Tries three tilt values and returns the best scoring variant.
+    """
     try:
         fl = np.asarray(f_l, dtype=float).reshape(-1)
         ml = np.asarray(m_l, dtype=float).reshape(-1)
@@ -540,21 +529,53 @@ def _auto_build_synth_target_candidate(
         fl, ml = np.asarray(fr, dtype=float).copy(), np.asarray(mr, dtype=float).copy()
     if fr.size < 32 and fl.size >= 32:
         fr, mr = np.asarray(fl, dtype=float).copy(), np.asarray(ml, dtype=float).copy()
-    tc = _auto_target_preselect_score_curve(
-        data,
-        fl=fl,
-        ml=ml,
-        fr=fr,
-        mr=mr,
-        hf=hf,
-        hm=hm,
-    )
-    if not isinstance(tc, dict) or not tc:
+
+    best_tc = None
+    best_score = float("inf")
+    for tilt_val in _SYNTH_TILT_VARIANTS:
+        try:
+            _ms = dict(measurements or {})
+            _ms.update({"f_l": f_l, "m_l": m_l, "f_r": f_r, "m_r": m_r})
+            synth = get_or_build_synth_target(
+                _ms,
+                tilt_comp_frac=float(tilt_val),
+                bass_comp_frac=float(AUTO_MODE_SYNTH_TARGET_BASS_COMP_FRAC),
+                bass_comp_ref_db=float(AUTO_MODE_SYNTH_TARGET_BASS_COMP_REF_DB),
+                hf_comp_frac=float(AUTO_MODE_SYNTH_TARGET_HF_COMP_FRAC),
+                smooth_oct=float(AUTO_MODE_SYNTH_TARGET_SMOOTH_OCT),
+                synth_fn=synthesize_target_from_measurements,
+            )
+            if synth is None:
+                continue
+            hf, hm = synth
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+            continue
+        try:
+            tc = _auto_target_preselect_score_curve(
+                data,
+                fl=fl,
+                ml=ml,
+                fr=fr,
+                mr=mr,
+                hf=hf,
+                hm=hm,
+            )
+            if not isinstance(tc, dict) or not tc:
+                continue
+            score = float(tc.get("preselect_score", float("inf")))
+            if score < best_score:
+                best_score = score
+                best_tc = dict(tc)
+                best_tc["_synth_tilt_frac_used"] = float(tilt_val)
+                best_tc["_synth_hc_f"] = np.asarray(hf, dtype=float).reshape(-1)
+                best_tc["_synth_hc_m"] = np.asarray(hm, dtype=float).reshape(-1)
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+            continue
+
+    if best_tc is None:
         return None
-    tc["hc_mode"] = str(AUTO_MODE_SYNTH_TARGET_NAME)
-    tc["_synth_hc_f"] = np.asarray(hf, dtype=float).reshape(-1)
-    tc["_synth_hc_m"] = np.asarray(hm, dtype=float).reshape(-1)
-    return dict(tc)
+    best_tc["hc_mode"] = str(AUTO_MODE_SYNTH_TARGET_NAME)
+    return dict(best_tc)
 
 
 def _auto_select_builtin_target_curve_scores(

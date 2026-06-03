@@ -77,19 +77,6 @@ def _correction_band_mask(freq_axis, cfg) -> np.ndarray:
         return np.zeros_like(np.asarray(freq_axis, dtype=float), dtype=bool)
 
 
-def _log_raw_mask_stats(logger, raw_g: np.ndarray, freq_axis: np.ndarray) -> None:
-    try:
-        mask = np.zeros_like(freq_axis, dtype=bool)
-        if not np.any(mask):
-            return
-        dv = raw_g[mask]
-        logger.info(
-            f"RAW_G(mask): max={float(np.max(dv)):.3f} min={float(np.min(dv)):.3f} rms={float(np.sqrt(np.mean(dv*dv))):.3f}"
-        )
-    except (TypeError, ValueError, FloatingPointError, IndexError):
-        return
-
-
 def run_mag_raw_stage(
     inputs: _MagPipelineInputs,
     *,
@@ -152,7 +139,6 @@ def run_mag_raw_stage(
         logger=logger,
     )
     raw_g = _error_to_correction_mag(err_db + float(manual_target_bias_db))
-    _log_raw_mask_stats(logger, raw_g, freq_axis)
     _log_stage_stats("raw_g_pre_confpull", raw_g, np.zeros_like(freq_axis, dtype=bool), logger=logger, enabled=debug_stage_stats)
 
     base_sigma = 60 // (filter_smooth / 12 if filter_smooth > 0 else 1)
@@ -177,7 +163,7 @@ def run_mag_raw_stage(
     )
 
 
-def run_mag_bassfirst_afdw_conf_stage(
+def run_mag_bassfirst_afdw_conf_stage(  # noqa: C901 - bass-first confidence handling is intentionally cohesive
     inputs: _MagPipelineInputs,
     raw_stage: _MagRawStageOutputs,
     *,

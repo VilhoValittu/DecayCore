@@ -79,7 +79,18 @@ def _normalize_filter_type(value) -> str:
     return "Asymmetric"
 
 
-def _coerce_legacy_boolean_lists(saved: dict) -> None:
+# Versioned migrations: each migration is registered with a version number.
+# Only migrations with version > saved config's _config_version are applied.
+# This ensures each migration runs exactly once, even across restarts.
+
+_CONFIG_CURRENT_VERSION = 1  # Increment this when adding a new migration
+
+
+def _migration_v1_coerce_legacy_boolean_lists(saved: dict) -> None:
+    """Migration 1: Convert list-valued booleans to bool type.
+
+    Old configs stored booleans as lists; extract the first element if present.
+    """
     for key in [
         "mag_correct",
         "normalize_opt",
@@ -108,17 +119,42 @@ def _coerce_legacy_boolean_lists(saved: dict) -> None:
         CAMILLAFIR_AUTO_MODE,
     ]:
         if key in saved and isinstance(saved[key], list):
-            saved[key] = bool(saved[key])
+            # Extract first element if list is non-empty, otherwise False
+            saved[key] = bool(saved[key][0]) if saved[key] else False
 
 
-def _migrate_lvl_manual_db(saved: dict) -> None:
+def _migration_v1_lvl_manual_db_shift(saved: dict) -> None:
+    """Migration 1: Shift lvl_manual_db values from old 40–110 range to relative."""
     try:
         if "lvl_manual_db" in saved:
             value = float(saved.get("lvl_manual_db"))
             if 40.0 <= value <= 110.0:
                 saved["lvl_manual_db"] = float(value - 75.0)
     except _RECOVERABLE_CONFIG_EXCEPTIONS:
-        logger.exception("lvl_manual_db migration")
+        pass
+
+
+def _apply_config_migrations(saved: dict) -> None:
+    """Apply versioned config migrations.
+
+    Each migration is applied only if its version > saved config's _config_version.
+    Migrations are defined as (_migration_vN_..., version) tuples.
+    """
+    current_version = int(saved.get("_config_version", 0))
+
+    migrations = [
+        (_migration_v1_coerce_legacy_boolean_lists, 1),
+        (_migration_v1_lvl_manual_db_shift, 1),
+    ]
+
+    for migration_fn, version in migrations:
+        if version > current_version:
+            try:
+                migration_fn(saved)
+            except _RECOVERABLE_CONFIG_EXCEPTIONS:
+                logger.exception(f"config migration {migration_fn.__name__}")
+
+    saved["_config_version"] = _CONFIG_CURRENT_VERSION
 
 
 def _normalize_saved_filter_type(saved: dict, default_conf: dict) -> None:
@@ -140,8 +176,7 @@ def _load_and_merge_saved_config(default_conf: dict) -> bool:
         if not isinstance(saved, dict):
             return saved_mode_explicit
 
-        _coerce_legacy_boolean_lists(saved)
-        _migrate_lvl_manual_db(saved)
+        _apply_config_migrations(saved)
         _normalize_saved_filter_type(saved, default_conf)
 
         saved_mode_explicit = saved.get("mode", None) not in (None, "")
@@ -396,6 +431,7 @@ def save_config(data: dict) -> None:
                 and not str(k).startswith("generated_measurement_")
                 and str(k) != "auto_mode_compat_version"
                 and str(k) != "unsafe_raw_dsp"
+                and str(k) != "_config_version"
                 and v is not None
             )
         }

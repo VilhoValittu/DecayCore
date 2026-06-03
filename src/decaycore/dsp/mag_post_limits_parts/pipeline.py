@@ -663,7 +663,7 @@ def _run_lowbass_hard_reapply_stage(
     return gain_db
 
 
-def _run_transition_fade_stage(
+def _run_transition_fade_stage(  # noqa: C901 - transition fade keeps the band-edge math and telemetry together
     gain_db,
     freq_axis,
     mask_c,

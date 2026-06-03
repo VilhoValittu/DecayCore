@@ -21,6 +21,7 @@ from ..common.comparison_stats import _make_comparison_stats
 from ..common.measurement_features import (
     build_harmonic_boost_risk_curve,
     estimate_schroeder_hz,
+    median_rt60_mid_band,
     normalize_rt60_bands,
     normalize_rt60_value,
 )
@@ -139,7 +140,7 @@ def _apply_measured_rt60_override(
         return
 
     st["rt60_bands"] = band_map
-    st["rt60_band_avg"] = _measured_rt60_band_average(band_map)
+    st["rt60_band_avg"] = median_rt60_mid_band(band_map)
 
 
 def _measured_rt60_band_map(measured_bands: dict) -> dict[float, float]:
@@ -154,14 +155,6 @@ def _measured_rt60_band_map(measured_bands: dict) -> dict[float, float]:
             band_map[float(freq_hz)] = float(band_rt60)
     return band_map
 
-
-def _measured_rt60_band_average(band_map: dict[float, float]) -> float:
-    ks = np.array(sorted(band_map.keys()), dtype=float)
-    vs = np.array([band_map[key] for key in ks], dtype=float)
-    mid = (ks >= 125.0) & (ks <= 4000.0) & (vs > 0.05) & (vs < 5.0)
-    if np.any(mid):
-        return float(np.median(vs[mid]))
-    return float(np.median(vs))
 
 def _inject_direct_dac_summed_prediction_for_plot(
     *,
@@ -256,7 +249,7 @@ def _generate_main_filters(
     return l_imp, l_st, r_imp, r_st
 
 
-def _generate_sub_ir(
+def _generate_sub_ir(  # noqa: C901 - sub path setup preserves the direct-DAC and normal branches together
     cfg,
     measurements,
     data,
@@ -388,7 +381,7 @@ def _generate_sub_ir(
     return sub_ir, sub_f, sub_m, sub_p, sub_st, sub_target_meta
 
 
-def _apply_rt60_and_alignment_checks(
+def _apply_rt60_and_alignment_checks(  # noqa: C901 - measurement quality and alignment checks are intentionally grouped
     l_st, r_st, measurements, data, cfg, *, is_wav: bool
 ) -> None:
     rt_rel = 1.0 if is_wav else 0.25
@@ -460,7 +453,7 @@ def _apply_rt60_and_alignment_checks(
             r_st["ir_align_sub"] = dict(_ir_align_sub)
 
 
-def _align_lr_and_sub(
+def _align_lr_and_sub(  # noqa: C901 - alignment policy keeps LR and sub timing branches explicit
     l_imp, r_imp, sub_ir, l_st, r_st, data, cfg, *, is_direct_dac_bi: bool
 ):
     with profiled_section("run_pipeline.align"):
@@ -548,7 +541,7 @@ def _detect_wav_like_grid(f_l: np.ndarray) -> bool:
 
 def _apply_wav_postpolish(
     l_imp, r_imp, cfg, data, warnings: list, *, is_wav: bool, wav_like_fft_grid: bool
-):
+) -> tuple:  # noqa: C901 - alignment policy must keep LR/sub timing branches explicit
     if not (bool(is_wav) or bool(wav_like_fft_grid)):
         return l_imp, r_imp
     with profiled_section("run_pipeline.wav_postpolish"):
@@ -679,7 +672,7 @@ def _build_response_arrays(
     return freq_axis, l_mag, r_mag, l_phase, r_phase
 
 
-def run_pipeline(
+def run_pipeline(  # noqa: C901 - pipeline orchestration is intentionally centralized
     cfg: FilterConfig,
     measurements: dict,
     *,

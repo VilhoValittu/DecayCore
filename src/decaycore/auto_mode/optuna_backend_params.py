@@ -370,6 +370,8 @@ def _auto_optuna_trial_float_ranges(max_boost_hi: float) -> dict[str, tuple[floa
         "phase_limit": (float(AUTO_MODE_PHASE_LIMIT_MIN_HZ), float(AUTO_MODE_PHASE_LIMIT_MAX_HZ), 1.0),
         "output_tilt_db_per_oct": (-2.0, 2.0, 0.05),
         "synth_tilt_frac": (0.05, 0.55, 0.01),
+        "synth_bass_frac": (0.20, 0.75, 0.01),
+        "synth_hf_frac": (0.10, 0.80, 0.01),
     }
 
 def _auto_optuna_distribution_from_key(

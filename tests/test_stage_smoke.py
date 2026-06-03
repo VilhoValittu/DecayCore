@@ -19,7 +19,7 @@ def _extract_diag(summary_path: Path) -> dict:
     return json.loads(payload)
 
 
-def _find_stage_probes_in_stats(stats: dict):
+def _find_stage_probes_in_stats(stats: dict):  # noqa: C901 - smoke test searches several possible stats shapes
     """
     Try to locate stage probes in common shapes:
     - stats["stage_probes"] as list[dict(stage=..., boost_peak_db=...)]

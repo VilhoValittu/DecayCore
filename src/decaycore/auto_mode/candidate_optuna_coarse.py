@@ -226,6 +226,18 @@ def _suggest_auto_mode_candidate_optuna(
             hi=0.55,
             step=0.01,
         )
+        cand["synth_bass_frac"] = _auto_optuna_snap_to_step(
+            trial.suggest_float("synth_bass_frac", 0.20, 0.75, step=0.01),
+            lo=0.20,
+            hi=0.75,
+            step=0.01,
+        )
+        cand["synth_hf_frac"] = _auto_optuna_snap_to_step(
+            trial.suggest_float("synth_hf_frac", 0.10, 0.80, step=0.01),
+            lo=0.10,
+            hi=0.80,
+            step=0.01,
+        )
     if bool(is_mixed):
         cand["mixed_freq"] = _auto_optuna_snap_to_step(
             trial.suggest_float("mixed_freq", 80.0, 320.0, step=0.1),
@@ -356,6 +368,18 @@ def _seed_auto_mode_candidate_optuna_params(
             _auto_safe_float(p.get("synth_tilt_frac", 0.30), 0.30),
             lo=0.05,
             hi=0.55,
+            step=0.01,
+        )
+        out["synth_bass_frac"] = _auto_optuna_snap_to_step(
+            _auto_safe_float(p.get("synth_bass_frac", 0.50), 0.50),
+            lo=0.20,
+            hi=0.75,
+            step=0.01,
+        )
+        out["synth_hf_frac"] = _auto_optuna_snap_to_step(
+            _auto_safe_float(p.get("synth_hf_frac", 0.50), 0.50),
+            lo=0.10,
+            hi=0.80,
             step=0.01,
         )
     if bool(optimize_mag_low):

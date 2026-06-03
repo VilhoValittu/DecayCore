@@ -52,7 +52,7 @@ def _mag_c_min_candidates(
 ) -> list[float]:
     step_hz_eff = max(0.1, float(_auto_safe_float(step_hz, 1.0)))
     max_down_hz_eff = max(0.0, float(_auto_safe_float(max_down_hz, 15.0)))
-    max_up_hz_eff = max(0.0, float(_auto_safe_float(max_up_hz, max_down_hz_eff)))
+    max_up_hz_eff = max(0.0, float(_auto_safe_float(max_up_hz, 0.0)))
     min_mag_c_min = max(
         float(AUTO_MODE_MAG_C_MIN_MIN_HZ),
         float(initial_mag_c_min - max_down_hz_eff),

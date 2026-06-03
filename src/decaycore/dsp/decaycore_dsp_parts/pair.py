@@ -132,7 +132,7 @@ def _maybe_per_channel_cfg(cfg: FilterConfig, channel: str) -> FilterConfig:
         return cfg
     return _dc.replace(cfg, **replacements)
 
-def generate_filter_pair(
+def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel decision tree explicit
     f_l,
     m_l,
     p_l,
