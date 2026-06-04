@@ -252,7 +252,8 @@ def build_global_progress_bar() -> None:
         auto_bar.visible = False
         with ui.expansion(t("run_auto_details_title")).classes("w-full text-xs") as auto_details_exp:
             auto_details_exp.visible = False
-            with ui.element("div").classes("cf-auto-details-scroll"):
+            auto_details_scroll = ui.element("div").classes("cf-auto-details-scroll")
+            with auto_details_scroll:
                 auto_details_label = ui.label("").classes("whitespace-pre text-xs")
 
     def _refresh_status() -> None:
@@ -317,6 +318,33 @@ def build_global_progress_bar() -> None:
         details = snap.get("auto_status_detail_body", "") or ""
         auto_details_label.set_text(details)
         auto_details_exp.set_visibility(bool(details))
+        if details:
+            try:
+                from nicegui import ui
+                ui.run_javascript("""
+                    setTimeout(() => {
+                        const sc = document.querySelector('.cf-auto-details-scroll');
+                        if (sc) {
+                            const remainingScroll = sc.scrollHeight - sc.scrollTop - sc.clientHeight;
+                            if (remainingScroll < 50) {
+                                sc.scrollTop = sc.scrollHeight;
+                            }
+                        }
+                    }, 50);
+                """)
+            except (
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
+                logger.debug("Failed to autoscroll auto details panel", exc_info=True)
 
     ui.timer(0.5, _refresh_status)
 

@@ -8,6 +8,22 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
+## [1.0.8] - 4-6-2026
+
+### UI — Details panel auto-scrolling
+
+During long AUTO mode runs, the details panel now automatically scrolls to show the latest updates as they arrive. No more manual scrolling needed to follow the search progress in real time.
+
+### Adaptive Target — Tuned bass response
+
+The Adaptive target strategy now delivers +2 dB more bass energy, improving the perceived low-frequency balance and punch. This tuning is based on measured RT60 decay data for more accurate, room-aware results.
+
+### AUTO Mode — Relaxed RT60 constraint for bass boost
+
+The RT60 delta limit has been increased to 4 dB, allowing AUTO mode to apply the full bass boost range without overly conservative gating. Rooms with varying bass decay characteristics can now achieve stronger, more confident low-frequency correction when the measurement supports it.
+
+---
+
 ## [1.0.7] - 31-5-2026
 
 ### Results — Hybrid IIR/FIR cuts now shown in overview

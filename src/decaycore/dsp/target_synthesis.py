@@ -72,7 +72,7 @@ def _slope_db_oct(f_hz, mag_db, f_lo=None, f_hi=None) -> float:
 
 # Precompute Harman6 slope the same way we will estimate measurements
 _SYNTH_HARMAN6_SLOPE_DB_OCT = _slope_db_oct(_SYNTH_FREQS[1:], _SYNTH_BASE_MAGS[1:])
-_RT60_TARGET_DELTA_LIMIT_DB = 2.0
+_RT60_TARGET_DELTA_LIMIT_DB = 4.0
 
 
 def _coerce_rt60_bands(value) -> dict[float, float]:
@@ -142,7 +142,7 @@ def _rt60_adjusted_compensation(
     tilt_eff = float(tilt_comp_frac)
     if abs(bass_eff) > 1e-9 and np.isfinite(bass_rt) and np.isfinite(mid_rt) and mid_rt > 1e-6:
         bass_to_mid = float(bass_rt / mid_rt)
-        bass_target = _interp_clamped(bass_to_mid, 0.8, 1.5, 0.30, 0.75)
+        bass_target = _interp_clamped(bass_to_mid, 0.8, 1.5, 0.05, 0.40)
         if np.isfinite(bass_target):
             bass_eff = bass_target
     if abs(tilt_eff) > 1e-9 and np.isfinite(treble_rt) and np.isfinite(mid_rt) and mid_rt > 1e-6:
