@@ -1,6 +1,7 @@
 import json
 import time
 
+import pytest
 from decaycore.worker import worker
 
 
@@ -48,7 +49,7 @@ def test_rt60_json_extracts_bands_and_averages(monkeypatch, tmp_path):
     assert metrics["rt60_63"] == 0.7
     assert metrics["rt60_1000"] == 0.3
     assert metrics["rt60_bass_avg"] == 0.65
-    assert metrics["rt60_mid_avg"] == 0.35000000000000003
+    assert metrics["rt60_mid_avg"] == pytest.approx(0.35)
     assert metrics["rt60_bass_to_mid_ratio"] > 1.8
 
 

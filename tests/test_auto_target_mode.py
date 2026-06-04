@@ -1718,7 +1718,7 @@ def test_search_refine_stages_use_canonical_order_with_seed(monkeypatch):
 
     def _summary_probe(*, summary):
         calls.append("summary")
-        return {}
+        return dict(summary.result or {})
 
     monkeypatch.setattr(orchestrator_refine, "_run_phase1_search", _phase1_search_probe)
     monkeypatch.setattr(orchestrator_refine, "_run_phase1_coarse_search", _phase1_probe)
@@ -2880,6 +2880,7 @@ def test_finalize_injects_phase1_top_into_empty_phase2_pool(monkeypatch):
         mag_c_min_winner_polish_enabled=False,
         mag_c_min_winner_polish_step_hz=1.0,
         mag_c_min_winner_polish_max_down_hz=0.0,
+        mag_c_min_winner_polish_max_up_hz=4.0,
         hpf_winner_polish_enabled=False,
         excess_phase_strength_winner_polish_enabled=False,
         excess_phase_strength_winner_polish_step=0.1,

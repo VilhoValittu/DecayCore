@@ -494,6 +494,7 @@ def test_mag_c_min_winner_polish_can_improve_upward():
         enabled=True,
         step_hz=1.0,
         max_down_hz=2.0,
+        max_up_hz=4.0,
         status_cb=None,
         materialize_preset_result=fake_materialize_preset_result,
         cache_ready_preset=fake_cache_ready_preset,
