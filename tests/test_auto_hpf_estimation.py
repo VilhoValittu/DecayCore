@@ -1,6 +1,6 @@
 import numpy as np
 
-from decaycore.io.decaycore_automatic_mode import (
+from decaycore.auto_mode.api import (
     _estimate_auto_hpf_from_response,
     _resolve_auto_hpf_application,
 )

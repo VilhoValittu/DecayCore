@@ -8,9 +8,20 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
+"""Room mode detection and modal analysis.
+
+Split into:
+- .modal_analysis_01: Input preparation and helper functions
+- .modal_analysis_02: Mode detection and classification logic
+
+Public API: detect_room_modes()
+
+Uses dynamic imports with explicit __all__ for IDE support.
+"""
+
 import importlib as _importlib
 
-_MODULE_NAMES = ['modal_analysis_01', 'modal_analysis_02']
+_MODULE_NAMES = ['modal_preparation', 'mode_detection']
 for _module_name in _MODULE_NAMES:
     _module = _importlib.import_module(f"{__name__}.{_module_name}")
     for _symbol in dir(_module):

@@ -1,7 +1,7 @@
 import numpy as np
 
 from decaycore.common.house_curves import get_house_curve_by_name
-from decaycore.io.auto_mode.target_preselection import _auto_select_builtin_target_curve
+from decaycore.auto_mode.target_preselection import _auto_select_builtin_target_curve
 
 
 def _synth_target_like_measurement(hc_name: str):

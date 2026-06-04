@@ -8,9 +8,18 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
+"""Magnitude correction pipeline submodules.
+
+Split into:
+- .correction_mag_01: Bass smoothing and mid refit logic
+- .correction_mag_02: Core pipeline orchestration
+
+Uses dynamic imports with explicit __all__ for IDE support.
+"""
+
 import importlib as _importlib
 
-_MODULE_NAMES = ['correction_mag_01', 'correction_mag_02']
+_MODULE_NAMES = ['bass_smoothing', 'mag_pipeline']
 for _module_name in _MODULE_NAMES:
     _module = _importlib.import_module(f"{__name__}.{_module_name}")
     for _symbol in dir(_module):

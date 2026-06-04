@@ -1,4 +1,4 @@
-from decaycore.io.decaycore_automatic_mode import (
+from decaycore.auto_mode.api import (
     AutoModeConfig,
     _build_auto_mode_candidates,
     _build_auto_mode_candidates_optuna,
@@ -25,13 +25,13 @@ from decaycore.auto_mode.shared import (
     _auto_sample_mag_low_pair,
 )
 import logging
-from decaycore.io.auto_mode.candidate_generation import (
+from decaycore.auto_mode.candidate_generation import (
     _suggest_auto_mode_candidate_optuna,
     _seed_auto_mode_candidate_optuna_params,
     _seed_auto_mode_candidate_local_optuna_params,
     _seed_auto_mode_candidate_micro_optuna_params,
 )
-from decaycore.io.auto_mode.orchestrator_refine import (
+from decaycore.auto_mode.orchestrator_refine import (
     _CacheRefineContext,
     _CacheRefineProgress,
     _CacheRefineRound,

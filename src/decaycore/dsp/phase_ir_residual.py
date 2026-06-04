@@ -434,9 +434,9 @@ def _residual_prepare_inputs(
     try:
         _base_sigma = float(base_sigma)
     except (TypeError, ValueError, OverflowError):
-        _base_sigma = float(60 // (_filter_smooth / 12 if _filter_smooth > 0 else 1))
+        _base_sigma = float(60 // (filter_smooth / 12 if filter_smooth > 0 else 1))
     if (not np.isfinite(_base_sigma)) or _base_sigma <= 0.0:
-        _base_sigma = float(60 // (_filter_smooth / 12 if _filter_smooth > 0 else 1))
+        _base_sigma = float(60 // (filter_smooth / 12 if filter_smooth > 0 else 1))
     _df_mode = bool(df_mode) if df_mode is not None else cfg_reader.bool("df_smoothing", False)
     return residual_mode, freq_axis, gain_db, mask_c, resid, float(k), float(strength), float(mult), float(_base_sigma), bool(_df_mode), gain_policy
 

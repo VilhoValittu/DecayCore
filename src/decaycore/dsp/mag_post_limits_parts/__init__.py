@@ -8,6 +8,18 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
+"""Post-limit magnitude response processing and constraints.
+
+Split into:
+- .pipeline: Main orchestration and soft clipping pipeline
+- .clamps: Hard clamps and soft curve limiting
+- .authority: Authority caps and override logic
+- .low_frequency: Low-frequency guard masks and limits
+- .metrics: Telemetry and diagnostic metrics
+
+Uses dynamic imports with explicit __all__ for IDE support.
+"""
+
 import importlib as _importlib
 
 _MODULE_NAMES = ['pipeline', 'clamps', 'authority', 'low_frequency', 'metrics']

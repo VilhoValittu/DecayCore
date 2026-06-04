@@ -48,7 +48,7 @@ def _prune_toast_cache(
             for k in list(_TOAST_LAST_SHOWN.keys()):
                 if k not in keep:
                     _TOAST_LAST_SHOWN.pop(k, None)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (TypeError, ValueError):
         return
 
 
@@ -71,7 +71,7 @@ def _tr(key: str, **kwargs: Any) -> str:
     if kwargs:
         try:
             return text.format(**kwargs)
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        except (KeyError, IndexError, TypeError, ValueError):
             return text
     return text
 
@@ -81,7 +81,7 @@ def _as_float(v: Any) -> Optional[float]:
         if v is None or v == "":
             return None
         return float(v)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (TypeError, ValueError):
         return None
 
 
@@ -90,7 +90,7 @@ def _as_int(v: Any) -> Optional[int]:
         if v is None or v == "":
             return None
         return int(v)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (TypeError, ValueError):
         return None
 
 
@@ -120,7 +120,7 @@ def _has_uploaded_file_name(v: Any) -> bool:
                     return True
         if isinstance(v, list):
             return any(_has_uploaded_file_name(x) for x in v)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (TypeError, AttributeError):
         return False
     return False
 
@@ -132,7 +132,7 @@ def _uploaded_file_name(v: Any) -> str:
                 name = str(v.get(key, "") or "").strip()
                 if name:
                     return name
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (TypeError, AttributeError):
         return ""
     return ""
 
@@ -151,7 +151,7 @@ def _has_uploaded_file(v: Any) -> bool:
             return True
         if isinstance(v, list):
             return any(_has_uploaded_file(x) for x in v)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (TypeError, AttributeError):
         return False
     return False
 
@@ -212,7 +212,7 @@ def show_toast(
         else:
             fn(msg, duration=duration, color=color)
         return True
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except Exception:
         return False
 
 
@@ -249,7 +249,7 @@ def _health_toast_color(level: str, mode_u: str) -> Optional[str]:
 
 def _health_bass_integration_issues(data: Dict[str, Any], mode_u: str) -> List[Issue]:
     issues: List[Issue] = []
-    bi_mode = "direct_dac"
+    bi_mode = str(data.get("bass_integration_mode", "direct_dac") or "direct_dac")
     is_direct_dac = bi_mode == "direct_dac"
 
     if mode_u != "AUTO":
@@ -531,7 +531,7 @@ def toast_health_gate_result(hr: HealthResult, mode: str) -> bool:
 def toast_mode_defaults_applied(mode: str) -> None:
     try:
         msg = _tr("mode_defaults_applied_toast", mode=mode)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (KeyError, IndexError, TypeError, ValueError):
         msg = f"Mode defaults applied: {mode}"
     show_toast(
         msg,
@@ -562,7 +562,7 @@ def toast_afdw_preset_applied(name: str) -> None:
 def toast_max_boost_over_cap(value: Any, max_safe_boost: float) -> None:
     try:
         v = float(value)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (TypeError, ValueError):
         _TOAST_EDGE_STATE["max_boost_over_cap"] = False
         return
 
@@ -574,7 +574,7 @@ def toast_max_boost_over_cap(value: Any, max_safe_boost: float) -> None:
 
     try:
         cap_suffix = _tr("max_boost_help_cap", value=f"{cap:.1f}")
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (KeyError, IndexError, TypeError, ValueError):
         cap_suffix = f" (capped to {cap:.1f} dB)"
     msg = f"{_tr('max_boost')}: {v:.1f} dB > {cap:.1f} dB{cap_suffix}"
     _toast_on_edge(
@@ -589,7 +589,7 @@ def toast_max_boost_over_cap(value: Any, max_safe_boost: float) -> None:
 def toast_taps_over_cap(value: Any, max_safe_taps: int) -> None:
     try:
         v = int(value)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (TypeError, ValueError):
         _TOAST_EDGE_STATE["taps_over_cap"] = False
         return
 
@@ -601,7 +601,7 @@ def toast_taps_over_cap(value: Any, max_safe_taps: int) -> None:
 
     try:
         msg = _tr("taps_warn_over", value=cap)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (KeyError, IndexError, TypeError, ValueError):
         msg = f"Taps > {cap}: very high latency and diminishing returns."
     _toast_on_edge(
         edge_key="taps_over_cap",

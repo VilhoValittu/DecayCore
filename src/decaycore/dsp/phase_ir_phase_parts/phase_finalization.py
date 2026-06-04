@@ -1,0 +1,639 @@
+# DecayCore
+# Copyright (c) 2026 Vilho Valittu.
+# All rights reserved except as expressly granted in the LICENSE file.
+#
+# This file is part of the public source-available DecayCore repository.
+# Non-commercial use is permitted under the terms of the LICENSE file.
+# Commercial use requires separate written permission.
+#
+# SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
+import scipy.ndimage
+
+from ..phase import combine_mixed_phase
+from ..phase_ir_ir import _build_complex_spectrum, _ifft_to_ir
+from ..phase_ir_phase_gradient import (
+    gd_grad_limiter as _gd_grad_limiter_impl,
+)
+from ..phase_ir_phase_gradient import (
+    gd_grad_metrics as _gd_grad_metrics_impl,
+)
+from ..phase_ir_phase_gradient import (
+    max_abs_gd_gradient_ms_per_oct as _max_abs_gd_gradient_ms_per_oct_impl,
+)
+from ..phase_ir_phase_models import (
+    apply_mixed_excess_mask as _apply_mixed_excess_mask_impl,
+)
+from ..phase_ir_phase_models import (
+    enforce_linear_tail_decay as _enforce_linear_tail_decay_impl,
+)
+from ..phase_ir_phase_models import (
+    linear_excess_weight as _linear_excess_weight_impl,
+)
+from ..phase_ir_phase_models import (
+    linear_to_minphase_blend_mask as _linear_to_minphase_blend_mask_impl,
+)
+from ..phase_ir_phase_models import (
+    merge_minphase_and_excess as _merge_minphase_and_excess_impl,
+)
+from ..phase_ir_phase_models import (
+    phase_confidence_profile as _phase_confidence_profile_impl,
+)
+from ..phase_ir_phase_models import (
+    phase_region_profiles as _phase_region_profiles_impl,
+)
+from ..phase_ir_phase_models import (
+    smooth_linear_boundary as _smooth_linear_boundary_impl,
+)
+from ..phase_ir_metrics import compute_pre_post_energy_metrics as _compute_pre_post_energy_metrics
+from ..phase_ir_utils import _max_abs_group_delay_ms, _pre_ringing_db
+from ..phase_authority import apply_phase_authority_gating as _apply_phase_authority_gating
+
+def _store_phase_profile_metrics(
+    *,
+    freq_axis: np.ndarray,
+    extra_phase: np.ndarray,
+    excess_phase: np.ndarray,
+    phase_mask: np.ndarray,
+    phase_confidence: np.ndarray,
+    phase_regions: dict[str, Any] | None,
+    spike_suppress: np.ndarray | None,
+    clamp_cut_frac: np.ndarray | None,
+    guard_scale_total: float,
+    st,
+) -> None:
+    if not isinstance(st, dict):
+        return
+    f = np.asarray(freq_axis, dtype=float)
+    corr = np.abs(np.asarray(extra_phase, dtype=float))
+    exc = np.abs(np.asarray(excess_phase, dtype=float))
+    mask = np.asarray(phase_mask, dtype=bool)
+    if f.size == 0 or corr.size != f.size or exc.size != f.size or mask.size != f.size:
+        return
+
+    phase_regions = dict(phase_regions or {})
+    lf_w = np.asarray(
+        phase_regions.get("lf", np.zeros_like(f, dtype=float)), dtype=float
+    )
+    xo_w = np.asarray(
+        phase_regions.get("xo", np.zeros_like(f, dtype=float)), dtype=float
+    )
+    hf_w = np.asarray(
+        phase_regions.get("hf", np.zeros_like(f, dtype=float)), dtype=float
+    )
+    audible_w = np.asarray(
+        phase_regions.get("audible", np.zeros_like(f, dtype=float)), dtype=float
+    )
+    conf = np.asarray(phase_confidence, dtype=float)
+    if conf.size != f.size:
+        conf = np.ones_like(f, dtype=float)
+    conf = np.clip(conf, 0.0, 1.0)
+    spike = np.asarray(
+        spike_suppress if spike_suppress is not None else np.ones_like(f, dtype=float),
+        dtype=float,
+    )
+    if spike.size != f.size:
+        spike = np.ones_like(f, dtype=float)
+    spike = np.clip(spike, 0.0, 1.0)
+    cut = np.asarray(
+        clamp_cut_frac if clamp_cut_frac is not None else np.zeros_like(f, dtype=float),
+        dtype=float,
+    )
+    if cut.size != f.size:
+        cut = np.zeros_like(f, dtype=float)
+    cut = np.clip(cut, 0.0, 1.0)
+
+    active = mask & np.isfinite(corr) & np.isfinite(exc)
+    if int(np.count_nonzero(active)) < 4:
+        return
+
+    active_w = active.astype(float)
+    lf_w = np.clip(lf_w * active_w, 0.0, 1.0)
+    xo_w = np.clip(xo_w * active_w, 0.0, 1.0)
+    hf_w = np.clip(hf_w * active_w, 0.0, 1.0)
+    audible_w = np.clip(audible_w * active_w, 0.0, 1.0)
+
+    corr_norm = np.tanh(corr / max(float(np.deg2rad(16.0)), 1e-9))
+    eff = np.clip(corr / np.maximum(exc, float(np.deg2rad(4.0))), 0.0, 1.0)
+    useful = np.clip(0.55 * corr_norm + 0.45 * eff, 0.0, 1.0)
+
+    st["phase_confidence_mean"] = _weighted_mean(conf, active_w)
+    st["phase_confidence_lf_mean"] = _weighted_mean(conf, lf_w)
+    st["phase_confidence_xo_mean"] = _weighted_mean(conf, xo_w)
+    st["phase_confidence_hf_mean"] = _weighted_mean(conf, hf_w)
+    st["phase_useful_lf_score"] = _weighted_mean(useful * conf, lf_w)
+    st["phase_useful_xo_score"] = _weighted_mean(useful * conf, xo_w)
+    st["phase_useful_audible_score"] = _weighted_mean(useful * conf, audible_w)
+    st["phase_risk_hf_score"] = _weighted_mean(corr_norm * (1.0 - conf), hf_w)
+    st["phase_risk_spiky_score"] = _weighted_mean(
+        corr_norm * (1.0 - spike), np.maximum(audible_w, 0.35 * hf_w)
+    )
+    st["phase_risk_clamp_score"] = _weighted_mean(cut, np.maximum(audible_w, hf_w))
+    st["phase_corr_lf_share"] = _weighted_share(corr_norm, lf_w, active_w)
+    st["phase_corr_xo_share"] = _weighted_share(corr_norm, xo_w, active_w)
+    st["phase_corr_hf_share"] = _weighted_share(corr_norm, hf_w, active_w)
+    st["phase_spike_suppression_mean"] = _weighted_mean(spike, active_w)
+    st["phase_spike_suppression_hf_mean"] = _weighted_mean(spike, hf_w)
+    st["phase_guard_scale_total"] = float(np.clip(guard_scale_total, 0.0, 1.0))
+    anchors = phase_regions.get("anchors_hz", tuple())
+    st["phase_anchor_count"] = int(len(tuple(anchors or ())))
+
+def _has_active_theoretical_phase_model(cfg) -> bool:
+    try:
+        for xo in list(getattr(cfg, "crossovers", None) or []):
+            try:
+                fc = float(xo.get("freq", 0.0) or 0.0)
+            except (AttributeError, TypeError, ValueError):
+                continue
+            if np.isfinite(fc) and fc > 0.0:
+                return True
+    except (AttributeError, TypeError, ValueError):
+        pass
+
+    try:
+        hs = getattr(cfg, "hpf_settings", None)
+        if isinstance(hs, dict) and bool(hs.get("enabled", False)):
+            fc = float(hs.get("freq", 0.0) or 0.0)
+            order = int(hs.get("order", 0) or 0)
+            if np.isfinite(fc) and fc > 0.0 and order > 0:
+                return True
+    except (AttributeError, TypeError, ValueError):
+        pass
+
+    return False
+
+def _pre_ringing_band_protection_floor(f: np.ndarray) -> np.ndarray:
+    """
+    Per-frequency minimum allowed guard_scale_total value.
+    Prevents the pre-ringing guard from over-reducing safe bass correction.
+      20–80 Hz:   floor=0.55 (bass protected — rarely causes audible pre-ringing)
+      80–200 Hz:  floor=0.35 (voice — moderate protection)
+      200–600 Hz: floor=0.05 (mid — full guard effect permitted)
+      >600 Hz:    floor=0.05 (already attenuated by phase_mask)
+    Uses cosine crossfades at band boundaries.
+    """
+    f = np.asarray(f, dtype=float)
+    floor = np.full_like(f, 0.05, dtype=float)
+
+    FLOOR_BASS = 0.55
+    F_BASS_TOP, F_VOICE_TOP = 80.0, 200.0
+
+    floor = np.where(f <= F_BASS_TOP, FLOOR_BASS, floor)
+
+    xfade_bv = (f > F_BASS_TOP) & (f < F_VOICE_TOP)
+    if np.any(xfade_bv):
+        x = (f[xfade_bv] - F_BASS_TOP) / (F_VOICE_TOP - F_BASS_TOP)
+        w = 0.5 + 0.5 * np.cos(np.pi * x)
+        floor[xfade_bv] = 0.05 + (FLOOR_BASS - 0.05) * w
+
+    # >=200 Hz stays at 0.05 (initialization value)
+    return np.clip(floor, 0.0, 1.0)
+
+def _apply_phase_model(  # noqa: C901 - phase containment and spike suppression are kept explicit
+    freq_axis, cfg, st, phase_components: _PhaseComponents
+) -> np.ndarray:
+    f = np.asarray(freq_axis, dtype=float)
+    is_mixed = bool(phase_components.is_mixed)
+    min_p = np.asarray(phase_components.min_phase, dtype=float)
+    theo_xo = np.asarray(phase_components.theo_xo, dtype=float)
+    excess_phase = np.asarray(phase_components.excess_u, dtype=float)
+    logger = phase_components.logger
+
+    if bool(getattr(cfg, "phase_safe_2058", False)):
+        if "Min" in cfg.filter_type_str:
+            final_phase = min_p
+        elif is_mixed:
+            low_phase = -theo_xo
+            phase_components.low_phase = low_phase
+            final_phase = low_phase
+        else:
+            final_phase = -theo_xo
+        phase_components.extra_phase = None
+        phase_components.phase_mask = None
+        return final_phase
+
+    phase_lim_hz = float(getattr(cfg, "phase_limit", 1000.0))
+    phase_mask = (f > 0) & (f <= phase_lim_hz)
+    phase_components.phase_mask = phase_mask
+    try:
+        if isinstance(st, dict):
+            st["phase_limit_hz"] = float(phase_lim_hz)
+    except (TypeError, ValueError):
+        pass
+
+    try:
+        f1 = float(phase_lim_hz)
+        f0_fade = f1 / 2.0
+        if f0_fade < (f1 - 1.0):
+            x = (f - f0_fade) / (f1 - f0_fade + 1e-12)
+            x = np.clip(x, 0.0, 1.0)
+            w_hi = 0.5 * (1.0 + np.cos(np.pi * x))
+            w_hi = np.where(f <= f0_fade, 1.0, w_hi)
+            w_hi = np.where(f >= f1, 0.0, w_hi)
+        else:
+            w_hi = np.ones_like(f, dtype=float)
+    except (TypeError, ValueError, FloatingPointError):
+        w_hi = np.ones_like(f, dtype=float)
+
+    phase_regions = _phase_region_profiles(f, phase_lim_hz, cfg)
+    try:
+        conf_arr = (
+            np.asarray(phase_components.conf_mask, dtype=float)
+            if phase_components.conf_mask is not None
+            else np.ones_like(f, dtype=float)
+        )
+    except (TypeError, ValueError):
+        conf_arr = np.ones_like(f, dtype=float)
+    phase_conf = _phase_confidence_profile(
+        f,
+        conf_arr,
+        phase_lim_hz,
+        cfg,
+        bassfirst=bool(phase_components.use_bassfirst),
+        afdw_on=bool(phase_components.afdw_on),
+    )
+
+    if is_mixed:
+        extra_phase = -_apply_mixed_excess_mask(f, excess_phase, cfg, st)
+    else:
+        phase_weight = _linear_excess_weight(f, phase_lim_hz)
+        phase_weight = phase_weight * phase_mask.astype(float)
+        extra_phase = -excess_phase * phase_weight
+
+    try:
+        extra_phase *= w_hi
+    except (TypeError, ValueError):
+        pass
+
+    try:
+        conf_floor = 0.06
+        conf_power = 1.10
+        conf_gain = np.clip(phase_conf, 0.0, 1.0) ** conf_power
+        conf_gain = conf_floor + (1.0 - conf_floor) * conf_gain
+        extra_phase *= conf_gain
+    except (TypeError, ValueError):
+        pass
+
+    spike_suppress = np.ones_like(f, dtype=float)
+    try:
+        abs_excess = np.abs(excess_phase)
+        if abs_excess.size >= 16:
+            try:
+                fs = float(cfg.fs) if hasattr(cfg, "fs") else 48000.0
+                n_fft = (
+                    int(phase_components.n_fft)
+                    if phase_components.n_fft is not None
+                    else 4096
+                )
+                target_smooth_hz = 20.0
+                sigma_bins = max(1.0, target_smooth_hz * n_fft / fs)
+            except (AttributeError, TypeError, ValueError):
+                sigma_bins = 2.0
+            smooth_abs = scipy.ndimage.gaussian_filter1d(
+                abs_excess, sigma=sigma_bins, mode="nearest"
+            )
+            spike_ratio = smooth_abs / np.maximum(abs_excess, float(np.deg2rad(2.0)))
+            spike_ratio = np.clip(spike_ratio, 0.25, 1.0)
+            hf_region = np.asarray(
+                phase_regions.get("hf", np.zeros_like(f, dtype=float)), dtype=float
+            )
+            mid_region = np.clip(
+                np.asarray(
+                    phase_regions.get("audible", np.zeros_like(f, dtype=float)),
+                    dtype=float,
+                )
+                - np.asarray(
+                    phase_regions.get("lf", np.zeros_like(f, dtype=float)), dtype=float
+                ),
+                0.0,
+                1.0,
+            )
+            spike_suppress = 1.0 - 0.55 * hf_region * (1.0 - spike_ratio**0.75)
+            spike_suppress *= 1.0 - 0.25 * mid_region * (1.0 - spike_ratio)
+            spike_suppress = np.clip(spike_suppress, 0.20, 1.0)
+            extra_phase *= spike_suppress
+    except (TypeError, ValueError, FloatingPointError):
+        spike_suppress = np.ones_like(f, dtype=float)
+
+    clamp_cut_frac_arr = np.zeros_like(f, dtype=float)
+    try:
+        extra_phase_before = np.asarray(extra_phase, dtype=float).copy()
+        if is_mixed:
+            clamp_max_deg = float(
+                getattr(cfg, "mixed_phase_budget_lf_deg", 60.0) or 60.0
+            )
+            clamp_min_deg = float(
+                getattr(cfg, "mixed_phase_budget_hf_deg", 40.0) or 40.0
+            )
+        else:
+            clamp_max_deg = 60.0
+            clamp_min_deg = 15.0
+        if clamp_max_deg < clamp_min_deg:
+            clamp_max_deg, clamp_min_deg = clamp_min_deg, clamp_max_deg
+
+        conf_part = np.clip(phase_conf, 0.0, 1.0) ** 0.85
+        if phase_lim_hz > 0.0:
+            freq_rel = np.clip((phase_lim_hz - f) / max(phase_lim_hz, 1e-9), 0.0, 1.0)
+        else:
+            freq_rel = np.ones_like(f, dtype=float)
+        freq_part = np.sqrt(freq_rel)
+
+        blend = 0.70 * conf_part + 0.30 * freq_part
+        limit_deg_arr = clamp_min_deg + (clamp_max_deg - clamp_min_deg) * blend
+        limit_deg_arr = np.clip(limit_deg_arr, clamp_min_deg, clamp_max_deg)
+        limit_rad_arr = np.deg2rad(limit_deg_arr)
+
+        before_rad = float(np.max(np.abs(extra_phase)))
+        extra_phase = np.clip(extra_phase, -limit_rad_arr, limit_rad_arr)
+        after_rad = float(np.max(np.abs(extra_phase)))
+        try:
+            _cut_rad = np.maximum(np.abs(extra_phase_before) - np.abs(extra_phase), 0.0)
+            _cut_frac = _cut_rad / np.maximum(np.abs(extra_phase_before), 1e-9)
+            _cut_frac = np.clip(_cut_frac, 0.0, 1.0)
+            clamp_cut_frac_arr = np.asarray(_cut_frac, dtype=float)
+            if isinstance(st, dict):
+                st["phase_corr_clamp_cut_frac"] = _cut_frac.tolist()
+        except (TypeError, ValueError, FloatingPointError):
+            pass
+
+        before_deg = float(np.rad2deg(before_rad))
+        after_deg = float(np.rad2deg(after_rad))
+        clipped = bool(np.any(np.abs(extra_phase_before) > (limit_rad_arr + 1e-12)))
+        try:
+            clipped_bins = int(
+                np.sum(
+                    (np.abs(extra_phase_before) > (limit_rad_arr + 1e-12)) & phase_mask
+                )
+            )
+        except (TypeError, ValueError, FloatingPointError):
+            clipped_bins = int(clipped)
+        if clipped:
+            msg = (
+                "Phase Correction Clamp (adaptive): "
+                f"max={before_deg:.1f} deg -> {after_deg:.1f} deg "
+                f"(limit {clamp_min_deg:.1f}..{clamp_max_deg:.1f} deg, clipped_bins={clipped_bins})"
+            )
+        else:
+            msg = (
+                "Phase Correction Clamp (adaptive): "
+                f"max={before_deg:.1f} deg (limit {clamp_min_deg:.1f}..{clamp_max_deg:.1f} deg)"
+            )
+        logger.info(msg)
+        try:
+            if isinstance(st, dict):
+                st["phase_corr_clamp_deg"] = float(clamp_max_deg)
+                st["phase_corr_clamp_min_deg"] = float(clamp_min_deg)
+                st["phase_corr_clamp_max_deg"] = float(clamp_max_deg)
+                st["phase_corr_clamp_mean_deg"] = (
+                    float(np.mean(limit_deg_arr[phase_mask]))
+                    if np.any(phase_mask)
+                    else float(np.mean(limit_deg_arr))
+                )
+                st["phase_corr_max_before_deg"] = float(before_deg)
+                st["phase_corr_max_after_deg"] = float(after_deg)
+                st["phase_corr_clipped"] = bool(clipped)
+                st["phase_corr_clipped_bins"] = int(clipped_bins)
+                st["phase_corr_clamp_msg"] = str(msg)
+        except (TypeError, ValueError):
+            pass
+    except (AttributeError, TypeError, ValueError, FloatingPointError, IndexError):
+        pass
+
+    phase_guard_scale_total = 1.0
+    if is_mixed:
+        try:
+            max_excess_delay_ms = float(getattr(cfg, "max_excess_delay_ms", 2.5) or 0.0)
+        except (AttributeError, TypeError, ValueError):
+            max_excess_delay_ms = 0.0
+        if np.isfinite(max_excess_delay_ms) and max_excess_delay_ms > 0.0:
+            try:
+                max_gd_ms = _max_abs_group_delay_ms(f, extra_phase, phase_mask)
+                if np.isfinite(max_gd_ms) and max_gd_ms > max_excess_delay_ms:
+                    gd_scale = float(
+                        np.clip(max_excess_delay_ms / max(max_gd_ms, 1e-9), 0.05, 1.0)
+                    )
+                    extra_phase *= gd_scale
+                    phase_guard_scale_total *= float(gd_scale)
+                    logger.info(
+                        "Mixed phase excess-delay guard: "
+                        f"max|GD|={max_gd_ms:.2f} ms -> target<={max_excess_delay_ms:.2f} ms "
+                        f"(scale={gd_scale:.3f})"
+                    )
+                    try:
+                        if isinstance(st, dict):
+                            st["mixed_max_excess_delay_ms"] = float(max_excess_delay_ms)
+                            st["mixed_excess_delay_before_ms"] = float(max_gd_ms)
+                            st["mixed_excess_delay_scale"] = float(gd_scale)
+                    except (TypeError, ValueError):
+                        pass
+            except (TypeError, ValueError, FloatingPointError, IndexError):
+                pass
+
+    if is_mixed:
+        try:
+            max_pre_db = float(getattr(cfg, "max_pre_ringing_db", -35.0) or -35.0)
+        except (AttributeError, TypeError, ValueError):
+            max_pre_db = -35.0
+        if np.isfinite(max_pre_db):
+            max_pre_db = float(min(max_pre_db, 0.0))
+            extra_guard = np.asarray(extra_phase, dtype=float).copy()
+            pre_before_db = None
+            pre_after_db = None
+            guard_scale_total = np.ones_like(extra_guard)
+            protection_floor = _pre_ringing_band_protection_floor(f)
+            h_min = _build_complex_spectrum(phase_components.total_mag, min_p)
+            ir_min = _ifft_to_ir(h_min, n=phase_components.n_fft)
+            for i in range(3):
+                h_lin_guard = _build_complex_spectrum(
+                    phase_components.total_mag,
+                    _merge_minphase_and_excess(-theo_xo, extra_guard),
+                )
+                ir_lin_guard = _ifft_to_ir(h_lin_guard, n=phase_components.n_fft)
+                ir_mixed_guard = combine_mixed_phase(
+                    ir_lin_guard,
+                    ir_min,
+                    fs=float(cfg.fs),
+                    split_freq=phase_components.mixed_split_hz,
+                    transition_hz=phase_components.mixed_transition_hz,
+                )
+                _prm = _compute_pre_post_energy_metrics(
+                    ir_mixed_guard,
+                    fs=float(cfg.fs),
+                    filter_type=getattr(cfg, "filter_type_str", None),
+                    phase_mode="mixed",
+                )
+                pre_now_db = float(_prm.get("pre_ringing_db", float("nan")))
+                if i == 0:
+                    pre_before_db = float(pre_now_db)
+                pre_after_db = float(pre_now_db)
+                if (not np.isfinite(pre_now_db)) or (pre_now_db <= max_pre_db):
+                    break
+                ratio_now = 10.0 ** (pre_now_db / 10.0)
+                ratio_target = 10.0 ** (max_pre_db / 10.0)
+                step_scale = float(
+                    np.clip(np.sqrt(ratio_target / max(ratio_now, 1e-30)), 0.20, 0.95)
+                )
+                effective_scale = np.maximum(
+                    step_scale,
+                    protection_floor / np.maximum(guard_scale_total, 1e-9),
+                )
+                extra_guard *= effective_scale
+                guard_scale_total *= effective_scale
+
+            guard_scale_mean = float(np.mean(guard_scale_total))
+            bass_mask = (f >= 20.0) & (f <= 80.0)
+            mid_mask = (f > 200.0) & (f <= 600.0)
+            guard_scale_bass = float(np.mean(guard_scale_total[bass_mask])) if np.any(bass_mask) else float("nan")
+            guard_scale_mid = float(np.mean(guard_scale_total[mid_mask])) if np.any(mid_mask) else float("nan")
+
+            if guard_scale_mean < 0.999:
+                extra_phase = extra_guard
+                phase_guard_scale_total *= guard_scale_mean
+                logger.info(
+                    "Mixed phase pre-ringing guard (band-aware): "
+                    f"{pre_before_db:.1f} dB -> {pre_after_db:.1f} dB "
+                    f"(limit={max_pre_db:.1f} dB, "
+                    f"scale_mean={guard_scale_mean:.3f}, "
+                    f"scale_bass={guard_scale_bass:.3f}, "
+                    f"scale_mid={guard_scale_mid:.3f})"
+                )
+                if (
+                    np.isfinite(guard_scale_bass)
+                    and guard_scale_bass < 0.60
+                    and np.isfinite(pre_after_db)
+                    and pre_after_db > max_pre_db
+                ):
+                    logger.warning(
+                        "Pre-ringing guard: bass protection floor reached "
+                        f"(scale_bass={guard_scale_bass:.3f}) but windowed pre-ringing still "
+                        f"above limit ({pre_after_db:.1f} dB > {max_pre_db:.1f} dB). "
+                        "Bass content may be source of pre-ringing."
+                    )
+            try:
+                if isinstance(st, dict):
+                    st["mixed_max_pre_ringing_db"] = float(max_pre_db)
+                    st["mixed_pre_ringing_before_db"] = (
+                        None if pre_before_db is None else float(pre_before_db)
+                    )
+                    st["mixed_pre_ringing_after_db"] = (
+                        None if pre_after_db is None else float(pre_after_db)
+                    )
+                    st["mixed_pre_ringing_scale"] = guard_scale_mean
+                    st["mixed_pre_ringing_scale_bass"] = guard_scale_bass
+                    st["mixed_pre_ringing_scale_mid"] = guard_scale_mid
+            except (TypeError, ValueError):
+                pass
+
+        try:
+            corr_band = phase_mask & (np.abs(excess_phase) > 1e-12)
+            if np.any(corr_band):
+                eff = np.abs(extra_phase[corr_band]) / np.maximum(
+                    np.abs(excess_phase[corr_band]), 1e-12
+                )
+                if isinstance(st, dict):
+                    st["mixed_phase_eff_strength_mean"] = float(np.mean(eff))
+                    st["mixed_phase_eff_strength_max"] = float(np.max(eff))
+        except (TypeError, ValueError, FloatingPointError):
+            pass
+
+    extra_phase, gd_lim_info = _gd_grad_limiter(
+        extra_phase,
+        cfg,
+        st,
+        freq_axis=f,
+        phase_mask=phase_mask,
+        use_bassfirst=phase_components.use_bassfirst,
+        afdw_on=phase_components.afdw_on,
+        limiter_fn=phase_components.limit_gd_gradient_ms_per_oct_fn,
+    )
+    if not is_mixed:
+        extra_phase = _smooth_linear_boundary(f, extra_phase, phase_lim_hz, cfg, st)
+        extra_phase = _enforce_linear_tail_decay(f, extra_phase, phase_lim_hz, cfg, st)
+
+    # P4: acoustic authority gating — scale excess-phase correction by authority
+    extra_phase = _apply_phase_authority_gating(f, extra_phase, cfg, st, logger)
+
+    try:
+        _store_phase_profile_metrics(
+            freq_axis=f,
+            extra_phase=extra_phase,
+            excess_phase=excess_phase,
+            phase_mask=phase_mask,
+            phase_confidence=phase_conf,
+            phase_regions=phase_regions,
+            spike_suppress=spike_suppress,
+            clamp_cut_frac=clamp_cut_frac_arr,
+            guard_scale_total=phase_guard_scale_total,
+            st=st,
+        )
+    except (TypeError, ValueError, FloatingPointError, IndexError):
+        pass
+    try:
+        gd_lim_enabled = bool(gd_lim_info.get("enabled", False))
+        gd_reason = str(gd_lim_info.get("reason", "unknown"))
+        gd_limit = gd_lim_info.get("limit_ms_per_oct", None)
+        gd_before = gd_lim_info.get("max_grad_before_ms_per_oct", None)
+        gd_after = gd_lim_info.get("max_grad_after_ms_per_oct", None)
+        if gd_lim_enabled:
+            if gd_limit is None:
+                logger.info(
+                    "GD gradient limiter: ON "
+                    f"(reason={gd_reason}, max|dGD/dOct| {float(gd_before or 0.0):.2f} -> {float(gd_after or 0.0):.2f} ms/oct)"
+                )
+            else:
+                logger.info(
+                    "GD gradient limiter: ON "
+                    f"(reason={gd_reason}, limit={float(gd_limit):.2f} ms/oct, "
+                    f"max|dGD/dOct| {float(gd_before or 0.0):.2f} -> {float(gd_after or 0.0):.2f} ms/oct)"
+                )
+        else:
+            logger.info(
+                "GD gradient limiter: OFF "
+                f"(reason={gd_reason}, max|dGD/dOct|={float(gd_before or 0.0):.2f} ms/oct)"
+            )
+    except (AttributeError, TypeError, ValueError):
+        pass
+
+    low_phase = _merge_minphase_and_excess(-theo_xo, extra_phase)
+    phase_components.low_phase = low_phase
+    phase_components.extra_phase = extra_phase
+
+    if "Min" in cfg.filter_type_str:
+        final_phase = min_p
+    elif is_mixed:
+        final_phase = low_phase
+    else:
+        sm_mask = _linear_to_minphase_blend_mask(f, phase_lim_hz, cfg, st)
+        if _has_active_theoretical_phase_model(cfg):
+            # phase_limit should only fade out room excess-phase correction, not
+            # remove the XO/HPF theoretical baseline used above the correction band.
+            tail_phase_baseline = -theo_xo
+        else:
+            # Without a theoretical model, blend back to pure minimum-phase
+            # behavior above the correction band.
+            tail_phase_baseline = min_p
+        final_phase = (1.0 - sm_mask) * low_phase + sm_mask * tail_phase_baseline
+    return final_phase
+
+
+__all__ = ['_store_phase_profile_metrics', '_has_active_theoretical_phase_model', '_pre_ringing_band_protection_floor', '_apply_phase_model']
+
+
+def _link_sibling_exports() -> None:
+    import importlib
+    package = __package__
+    for module_name in ['phase_windowing', 'phase_computation', 'phase_finalization']:
+        if module_name == __name__.rsplit('.', 1)[-1]:
+            continue
+        module = importlib.import_module(f"{package}.{module_name}")
+        for symbol in getattr(module, "__all__", ()):
+            globals().setdefault(symbol, getattr(module, symbol))
+
+
+_link_sibling_exports()

@@ -3,16 +3,16 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from decaycore.io.auto_mode.runtime_context import (
+from decaycore.auto_mode.runtime_context import (
     _auto_get_top_modes_hz,
     _auto_get_worst_mode_hz,
     _auto_mode_band,
 )
-from decaycore.io.auto_mode.materialize import (
+from decaycore.auto_mode.materialize import (
     AutoModeMaterializeContext,
     build_materialize_helpers,
 )
-from decaycore.io.auto_mode.scoring_metrics import (
+from decaycore.auto_mode.scoring_metrics import (
     _auto_score_result,
     _auto_bass_boost_metrics_from_stats,
     _auto_channel_overfit_metrics_from_stats,
@@ -24,8 +24,8 @@ from decaycore.io.auto_mode.scoring_metrics import (
     _auto_target_tracking_penalty,
     compute_broad_residual_peak_metrics,
 )
-from decaycore.io.auto_mode.scoring_ranking import _auto_is_better_refine, _auto_phase2_hard_gate_pool
-from decaycore.io.auto_mode.winner_polish import (
+from decaycore.auto_mode.scoring_ranking import _auto_is_better_refine, _auto_phase2_hard_gate_pool
+from decaycore.auto_mode.winner_polish import (
     apply_hpf_winner_polish,
     apply_low_bass_cut_winner_polish,
     apply_mag_c_min_winner_polish,

@@ -8,6 +8,17 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
+"""Equalization leveling (loudness matching by octave band).
+
+Split into:
+- .api: Main public entry points
+- .window_scoring: Candidate window evaluation with metrics
+- .tilt_helpers: Tilt and target curve utilities
+- .state_cache: Configuration and state caching
+
+Uses dynamic imports with explicit __all__ for IDE support.
+"""
+
 import importlib as _importlib
 
 _MODULE_NAMES = ['tilt_helpers', 'window_scoring', 'api', 'state_cache']

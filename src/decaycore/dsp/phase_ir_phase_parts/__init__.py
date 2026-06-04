@@ -8,9 +8,19 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
+"""Phase response construction and processing.
+
+Split into:
+- .phase_ir_phase_01: Input preparation and windowing
+- .phase_ir_phase_02: Phase computation and alignment
+- .phase_ir_phase_03: Post-processing and finalization
+
+Uses dynamic imports with explicit __all__ for IDE support.
+"""
+
 import importlib as _importlib
 
-_MODULE_NAMES = ['phase_ir_phase_01', 'phase_ir_phase_03', 'phase_ir_phase_02']
+_MODULE_NAMES = ['phase_windowing', 'phase_computation', 'phase_finalization']
 for _module_name in _MODULE_NAMES:
     _module = _importlib.import_module(f"{__name__}.{_module_name}")
     for _symbol in dir(_module):

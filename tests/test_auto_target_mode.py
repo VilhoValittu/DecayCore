@@ -27,13 +27,13 @@ from decaycore.auto_mode.search_v2.planner import determine_auto_search_plan
 from decaycore.auto_mode.search_v2.signature import compute_auto_search_signature
 from decaycore.auto_mode.shared import AUTO_MODE_CACHE_SCHEMA_VERSION
 from decaycore.engine_build import build_config
-from decaycore.io.auto_mode.orchestrator_target import (
+from decaycore.auto_mode.orchestrator_target import (
     _TargetTrialSetup,
     _run_target_phase1_trials,
     _target_eval_one,
 )
-from decaycore.io.decaycore_automatic_mode import _auto_select_target_curve_with_trials
-from decaycore.io.decaycore_automatic_mode import _run_auto_mode_search
+from decaycore.auto_mode.api import _auto_select_target_curve_with_trials
+from decaycore.auto_mode.api import _run_auto_mode_search
 from decaycore.workflow.auto_flow_parts.seed_phases import _try_cached_target_pick_before_search
 
 

@@ -8,9 +8,19 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
+"""Final impulse response validation and quality checks.
+
+Split into:
+- .final_ir_validation_01: Input preparation and basic checks
+- .final_ir_validation_02: Mid-stage validation logic
+- .final_ir_validation_03: Final quality assessment and metrics
+
+Uses dynamic imports with explicit __all__ for IDE support.
+"""
+
 import importlib as _importlib
 
-_MODULE_NAMES = ['final_ir_validation_01', 'final_ir_validation_03', 'final_ir_validation_02']
+_MODULE_NAMES = ['validation_setup', 'validation_checks', 'validation_metrics']
 for _module_name in _MODULE_NAMES:
     _module = _importlib.import_module(f"{__name__}.{_module_name}")
     for _symbol in dir(_module):

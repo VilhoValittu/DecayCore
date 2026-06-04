@@ -8,6 +8,15 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
+"""Core DSP processing split by channel configuration.
+
+Split into:
+- .pair: Stereo/multi-channel processing
+- .single_channel: Mono/single-channel processing
+
+Uses dynamic imports with explicit __all__ for IDE support.
+"""
+
 import importlib as _importlib
 
 _MODULE_NAMES = ['pair', 'single_channel']
