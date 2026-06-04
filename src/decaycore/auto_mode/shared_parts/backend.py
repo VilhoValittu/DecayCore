@@ -55,7 +55,6 @@ def _auto_optuna_sampler_kwargs(base_data: dict | None, *, workers: int = 1) -> 
         "multivariate": bool(multivariate),
         "group": bool(group),
         "constant_liar": bool(constant_liar),
-        "warn_independent_sampling": False,
     }
 
 def _auto_trial_workers(base_data: dict | None, n_trials: int) -> int:

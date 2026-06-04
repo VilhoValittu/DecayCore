@@ -839,13 +839,11 @@ def test_auto_optuna_sampler_kwargs_defaults_and_parallel_behavior():
         "multivariate": True,
         "group": False,
         "constant_liar": False,
-        "warn_independent_sampling": False,
     }
     assert _auto_optuna_sampler_kwargs({}, workers=4) == {
         "multivariate": True,
         "group": False,
         "constant_liar": True,
-        "warn_independent_sampling": False,
     }
 
 
@@ -861,7 +859,6 @@ def test_auto_optuna_sampler_kwargs_group_requires_multivariate():
         "multivariate": False,
         "group": False,
         "constant_liar": True,
-        "warn_independent_sampling": False,
     }
 
 
