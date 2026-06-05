@@ -8,6 +8,14 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
+## [1.0.9.1] - 5-6-2026
+
+### BUG FIX
+
+- Fixed Mixed-phase filter auto-mode mag_c_min behaviour.
+
+---
+
 ## [1.0.9] - 5-6-2026
 
 ### Shutdown — Cleaner application control
