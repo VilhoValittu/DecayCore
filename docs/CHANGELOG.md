@@ -8,6 +8,30 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
+## [1.0.9] - 5-6-2026
+
+### Shutdown — Cleaner application control
+
+Closing DecayCore is now simpler. A new Quit button and tab-close shutdown cleanly close the server without manual intervention. The application now exits gracefully on all platforms.
+
+### AUTO Mode — Improved cache and stability
+
+The automatic mode cache is now version-aware, ensuring old cache data doesn't get mixed with new results. The `mag_c_min` handling has been unified across all components, making results more predictable and reliable across different measurement conditions.
+
+### macOS — Enhanced app bundle
+
+The macOS application now includes a convenient Start_Decay.command launcher, making it easier to start the app. Measurement directory handling improved and app bundle identifier updated for better system integration.
+
+### Error handling — Safer audio backend
+
+Audio backend issues (such as PortAudio errors) are now handled with clean error messages instead of crashes. Measurement startup is more robust even on systems with challenging audio configurations.
+
+### Code quality — Comprehensive testing and documentation
+
+Added extensive test coverage for configuration, UI state management, and health checks. Internal DSP architecture documentation is clearer to support future development.
+
+---
+
 ## [1.0.8] - 4-6-2026
 
 ### UI — Details panel auto-scrolling
