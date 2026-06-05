@@ -24,6 +24,7 @@ from .correction_types import (
     _MagRawStageOutputs,
 )
 from .mag_shape import (
+    _active_correction_band_min,
     _apply_confidence_logic,
     _apply_regularization,
     _compute_error_db,
@@ -68,7 +69,7 @@ def _correction_band_mask(freq_axis, cfg) -> np.ndarray:
     try:
         f = np.asarray(freq_axis, dtype=float).reshape(-1)
         try:
-            fmin = float(getattr(cfg, "mag_c_min", 20.0) or 20.0)
+            fmin = float(_active_correction_band_min(cfg))
             fmax = float(getattr(cfg, "mag_c_max", 200.0) or 200.0)
         except (AttributeError, TypeError, ValueError):
             fmin, fmax = 20.0, 200.0

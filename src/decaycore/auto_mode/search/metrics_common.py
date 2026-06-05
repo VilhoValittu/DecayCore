@@ -12,41 +12,13 @@ from __future__ import annotations
 
 import bisect
 import inspect
-import logging
-import math
 import sys
 
 import numpy as np
 
-_logger = logging.getLogger(__name__)
-
 from ...common.acoustic_stats import calc_acoustic_score, calc_ai_summary_from_stats
-from ...config.models import StereoAutoPolicyConfig, StereoResolvedAutoPolicies
-from ...dsp.quality_metrics import (
-    band_lr_mismatch_change_from_stats,
-    band_lr_mismatch_rms_from_stats,
-    normalized_policy_divergence_score,
-    worst_channel_relief_db,
-)
-from ...dsp.modal_analysis import ModalAnalysisResult, RoomModeEvent, detect_room_modes
-from ...dsp.smoothing import smooth_gain_fractional_octave
 from ...dsp.target_match import target_match_from_stats
 from .. import shared
-from ..rank_score import (
-    OFFICIAL_RANK_SCORE_CONTEXT,
-    attach_official_rank_score,
-    calibrated_auto_quality,
-    compute_rank_score_components,
-)
-from ..runtime_context import (
-    _auto_collect_reflections,
-    _auto_event_penalty_weighted,
-    _auto_event_severity,
-    _auto_get_top_modes_hz,
-    _auto_get_worst_mode_hz,
-    _auto_mode_band,
-    _auto_pick_metric,
-)
 
 _AI_SUMMARY_SCORING_RANGE_SUPPORT_CACHE: dict[tuple[int, str], bool] = {}
 
@@ -163,6 +135,11 @@ def _get_auto_scoring_range(
     sources = [st_l, st_r, base_data or {}]
 
     def _pick(key: str, fallback: float) -> float:
+        if key == "mag_c_min":
+            for s in sources:
+                v_seed = shared._auto_safe_float((s or {}).get("_auto_mag_c_min_hz", float("nan")), float("nan"))
+                if np.isfinite(v_seed) and v_seed > 0.0:
+                    return float(v_seed)
         for s in sources:
             v = shared._auto_safe_float((s or {}).get(key, float("nan")), float("nan"))
             if np.isfinite(v) and v > 0.0:

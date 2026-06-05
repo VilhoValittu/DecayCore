@@ -32,6 +32,7 @@ from decaycore.auto_mode.candidate_generation import (
     _seed_auto_mode_candidate_local_optuna_params,
     _seed_auto_mode_candidate_micro_optuna_params,
 )
+from decaycore.auto_mode.target_preselection_parts.target_preselection_01 import _auto_target_preselect_common_ranges
 from decaycore.auto_mode.orchestrator_refine import (
     _CacheRefineContext,
     _CacheRefineProgress,
@@ -60,6 +61,7 @@ from decaycore.auto_mode.candidate_base import _derive_adaptive_freq_bounds
 from decaycore.auto_mode.materialize import AutoModeMaterializeContext, build_materialize_helpers
 from decaycore.auto_mode.rank_score import compute_rank_score_components
 from decaycore.auto_mode.search.rank_combiner import _collect_rank_cached_focus_ripple
+from decaycore.auto_mode.search.metrics_common import _get_auto_scoring_range
 from decaycore.auto_mode.scoring_ranking import (
     _auto_hard_gate_reasons,
     _auto_is_better_refine,
@@ -2362,6 +2364,33 @@ def test_seed_auto_mode_candidate_local_optuna_params_prefers_auto_mag_c_min_see
     params = _suggest_auto_mode_candidate_local_optuna(base, preset, _FakeTrial())
 
     assert float(params["mag_c_min"]) == pytest.approx(15.0, abs=1e-9)
+
+
+def test_target_preselect_common_ranges_prefers_auto_mag_c_min_seed_for_mixed():
+    lvl_min, lvl_max, mag_lo, mag_hi, mode_lo, mode_hi = _auto_target_preselect_common_ranges(
+        {
+            "filter_type": "Mixed",
+            "mag_c_min": 28.0,
+            "_auto_mag_c_min_hz": 15.0,
+            "mag_c_max": 250.0,
+        }
+    )
+
+    assert (lvl_min, lvl_max) == (500.0, 2000.0)
+    assert float(mag_lo) == pytest.approx(15.0, abs=1e-9)
+    assert float(mag_hi) == pytest.approx(250.0, abs=1e-9)
+    assert float(mode_lo) == pytest.approx(25.0, abs=1e-9)
+    assert float(mode_hi) == pytest.approx(160.0, abs=1e-9)
+
+
+def test_auto_scoring_range_prefers_auto_mag_c_min_seed_over_current_stats():
+    scoring_range = _get_auto_scoring_range(
+        {"mag_c_min": 66.3, "mag_c_max": 250.0},
+        {},
+        {"_auto_mag_c_min_hz": 15.0, "mag_c_min": 66.3, "mag_c_max": 250.0, "trans_width": 100.0},
+    )
+
+    assert scoring_range == pytest.approx((15.0, 1500.0), abs=1e-9)
 
 
 def test_build_auto_mode_candidates_local_varies_mag_and_low_cut():

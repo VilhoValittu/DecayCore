@@ -119,6 +119,8 @@ def test_packaging_specs_include_lazy_runtime_dependencies(spec_name: str):
     assert "optuna" in hiddenimports
     assert "decaycore_scoring" in hiddenimports
     assert "decaycore_scoring.decaycore_scoring" in hiddenimports
+    assert "pkg_resources._vendor.platformdirs" in hiddenimports
+    assert "platformdirs" in hiddenimports
 
 
 @pytest.mark.parametrize("spec_name", SPEC_NAMES)

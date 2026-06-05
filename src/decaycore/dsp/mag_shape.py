@@ -22,9 +22,35 @@ from .smoothing import smooth_meas_freq_dep
 _smooth_meas_freq_dep = smooth_meas_freq_dep
 
 
+def _active_correction_band_min(cfg: Any) -> float:
+    """Palauttaa korjauskaistan alarajan.
+
+    Mixed-filtterissä käytetään tarvittaessa hieman alempaa lähtökohtaa,
+    jotta `mag_c_min`-seed ei leikkaa korjausta liian aikaisin juuri
+    low-bass / transition-alueella.
+    """
+    try:
+        fmin = float(getattr(cfg, "mag_c_min", 20.0) or 20.0)
+    except (AttributeError, TypeError, ValueError):
+        fmin = 20.0
+    if not np.isfinite(fmin) or fmin <= 0.0:
+        fmin = 20.0
+
+    filter_type = str(getattr(cfg, "filter_type_str", "") or "").strip().lower()
+    if "mixed" in filter_type:
+        try:
+            low_bass_cut = float(getattr(cfg, "low_bass_cut_hz", fmin) or fmin)
+        except (AttributeError, TypeError, ValueError):
+            low_bass_cut = fmin
+        if np.isfinite(low_bass_cut) and low_bass_cut > 0.0:
+            fmin = min(float(fmin), max(20.0, float(low_bass_cut)))
+
+    return float(fmin)
+
+
 def _select_active_band(freq_axis: np.ndarray, cfg: Any) -> tuple[np.ndarray, tuple[float, float]]:
     """Laskee nykylogiikkaa vastaavan aktiivisen korjauskaistan."""
-    fmin = float(cfg.mag_c_min)
+    fmin = float(_active_correction_band_min(cfg))
     fmax = float(cfg.mag_c_max)
     mask = (freq_axis >= fmin) & (freq_axis <= fmax)
     return mask, (fmin, fmax)

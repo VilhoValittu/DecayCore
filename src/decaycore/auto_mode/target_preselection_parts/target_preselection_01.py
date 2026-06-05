@@ -24,7 +24,6 @@ from ..shared import (
     AUTO_MODE_SYNTH_TARGET_NAME,
     AUTO_MODE_SYNTH_TARGET_BASS_COMP_FRAC,
     AUTO_MODE_SYNTH_TARGET_BASS_COMP_REF_DB,
-    AUTO_MODE_SYNTH_TARGET_TILT_COMP_FRAC,
     AUTO_MODE_SYNTH_TARGET_HF_COMP_FRAC,
     AUTO_MODE_TARGET_PRESELECT_ASYM_W,
     AUTO_MODE_TARGET_PRESELECT_BASS_SHAPE_W,
@@ -149,7 +148,13 @@ def _auto_target_preselect_common_ranges(data: dict) -> tuple[float, float, floa
         lvl_min, lvl_max = 500.0, 2000.0
 
     try:
-        mag_lo = float(data.get("mag_c_min", 20.0) or 20.0)
+        mag_lo = float(
+            data.get(
+                "_auto_mag_c_min_hz",
+                data.get("mag_c_min", 20.0),
+            )
+            or 20.0
+        )
         mag_hi = float(data.get("mag_c_max", 250.0) or 250.0)
     except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
         mag_lo, mag_hi = 20.0, 250.0

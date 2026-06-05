@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from decaycore.dsp.decaycore_dsp import _limit_gd_gradient_ms_per_oct, apply_confidence_weighted_target_pull
-from decaycore.dsp.mag_shape import _apply_confidence_logic
+from decaycore.dsp.mag_shape import _active_correction_band_min, _apply_confidence_logic, _select_active_band
 from decaycore.dsp.phase_ir_phase_gradient import max_abs_gd_gradient_ms_per_oct
 
 
@@ -76,3 +76,20 @@ def test_gd_gradient_limiter_never_worsens_peak_gradient_metric():
 
     assert float(after) <= float(before) + 1e-9
     assert limited.shape == phase.shape
+
+
+def test_mixed_active_correction_band_min_prefers_low_bass_cut_floor():
+    cfg = SimpleNamespace(
+        mag_c_min=65.0,
+        mag_c_max=250.0,
+        filter_type_str="Mixed Phase",
+        low_bass_cut_enable=False,
+        low_bass_cut_hz=40.0,
+    )
+
+    assert float(_active_correction_band_min(cfg)) == pytest.approx(40.0, abs=1e-9)
+
+    freq = np.asarray([20.0, 30.0, 40.0, 50.0, 65.0, 80.0], dtype=float)
+    mask, band = _select_active_band(freq, cfg)
+    assert band == pytest.approx((40.0, 250.0), abs=1e-9)
+    assert mask.tolist() == [False, False, True, True, True, True]

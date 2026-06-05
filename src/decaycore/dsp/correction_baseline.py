@@ -31,6 +31,7 @@ from .decaycore_analysis import calculate_rt60, calculate_rt60_bands
 from .decaycore_leveling import compute_leveling
 from .dsp_config import CfgReader
 from .limits import build_slope_limit_envelope
+from .mag_shape import _active_correction_band_min
 from .phase import get_min_phase_impulse
 from .tdc import apply_smart_tdc
 
@@ -376,7 +377,7 @@ def _prepare_correction_baseline(  # noqa: C901 - baseline assembly intentionall
     ng_enable = cfg_reader.bool("enable_null_guard", True)
     if ng_enable:
         with profiled_section("generate_filter.correction.baseline.null_guard"):
-            mag_c_min = cfg_reader.float_allow_zero("mag_c_min", 0.0)
+            mag_c_min = _active_correction_band_min(cfg)
             mag_c_max = cfg_reader.float_allow_zero("mag_c_max", 0.0)
             # use analysis magnitude (m_anal) already on freq_axis scale
             target_mags = apply_null_guard_target(
