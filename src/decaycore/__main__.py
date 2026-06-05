@@ -8,6 +8,7 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
+import asyncio
 import os
 import sys
 from pathlib import Path
@@ -29,20 +30,31 @@ FAVICON_PATH = Path(__file__).resolve().parent / "ui" / "assets" / "favicon.ico"
 
 def _register_single_client_guard() -> None:
     _active: list[str | None] = [None]
+    _shutdown_scheduled: list[bool] = [False]
 
     @app.on_connect
     async def _on_connect(client: Client) -> None:
         prev_id = _active[0]
         _active[0] = client.id
+        _shutdown_scheduled[0] = False
         if prev_id and prev_id != client.id:
             old = Client.instances.get(prev_id)
             if old:
                 await old.run_javascript('window.location.replace("about:blank")')
 
+    async def _schedule_shutdown(client_id: str) -> None:
+        if _shutdown_scheduled[0]:
+            return
+        _shutdown_scheduled[0] = True
+        await asyncio.sleep(3)
+        if _active[0] is None and _shutdown_scheduled[0]:
+            app.shutdown()
+
     @app.on_disconnect
     async def _on_disconnect(client: Client) -> None:
         if _active[0] == client.id:
             _active[0] = None
+            asyncio.create_task(_schedule_shutdown(client.id))
 
 
 def main():
@@ -52,7 +64,7 @@ def main():
 
     @app.on_startup
     async def _print_shutdown_hint() -> None:
-        print("To shut down the DecayCore, press Ctrl+C or close the terminal.", flush=True)
+        print("To shut down the DecayCore, close browser tab, press red icon on right top corner, at terminal press Ctrl+C or close the terminal.", flush=True)
 
     ui.run(
         port=8080,

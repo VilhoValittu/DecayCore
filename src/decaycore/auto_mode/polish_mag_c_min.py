@@ -19,7 +19,7 @@ import numpy as np
 
 from .auto_mode_profile import profiled_section
 from .rank_score import official_rank_score
-from .shared import AUTO_MODE_MAG_C_MIN_MAX_HZ, AUTO_MODE_MAG_C_MIN_MIN_HZ, _auto_safe_float
+from .shared import AUTO_MODE_MAG_C_MIN_MAX_HZ, AUTO_MODE_MAG_C_MIN_MIN_HZ, _auto_mag_c_min_center, _auto_safe_float
 from .winner_polish_utils import _enrich_target_tracking_metrics, _winner_polish_acceptance
 
 logger = logging.getLogger("DecayCore")
@@ -289,12 +289,17 @@ def apply_mag_c_min_winner_polish(
         return cur_best_preset, cur_best_metrics, False, mag_c_min_meta
 
     mag_c_min_base = _auto_safe_float(
-        cur_best_preset.get(
-            "mag_c_min",
-            dict(base_data_ref or {}).get("mag_c_min", float("nan")),
-        ),
+        _auto_mag_c_min_center(base_data_ref, default=float("nan")),
         float("nan"),
     )
+    if not np.isfinite(mag_c_min_base):
+        mag_c_min_base = _auto_safe_float(
+            cur_best_preset.get(
+                "mag_c_min",
+                dict(base_data_ref or {}).get("mag_c_min", float("nan")),
+            ),
+            float("nan"),
+        )
     if not np.isfinite(mag_c_min_base):
         return cur_best_preset, cur_best_metrics, False, mag_c_min_meta
     initial_mag_c_min = round(

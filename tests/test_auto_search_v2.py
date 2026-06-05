@@ -29,6 +29,7 @@ from decaycore.auto_mode.search_v2.context import build_execution_context
 from decaycore.auto_mode.search_v2.plan import AutoSearchPlan, AutoSearchPlanDecision
 from decaycore.auto_mode.search_v2.planner import determine_auto_search_plan
 from decaycore.auto_mode.search_v2.runner import run_auto_search_v2
+from decaycore.auto_mode.search_v2.seeds import _apply_seed_payload
 from decaycore.auto_mode.search_v2.signature import (
     compute_auto_search_signature,
     compute_auto_search_signature_object,
@@ -220,6 +221,31 @@ def test_auto_search_v2_auto_applied_values_do_not_change_signature():
 
     assert sig2 == sig1
     assert sig3 != sig1
+
+
+def test_auto_search_v2_seed_payload_restores_measurement_mag_c_min():
+    search_base_data = {
+        "mag_c_min": 31.0,
+        "_auto_mag_c_min_hz": 16.0,
+        "exc_freq": 42.0,
+    }
+    cache_base_data = {"exc_freq": 55.0}
+    context = SimpleNamespace(prior_seed_preset={})
+
+    applied = _apply_seed_payload(
+        search_base_data=search_base_data,
+        cache_base_data=cache_base_data,
+        seed_preset={"mag_c_min": 44.0, "exc_freq": 60.0},
+        seed_metrics={"rank_score": 1.0},
+        context=context,
+        success_log="seed payload test",
+    )
+
+    assert applied is True
+    assert float(search_base_data["mag_c_min"]) == pytest.approx(16.0, abs=1e-9)
+    assert float(search_base_data["_auto_mag_c_min_hz"]) == pytest.approx(16.0, abs=1e-9)
+    assert float(search_base_data["exc_freq"]) == pytest.approx(55.0, abs=1e-9)
+    assert context.prior_seed_preset == {"mag_c_min": 44.0, "exc_freq": 60.0}
 
 
 def test_auto_search_v2_real_user_input_changes_signature():

@@ -21,14 +21,13 @@ from .shared import (
     AUTO_MODE_LOCAL_REFINE_SHRINK,
     AUTO_MODE_LOW_BASS_MAX_HZ,
     AUTO_MODE_LOW_BASS_MIN_HZ,
-    AUTO_MODE_MAG_C_MIN_MAX_HZ,
-    AUTO_MODE_MAG_C_MIN_MIN_HZ,
     AUTO_MODE_PHASE_LIMIT_LOCAL_SIGMA_HZ,
     AUTO_MODE_PHASE_LIMIT_MAX_HZ,
     AUTO_MODE_PHASE_LIMIT_MIN_HZ,
     AUTO_MODE_PHASE3_MICRO_TRIALS,
     _auto_is_phase_search_filter,
     _auto_goal,
+    _auto_mag_c_min_center,
     _auto_phase_limit_center,
     _auto_safe_float,
     _auto_sample_mag_low_pair,
@@ -44,8 +43,6 @@ from .candidate_base import (
     _BASS_FIRST_MODE_MAX_HZ,
     _CONF_PULL_MAX_MIN_HZ,
     _CONF_PULL_MAX_MAX_HZ,
-    _bi_search_enabled,
-    _suggest_bi_optuna_params,
 )
 
 
@@ -75,14 +72,7 @@ def _build_auto_mode_candidates_local(
     keep_tdc = bool(c.get("enable_tdc", True))
     keep_afdw = bool(c.get("enable_afdw", True))
     keep_bass_first = bool(c.get("bass_first_ai", True))
-    mag_c_min_center = round(
-        _clip(
-            c.get("mag_c_min", base.get("mag_c_min", 25.0)),
-            float(AUTO_MODE_MAG_C_MIN_MIN_HZ),
-            float(AUTO_MODE_MAG_C_MIN_MAX_HZ),
-        ),
-        1,
-    )
+    mag_c_min_center = round(_auto_mag_c_min_center(c, default=25.0), 1)
     low_bass_cut_center = round(
         _clip(
             c.get("low_bass_cut_hz", base.get("low_bass_cut_hz", 40.0)),

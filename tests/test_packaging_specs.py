@@ -93,6 +93,10 @@ def test_packaging_specs_reference_expected_icons(spec_name: str):
     if spec_name == "DecayCore_macos.spec":
         assert Path(captured["bundle"]["kwargs"]["icon"]) == REPO_ROOT / "src" / "decaycore" / "ui" / "assets" / "DecayCore.icns"
         assert Path(captured["bundle"]["kwargs"]["icon"]).exists()
+        assert captured["bundle"]["kwargs"]["bundle_identifier"] == "com.github.vilhovalittu.decaycore"
+        info_plist = captured["bundle"]["kwargs"]["info_plist"]
+        assert "NSMicrophoneUsageDescription" in info_plist
+        assert "NSDocumentsFolderUsageDescription" in info_plist
 
 
 @pytest.mark.parametrize("spec_name", SPEC_NAMES)
@@ -158,6 +162,11 @@ def test_release_workflow_verifies_manual_in_macos_app_bundle_layout():
     assert 'find dist/DecayCore-${VERSION}.app -path "*docs/User_Manual.md" -print -quit | grep -q .' in workflow_text
     assert "test -f dist/DecayCore/docs/User_Manual.md" not in workflow_text
     assert 'Test-Path "dist\\DecayCore\\docs\\User_Manual.md"' not in workflow_text
+    assert 'cat > "dist/Start_Decay.command" << \'EOF\'' in workflow_text
+    assert 'sed -i "" "s/__DECAYCORE_VERSION__/${VERSION}/g" "dist/Start_Decay.command"' in workflow_text
+    assert '(cd dist && 7z a -t7z -mx=9 -mmt=on -m0=lzma2 "../out/DecayCore_${VERSION}_macos_arm64.7z" "DecayCore_${VERSION}.app" "Start_Decay.command")' in workflow_text
+    assert '7z l "out/DecayCore_${VERSION}_macos_arm64.7z" | grep -q "DecayCore_${VERSION}.app"' in workflow_text
+    assert '7z l "out/DecayCore_${VERSION}_macos_arm64.7z" | grep -q "Start_Decay.command"' in workflow_text
 
 
 def test_release_workflow_skips_matplotlib_warmup_when_dependency_is_missing():
@@ -184,3 +193,4 @@ def test_installation_guide_mentions_linux_portaudio_runtime_dependency():
 
     assert "libportaudio2" in installation_text
     assert "measurement audio" in installation_text.lower()
+    assert "Start_Decay.command" in installation_text

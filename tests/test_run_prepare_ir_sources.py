@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import numpy as np
 
 from decaycore.application.run_request import RunRequest
@@ -7,6 +9,10 @@ from decaycore.ui.ng_bridge import ProcessRunCallbacks
 from decaycore.workflow.run_prepare import (
     _prepare_target_curve_and_run_context,
     _prepare_ui_and_measurements,
+)
+from decaycore.workflow.run_prepare_parts.target_context import (
+    _build_bass_integration_metadata_unified,
+    _safe_float_from_dict,
 )
 
 
@@ -43,6 +49,224 @@ def _measurement_tuple():
 def _patch_common(monkeypatch) -> None:
     monkeypatch.setattr("decaycore.workflow.run_prepare.compute_health", lambda data, mode: object())
     monkeypatch.setattr("decaycore.workflow.run_prepare.save_config", lambda data: None)
+
+
+def test_safe_float_from_dict_rejects_invalid_positive_values() -> None:
+    data = {
+        "valid": "82.5",
+        "zero": 0.0,
+        "nan_value": float("nan"),
+        "bad": object(),
+    }
+
+    assert _safe_float_from_dict(data, "valid", 80.0, positive=True) == 82.5
+    assert _safe_float_from_dict(data, "zero", 80.0, positive=True) == 80.0
+    assert _safe_float_from_dict(data, "nan_value", 80.0, positive=True) == 80.0
+    assert _safe_float_from_dict(data, "bad", 1.5) == 1.5
+
+
+def test_build_bass_integration_metadata_unified_keeps_measurement_fields_in_sync() -> None:
+    data = {
+        "bass_integration_profile": "safe",
+        "bass_integration_sub_combine_mode": "average",
+        "avr_crossover_hz": 82.5,
+        "sub_crossover_hz": 82.5,
+        "direct_dac_sub_lpf_hz": 96.5,
+        "bass_integration_alignment_auto_applied": True,
+        "bass_integration_sub_delay_ms": 3.25,
+        "bass_integration_sub_polarity_invert": True,
+        "bass_integration_sub_gain_trim_db": -1.5,
+        "bass_integration_alignment_reason": "Alignment test",
+        "bass_integration_allpass_auto_enable": True,
+        "bass_integration_allpass_auto_applied": True,
+        "bass_integration_allpass_freq_hz": 77.5,
+        "bass_integration_allpass_q": 0.9,
+        "bass_integration_allpass_reason": "Allpass test",
+        "sub_crossover_manual_override": False,
+        "local_path_l_main": "L-main.wav",
+        "local_path_r_main": "R-main.wav",
+        "local_path_l_sub": "L-sub.wav",
+        "local_path_r_sub": "R-sub.wav",
+    }
+    bi_state = {
+        "bi_recommended_xo_hz": 82.5,
+        "bi_recommended_sub_lpf_hz": 96.5,
+        "bi_rec_xo_l": 81.0,
+        "bi_rec_xo_r": 84.0,
+        "bi_selected_diagnostics": {"selected_only": 2.5},
+        "bi_alignment_recommendation": {
+            "improvement_score": 0.75,
+            "baseline": {"overlap_ripple_db": 4.5},
+            "optimized": {"overlap_ripple_db": 2.0},
+        },
+        "bi_allpass_recommendation": {
+            "improvement_score": 0.22,
+            "baseline": {"xo_gd_mismatch_ms": 1.4},
+            "optimized": {"xo_gd_mismatch_ms": 0.7},
+        },
+    }
+
+    meta, measurements_updates = _build_bass_integration_metadata_unified(
+        data=data,
+        bi_state=bi_state,
+        bundle_diagnostics={"sub_combine_mode": "dual_sub_peak_aligned_average", "bundle_only": 1.25},
+    )
+
+    assert meta["sub_combine_mode"] == "dual_sub_peak_aligned_average"
+    assert meta["diagnostics"]["bundle_only"] == 1.25
+    assert meta["diagnostics"]["selected_only"] == 2.5
+    assert meta["alignment"]["delay_ms"] == measurements_updates["bass_integration_sub_delay_ms"] == 3.25
+    assert meta["alignment"]["polarity_invert"] == measurements_updates["bass_integration_sub_polarity_invert"] is True
+    assert meta["alignment"]["gain_trim_db"] == measurements_updates["bass_integration_sub_gain_trim_db"] == -1.5
+    assert meta["avr_crossover_hz"] == measurements_updates["avr_crossover_hz"] == 82.5
+    assert meta["direct_dac_sub_lpf_hz"] == measurements_updates["direct_dac_sub_lpf_hz"] == 96.5
+    assert meta["recommended_allpass"]["enabled"] == measurements_updates["bass_integration_allpass_auto_applied"] is True
+    assert meta["recommended_allpass"]["freq_hz"] == measurements_updates["bass_integration_allpass_freq_hz"] == 77.5
+    assert meta["recommended_allpass"]["q"] == measurements_updates["bass_integration_allpass_q"] == 0.9
+
+
+def test_prepare_target_curve_context_keeps_bass_integration_metadata_consistent(monkeypatch) -> None:
+    _patch_common(monkeypatch)
+    bundle = SimpleNamespace(
+        diagnostics={
+            "sub_combine_mode": "dual_sub_peak_aligned_average",
+            "bundle_only": 1.25,
+        }
+    )
+
+    monkeypatch.setattr(
+        "decaycore.workflow.run_prepare.load_measurements_lr",
+        lambda data, logger=None: (_ for _ in ()).throw(AssertionError("unexpected regular measurement load")),
+    )
+    monkeypatch.setattr(
+        "decaycore.workflow.run_prepare.load_bass_integration_measurements",
+        lambda data, logger=None: (bundle, *_measurement_tuple()),
+    )
+    monkeypatch.setattr(
+        "decaycore.workflow.run_prepare.load_raw_irs_lr",
+        lambda data, logger=None, **kwargs: (
+            np.asarray([1.0], dtype=float),
+            48000,
+            np.asarray([2.0], dtype=float),
+            48000,
+        ),
+    )
+    monkeypatch.setattr(
+        "decaycore.workflow.run_prepare.load_raw_ir_sub",
+        lambda data, logger=None: (np.asarray([3.0], dtype=float), 48000),
+    )
+    monkeypatch.setattr(
+        "decaycore.workflow.run_prepare.load_house_curve",
+        lambda data, parse_measurements_from_path=None: (None, None, "none"),
+    )
+    monkeypatch.setattr(
+        "decaycore.workflow.run_prepare.build_xos_hpf",
+        lambda data: ([], {"enabled": False}),
+    )
+    monkeypatch.setattr(
+        "decaycore.workflow.run_prepare.choose_target_rates",
+        lambda data: [48000],
+    )
+    monkeypatch.setattr(
+        "decaycore.workflow.run_prepare.choose_dash_fs",
+        lambda target_rates, *, multi_rate_on=False, forced_plot_fs_hz=0: 48000,
+    )
+    monkeypatch.setattr(
+        "decaycore.workflow.run_prepare.detect_is_wav_source",
+        lambda data: False,
+    )
+    monkeypatch.setattr(
+        "decaycore.workflow.run_prepare.filter_type_short",
+        lambda value: "Linear",
+    )
+    monkeypatch.setattr(
+        "decaycore.workflow.run_prepare.log_df_smoothing_toggle",
+        lambda data, logger: None,
+    )
+
+    def _fake_prepare_bi(*, ctx, data, callbacks):
+        data["bass_integration_mode"] = "direct_dac"
+        data["bass_integration_sub_combine_mode"] = "average"
+        data["bass_integration_profile"] = "safe"
+        data["avr_crossover_hz"] = 82.5
+        data["sub_crossover_hz"] = 82.5
+        data["direct_dac_sub_lpf_hz"] = 96.5
+        data["bass_integration_alignment_auto_applied"] = True
+        data["bass_integration_sub_delay_ms"] = 3.25
+        data["bass_integration_sub_polarity_invert"] = True
+        data["bass_integration_sub_gain_trim_db"] = -1.5
+        data["bass_integration_alignment_reason"] = "Alignment test"
+        data["bass_integration_allpass_auto_enable"] = True
+        data["bass_integration_allpass_auto_applied"] = True
+        data["bass_integration_allpass_freq_hz"] = 77.5
+        data["bass_integration_allpass_q"] = 0.9
+        data["bass_integration_allpass_reason"] = "Allpass test"
+        return {
+            "bi_recommended_xo_hz": 82.5,
+            "bi_recommended_sub_lpf_hz": 96.5,
+            "bi_rec_xo_l": 81.0,
+            "bi_rec_xo_r": 84.0,
+            "bi_selected_diagnostics": {"selected_only": 2.5},
+            "bi_alignment_recommendation": {
+                "applied": True,
+                "sub_delay_ms": 3.25,
+                "sub_polarity_invert": True,
+                "sub_gain_trim_db": -1.5,
+                "reason": "Alignment test",
+                "improvement_score": 0.75,
+                "baseline": {"overlap_ripple_db": 4.5},
+                "optimized": {"overlap_ripple_db": 2.0},
+            },
+            "bi_allpass_recommendation": {
+                "enabled": True,
+                "freq_hz": 77.5,
+                "q": 0.9,
+                "reason": "Allpass test",
+                "improvement_score": 0.22,
+                "baseline": {"xo_gd_mismatch_ms": 1.4},
+                "optimized": {"xo_gd_mismatch_ms": 0.7},
+            },
+        }
+
+    monkeypatch.setattr(
+        "decaycore.workflow.run_prepare._prepare_target_curve_bass_integration_context",
+        _fake_prepare_bi,
+    )
+
+    support = _DummySupport()
+    ctx = _prepare_ui_and_measurements(
+        request=RunRequest(
+            raw_ui_data={
+                "mode": "AUTO",
+                "bass_integration_enable": True,
+                "filter_type": "Linear",
+            }
+        ),
+        callbacks=_callbacks(),
+        support=support,
+    )
+
+    assert ctx is not None
+
+    _prepare_target_curve_and_run_context(
+        ctx,
+        support=support,
+    )
+
+    meta = ctx["data"]["_bass_integration_meta"]
+    measurements = ctx["measurements"]
+
+    assert meta["diagnostics"]["bundle_only"] == 1.25
+    assert meta["diagnostics"]["selected_only"] == 2.5
+    assert meta["sub_combine_mode"] == measurements["bass_integration_sub_combine_mode"] == "dual_sub_peak_aligned_average"
+    assert meta["avr_crossover_hz"] == measurements["avr_crossover_hz"] == 82.5
+    assert meta["direct_dac_sub_lpf_hz"] == measurements["direct_dac_sub_lpf_hz"] == 96.5
+    assert meta["alignment"]["delay_ms"] == measurements["bass_integration_sub_delay_ms"] == 3.25
+    assert meta["alignment"]["polarity_invert"] == measurements["bass_integration_sub_polarity_invert"] is True
+    assert meta["alignment"]["gain_trim_db"] == measurements["bass_integration_sub_gain_trim_db"] == -1.5
+    assert meta["recommended_allpass"]["enabled"] == measurements["bass_integration_allpass_auto_applied"] is True
+    assert meta["recommended_allpass"]["freq_hz"] == measurements["bass_integration_allpass_freq_hz"] == 77.5
+    assert meta["recommended_allpass"]["q"] == measurements["bass_integration_allpass_q"] == 0.9
 
 
 def test_prepare_ui_reads_lr_raw_ir_from_regular_slots(monkeypatch) -> None:

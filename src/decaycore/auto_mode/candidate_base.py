@@ -49,12 +49,11 @@ from .shared import (
     AUTO_MODE_PHASE_LIMIT_MAX_HZ,
     AUTO_MODE_PHASE_LIMIT_MIN_HZ,
     AUTO_MODE_PHASE_LIMIT_PRIOR_CENTER_HZ,
-    AUTO_MODE_PHASE3_MICRO_TRIALS,
     _auto_is_phase_search_filter,
     _auto_goal,
     _auto_filter_cache_key,
     _auto_filter_type_for_key,
-    _auto_output_tilt_bounds,
+    _auto_mag_c_min_center,
     _auto_optuna_sampler_kwargs,
     _auto_phase_limit_center,
     _auto_safe_float,
@@ -456,13 +455,7 @@ def _build_auto_mode_candidates(
     _r_bass_first_hi = float(adaptive.get("bass_first_hi", _BASS_FIRST_MODE_MAX_HZ))
     _r_conf_pull_hi = float(adaptive.get("conf_pull_hi", _CONF_PULL_MAX_MAX_HZ))
 
-    mag_c_min_seed = float(
-        np.clip(
-            _auto_safe_float(base_data.get("mag_c_min", 25.0), 25.0),
-            _r_mag_c_min_lo,
-            _r_mag_c_min_hi,
-        )
-    )
+    mag_c_min_seed = float(_auto_mag_c_min_center(base_data, default=25.0))
     low_bass_cut_seed = float(
         np.clip(
             _auto_safe_float(base_data.get("low_bass_cut_hz", 40.0), 40.0),
@@ -582,7 +575,6 @@ def _build_auto_mode_candidates_optuna(
     keep_tdc = bool(base_data.get("enable_tdc", True))
     keep_afdw = bool(base_data.get("enable_afdw", True))
     keep_bass_first = bool(base_data.get("bass_first_ai", True))
-    prefer_bass = bool(_auto_goal(base_data) == AUTO_MODE_GOAL_FLAT)
     ft = str(base_data.get("filter_type", "") or "").strip().lower()
     is_phase_search = _auto_is_phase_search_filter(ft)
 

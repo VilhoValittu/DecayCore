@@ -26,15 +26,13 @@ from .shared import (
     AUTO_MODE_PHASE_LIMIT_LOCAL_SIGMA_HZ,
     AUTO_MODE_PHASE_LIMIT_MAX_HZ,
     AUTO_MODE_PHASE_LIMIT_MIN_HZ,
-    AUTO_MODE_PHASE3_MICRO_TRIALS,
     _auto_is_phase_search_filter,
     _auto_goal,
+    _auto_mag_c_min_center,
     _auto_output_tilt_bounds,
     _auto_phase_limit_center,
     _auto_safe_float,
-    _auto_sample_mag_low_pair,
     _clip,
-    _jitter,
 )
 from .candidate_base import (
     _TDC_STRENGTH_MIN,
@@ -87,16 +85,7 @@ def _suggest_auto_mode_candidate_local_optuna(
     keep_tdc = bool(c.get("enable_tdc", True))
     keep_afdw = bool(c.get("enable_afdw", True))
     keep_bass_first = bool(c.get("bass_first_ai", True))
-    mag_c_min_center = float(
-        round(
-            _clip(
-                c.get("mag_c_min", base.get("mag_c_min", 25.0)),
-                float(AUTO_MODE_MAG_C_MIN_MIN_HZ),
-                float(AUTO_MODE_MAG_C_MIN_MAX_HZ),
-            ),
-            1,
-        )
-    )
+    mag_c_min_center = float(round(_auto_mag_c_min_center(c, default=25.0), 1))
     low_bass_cut_center = float(
         round(
             _clip(
@@ -337,16 +326,7 @@ def _seed_auto_mode_candidate_local_optuna_params(
         )
     )
     phase_center = _auto_phase_limit_center(c.get("phase_limit", base.get("phase_limit", None)))
-    mag_c_min_center = float(
-        round(
-            _clip(
-                c.get("mag_c_min", base.get("mag_c_min", 25.0)),
-                float(AUTO_MODE_MAG_C_MIN_MIN_HZ),
-                float(AUTO_MODE_MAG_C_MIN_MAX_HZ),
-            ),
-            1,
-        )
-    )
+    mag_c_min_center = float(round(_auto_mag_c_min_center(c, default=25.0), 1))
     low_bass_cut_center = float(
         round(
             _clip(

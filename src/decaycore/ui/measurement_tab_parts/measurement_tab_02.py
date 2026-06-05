@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import math
 import sys
@@ -22,13 +21,11 @@ logger = logging.getLogger("DecayCore")
 
 import numpy as np
 
-from ...app_paths import default_measurements_dir
+from ...app_paths import default_measurements_dir, safe_measurements_dir
 from ...measurement.adapter import bundle_to_generated_source, bundle_to_upload_payload
 from ...measurement.devices import (
-    check_measurement_audio_backend,
     get_default_input_device_index,
     get_default_output_device_index,
-    is_measurement_device_wasapi,
     list_measurement_input_devices,
     list_measurement_output_devices,
     list_wasapi_input_devices,
@@ -50,7 +47,6 @@ from ...measurement.capture import run_audibility_test
 from ...measurement.workflow import run_measurement_workflow
 from .. import measurement_state, ng_controls as ctrl
 from ..measurement_session_dialog import build_measurement_session_dialog
-from ..plot_common import _view_mags_for_plot
 
 _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS = (
     AttributeError,
@@ -334,7 +330,7 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
             except (TypeError, ValueError, OverflowError):
                 return float(default)
 
-        save_dir = default_measurements_dir()
+        save_dir = Path(safe_measurements_dir(str(default_measurements_dir())))
         samplerate = _int("measurement_samplerate", DEFAULT_MEASUREMENT_SAMPLE_RATE)
         calibration_label = str(ctrl.value("measurement_mic_calibration_label", "") or "").strip()
         calibration_upload = ctrl.value("measurement_mic_calibration_upload", None)
@@ -451,7 +447,11 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
         bundle = _current_bundle()
         if bundle is None:
             return
-        save_dir = Path(bundle.capture.request.save_dir or default_measurements_dir())
+        save_dir = Path(
+            safe_measurements_dir(
+                str(bundle.capture.request.save_dir or default_measurements_dir())
+            )
+        )
         role = str(bundle.capture.request.role or "generic").strip().lower() or "generic"
         stem = "measurement" if role == "generic" else f"measurement_{role}"
         bundle.saved_paths = save_measurement_bundle(bundle, save_dir, stem)

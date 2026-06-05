@@ -1,8 +1,15 @@
 import importlib
 import sys
 import types
+from pathlib import Path
 
-from decaycore.app_paths import default_measurements_dir, program_version_token, safe_filters_dir
+import decaycore.app_paths as app_paths
+from decaycore.app_paths import (
+    default_measurements_dir,
+    program_version_token,
+    safe_filters_dir,
+    safe_measurements_dir,
+)
 from decaycore.version import normalize_version
 
 
@@ -46,3 +53,23 @@ def test_default_measurements_dir_uses_documents_folder():
     measurements_dir = default_measurements_dir()
 
     assert measurements_dir.parts[-3:] == ("Documents", "DecayCore", "measurement")
+
+
+def test_safe_measurements_dir_falls_back_to_app_data_when_primary_path_is_unwritable(monkeypatch, tmp_path):
+    blocked = tmp_path / "blocked" / "measurement"
+    fallback_base = tmp_path / "appdata"
+    monkeypatch.setattr(app_paths, "decaycore_data_dir", lambda: fallback_base)
+
+    original_mkdir = Path.mkdir
+
+    def _mkdir(self, *args, **kwargs):
+        if self == blocked:
+            raise OSError("permission denied")
+        return original_mkdir(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "mkdir", _mkdir)
+
+    result = Path(safe_measurements_dir(str(blocked)))
+
+    assert result == fallback_base / "measurement"
+    assert result.is_dir()

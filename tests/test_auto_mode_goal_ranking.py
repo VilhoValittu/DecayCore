@@ -26,6 +26,7 @@ from decaycore.auto_mode.shared import (
 )
 import logging
 from decaycore.auto_mode.candidate_generation import (
+    _suggest_auto_mode_candidate_local_optuna,
     _suggest_auto_mode_candidate_optuna,
     _seed_auto_mode_candidate_optuna_params,
     _seed_auto_mode_candidate_local_optuna_params,
@@ -2281,6 +2282,7 @@ def test_build_auto_mode_candidates_local_center_first_and_clamped():
         "enable_afdw": True,
         "bass_first_ai": True,
         "mag_c_min": 26.0,
+        "_auto_mag_c_min_hz": 15.0,
         "low_bass_cut_hz": 34.0,
     }
     center = {
@@ -2300,7 +2302,7 @@ def test_build_auto_mode_candidates_local_center_first_and_clamped():
     assert len(cands) == 9
     first = dict(cands[0])
     assert float(first.get("mixed_freq", 0.0)) == 92.0
-    assert float(first.get("mag_c_min", 0.0)) == 26.0
+    assert float(first.get("mag_c_min", 0.0)) == 15.0
     assert float(first.get("low_bass_cut_hz", 0.0)) == 34.0
 
     for c in cands:
@@ -2316,6 +2318,50 @@ def test_build_auto_mode_candidates_local_center_first_and_clamped():
         assert 120.0 <= float(c.get("bass_first_mode_max_hz", 0.0)) <= 220.0
         assert 80.0 <= float(c.get("conf_pull_max_hz", 0.0)) <= 220.0
         assert 18.0 <= float(c.get("low_bass_cut_hz", 0.0)) <= 55.0
+
+
+def test_seed_auto_mode_candidate_local_optuna_params_prefers_auto_mag_c_min_seed():
+    class _FakeTrial:
+        def suggest_float(self, name, low, high, **kwargs):
+            _ = name, low, high, kwargs
+            return float(low)
+
+        def suggest_categorical(self, name, choices):
+            _ = name
+            return list(choices)[0]
+
+    base = {
+        "filter_type": "Mixed",
+        "enable_tdc": True,
+        "enable_afdw": True,
+        "bass_first_ai": True,
+        "mag_c_min": 26.0,
+        "_auto_mag_c_min_hz": 15.0,
+        "low_bass_cut_hz": 34.0,
+    }
+    preset = {
+        "mag_c_min": 26.0,
+        "low_bass_cut_hz": 34.0,
+        "fdw_cycles": 10.0,
+        "tdc_strength": 50.0,
+        "tdc_max_reduction_db": 9.0,
+        "tdc_slope_db_per_oct": 6.0,
+        "reg_strength": 30.0,
+        "max_slope_db_per_oct": 12.0,
+        "max_slope_boost_db_per_oct": 0.0,
+        "max_slope_cut_db_per_oct": 0.0,
+        "max_boost": 4.0,
+        "mag_c_max": 220.0,
+        "trans_width": 100.0,
+        "bass_first_mode_max_hz": 180.0,
+        "conf_pull_max_hz": 200.0,
+        "enable_afdw": True,
+        "bass_first_ai": True,
+    }
+
+    params = _suggest_auto_mode_candidate_local_optuna(base, preset, _FakeTrial())
+
+    assert float(params["mag_c_min"]) == pytest.approx(15.0, abs=1e-9)
 
 
 def test_build_auto_mode_candidates_local_varies_mag_and_low_cut():

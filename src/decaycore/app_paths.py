@@ -75,6 +75,47 @@ def default_measurements_dir() -> Path:
         return home / "Documents" / PROGRAM_NAME / "measurement"
 
 
+def safe_measurements_dir(path: str | None, *, fallback: Path | None = None) -> str:
+    """
+    Resolve a writable measurement directory with conservative fallbacks.
+
+    Measurement saves prefer Documents for discoverability, but macOS privacy
+    prompts or platform-specific folder policies can make that location
+    unavailable. In that case we fall back to the app data directory and then
+    to a local working-directory directory.
+    """
+    fallback_base = fallback or (decaycore_data_dir() / "measurement")
+    try:
+        p_base = Path(path).expanduser() if path else default_measurements_dir()
+    except _RECOVERABLE_PATH_EXCEPTIONS:
+        p_base = default_measurements_dir()
+
+    try:
+        if p_base.is_absolute() and len(p_base.parts) <= 2:
+            p_base = default_measurements_dir()
+    except _RECOVERABLE_PATH_EXCEPTIONS:
+        p_base = default_measurements_dir()
+
+    try:
+        p_base.mkdir(parents=True, exist_ok=True)
+        return str(p_base.resolve())
+    except OSError:
+        pass
+    except _RECOVERABLE_PATH_EXCEPTIONS:
+        pass
+
+    try:
+        fallback_base.mkdir(parents=True, exist_ok=True)
+        return str(fallback_base.resolve())
+    except _RECOVERABLE_PATH_EXCEPTIONS:
+        last = Path.cwd() / "measurement"
+        try:
+            last.mkdir(parents=True, exist_ok=True)
+        except _RECOVERABLE_PATH_EXCEPTIONS:
+            logger.exception("fallback measurement dir create")
+        return str(last)
+
+
 def program_version_token(version: str | None, *, default: str = "v0") -> str:
     """Create filesystem-safe version token for folder/file names."""
     try:

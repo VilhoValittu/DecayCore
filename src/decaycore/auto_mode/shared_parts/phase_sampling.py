@@ -40,6 +40,39 @@ def _auto_phase_limit_center(value, *, default: float | None = None) -> float:
     )
     return float(_clip(d, lo, hi))
 
+def _auto_mag_c_min_center(base_data: dict | None, *, default: float = 25.0) -> float:
+    try:
+        raw = dict(base_data or {}).get(
+            "_auto_mag_c_min_hz",
+            dict(base_data or {}).get("mag_c_min", default),
+        )
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        raw = default
+    seed = _auto_safe_float(raw, float("nan"))
+    if not np.isfinite(seed):
+        seed = _auto_safe_float(default, float("nan"))
+    if not np.isfinite(seed):
+        return float("nan")
+    return float(
+        _clip(
+            seed,
+            float(AUTO_MODE_MAG_C_MIN_MIN_HZ),
+            float(AUTO_MODE_MAG_C_MIN_MAX_HZ),
+        )
+    )
+
 def _auto_phase_limit_prior_penalty(
     phase_limit_hz: float, *, filter_key: str | None
 ) -> float:
@@ -151,7 +184,7 @@ def _auto_sample_mag_low_pair(
     return float(round(mag, 1)), float(round(low, 1))
 
 
-__all__ = ['_auto_is_phase_search_filter', '_auto_phase_limit_clip', '_auto_phase_limit_center', '_auto_phase_limit_prior_penalty', '_jitter', '_auto_sample_mag_low_pair']
+__all__ = ['_auto_is_phase_search_filter', '_auto_phase_limit_clip', '_auto_phase_limit_center', '_auto_mag_c_min_center', '_auto_phase_limit_prior_penalty', '_jitter', '_auto_sample_mag_low_pair']
 
 
 def _link_sibling_exports() -> None:

@@ -59,18 +59,20 @@ sudo apt install libportaudio2
 
 ### macOS (Apple Silicon)
 
-1. Download `DecayCore_<version>_macos.7z` from Releases.
+1. Download `DecayCore_<version>_macos_arm64.7z` from Releases.
 2. Extract the archive.
-3. Open Terminal in the extracted folder and run:
+3. Double-click `Start_Decay.command` to launch DecayCore through Terminal.
+4. If macOS blocks the first launch, open `System Settings -> Privacy & Security -> Open Anyway`.
+5. If you prefer the bundle directly, you can also double-click `DecayCore_<version>.app`.
+6. If you prefer Terminal, open Terminal in the extracted folder and run:
 
 ```bash
-chmod +x DecayCore
-./DecayCore
+./Start_Decay.command
 ```
 
-4. If macOS blocks first launch, open `System Settings -> Privacy & Security -> Open Anyway`.
-5. **Built-in measurement:** Measurement has been verified to work on Windows. Linux has been verified to work at least on Ubuntu 22.04. macOS could not be tested due to unavailable test hardware. macOS users can use compatible external measurements.
-6. Open `http://127.0.0.1:8080` if the browser does not open automatically.
+7. **Built-in measurement:** Measurement has been verified to work on Windows. Linux has been verified to work at least on Ubuntu 22.04. macOS could not be tested due to unavailable test hardware. macOS users can use compatible external measurements.
+8. If macOS asks for microphone access, allow DecayCore. Measurement files are saved under `Documents/DecayCore/measurement` by default and fall back to a writable app-data location if needed.
+9. Open `http://127.0.0.1:8080` if the browser does not open automatically.
 
 ---
 

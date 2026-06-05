@@ -356,6 +356,14 @@ def _build_brand_header(*, version: str, dark_mode) -> None:
                 .tooltip("Vaihda teemaa")
             )
 
+            async def _do_quit():
+                from nicegui import app as _nicegui_app
+                _nicegui_app.shutdown()
+
+            ui.button(icon="power_settings_new", on_click=_do_quit) \
+                .props("flat dense round color=negative") \
+                .tooltip(t("quit_btn_tooltip"))
+
     ui.separator()
     # About / guide (collapsed by default)
     with ui.expansion(t("about_title")).classes("w-full"):

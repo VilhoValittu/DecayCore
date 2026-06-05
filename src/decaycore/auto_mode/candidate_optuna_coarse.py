@@ -21,6 +21,7 @@ from .shared import (
     AUTO_MODE_PHASE_LIMIT_MAX_HZ,
     AUTO_MODE_PHASE_LIMIT_MIN_HZ,
     _auto_is_phase_search_filter,
+    _auto_mag_c_min_center,
     _auto_output_tilt_bounds,
     _auto_phase_limit_center,
     _auto_safe_float,
@@ -87,13 +88,7 @@ def _suggest_auto_mode_candidate_optuna(
             f" (schroeder={_schroeder_hz:.1f} Hz)" if _schroeder_hz is not None else "",
         )
 
-    mag_c_min_seed = float(
-        np.clip(
-            _auto_safe_float(base_data.get("mag_c_min", 25.0), 25.0),
-            _mag_c_min_lo,
-            _mag_c_min_hi,
-        )
-    )
+    mag_c_min_seed = float(_auto_mag_c_min_center(base_data, default=25.0))
     low_bass_cut_seed = float(
         np.clip(
             _auto_safe_float(base_data.get("low_bass_cut_hz", 40.0), 40.0),

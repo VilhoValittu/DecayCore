@@ -73,6 +73,21 @@ def _restore_auto_excursion_seed(search_data: dict, seed_data: dict | None) -> N
     search_data["exc_freq"] = float(seed_hz)
 
 
+def _restore_auto_mag_c_min_seed(search_data: dict, seed_hz: float) -> None:
+    if not np.isfinite(seed_hz):
+        return
+    seed_hz = float(
+        np.clip(
+            float(seed_hz),
+            float(auto_api.AUTO_MODE_MAG_C_MIN_MIN_HZ),
+            float(auto_api.AUTO_MODE_MAG_C_MIN_MAX_HZ),
+        )
+    )
+    seed_hz = float(round(seed_hz, 1))
+    search_data["_auto_mag_c_min_hz"] = float(seed_hz)
+    search_data["mag_c_min"] = float(seed_hz)
+
+
 def _apply_explicit_seed(
     *,
     search_base_data: dict,
@@ -95,8 +110,13 @@ def _apply_explicit_seed(
         logger.debug("Failed to read automatic-mode prior seed preset", exc_info=True)
         prior_seed_preset = {}
     if seed_preset:
+        mag_c_min_seed_hz = auto_api._auto_safe_float(
+            search_base_data.get("_auto_mag_c_min_hz", search_base_data.get("mag_c_min", float("nan"))),
+            float("nan"),
+        )
         search_base_data.update(seed_preset)
         _restore_auto_excursion_seed(search_base_data, cache_base_data)
+        _restore_auto_mag_c_min_seed(search_base_data, mag_c_min_seed_hz)
         prior_seed_preset = dict(seed_preset)
         logger.info(
             "Automatic mode: target/cache preset seed loaded for canonical "
@@ -116,9 +136,14 @@ def _apply_seed_payload(
 ) -> bool:
     if not (isinstance(seed_preset, dict) and seed_preset):
         return False
+    mag_c_min_seed_hz = auto_api._auto_safe_float(
+        search_base_data.get("_auto_mag_c_min_hz", search_base_data.get("mag_c_min", float("nan"))),
+        float("nan"),
+    )
     search_base_data["_auto_target_seed_preset"] = dict(seed_preset)
     search_base_data.update(dict(seed_preset))
     _restore_auto_excursion_seed(search_base_data, cache_base_data)
+    _restore_auto_mag_c_min_seed(search_base_data, mag_c_min_seed_hz)
     context.prior_seed_preset = dict(seed_preset)
     if "hc_mode" in cache_base_data:
         search_base_data["hc_mode"] = cache_base_data["hc_mode"]
@@ -274,8 +299,6 @@ def _try_apply_last_used_seed(context: AutoSearchExecutionContext) -> None:
 
 
 def _apply_legacy_opportunistic_seeds(context: AutoSearchExecutionContext) -> None:
-    search_base_data = context.search_base_data
-    cache_base_data = context.cache_base_data
     _try_apply_cache_signature_seed(context)
     _try_apply_optuna_phase1_seed(context)
     _try_apply_last_used_seed(context)

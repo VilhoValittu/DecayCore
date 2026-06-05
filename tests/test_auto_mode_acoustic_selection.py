@@ -507,6 +507,58 @@ def test_mag_c_min_winner_polish_can_improve_upward():
     assert 26.0 in [float(v) for v in list(meta.get("tested_mag_c_min_hz", []) or [])]
 
 
+def test_mag_c_min_winner_polish_prefers_auto_mag_c_min_seed_center():
+    def fake_materialize_preset_result(
+        preset,
+        *,
+        include_response_arrays,
+        summarize,
+        base_data_override,
+    ):
+        _ = include_response_arrays, summarize, base_data_override
+        mag_c_min = float(dict(preset or {}).get("mag_c_min", 25.0))
+        rank_score = 80.0 - abs(mag_c_min - 20.0)
+        metrics = {
+            "rank_score": float(rank_score),
+            "avg_score": 90.0,
+        }
+        return object(), metrics, dict(preset or {})
+
+    def fake_cache_ready_preset(preset, *, best_metrics=None):
+        _ = best_metrics
+        return dict(preset or {})
+
+    def fake_auto_is_better_refine(new_metrics, best_metrics, goal, *, return_reason=False):
+        _ = goal
+        better = float(dict(new_metrics or {}).get("rank_score", 0.0)) > float(
+            dict(best_metrics or {}).get("rank_score", 0.0)
+        )
+        return (better, "rank") if return_reason else better
+
+    best_preset, best_metrics, improved, meta = apply_mag_c_min_winner_polish(
+        best_preset={"mag_c_min": 30.0},
+        best_metrics={"rank_score": 79.0, "avg_score": 90.0},
+        base_data_ref={"mag_c_min": 30.0, "_auto_mag_c_min_hz": 18.0},
+        phase_label="test",
+        goal="balanced",
+        enabled=True,
+        step_hz=2.0,
+        max_down_hz=4.0,
+        max_up_hz=4.0,
+        status_cb=None,
+        materialize_preset_result=fake_materialize_preset_result,
+        cache_ready_preset=fake_cache_ready_preset,
+        auto_is_better_refine=fake_auto_is_better_refine,
+    )
+
+    assert bool(improved) is True
+    assert float(meta.get("start_mag_c_min_hz", 0.0)) == pytest.approx(18.0, abs=1e-9)
+    assert [float(v) for v in list(meta.get("tested_mag_c_min_hz", []) or [])] == [16.0, 20.0, 22.0]
+    assert 20.0 in [float(v) for v in list(meta.get("accepted_mag_c_min_hz", []) or [])]
+    assert float(best_preset.get("mag_c_min", 0.0)) == pytest.approx(20.0, abs=1e-9)
+    assert float(best_metrics.get("rank_score", 0.0)) == pytest.approx(80.0, abs=1e-9)
+
+
 def test_mag_c_min_winner_polish_reuses_matching_candidate_metrics():
     calls = {"materialize": 0}
 

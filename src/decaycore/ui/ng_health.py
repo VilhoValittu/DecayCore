@@ -28,7 +28,7 @@ import logging
 import threading
 from typing import NamedTuple
 
-from ..application import health_service as _sh
+from ..application import toast_service as _ts
 
 logger = logging.getLogger("DecayCore")
 
@@ -91,8 +91,8 @@ def install_toast_timer() -> None:
     ui.timer(0.25, _drain_pending_toasts)
 
 
-# Patch the application health service to use the queued notify backend.
-_sh._get_toast_callable = _ng_toast_callable  # type: ignore[attr-defined]
+# Patch the toast service to use the queued notify backend.
+_ts.set_toast_callable(_ng_toast_callable())
 
 from ..application.health_service import (  # noqa: E402
     HealthResult,
@@ -100,6 +100,9 @@ from ..application.health_service import (  # noqa: E402
     Level,
     compute_health,
     format_health_summary,
+)
+
+from ..application.toast_service import (  # noqa: E402
     show_toast,
     toast_afdw_preset_applied,
     toast_health_gate_result,

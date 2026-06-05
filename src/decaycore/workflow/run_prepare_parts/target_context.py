@@ -18,18 +18,13 @@ from datetime import datetime
 
 import numpy as np
 
-from ...application.health_service import compute_health
 from ...application.house_curve_service import load_house_curve
-from ...application.run_request import RunRequest
 from ...application.run_contracts import (
-    PreparedRunInput,
     ResolvedRunConfig,
-    copy_resolved_data,
     copy_source_ui_data,
 )
 from ...common.result_postprocess import _irwin_tag
 from ...config.legacy_keys import is_auto_mode
-from ...config.decaycore_config import save_config
 from ...config.decaycore_pipeline import (
     build_xos_hpf,
     choose_dash_fs,
@@ -38,23 +33,391 @@ from ...config.decaycore_pipeline import (
     filter_type_short,
     log_df_smoothing_toggle,
 )
-from ...io.generated_measurement_source import generated_source_matches_upload, parse_generated_source
-from ...io.measurements_loader import (
-    _try_load_harmonic_sidecar,
-    _try_load_rt60_sidecar,
-    load_bass_integration_measurements,
-    load_measurements_lr,
-    load_raw_irs_lr,
-    load_raw_ir_sub,
-)
 from ...io.measurements_txt import parse_measurements_from_path
-from ...resources.i8n.decaycore_i18n import t
 from ..bridge_types import ProcessRunCallbacks
 
 if typing.TYPE_CHECKING:
     from ..process_run_flow import ProcessRunSupport
 
 logger = logging.getLogger("DecayCore")
+
+
+def _safe_float(value: object, default: float, *, positive: bool = False) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return float(default)
+    if not math.isfinite(parsed):
+        return float(default)
+    if positive and parsed <= 0.0:
+        return float(default)
+    return parsed
+
+
+def _safe_float_from_dict(data: dict, key: str, default: float, *, positive: bool = False) -> float:
+    return _safe_float(data.get(key, default), default, positive=positive)
+
+
+def _safe_log_info(active_logger: logging.Logger | None, msg: str, *args) -> None:
+    try:
+        if active_logger is not None and hasattr(active_logger, "info"):
+            active_logger.info(msg, *args)
+    except Exception:
+        pass
+
+
+def _build_bi_alignment_recommendation(bi_unified: dict) -> dict:
+    return {
+        "applied": bool(bi_unified.get("applied", False)),
+        "sub_delay_ms": _safe_float(bi_unified.get("sub_delay_ms", 0.0), 0.0),
+        "sub_polarity_invert": bool(bi_unified.get("sub_polarity_invert", False)),
+        "sub_gain_trim_db": _safe_float(bi_unified.get("sub_gain_trim_db", 0.0), 0.0),
+        "reason": str(bi_unified.get("reason", "") or ""),
+        "improvement_score": _safe_float(bi_unified.get("improvement_score", 0.0), 0.0),
+        "baseline": dict(bi_unified.get("baseline", {}) or {}),
+        "optimized": dict(bi_unified.get("optimized", {}) or {}),
+    }
+
+
+def _build_bi_allpass_recommendation(bi_unified: dict) -> dict:
+    return {
+        "enabled": bool(bi_unified.get("allpass_enabled", False)),
+        "freq_hz": _safe_float(bi_unified.get("allpass_freq_hz", 0.0), 0.0),
+        "q": _safe_float(bi_unified.get("allpass_q", 0.707), 0.707, positive=True),
+        "improvement_score": 0.0,
+        "reason": str(bi_unified.get("allpass_reason", "") or ""),
+        "baseline": {},
+        "optimized": {},
+    }
+
+
+def _log_house_curve_info(hc_f, hc_m) -> None:
+    try:
+        if hc_f is None or hc_m is None or len(hc_f) == 0 or len(hc_m) == 0:
+            return
+        _safe_log_info(
+            logger,
+            "HC: n=%s f=[%.2f..%.2f] m=[%.2f..%.2f] mean=%.2f",
+            len(hc_f),
+            float(hc_f[0]),
+            float(hc_f[-1]),
+            float(np.min(hc_m)),
+            float(np.max(hc_m)),
+            float(np.mean(hc_m)),
+        )
+    except (TypeError, ValueError, IndexError):
+        pass
+
+
+def _log_xo_hpf_info(xos, hpf) -> None:
+    try:
+        if xos:
+            xo_txt = ", ".join(
+                [
+                    f"{float(x.get('freq')):.1f}Hz/{int(x.get('slope', int(x.get('order', 1)) * 6))}dB/oct"
+                    for x in xos
+                ]
+            )
+            _safe_log_info(logger, "XO (UI->CFG): %s", xo_txt)
+        else:
+            _safe_log_info(logger, "XO (UI->CFG): off")
+        if isinstance(hpf, dict) and hpf.get("enabled"):
+            hf = _safe_float(hpf.get("freq", 0.0), 0.0)
+            ho = int(hpf.get("order", 0) or 0)
+            _safe_log_info(logger, "HPF (UI->CFG): %.1fHz/%sdB/oct", hf, int(ho * 6))
+        else:
+            _safe_log_info(logger, "HPF (UI->CFG): off")
+    except (TypeError, ValueError, KeyError, IndexError):
+        pass
+
+
+def _prepare_house_curve_context(data: dict, support: "ProcessRunSupport") -> tuple[object, object, str, str]:
+    hc_f, hc_m, hc_source = load_house_curve(
+        data,
+        parse_measurements_from_path=parse_measurements_from_path,
+    )
+    data["hc_source"] = hc_source
+    target_curve_name = support.pick_target_curve_label(data)
+    target_curve_tag = support.slugify_filename_token(target_curve_name, default="target")
+    data["target_curve_name"] = target_curve_name
+    data["target_curve_tag"] = target_curve_tag
+    _safe_log_info(logger, "House curve source: %s", hc_source)
+    _safe_log_info(
+        logger,
+        "Export target curve tag: %s (from %r)",
+        target_curve_tag,
+        target_curve_name,
+    )
+    return hc_f, hc_m, hc_source, target_curve_tag
+
+
+def _prepare_bass_integration_state(
+    *,
+    ctx: dict,
+    data: dict,
+    callbacks: "ProcessRunCallbacks | None",
+) -> dict:
+    state = {
+        "bi_recommended_xo_hz": None,
+        "bi_recommended_sub_lpf_hz": None,
+        "bi_rec_xo_l": None,
+        "bi_rec_xo_r": None,
+        "bi_selected_diagnostics": {},
+        "bi_alignment_recommendation": {},
+        "bi_allpass_recommendation": {},
+    }
+    if bool(data.get("bass_integration_enable", False)):
+        state.update(
+            _prepare_target_curve_bass_integration_context(
+                ctx=ctx,
+                data=data,
+                callbacks=callbacks,
+            )
+        )
+    return state
+
+
+def _prepare_xo_hpf(data: dict) -> tuple[object, object]:
+    xos, hpf = build_xos_hpf(data)
+    _log_xo_hpf_info(xos, hpf)
+    log_df_smoothing_toggle(data, logger)
+    return xos, hpf
+
+
+def _prepare_export_parameters(data: dict, support: "ProcessRunSupport") -> dict:
+    target_rates = choose_target_rates(data)
+    multi_rate_on = bool(data.get("multi_rate_opt"))
+    dash_fs = choose_dash_fs(
+        target_rates,
+        multi_rate_on=multi_rate_on,
+        forced_plot_fs_hz=int(support.force_single_plot_fs_hz),
+    )
+    mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
+    auto_mode_enabled = is_auto_mode(data, mode_u)
+    ts = datetime.now().strftime("%d%m%y_%H%M")
+    file_ts = datetime.now().strftime("%H%M_%d%m%y")
+    ft_short = filter_type_short(data["filter_type"])
+    _safe_log_info(
+        logger,
+        "EXPORT IR (UI): shape=%s, alpha=%s",
+        data.get("ir_export_window_shape"),
+        data.get("ir_export_tukey_alpha"),
+    )
+
+    val_raw = data.get("ir_export_window_mode", None)
+    if not isinstance(val_raw, str) or val_raw.strip() == "":
+        val_raw = data.get("ir_window_mode", "auto")
+    irw_mode = str(val_raw or "auto").strip().lower()
+    if irw_mode not in ("auto", "off", "rew_sym", "rew_asym"):
+        irw_mode = "auto"
+    data["ir_export_window_mode"] = irw_mode
+    return {
+        "target_rates": target_rates,
+        "dash_fs": dash_fs,
+        "auto_mode_enabled": auto_mode_enabled,
+        "zip_dashboards_on": False,
+        "ts": ts,
+        "file_ts": file_ts,
+        "ft_short": ft_short,
+        "irw_tag": _irwin_tag(irw_mode),
+    }
+
+
+def _build_bass_integration_metadata_unified(
+    *,
+    data: dict,
+    bi_state: dict,
+    bundle_diagnostics: dict,
+) -> tuple[dict, dict]:
+    alignment = {
+        "applied": bool(data.get("bass_integration_alignment_auto_applied", False)),
+        "delay_ms": _safe_float_from_dict(data, "bass_integration_sub_delay_ms", 0.0),
+        "polarity_invert": bool(data.get("bass_integration_sub_polarity_invert", False)),
+        "gain_trim_db": _safe_float_from_dict(data, "bass_integration_sub_gain_trim_db", 0.0),
+        "reason": str(data.get("bass_integration_alignment_reason", "") or ""),
+        "improvement_score": _safe_float(
+            bi_state["bi_alignment_recommendation"].get("improvement_score", 0.0),
+            0.0,
+        ),
+        "baseline_metrics": dict(bi_state["bi_alignment_recommendation"].get("baseline", {}) or {}),
+        "optimized_metrics": dict(bi_state["bi_alignment_recommendation"].get("optimized", {}) or {}),
+    }
+    recommended_allpass = {
+        "enabled": bool(data.get("bass_integration_allpass_auto_applied", False)),
+        "freq_hz": _safe_float_from_dict(data, "bass_integration_allpass_freq_hz", 0.0),
+        "q": _safe_float_from_dict(data, "bass_integration_allpass_q", 0.707, positive=True),
+        "improvement_score": _safe_float(
+            bi_state["bi_allpass_recommendation"].get("improvement_score", 0.0),
+            0.0,
+        ),
+        "reason": str(data.get("bass_integration_allpass_reason", "") or ""),
+    }
+    direct_dac_sub_lpf_hz = _safe_float_from_dict(
+        data,
+        "direct_dac_sub_lpf_hz",
+        _safe_float_from_dict(data, "sub_crossover_hz", 80.0, positive=True),
+        positive=True,
+    )
+    meta_dict = {
+        "enabled": True,
+        "mode": "direct_dac",
+        "profile": str(data.get("bass_integration_profile", "safe") or "safe"),
+        "sub_combine_mode": str(
+            bundle_diagnostics.get(
+                "sub_combine_mode",
+                data.get("bass_integration_sub_combine_mode", "average"),
+            )
+            or "average"
+        ),
+        "avr_crossover_hz": _safe_float_from_dict(data, "avr_crossover_hz", 80.0, positive=True),
+        "direct_dac_sub_lpf_hz": direct_dac_sub_lpf_hz,
+        "inputs": {
+            "l_main": str(data.get("local_path_l_main", "") or "")
+            or str(dict(data.get("file_l_main", {}) or {}).get("filename", "") or ""),
+            "r_main": str(data.get("local_path_r_main", "") or "")
+            or str(dict(data.get("file_r_main", {}) or {}).get("filename", "") or ""),
+            "l_sub": str(data.get("local_path_l_sub", "") or "")
+            or str(dict(data.get("file_l_sub", {}) or {}).get("filename", "") or ""),
+            "r_sub": str(data.get("local_path_r_sub", "") or "")
+            or str(dict(data.get("file_r_sub", {}) or {}).get("filename", "") or ""),
+        },
+        "diagnostics": {
+            **bundle_diagnostics,
+            **dict(bi_state["bi_selected_diagnostics"] or {}),
+        },
+        "recommended_crossover_hz": bi_state["bi_recommended_xo_hz"],
+        "recommended_sub_lpf_hz": bi_state["bi_recommended_sub_lpf_hz"],
+        "recommended_crossover_hz_l": bi_state["bi_rec_xo_l"],
+        "recommended_crossover_hz_r": bi_state["bi_rec_xo_r"],
+        "sub_crossover_manual_override": bool(data.get("sub_crossover_manual_override", False)),
+        "alignment": alignment,
+        "recommended_allpass": recommended_allpass,
+        "allpass_baseline_metrics": dict(bi_state["bi_allpass_recommendation"].get("baseline", {}) or {}),
+        "allpass_optimized_metrics": dict(bi_state["bi_allpass_recommendation"].get("optimized", {}) or {}),
+    }
+    measurements_updates = {
+        "bass_integration_enabled": True,
+        "bass_integration_mode": "direct_dac",
+        "bass_integration_sub_combine_mode": meta_dict["sub_combine_mode"],
+        "avr_crossover_hz": meta_dict["avr_crossover_hz"],
+        "bass_integration_profile": meta_dict["profile"],
+        "direct_dac_sub_lpf_hz": meta_dict["direct_dac_sub_lpf_hz"],
+        "bass_integration_sub_delay_ms": alignment["delay_ms"],
+        "bass_integration_sub_polarity_invert": alignment["polarity_invert"],
+        "bass_integration_sub_gain_trim_db": alignment["gain_trim_db"],
+        "bass_integration_alignment_auto_applied": alignment["applied"],
+        "bass_integration_allpass_auto_enable": bool(data.get("bass_integration_allpass_auto_enable", False)),
+        "bass_integration_allpass_auto_applied": recommended_allpass["enabled"],
+        "bass_integration_allpass_freq_hz": recommended_allpass["freq_hz"],
+        "bass_integration_allpass_q": recommended_allpass["q"],
+    }
+    return meta_dict, measurements_updates
+
+
+def _build_measurements_dict(
+    *,
+    ctx: dict,
+    data: dict,
+    hc_f,
+    hc_m,
+    bi_state: dict,
+) -> dict:
+    is_wav_source = detect_is_wav_source(data)
+    data["_is_wav_source"] = bool(is_wav_source)
+    measurements = {
+        "f_l": np.asarray(ctx["f_l"], dtype=float),
+        "m_l": np.asarray(ctx["m_l"], dtype=float),
+        "p_l": np.asarray(ctx["p_l"], dtype=float),
+        "f_r": np.asarray(ctx["f_r"], dtype=float),
+        "m_r": np.asarray(ctx["m_r"], dtype=float),
+        "p_r": np.asarray(ctx["p_r"], dtype=float),
+        "hc_f": hc_f,
+        "hc_m": hc_m,
+        "ui_data": data,
+        "is_wav_source": bool(is_wav_source),
+        "raw_ir_l": ctx.get("raw_ir_l"),
+        "raw_ir_fs_l": ctx.get("raw_ir_fs_l", 0),
+        "raw_ir_r": ctx.get("raw_ir_r"),
+        "raw_ir_fs_r": ctx.get("raw_ir_fs_r", 0),
+        "raw_ir_sub": ctx.get("raw_ir_sub"),
+        "raw_ir_fs_sub": ctx.get("raw_ir_fs_sub", 0),
+        "measured_rt60_l": ctx.get("measured_rt60_l"),
+        "measured_rt60_bands_l": ctx.get("measured_rt60_bands_l"),
+        "measured_rt60_r": ctx.get("measured_rt60_r"),
+        "measured_rt60_bands_r": ctx.get("measured_rt60_bands_r"),
+        "harmonic_freq_hz_l": ctx.get("harmonic_freq_hz_l"),
+        "harmonic_magnitudes_db_l": ctx.get("harmonic_magnitudes_db_l"),
+        "harmonic_freq_hz_r": ctx.get("harmonic_freq_hz_r"),
+        "harmonic_magnitudes_db_r": ctx.get("harmonic_magnitudes_db_r"),
+    }
+    if bool(data.get("bass_integration_enable", False)):
+        bundle = ctx.get("bass_integration_bundle", None)
+        bundle_diagnostics = dict(getattr(bundle, "diagnostics", {}) or {})
+        meta_dict, measurements_updates = _build_bass_integration_metadata_unified(
+            data=data,
+            bi_state=bi_state,
+            bundle_diagnostics=bundle_diagnostics,
+        )
+        data["_bass_integration_meta"] = meta_dict
+        measurements["bass_integration_bundle"] = bundle
+        measurements.update(measurements_updates)
+    return measurements
+
+
+def _finalize_target_context(
+    *,
+    ctx: dict,
+    data: dict,
+    hc_f,
+    hc_m,
+    xos,
+    hpf,
+    target_curve_tag: str,
+    export_state: dict,
+    measurements: dict,
+) -> None:
+    resolved_config = ResolvedRunConfig(
+        source_ui_data=copy_source_ui_data(ctx.get("source_ui_data", {})),
+        resolved_data=data,
+        measurements=measurements,
+        hc_f=hc_f,
+        hc_m=hc_m,
+        xos=list(xos or []),
+        hpf=dict(hpf or {}) if isinstance(hpf, dict) else hpf,
+        target_rates=list(export_state["target_rates"] or []),
+        dash_fs=int(export_state["dash_fs"]),
+        target_curve_tag=str(target_curve_tag),
+    )
+
+    ctx.update(
+        {
+            "hc_f": hc_f,
+            "hc_m": hc_m,
+            "xos": xos,
+            "hpf": hpf,
+            "target_curve_tag": target_curve_tag,
+            "target_rates": export_state["target_rates"],
+            "dash_fs": export_state["dash_fs"],
+            "auto_mode_enabled": export_state["auto_mode_enabled"],
+            "zip_dashboards_on": export_state["zip_dashboards_on"],
+            "ts": export_state["ts"],
+            "file_ts": export_state["file_ts"],
+            "ft_short": export_state["ft_short"],
+            "irw_tag": export_state["irw_tag"],
+            "measurements": measurements,
+            "resolved_config": resolved_config,
+            "results_by_fs": [],
+            "l_st_f": None,
+            "r_st_f": None,
+            "sub_ir_f": None,
+            "sub_st_f": None,
+            "sub_meas_f": {},
+            "l_imp_f": None,
+            "r_imp_f": None,
+            "ui_dashboards": {},
+        }
+    )
+
 
 def _prepare_target_curve_bass_integration_context(
     *,
@@ -90,8 +453,15 @@ def _prepare_target_curve_bass_integration_context(
         "sub_delay_ms": 0.0,
         "sub_polarity_invert": False,
         "sub_gain_trim_db": 0.0,
-        "recommended_hz": float(data.get("avr_crossover_hz", 80.0) or 80.0),
-        "recommended_sub_lpf_hz": float(data.get("direct_dac_sub_lpf_hz", data.get("avr_crossover_hz", 80.0)) or data.get("avr_crossover_hz", 80.0) or 80.0),
+        "recommended_hz": _safe_float_from_dict(data, "avr_crossover_hz", 80.0, positive=True),
+        "recommended_sub_lpf_hz": _safe_float(
+            data.get(
+                "direct_dac_sub_lpf_hz",
+                _safe_float_from_dict(data, "avr_crossover_hz", 80.0, positive=True),
+            ),
+            _safe_float_from_dict(data, "avr_crossover_hz", 80.0, positive=True),
+            positive=True,
+        ),
         "baseline": {},
         "optimized": {},
         "improvement_score": 0.0,
@@ -101,20 +471,17 @@ def _prepare_target_curve_bass_integration_context(
         "allpass_q": 0.707,
         "allpass_reason": "Direct DAC rewrite uses polarity/delay/gain only.",
     }
-    bi_alignment_recommendation = {
-        "applied": bool(_bi_unified.get("applied", False)),
-        "sub_delay_ms": float(_bi_unified.get("sub_delay_ms", 0.0) or 0.0),
-        "sub_polarity_invert": bool(_bi_unified.get("sub_polarity_invert", False)),
-        "sub_gain_trim_db": float(_bi_unified.get("sub_gain_trim_db", 0.0) or 0.0),
-        "reason": str(_bi_unified.get("reason", "") or ""),
-        "improvement_score": float(_bi_unified.get("improvement_score", 0.0) or 0.0),
-        "baseline": dict(_bi_unified.get("baseline", {}) or {}),
-        "optimized": dict(_bi_unified.get("optimized", {}) or {}),
-    }
+    bi_alignment_recommendation = _build_bi_alignment_recommendation(_bi_unified)
     data["bass_integration_alignment_auto_applied"] = bool(bi_alignment_recommendation["applied"])
-    data["bass_integration_sub_delay_ms"] = float(bi_alignment_recommendation["sub_delay_ms"])
+    data["bass_integration_sub_delay_ms"] = _safe_float(
+        bi_alignment_recommendation["sub_delay_ms"],
+        0.0,
+    )
     data["bass_integration_sub_polarity_invert"] = bool(bi_alignment_recommendation["sub_polarity_invert"])
-    data["bass_integration_sub_gain_trim_db"] = float(bi_alignment_recommendation["sub_gain_trim_db"])
+    data["bass_integration_sub_gain_trim_db"] = _safe_float(
+        bi_alignment_recommendation["sub_gain_trim_db"],
+        0.0,
+    )
     data["bass_integration_alignment_reason"] = bi_alignment_recommendation["reason"]
     logger.info(
         "Bass Integration Direct-DAC alignment %s: delay %.2f ms, polarity %s, gain %+0.2f dB",
@@ -144,53 +511,22 @@ def _prepare_target_curve_bass_integration_context(
                 "Bass Integration Direct-DAC auto XO selected: "
                 f"{float(bi_recommended_xo_hz):.1f} Hz"
             )
-    try:
-        _current_main_hpf = float(data.get("sub_crossover_hz", 80.0) or 80.0)
-    except (
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        _current_main_hpf = 80.0
-    if not math.isfinite(_current_main_hpf) or _current_main_hpf <= 0.0:
-        _current_main_hpf = 80.0
-    try:
-        _current_sub_lpf = float(data.get("direct_dac_sub_lpf_hz", _current_main_hpf) or _current_main_hpf)
-    except (
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        _current_sub_lpf = _current_main_hpf
-    if not math.isfinite(_current_sub_lpf) or _current_sub_lpf <= 0.0:
-        _current_sub_lpf = _current_main_hpf
+    _current_main_hpf = _safe_float_from_dict(data, "sub_crossover_hz", 80.0, positive=True)
+    _current_sub_lpf = _safe_float_from_dict(
+        data,
+        "direct_dac_sub_lpf_hz",
+        _current_main_hpf,
+        positive=True,
+    )
     data["direct_dac_sub_lpf_hz"] = float(max(_current_main_hpf + 20.0, _current_sub_lpf))
-    bi_allpass_recommendation = {
-        "enabled": bool(_bi_unified.get("allpass_enabled", False)),
-        "freq_hz": float(_bi_unified.get("allpass_freq_hz", 0.0) or 0.0),
-        "q": float(_bi_unified.get("allpass_q", 0.707) or 0.707),
-        "improvement_score": 0.0,
-        "reason": str(_bi_unified.get("allpass_reason", "") or ""),
-        "baseline": {},
-        "optimized": {},
-    }
+    bi_allpass_recommendation = _build_bi_allpass_recommendation(_bi_unified)
     data["bass_integration_allpass_auto_applied"] = bool(bi_allpass_recommendation["enabled"])
-    data["bass_integration_allpass_freq_hz"] = float(bi_allpass_recommendation["freq_hz"])
-    data["bass_integration_allpass_q"] = float(bi_allpass_recommendation["q"])
+    data["bass_integration_allpass_freq_hz"] = _safe_float(bi_allpass_recommendation["freq_hz"], 0.0)
+    data["bass_integration_allpass_q"] = _safe_float(
+        bi_allpass_recommendation["q"],
+        0.707,
+        positive=True,
+    )
     data["bass_integration_allpass_reason"] = bi_allpass_recommendation["reason"]
     if bool(data.get("bass_integration_allpass_auto_applied", False)):
         logger.info(
@@ -284,300 +620,32 @@ def _prepare_target_curve_and_run_context(
     data = ctx.get("resolved_data", ctx["data"])
     ctx["resolved_data"] = data
     ctx["data"] = data
-    taps_base = int(ctx["taps_base"])
-    f_l = ctx["f_l"]
-    m_l = ctx["m_l"]
-    p_l = ctx["p_l"]
-    f_r = ctx["f_r"]
-    m_r = ctx["m_r"]
-    p_r = ctx["p_r"]
-    _harmonic_freq_hz_l = ctx.get("harmonic_freq_hz_l")
-    _harmonic_mags_l = ctx.get("harmonic_magnitudes_db_l")
-    _harmonic_freq_hz_r = ctx.get("harmonic_freq_hz_r")
-    _harmonic_mags_r = ctx.get("harmonic_magnitudes_db_r")
-
-    hc_f, hc_m, hc_source = load_house_curve(
-        data,
-        parse_measurements_from_path=parse_measurements_from_path,
+    hc_f, hc_m, _hc_source, target_curve_tag = _prepare_house_curve_context(data, support)
+    bi_state = _prepare_bass_integration_state(
+        ctx=ctx,
+        data=data,
+        callbacks=callbacks,
     )
-    data["hc_source"] = hc_source
-    target_curve_name = support.pick_target_curve_label(data)
-    target_curve_tag = support.slugify_filename_token(target_curve_name, default="target")
-    data["target_curve_name"] = target_curve_name
-    data["target_curve_tag"] = target_curve_tag
-    logger.info(f"House curve source: {hc_source}")
-    logger.info(f"Export target curve tag: {target_curve_tag} (from '{target_curve_name}')")
-
-    bi_recommended_xo_hz = None
-    bi_recommended_sub_lpf_hz = None
-    bi_rec_xo_l = None
-    bi_rec_xo_r = None
-    bi_selected_diagnostics = {}
-    bi_alignment_recommendation = {}
-    bi_allpass_recommendation = {}
-    if bool(data.get("bass_integration_enable", False)):
-        bi_state = _prepare_target_curve_bass_integration_context(
-            ctx=ctx,
-            data=data,
-            callbacks=callbacks,
-        )
-        bi_recommended_xo_hz = bi_state["bi_recommended_xo_hz"]
-        bi_recommended_sub_lpf_hz = bi_state["bi_recommended_sub_lpf_hz"]
-        bi_rec_xo_l = bi_state["bi_rec_xo_l"]
-        bi_rec_xo_r = bi_state["bi_rec_xo_r"]
-        bi_selected_diagnostics = bi_state["bi_selected_diagnostics"]
-        bi_alignment_recommendation = bi_state["bi_alignment_recommendation"]
-        bi_allpass_recommendation = bi_state["bi_allpass_recommendation"]
-
-    try:
-        if hc_f is not None and hc_m is not None:
-            logger.info(
-                f"HC: n={len(hc_f)} f=[{hc_f[0]:.2f}..{hc_f[-1]:.2f}] "
-                f"m=[{float(np.min(hc_m)):.2f}..{float(np.max(hc_m)):.2f}] mean={float(np.mean(hc_m)):.2f}"
-            )
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        logger.exception("house curve info log")
-    xos, hpf = build_xos_hpf(data)
-    try:
-        if xos:
-            xo_txt = ", ".join(
-                [
-                    f"{float(x.get('freq')):.1f}Hz/{int(x.get('slope', int(x.get('order', 1)) * 6))}dB/oct"
-                    for x in xos
-                ]
-            )
-            logger.info(f"XO (UI->CFG): {xo_txt}")
-        else:
-            logger.info("XO (UI->CFG): off")
-        if isinstance(hpf, dict) and hpf.get("enabled"):
-            hf = float(hpf.get("freq", 0.0) or 0.0)
-            ho = int(hpf.get("order", 0) or 0)
-            logger.info(f"HPF (UI->CFG): {hf:.1f}Hz/{int(ho * 6)}dB/oct")
-        else:
-            logger.info("HPF (UI->CFG): off")
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        logger.exception("XO/HPF info log")
-    log_df_smoothing_toggle(data, logger)
-
-    target_rates = choose_target_rates(data)
-    multi_rate_on = bool(data.get("multi_rate_opt"))
-    dash_fs = choose_dash_fs(
-        target_rates,
-        multi_rate_on=multi_rate_on,
-        forced_plot_fs_hz=int(support.force_single_plot_fs_hz),
-    )
-    mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
-    auto_mode_enabled = is_auto_mode(data, mode_u)
-    zip_dashboards_on = False
-
-    ts = datetime.now().strftime("%d%m%y_%H%M")
-    file_ts = datetime.now().strftime("%H%M_%d%m%y")
-    ft_short = filter_type_short(data["filter_type"])
-    logger.info(
-        f"EXPORT IR (UI): shape={data.get('ir_export_window_shape')}, "
-        f"alpha={data.get('ir_export_tukey_alpha')}"
-    )
-
-    val_raw = data.get("ir_export_window_mode", None)
-    if not isinstance(val_raw, str) or val_raw.strip() == "":
-        val_raw = data.get("ir_window_mode", "auto")
-    irw_mode = str(val_raw or "auto").strip().lower()
-    if irw_mode not in ("auto", "off", "rew_sym", "rew_asym"):
-        irw_mode = "auto"
-    data["ir_export_window_mode"] = irw_mode
-    irw_tag = _irwin_tag(irw_mode)
-
-    is_wav_source = detect_is_wav_source(data)
-    data["_is_wav_source"] = bool(is_wav_source)
-
-    measurements = {
-        "f_l": np.asarray(f_l, dtype=float),
-        "m_l": np.asarray(m_l, dtype=float),
-        "p_l": np.asarray(p_l, dtype=float),
-        "f_r": np.asarray(f_r, dtype=float),
-        "m_r": np.asarray(m_r, dtype=float),
-        "p_r": np.asarray(p_r, dtype=float),
-        "hc_f": hc_f,
-        "hc_m": hc_m,
-        "ui_data": data,
-        "is_wav_source": bool(is_wav_source),
-        "raw_ir_l": ctx.get("raw_ir_l"),
-        "raw_ir_fs_l": ctx.get("raw_ir_fs_l", 0),
-        "raw_ir_r": ctx.get("raw_ir_r"),
-        "raw_ir_fs_r": ctx.get("raw_ir_fs_r", 0),
-        "raw_ir_sub": ctx.get("raw_ir_sub"),
-        "raw_ir_fs_sub": ctx.get("raw_ir_fs_sub", 0),
-        "measured_rt60_l": ctx.get("measured_rt60_l"),
-        "measured_rt60_bands_l": ctx.get("measured_rt60_bands_l"),
-        "measured_rt60_r": ctx.get("measured_rt60_r"),
-        "measured_rt60_bands_r": ctx.get("measured_rt60_bands_r"),
-        "harmonic_freq_hz_l": _harmonic_freq_hz_l,
-        "harmonic_magnitudes_db_l": _harmonic_mags_l,
-        "harmonic_freq_hz_r": _harmonic_freq_hz_r,
-        "harmonic_magnitudes_db_r": _harmonic_mags_r,
-    }
-    if bool(data.get("bass_integration_enable", False)):
-        bundle = ctx.get("bass_integration_bundle", None)
-        bundle_diagnostics = dict(getattr(bundle, "diagnostics", {}) or {})
-        data["_bass_integration_meta"] = {
-            "enabled": True,
-            "mode": "direct_dac",
-            "profile": str(data.get("bass_integration_profile", "safe") or "safe"),
-            "sub_combine_mode": str(
-                bundle_diagnostics.get(
-                    "sub_combine_mode",
-                    data.get("bass_integration_sub_combine_mode", "average"),
-                )
-                or "average"
-            ),
-            "avr_crossover_hz": float(data.get("avr_crossover_hz", 80.0) or 80.0),
-            "direct_dac_sub_lpf_hz": float(
-                data.get(
-                    "direct_dac_sub_lpf_hz",
-                    data.get("sub_crossover_hz", 80.0),
-                )
-                or data.get("sub_crossover_hz", 80.0)
-                or 80.0
-            ),
-            "inputs": {
-                "l_main": str(data.get("local_path_l_main", "") or "") or str(dict(data.get("file_l_main", {}) or {}).get("filename", "") or ""),
-                "r_main": str(data.get("local_path_r_main", "") or "") or str(dict(data.get("file_r_main", {}) or {}).get("filename", "") or ""),
-                "l_sub": str(data.get("local_path_l_sub", "") or "") or str(dict(data.get("file_l_sub", {}) or {}).get("filename", "") or ""),
-                "r_sub": str(data.get("local_path_r_sub", "") or "") or str(dict(data.get("file_r_sub", {}) or {}).get("filename", "") or ""),
-            },
-            "diagnostics": {**bundle_diagnostics, **dict(bi_selected_diagnostics or {})},
-            "recommended_crossover_hz": bi_recommended_xo_hz,
-            "recommended_sub_lpf_hz": bi_recommended_sub_lpf_hz,
-            "recommended_crossover_hz_l": bi_rec_xo_l,
-            "recommended_crossover_hz_r": bi_rec_xo_r,
-            "sub_crossover_manual_override": bool(data.get("sub_crossover_manual_override", False)),
-            "alignment": {
-                "applied": bool(data.get("bass_integration_alignment_auto_applied", False)),
-                "delay_ms": float(data.get("bass_integration_sub_delay_ms", 0.0) or 0.0),
-                "polarity_invert": bool(data.get("bass_integration_sub_polarity_invert", False)),
-                "gain_trim_db": float(data.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0),
-                "reason": str(data.get("bass_integration_alignment_reason", "") or ""),
-                "improvement_score": float(bi_alignment_recommendation.get("improvement_score", 0.0) or 0.0),
-                "baseline_metrics": dict(bi_alignment_recommendation.get("baseline", {}) or {}),
-                "optimized_metrics": dict(bi_alignment_recommendation.get("optimized", {}) or {}),
-            },
-            "recommended_allpass": {
-                "enabled": bool(data.get("bass_integration_allpass_auto_applied", False)),
-                "freq_hz": float(data.get("bass_integration_allpass_freq_hz", 0.0) or 0.0),
-                "q": float(data.get("bass_integration_allpass_q", 0.707) or 0.707),
-                "improvement_score": float(bi_allpass_recommendation.get("improvement_score", 0.0) or 0.0),
-                "reason": str(data.get("bass_integration_allpass_reason", "") or ""),
-            },
-            "allpass_baseline_metrics": dict(bi_allpass_recommendation.get("baseline", {}) or {}),
-            "allpass_optimized_metrics": dict(bi_allpass_recommendation.get("optimized", {}) or {}),
-        }
-        measurements["bass_integration_enabled"] = True
-        measurements["bass_integration_bundle"] = bundle
-        measurements["bass_integration_mode"] = "direct_dac"
-        measurements["bass_integration_sub_combine_mode"] = str(
-            data.get("bass_integration_sub_combine_mode", "average") or "average"
-        )
-        measurements["avr_crossover_hz"] = float(data.get("avr_crossover_hz", 80.0) or 80.0)
-        measurements["bass_integration_profile"] = str(
-            data.get("bass_integration_profile", "safe") or "safe"
-        )
-        measurements["direct_dac_sub_lpf_hz"] = float(
-            data.get(
-                "direct_dac_sub_lpf_hz",
-                data.get("sub_crossover_hz", 80.0),
-            )
-            or data.get("sub_crossover_hz", 80.0)
-            or 80.0
-        )
-        measurements["bass_integration_sub_delay_ms"] = float(
-            data.get("bass_integration_sub_delay_ms", 0.0) or 0.0
-        )
-        measurements["bass_integration_sub_polarity_invert"] = bool(
-            data.get("bass_integration_sub_polarity_invert", False)
-        )
-        measurements["bass_integration_sub_gain_trim_db"] = float(
-            data.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0
-        )
-        measurements["bass_integration_alignment_auto_applied"] = bool(
-            data.get("bass_integration_alignment_auto_applied", False)
-        )
-        measurements["bass_integration_allpass_auto_enable"] = bool(
-            data.get("bass_integration_allpass_auto_enable", False)
-        )
-        measurements["bass_integration_allpass_auto_applied"] = bool(
-            data.get("bass_integration_allpass_auto_applied", False)
-        )
-        measurements["bass_integration_allpass_freq_hz"] = float(
-            data.get("bass_integration_allpass_freq_hz", 0.0) or 0.0
-        )
-        measurements["bass_integration_allpass_q"] = float(
-            data.get("bass_integration_allpass_q", 0.707) or 0.707
-        )
-
-    resolved_config = ResolvedRunConfig(
-        source_ui_data=copy_source_ui_data(ctx.get("source_ui_data", {})),
-        resolved_data=data,
-        measurements=measurements,
+    _log_house_curve_info(hc_f, hc_m)
+    xos, hpf = _prepare_xo_hpf(data)
+    export_state = _prepare_export_parameters(data, support)
+    measurements = _build_measurements_dict(
+        ctx=ctx,
+        data=data,
         hc_f=hc_f,
         hc_m=hc_m,
-        xos=list(xos or []),
-        hpf=dict(hpf or {}) if isinstance(hpf, dict) else hpf,
-        target_rates=list(target_rates or []),
-        dash_fs=int(dash_fs),
-        target_curve_tag=str(target_curve_tag),
+        bi_state=bi_state,
     )
-
-    ctx.update(
-        {
-            "hc_f": hc_f,
-            "hc_m": hc_m,
-            "xos": xos,
-            "hpf": hpf,
-            "target_curve_tag": target_curve_tag,
-            "target_rates": target_rates,
-            "dash_fs": dash_fs,
-            "auto_mode_enabled": auto_mode_enabled,
-            "zip_dashboards_on": zip_dashboards_on,
-            "ts": ts,
-            "file_ts": file_ts,
-            "ft_short": ft_short,
-            "irw_tag": irw_tag,
-            "measurements": measurements,
-            "resolved_config": resolved_config,
-            "results_by_fs": [],
-            "l_st_f": None,
-            "r_st_f": None,
-            "sub_ir_f": None,
-            "sub_st_f": None,
-            "sub_meas_f": {},
-            "l_imp_f": None,
-            "r_imp_f": None,
-            "ui_dashboards": {},
-        }
+    _finalize_target_context(
+        ctx=ctx,
+        data=data,
+        hc_f=hc_f,
+        hc_m=hc_m,
+        xos=xos,
+        hpf=hpf,
+        target_curve_tag=target_curve_tag,
+        export_state=export_state,
+        measurements=measurements,
     )
 
 
