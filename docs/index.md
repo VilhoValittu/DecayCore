@@ -90,6 +90,10 @@ hide_title: true
 
 <div class="doc-grid">
   <section class="doc-card">
+    <h3><a href="{{ '/performance/' | relative_url }}">Performance report</a></h3>
+    <p>Automatic mode performance results and the adaptive-target comparison in an embedded PDF view.</p>
+  </section>
+  <section class="doc-card">
     <h3><a href="{{ '/getting-started/' | relative_url }}">Getting started</a></h3>
     <p>The shortest path from release download to generated FIR filters.</p>
   </section>

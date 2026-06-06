@@ -44,6 +44,7 @@ REW-style measurement data may also be used in compatible workflows, but DecayCo
 
 ## Documentation
 
+- [Performance report](https://vilhovalittu.github.io/DecayCore/performance/)
 - [Getting started](https://vilhovalittu.github.io/DecayCore/getting-started/)
 - [Measurement workflow](https://vilhovalittu.github.io/DecayCore/measurement-workflow/)
 - [CamillaDSP FIR room correction](https://vilhovalittu.github.io/DecayCore/camilladsp-fir-room-correction/)

@@ -333,6 +333,29 @@ a:hover {
   color: var(--muted);
 }
 
+.performance-report {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 28px 0 0;
+}
+
+.performance-report__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.performance-report__frame {
+  display: block;
+  width: 100%;
+  height: min(82vh, 1100px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+}
+
 .site-footer {
   border-top: 1px solid var(--line);
   background: #ffffff;
