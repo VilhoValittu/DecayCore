@@ -59,6 +59,7 @@ from ..results_formatters import (
     safe_float,
     shared_window_label,
     stereo_link_mode_label,
+    xo_fc_gd_badge,
     xo_fc_gd_label,
 )
 
@@ -315,6 +316,7 @@ def _render_dsp_quality(*, data: dict, l_st_f: dict, r_st_f: dict, psl_str: str)
         t("results_section_phase_gd"),
         [
             metric_row(t("results_metric_xo_phase_model"), xo_fc_gd_label(l_st_f), xo_fc_gd_label(r_st_f)),
+            metric_row("XO severity", xo_fc_gd_badge(l_st_f), xo_fc_gd_badge(r_st_f)),
             metric_row(t("results_metric_phase_clamp"), phase_clamp_label(l_st_f), phase_clamp_label(r_st_f)),
             metric_row(t("results_metric_gd_limiter"), gd_limiter_label(l_st_f), gd_limiter_label(r_st_f)),
             metric_row(t("results_metric_gd_gradient_max"), gd_grad_max_label(l_st_f), gd_grad_max_label(r_st_f)),

@@ -475,9 +475,9 @@ After a run, the results section shows:
 
 - **XO Phase Model** — the list of configured crossovers and slopes (e.g., "2500 Hz / 12 dB/oct")
 - **XO delta GD badge** — a coloured indicator (LOW / MED / HIGH) describing how much phase complexity the crossover introduces:
-  - **LOW** (green) — minimal crossover phase, subtle phase correction
-  - **MED** (orange) — moderate crossover phase, noticeable correction benefit
-  - **HIGH** (red) — aggressive crossover, significant phase component that the FIR correction addresses
+  - **LOW** (green) — "Small crossover effect"
+  - **MED** (orange) — "Moderate effect - correction helps"
+  - **HIGH** (red) — "Large effect - correction needed)"
 - **Phase and group-delay metrics** — detailed values showing the phase deviation and group-delay excess at and around the crossover frequency
 
 **If left empty:**

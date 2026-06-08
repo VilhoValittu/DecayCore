@@ -322,26 +322,26 @@ def xo_fc_gd_badge(st: dict) -> str:
                 "LOW",
                 "rgba(46, 125, 50, 0.15)",
                 "rgba(46, 125, 50, 1.0)",
-                "Small XO delta GD at fc (typically subtle).",
+                "Small crossover effect",
             )
         elif worst < 1.5:
             label, bg, fg, title = (
                 "MED",
                 "rgba(255, 143, 0, 0.15)",
                 "rgba(255, 143, 0, 1.0)",
-                "Moderate XO delta GD at fc (often audible improvement with XO phase correction).",
+                "Moderate effect - correction helps",
             )
         else:
             label, bg, fg, title = (
                 "HIGH",
                 "rgba(211, 47, 47, 0.15)",
                 "rgba(211, 47, 47, 1.0)",
-                "Large XO delta GD at fc (aggressive crossover / lots of time smear).",
+                "Large effect - correction needed",
             )
         return (
-            f"<span title='{title}' style='display:inline-block; margin-left:6px; padding:1px 6px; "
-            f"border-radius:10px; font-size:11px; font-weight:600; background:{bg}; color:{fg}; "
-            f"vertical-align:middle;'>{label}</span>"
+            f"<span style='display:inline-block; margin-left:6px; padding:2px 6px; "
+            f"border-radius:10px; font-size:12px; font-weight:600; background:{bg}; color:{fg}; "
+            f"vertical-align:middle;' title='{title}'>{label}: {title}</span>"
         )
     except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         logger.exception("XO delta GD badge render")
