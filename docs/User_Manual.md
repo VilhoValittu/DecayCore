@@ -437,6 +437,53 @@ When not to use it:
 
 Controls are available in the Advanced tab under a collapsible hybrid IIR tuning section. Default state is disabled.
 
+### 9.8 XO Phase Model (Crossover Phase Correction)
+
+The XO tab models the phase shift introduced by your speaker's passive or active crossover filters. When configured correctly, DecayCore accounts for this phase contribution during FIR generation, ensuring the correction cooperates with the speaker design instead of fighting it.
+
+**What it does:**
+
+- defines the frequency and slope of each crossover network in the speaker
+- tells DecayCore to include theoretical phase data for those crossovers in its FIR synthesis
+- avoids over-correcting or partially opposing the speaker's intended crossover behavior
+
+**Availability:**
+
+The XO tab is only active when the filter type is **Asymmetric** or **Linear Phase**. It is disabled for Mixed Phase and Minimum Phase modes, which do not use a theoretical crossover phase model.
+
+**How to use it:**
+
+1. **Identify the speaker's crossovers** — look for passive dividing networks (crossover frequencies and slopes) or active HPF/LPF filters built into the speaker or amplifier.
+2. **Fill in up to five XO slots:**
+   - **Frequency** (Hz) — the crossover point, e.g., `2500` for a tweeter crossover
+   - **Slope** (dB/oct) — the filter slope, e.g., `12` dB/octave. Options are 6, 12, 18, 24, 36, or 48 dB/oct
+   - Leave unused slots empty
+3. **HPF/subsonic filter** — the high-pass filter (e.g., a subwoofer's 20 Hz 24 dB/oct HPF) is configured in the Basic tab but feeds the same theoretical model
+
+**Practical examples:**
+
+- **2-way speaker, 2.5 kHz tweeter crossover at 12 dB/oct:** enter `2500` Hz, `12` dB/oct
+- **3-way speaker with woofer/midrange crossover at 500 Hz (18 dB/oct) and midrange/tweeter at 4 kHz (12 dB/oct):** fill XO 1 with `500 / 18` and XO 2 with `4000 / 12`
+- **Active subwoofer with 80 Hz low-pass (24 dB/oct):** enter `80` Hz, `24` dB/oct
+- **Full-range driver with no crossover:** leave all XO slots empty
+
+Only describe filters that already exist in your system. Do not invent crossovers.
+
+**Understanding the results:**
+
+After a run, the results section shows:
+
+- **XO Phase Model** — the list of configured crossovers and slopes (e.g., "2500 Hz / 12 dB/oct")
+- **XO delta GD badge** — a coloured indicator (LOW / MED / HIGH) describing how much phase complexity the crossover introduces:
+  - **LOW** (green) — minimal crossover phase, subtle phase correction
+  - **MED** (orange) — moderate crossover phase, noticeable correction benefit
+  - **HIGH** (red) — aggressive crossover, significant phase component that the FIR correction addresses
+- **Phase and group-delay metrics** — detailed values showing the phase deviation and group-delay excess at and around the crossover frequency
+
+**If left empty:**
+
+DecayCore assumes a flat theoretical phase response (no crossovers). This is correct for full-range drivers or coaxial designs but leaves the crossover region uncorrected on multi-driver speakers. If your speaker has multiple drivers with a crossover, specifying the XO parameters usually improves the overall phase coherence of the room-correction result.
+
 ## 10. Running Filter Generation
 
 When the main settings look correct:

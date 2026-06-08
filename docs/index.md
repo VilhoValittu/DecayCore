@@ -91,7 +91,7 @@ hide_title: true
 <div class="doc-grid">
   <section class="doc-card">
     <h3><a href="{{ '/performance/' | relative_url }}">Performance report</a></h3>
-    <p>Automatic mode performance results and the adaptive-target comparison in an embedded PDF view.</p>
+    <p>Automatic mode performance results and the adaptive-target comparison.</p>
   </section>
   <section class="doc-card">
     <h3><a href="{{ '/getting-started/' | relative_url }}">Getting started</a></h3>
