@@ -8,6 +8,18 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
+## [1.0.9.2] - 8-6-2026
+
+### Documentation — Enhanced User Manual and clarity
+
+The User Manual has been significantly improved with clearer descriptions of the Crossover (XO) Phase Model and better real-world examples. A new performance example demonstrates DecayCore's effectiveness on actual challenging room measurements, making it easier to understand what the tool can achieve in practice.
+
+### Results — Improved badge rendering and formatting
+
+Status badges and performance indicators are now rendered more cleanly and consistently throughout the results interface. Enhanced formatting makes it easier to scan and interpret measurement quality, correction confidence, and acoustic improvement at a glance.
+
+---
+
 ## [1.0.9.1] - 5-6-2026
 
 ### BUG FIX

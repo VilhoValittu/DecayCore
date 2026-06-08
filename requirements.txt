@@ -1,3 +1,5 @@
+# Core dependencies - reproducible release builds
+# Update available versions: pip list --outdated
 numpy
 scipy
 nicegui>=1.4
