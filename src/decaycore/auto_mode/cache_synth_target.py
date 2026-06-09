@@ -20,6 +20,7 @@ from .cache_measurement_sig import _auto_get_measurement_signature
 _SYNTH_TARGET_MISS = object()
 _SYNTH_TARGET_CACHE: dict = {}
 _SYNTH_TARGET_CACHE_LOCK = RLock()
+_SYNTH_TARGET_ALGO_V = 2
 
 
 def _synth_target_cache_key(
@@ -32,6 +33,7 @@ def _synth_target_cache_key(
     smooth_oct: float,
 ) -> tuple:
     return (
+        int(_SYNTH_TARGET_ALGO_V),
         str(measurement_sig),
         round(float(tilt_comp_frac), 5),
         round(float(bass_comp_frac), 5),

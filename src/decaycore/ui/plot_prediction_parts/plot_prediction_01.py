@@ -150,6 +150,7 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
             f_win_min, f_win_max = 500.0, 2000.0
         f_target = np.asarray(target_stats.get("freq_axis", []), dtype=float) if target_stats else np.asarray([], dtype=float)
         target_curve = target_stats.get("target_mags", None) if target_stats else None
+        selected_target_curve = target_stats.get("selected_target_mags", None) if target_stats else None
 
         direct_pred_export = None
         direct_pred_comp = None
@@ -353,6 +354,21 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
         )
 
         if target_stats and "target_mags" in target_stats:
+            selected_target_arr = np.asarray(selected_target_curve, dtype=float).reshape(-1)
+            has_selected_target = selected_target_arr.size == f_target.size and selected_target_arr.size > 1
+
+            if has_selected_target:
+                fig.add_trace(
+                    go.Scatter(
+                        x=target_stats["freq_axis"],
+                        y=selected_target_arr,
+                        name="Target",
+                        line=dict(color="#34d399", dash="dash", width=2.0),
+                    ),
+                    row=1,
+                    col=1,
+                )
+
             t_mags = _maybe_shift_to_abs(target_stats.get("target_mags", []), avg_t)
             if mag_display_offset_db != 0.0:
                 t_mags = np.asarray(t_mags, dtype=float) - float(mag_display_offset_db)
@@ -360,8 +376,12 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
                 go.Scatter(
                     x=target_stats["freq_axis"],
                     y=t_mags,
-                    name="Target",
-                    line=dict(color="#34d399", dash="dash", width=2.0),
+                    name="Effective target" if has_selected_target else "Target",
+                    line=dict(
+                        color="rgba(52,211,153,0.75)" if has_selected_target else "#34d399",
+                        dash="dot" if has_selected_target else "dash",
+                        width=1.4 if has_selected_target else 2.0,
+                    ),
                 ),
                 row=1,
                 col=1,

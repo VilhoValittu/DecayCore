@@ -342,6 +342,29 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
 
     }
 
+    try:
+        cfg_house_freqs = np.asarray(getattr(cfg, "house_freqs", []), dtype=float).reshape(-1)
+        cfg_house_mags = np.asarray(getattr(cfg, "house_mags", []), dtype=float).reshape(-1)
+        if cfg_house_freqs.size >= 2 and cfg_house_mags.size == cfg_house_freqs.size:
+            stats["selected_target_mags"] = interpolate_response(
+                cfg_house_freqs,
+                cfg_house_mags,
+                np.asarray(freq_axis, dtype=float),
+            ).tolist()
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        logger.debug("selected target trace export skipped", exc_info=True)
+
     _add_response_payload_fields(
         stats,
         include_response_arrays=bool(include_response_arrays),

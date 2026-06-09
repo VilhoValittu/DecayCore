@@ -402,6 +402,31 @@ def test_apply_null_guard_target_matches_reference_convolution():
     assert np.allclose(out, ref, atol=1e-9, rtol=1e-9)
 
 
+def test_apply_null_guard_target_respects_guard_max_hz_and_leaves_treble_unchanged():
+    freq_axis = np.linspace(20.0, 20000.0, 4096, dtype=float)
+    target = np.zeros_like(freq_axis)
+    measured = np.zeros_like(freq_axis)
+    null_band = (freq_axis >= 1800.0) & (freq_axis <= 2200.0)
+    measured[null_band] = -12.0
+
+    out = apply_null_guard_target(
+        freq_axis,
+        target,
+        measured,
+        mag_c_min=20.0,
+        mag_c_max=20000.0,
+        guard_max_hz=300.0,
+        enable=True,
+        depth_db=12.0,
+        max_blend=0.85,
+        max_total_relax_db=12.0,
+        smooth_oct=0.18,
+    )
+
+    high = freq_axis >= 1000.0
+    assert np.allclose(out[high], target[high], atol=1e-9, rtol=1e-9)
+
+
 def test_prepare_correction_baseline_skips_second_leveling_pass_after_uniform_target_shift(monkeypatch):
     freq_axis = np.linspace(20.0, 20000.0, 2048, dtype=float)
     measured = np.zeros_like(freq_axis)

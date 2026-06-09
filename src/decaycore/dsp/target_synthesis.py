@@ -20,6 +20,12 @@ _SYNTH_BASE_MAGS = np.array([
     1.4, 0.4, 0., -0.5, -1., -1.8, -2.8, -4., -5.5, -6.
 ])
 
+# HF slope is estimated and applied only up to this frequency.  Above this
+# point the slope-based adjustment is held constant (shelf), preventing
+# measurement noise floor above ~10 kHz from inflating the estimate and
+# creating spurious target rises at very high frequencies.
+_SYNTH_HF_SLOPE_CAP_HZ = 10000.0
+
 
 def _slope_db_oct(f_hz, mag_db, f_lo=None, f_hi=None) -> float:
     """Least-squares dB/octave slope via polyfit on log10(f)."""
@@ -184,6 +190,19 @@ def _target_synthesis_band_mean(arr, fg, flo, fhi):
     return float(np.mean(arr[mask])) if int(np.count_nonzero(mask)) >= 4 else float("nan")
 
 
+def _target_synthesis_hf_slope_hi_hz(hf_break_hz: float) -> float | None:
+    try:
+        hf_break = float(hf_break_hz)
+        hf_cap = float(_SYNTH_HF_SLOPE_CAP_HZ)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(hf_break) or not np.isfinite(hf_cap):
+        return None
+    if hf_break <= 0.0 or hf_cap <= hf_break:
+        return None
+    return float(hf_cap)
+
+
 def _target_synthesis_build_work(
     *,
     f_work: np.ndarray,
@@ -228,13 +247,29 @@ def _target_synthesis_build_work(
             m_out += tilt_adj_per_oct * log2_f_over_1k
 
     harman6_hf_ref = np.interp(fg, _SYNTH_FREQS[1:], _SYNTH_BASE_MAGS[1:])
-    harman6_hf_slope = _slope_db_oct(fg, harman6_hf_ref, f_lo=float(hf_break_hz))
+    hf_slope_hi_hz = _target_synthesis_hf_slope_hi_hz(float(hf_break_hz))
+    harman6_hf_slope = (
+        _slope_db_oct(
+            fg,
+            harman6_hf_ref,
+            f_lo=float(hf_break_hz),
+            f_hi=float(hf_slope_hi_hz),
+        )
+        if hf_slope_hi_hz is not None else float("nan")
+    )
     if np.isfinite(hf_slope) and np.isfinite(harman6_hf_slope) and abs(hf_slope - harman6_hf_slope) > 0.5:
         hf_excess_slope = float(hf_slope - harman6_hf_slope)
         hf_adj_per_oct = float(hf_comp_frac) * hf_excess_slope
         if abs(hf_adj_per_oct) > 1e-4:
             mask_hf = f_work > float(hf_break_hz)
-            log2_f_over_break = np.log2(np.maximum(f_work[mask_hf], 1.0) / float(hf_break_hz))
+            # Cap the log2 accumulation at the slope estimation ceiling so the
+            # adjustment becomes a shelf above _SYNTH_HF_SLOPE_CAP_HZ rather
+            # than continuing to grow with frequency.
+            log2_cap = np.log2(float(hf_slope_hi_hz) / float(hf_break_hz))
+            log2_f_over_break = np.minimum(
+                np.log2(np.maximum(f_work[mask_hf], 1.0) / float(hf_break_hz)),
+                log2_cap,
+            )
             m_out[mask_hf] += hf_adj_per_oct * log2_f_over_break
     return m_out
 
@@ -311,9 +346,16 @@ def synthesize_target_from_measurements(
     mid_avg = _target_synthesis_band_mean(m_sm, fg, mid_ref_lo_hz, mid_ref_hi_hz)
     bass_excess_db = float(bass_avg - mid_avg) if (np.isfinite(bass_avg) and np.isfinite(mid_avg)) else 0.0
 
-    # Slope estimates — use mid-range only to avoid bass-room-mode bias
-    meas_slope = _slope_db_oct(fg, m_sm, f_lo=200.0, f_hi=8000.0)
-    hf_slope = _slope_db_oct(fg, m_sm, f_lo=float(hf_break_hz))
+    # Slope estimates — use mid-range only to avoid bass-room-mode bias.
+    # HF slope is capped at _SYNTH_HF_SLOPE_CAP_HZ to exclude frequencies
+    # where measurement noise floor can dominate and create a falsely shallow
+    # (or even positive) slope that would inflate the target at high frequencies.
+    meas_slope = _slope_db_oct(fg, m_sm, f_lo=200.0, f_hi=1000.0)
+    hf_slope_hi_hz = _target_synthesis_hf_slope_hi_hz(float(hf_break_hz))
+    hf_slope = (
+        _slope_db_oct(fg, m_sm, f_lo=float(hf_break_hz), f_hi=float(hf_slope_hi_hz))
+        if hf_slope_hi_hz is not None else float("nan")
+    )
 
     f_work = _SYNTH_FREQS[1:].copy()   # 19 points: 20..20000 Hz
     m_base = _target_synthesis_build_work(

@@ -66,6 +66,7 @@ def apply_null_guard_target(
     *,
     mag_c_min: float,
     mag_c_max: float,
+    guard_max_hz: float | None = None,
     enable: bool = True,
     depth_db: float = 12.0,          # min dip depth to start guarding
     max_blend: float = 0.85,         # max blend toward measured at dip center
@@ -91,6 +92,12 @@ def apply_null_guard_target(
         fmax = float(mag_c_max or 0.0)
     except (TypeError, ValueError, OverflowError):
         fmin, fmax = 0.0, 0.0
+    try:
+        guard_hi = float(guard_max_hz) if guard_max_hz is not None else float("nan")
+    except (TypeError, ValueError, OverflowError):
+        guard_hi = float("nan")
+    if np.isfinite(guard_hi) and guard_hi > 0.0:
+        fmax = min(float(fmax), float(guard_hi))
     if not (np.isfinite(fmin) and np.isfinite(fmax) and fmax > fmin and fmax > 0):
         # if no band set, do nothing (safer default)
         return t
@@ -379,6 +386,13 @@ def _prepare_correction_baseline(  # noqa: C901 - baseline assembly intentionall
         with profiled_section("generate_filter.correction.baseline.null_guard"):
             mag_c_min = _active_correction_band_min(cfg)
             mag_c_max = cfg_reader.float_allow_zero("mag_c_max", 0.0)
+            null_guard_max_hz = float(np.clip(
+                float(schroeder_hz) if schroeder_hz is not None and np.isfinite(float(schroeder_hz)) else 300.0,
+                120.0,
+                500.0,
+            ))
+            if isinstance(st, dict):
+                st["null_guard_max_hz"] = float(null_guard_max_hz)
             # use analysis magnitude (m_anal) already on freq_axis scale
             target_mags = apply_null_guard_target(
                 np.asarray(freq_axis, dtype=float),
@@ -386,6 +400,7 @@ def _prepare_correction_baseline(  # noqa: C901 - baseline assembly intentionall
                 np.asarray(m_anal, dtype=float),
                 mag_c_min=mag_c_min,
                 mag_c_max=mag_c_max,
+                guard_max_hz=null_guard_max_hz,
                 enable=True,
                 depth_db=cfg_reader.float("null_guard_depth_db", 12.0),
                 max_blend=cfg_reader.float("null_guard_max_blend", 0.85),

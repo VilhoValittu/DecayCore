@@ -216,7 +216,10 @@ def test_apply_post_limits_and_metrics_preserves_array_shape():
     assert isinstance(st, dict)
 
 
-def test_transition_fade_clamps_very_wide_width_to_upper_quarter_of_correction_band():
+def test_transition_fade_wide_width_covers_full_correction_band():
+    # When trans_width exceeds the correction band, the fade covers the full band.
+    # The effective fade width = max(trans_width, 0.25 * band_width), so trans_width=1000
+    # on a 380 Hz band gives a full-band fade (f_start ≈ mag_c_min).
     freq_axis = np.geomspace(10.0, 1000.0, 512)
     gain_apply = np.ones_like(freq_axis, dtype=float)
     cfg = _transition_cfg(trans_width=1000.0)
@@ -224,10 +227,9 @@ def test_transition_fade_clamps_very_wide_width_to_upper_quarter_of_correction_b
 
     out = apply_post_limits_and_metrics(inputs, apply_mid_refit_pre_slope=_identity_mid_refit)
 
-    unchanged = freq_axis <= 305.0
-    faded = (freq_axis > 305.0) & (freq_axis < 400.0)
-    assert np.allclose(out.gain_db[unchanged], 1.0, atol=1e-9, rtol=1e-9)
-    assert np.any(out.gain_db[faded] < 1.0)
+    # Fade covers the whole correction band: gain should be reduced well below mag_c_max
+    mid_band = (freq_axis > 100.0) & (freq_axis < 350.0)
+    assert np.any(out.gain_db[mid_band] < 1.0)
     assert st["mag_transition_fade_applied"] is True
     assert "mag_transition_slope_abs_max_db_per_oct" in st
 
@@ -240,9 +242,11 @@ def test_transition_fade_preserves_normal_width_start_frequency():
 
     out = apply_post_limits_and_metrics(inputs, apply_mid_refit_pre_slope=_identity_mid_refit)
 
-    below_old_start = freq_axis <= 320.0
-    normal_fade = (freq_axis > 320.0) & (freq_axis < 400.0)
-    assert np.allclose(out.gain_db[below_old_start], 1.0, atol=1e-9, rtol=1e-9)
+    # With trans_width=80 and band_width=380, effective width = max(80, 0.25*380=95) = 95.
+    # f_start = 400 - 95 = 305 Hz.
+    below_new_start = freq_axis <= 305.0
+    normal_fade = (freq_axis > 305.0) & (freq_axis < 400.0)
+    assert np.allclose(out.gain_db[below_new_start], 1.0, atol=1e-9, rtol=1e-9)
     assert np.any(out.gain_db[normal_fade] < 1.0)
 
 

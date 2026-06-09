@@ -8,6 +8,22 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
+## [1.0.9.3] - 9-6-2026
+
+### Target Synthesis — Enhanced cache and algorithm stability
+
+Target curve synthesis now includes algorithm versioning in cache keys, ensuring compatibility across updates. This prevents stale cached targets from being incorrectly reused when synthesis logic changes, guaranteeing more reliable and predictable results in AUTO mode.
+
+### Prediction Plot — Clearer target visualization
+
+The prediction plot now prominently displays selected targets, making it easy to see which house curve is being applied to your measurement. Visual clarity has been improved for faster interpretation of target-curve choices and correction alignment.
+
+### Refined null guard handling
+
+The null guard target implementation now features improved maximum frequency constraints, providing better control over bass region protection and preventing overly aggressive corrections in critical low-frequency bands.
+
+---
+
 ## [1.0.9.2] - 8-6-2026
 
 ### Documentation — Enhanced User Manual and clarity

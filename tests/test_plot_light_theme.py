@@ -246,6 +246,44 @@ def test_prediction_plot_keeps_negative_absolute_target_from_double_shift():
     assert abs(float(np.nanmedian(measured_y))) < 2.0
 
 
+def test_prediction_plot_exposes_selected_and_effective_targets_when_available():
+    freqs = np.array([20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0], dtype=float)
+    mags = np.array([-57.0, -56.0, -55.0, -54.5, -54.0, -54.0, -54.5, -55.0], dtype=float)
+    phases = np.zeros_like(freqs)
+    filt_ir = np.array([1.0, 0.0, 0.0, 0.0], dtype=float)
+
+    _html, fig = generate_prediction_plot(
+        freqs,
+        mags,
+        phases,
+        filt_ir,
+        48000,
+        "Test",
+        target_stats={
+            "freq_axis": freqs.tolist(),
+            "measured_mags": mags.tolist(),
+            "target_mags": [-54.0, -53.5, -53.0, -52.5, -52.5, -53.0, -53.5, -54.0],
+            "selected_target_mags": [0.0, 0.0, -0.5, -1.0, -1.0, -1.5, -2.0, -2.5],
+            "eff_target_db": -53.0,
+            "target_level_db_window": -53.0,
+            "offset_db": 0.0,
+            "smart_scan_range": [160.0, 1280.0],
+        },
+        create_full_html=False,
+        return_fig=True,
+    )
+
+    assert fig is not None
+    trace_names = [trace.name for trace in fig.data]
+    assert "Target" in trace_names
+    assert "Effective target" in trace_names
+
+    target_trace = next(trace for trace in fig.data if trace.name == "Target")
+    effective_trace = next(trace for trace in fig.data if trace.name == "Effective target")
+    np.testing.assert_allclose(np.asarray(target_trace.y, dtype=float), np.array([0.0, 0.0, -0.5, -1.0, -1.0, -1.5, -2.0, -2.5], dtype=float))
+    assert effective_trace.line.dash == "dot"
+
+
 def test_prediction_plot_keeps_magnitude_legend_focused_on_core_curves():
     freqs = np.array([20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0], dtype=float)
     mags = np.zeros_like(freqs)

@@ -20,9 +20,13 @@ import logging
 from typing import Any, Callable
 
 from . import ng_controls as ctrl
+from ..common.house_curves import _normalize_hc_mode_key
 from ..config.legacy_keys import CAMILLAFIR_AUTO_MODE
 
 logger = logging.getLogger("DecayCore")
+
+_MANUAL_HC_DEFAULT = "Harman6"
+_MANUAL_HC_STATE_KEY = "_manual_hc_mode"
 
 
 def register_callbacks(*, t: Callable, get_val: Callable, max_safe_boost: float) -> None:
@@ -54,6 +58,7 @@ def _register_mode_callbacks(*, t: Callable) -> None:
         if mode_u != "AUTO" and bool(ctrl.value("bass_integration_enable", False)):
             ctrl.set_value("bass_integration_enable", False, emit=False)
         ctrl.set_value(CAMILLAFIR_AUTO_MODE, mode_u == "AUTO", emit=False)
+        _restore_manual_hc_mode_if_needed(mode_override=mode_u)
         on_mode_change(mode=mode_u, t=t)
         _sync_bass_integration_visibility()
         _update_target_preview()
@@ -63,6 +68,8 @@ def _register_mode_callbacks(*, t: Callable) -> None:
 
 def _register_target_callbacks(*, t: Callable) -> None:
     """hc_mode, hc_custom_file, auto_goal, auto_target_mode -> target preview."""
+
+    _ensure_manual_hc_mode_holder()
 
     def _sync_hc_upload_visibility(v: Any) -> None:
         upload_col = ctrl.get_container("hc_custom_upload_col")
@@ -117,8 +124,11 @@ def _register_target_callbacks(*, t: Callable) -> None:
         ctrl.on_change(field, lambda v, f=field: _update_target_preview())
 
     def _on_hc_mode_change(v: Any) -> None:
-        _sync_hc_upload_visibility(v)
-        if str(v or "").strip().lower() != "upload":
+        _remember_manual_hc_mode(v)
+        _restore_manual_hc_mode_if_needed()
+        current_hc_mode = _normalized_hc_mode(ctrl.value("hc_mode", v or _MANUAL_HC_DEFAULT))
+        _sync_hc_upload_visibility(current_hc_mode)
+        if current_hc_mode != "Upload":
             ctrl.set_value("hc_custom_file", None)
         _update_target_preview()
 
@@ -132,19 +142,22 @@ def _register_target_callbacks(*, t: Callable) -> None:
         ctrl.set_options("auto_target_mode", _auto_target_mode_options(t=t, auto_goal=v))
         if _auto_goal_is_prefer_bass(v):
             ctrl.set_value("auto_target_mode", "selected", emit=False)
+        _restore_manual_hc_mode_if_needed(auto_target_mode_override=ctrl.value("auto_target_mode", "auto"))
         update_target_curve_controls_ui()
         _update_target_preview()
 
     def _on_auto_target_mode_change(v: Any) -> None:
         from .ng_mode_controls import update_target_curve_controls_ui  # noqa: PLC0415
 
+        _restore_manual_hc_mode_if_needed(auto_target_mode_override=v)
         update_target_curve_controls_ui()
         _update_target_preview()
 
     ctrl.on_change("hc_mode", _on_hc_mode_change)
     ctrl.on_change("auto_goal", _sync_auto_target_mode_for_goal)
     ctrl.on_change("auto_target_mode", _on_auto_target_mode_change)
-    _sync_hc_upload_visibility(ctrl.value("hc_mode", "Harman6"))
+    _restore_manual_hc_mode_if_needed()
+    _sync_hc_upload_visibility(ctrl.value("hc_mode", _MANUAL_HC_DEFAULT))
 
 
 def _register_bass_integration_callbacks(*, t: Callable) -> None:
@@ -311,6 +324,11 @@ def _initial_state_sync(*, t: Callable, get_val: Callable) -> None:
         if bool(ctrl.value("bass_integration_enable", get_val("bass_integration_enable", False))):
             mode = "AUTO"
             ctrl.set_value("mode", "AUTO", emit=False)
+        _ensure_manual_hc_mode_holder()
+        _restore_manual_hc_mode_if_needed(
+            mode_override=mode,
+            auto_target_mode_override=ctrl.value("auto_target_mode", get_val("auto_target_mode", "auto")),
+        )
         on_mode_change(mode=mode, t=t)
         _sync_bass_integration_visibility()
         update_lvl_ui(t=t)
@@ -365,6 +383,72 @@ def _update_target_preview() -> None:
         NameError,
     ):
         logger.exception("target preview refresh")
+
+
+def _normalized_hc_mode(value: Any) -> str:
+    try:
+        return str(_normalize_hc_mode_key(value or _MANUAL_HC_DEFAULT))
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        return _MANUAL_HC_DEFAULT
+
+
+def _manual_hc_mode_or_default(value: Any) -> str:
+    mode = _normalized_hc_mode(value)
+    return _MANUAL_HC_DEFAULT if mode == "Adaptive" else mode
+
+
+def _ensure_manual_hc_mode_holder() -> None:
+    if ctrl.get(_MANUAL_HC_STATE_KEY) is not None:
+        return
+    ctrl.register(
+        _MANUAL_HC_STATE_KEY,
+        ctrl._ValueHolder(_manual_hc_mode_or_default(ctrl.value("hc_mode", _MANUAL_HC_DEFAULT))),
+    )
+
+
+def _remember_manual_hc_mode(value: Any) -> None:
+    mode = _normalized_hc_mode(value)
+    if mode == "Adaptive":
+        return
+    _ensure_manual_hc_mode_holder()
+    ctrl.set_value(_MANUAL_HC_STATE_KEY, mode, emit=False)
+
+
+def _restore_manual_hc_mode_if_needed(
+    *,
+    mode_override: Any | None = None,
+    auto_target_mode_override: Any | None = None,
+) -> bool:
+    current_hc_mode = _normalized_hc_mode(ctrl.value("hc_mode", _MANUAL_HC_DEFAULT))
+    if current_hc_mode != "Adaptive":
+        return False
+
+    mode_u = str(mode_override if mode_override is not None else ctrl.value("mode", "BASIC") or "BASIC").strip().upper()
+    auto_target_mode = str(
+        auto_target_mode_override
+        if auto_target_mode_override is not None
+        else ctrl.value("auto_target_mode", "auto")
+        or "auto"
+    ).strip().lower()
+    if mode_u == "AUTO" and auto_target_mode == "adaptive":
+        return False
+
+    _ensure_manual_hc_mode_holder()
+    restore_mode = _manual_hc_mode_or_default(ctrl.value(_MANUAL_HC_STATE_KEY, _MANUAL_HC_DEFAULT))
+    ctrl.set_value("hc_mode", restore_mode, emit=False)
+    return True
 
 
 def _sync_bass_integration_visibility() -> None:

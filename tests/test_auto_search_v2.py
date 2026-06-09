@@ -810,6 +810,21 @@ def test_synth_target_cache_keys_include_rt60_bands_and_forward_measurements():
     clear_auto_mode_runtime_caches()
 
 
+def test_synth_target_cache_key_includes_algo_version():
+    from decaycore.auto_mode import cache_synth_target
+
+    key = cache_synth_target._synth_target_cache_key(
+        "measurement-sig",
+        tilt_comp_frac=0.3,
+        bass_comp_frac=0.5,
+        bass_comp_ref_db=8.0,
+        hf_comp_frac=0.5,
+        smooth_oct=1.0 / 3.0,
+    )
+
+    assert key[0] == cache_synth_target._SYNTH_TARGET_ALGO_V
+
+
 def test_auto_search_v2_fallback_reasons_attached_on_cache_miss(monkeypatch, tmp_path):
     cache_path = tmp_path / "auto_cache.json"
     from decaycore.auto_mode import cache_signature

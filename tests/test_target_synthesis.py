@@ -4,6 +4,7 @@ import pytest
 from decaycore.dsp.target_synthesis import (
     _SYNTH_BASE_MAGS,
     _SYNTH_FREQS,
+    _target_synthesis_hf_slope_hi_hz,
     synthesize_target_from_measurements,
 )
 
@@ -24,6 +25,26 @@ def _bass_peak_mags(peak_db=10.0, peak_hz=80.0, width_oct=1.0):
     sigma = width_oct * np.log(2) / (2 * np.sqrt(2 * np.log(2)))
     bump = peak_db * np.exp(-0.5 * ((np.log2(_FLAT_FREQS / peak_hz)) / sigma) ** 2)
     return base + bump
+
+
+def _hf_rise_mags(start_hz=5000.0, slope_db_per_oct=3.0):
+    base = _harman6_mags()
+    hf_boost = np.where(
+        _FLAT_FREQS > float(start_hz),
+        float(slope_db_per_oct) * np.log2(_FLAT_FREQS / float(start_hz)),
+        0.0,
+    )
+    return base + hf_boost
+
+
+def _hf_noise_floor_brightening_mags(start_hz=4000.0, boost_db=7.0):
+    base = _harman6_mags()
+    rise = np.where(
+        _FLAT_FREQS > float(start_hz),
+        float(boost_db) * np.clip(np.log2(_FLAT_FREQS / float(start_hz)) / np.log2(20000.0 / float(start_hz)), 0.0, 1.0),
+        0.0,
+    )
+    return base + rise
 
 
 def test_bass_heavy_room_no_double_compensation():
@@ -69,14 +90,7 @@ def test_bright_room_hf_target_raised():
 
     Previously the HF compensation was one-directional (only lowered target).
     """
-    base = _harman6_mags()
-    # Add +3 dB/oct HF rise above 5 kHz
-    hf_boost = np.where(
-        _FLAT_FREQS > 5000.0,
-        3.0 * np.log2(_FLAT_FREQS / 5000.0),
-        0.0,
-    )
-    m = base + hf_boost
+    m = _hf_rise_mags(start_hz=5000.0, slope_db_per_oct=3.0)
 
     result_bright = synthesize_target_from_measurements(
         _FLAT_FREQS, m, _FLAT_FREQS, m,
@@ -94,11 +108,63 @@ def test_bright_room_hf_target_raised():
     _, m_bright = result_bright
     _, m_neutral = result_neutral
 
+    freqs = np.asarray(result_bright[0], dtype=float)
     idx_16k = int(np.argmin(np.abs(np.asarray(result_bright[0]) - 16000.0)))
+    idx_20k = int(np.argmin(np.abs(freqs - 20000.0)))
     assert m_bright[idx_16k] > m_neutral[idx_16k], (
         "Bright room should yield higher HF target than neutral room "
         "(bidirectional HF compensation not working)"
     )
+    assert float(m_bright[idx_20k] - m_bright[idx_16k]) <= 0.75, (
+        "HF lift should stay bounded near the top octave instead of continuing "
+        "to rise toward 20 kHz"
+    )
+
+
+def test_hf_noise_floor_brightening_does_not_accumulate_to_20khz():
+    m = _hf_noise_floor_brightening_mags(start_hz=4000.0, boost_db=7.0)
+    neutral = _harman6_mags()
+
+    result = synthesize_target_from_measurements(
+        _FLAT_FREQS, m, _FLAT_FREQS, m,
+        hf_comp_frac=0.25,
+        bass_comp_frac=0.0,
+        tilt_comp_frac=0.0,
+    )
+    neutral_result = synthesize_target_from_measurements(
+        _FLAT_FREQS, neutral, _FLAT_FREQS, neutral,
+        hf_comp_frac=0.25,
+        bass_comp_frac=0.0,
+        tilt_comp_frac=0.0,
+    )
+
+    assert result is not None and neutral_result is not None
+    out_f, out_m = result
+    _, neutral_m = neutral_result
+    out_f = np.asarray(out_f, dtype=float)
+    out_m = np.asarray(out_m, dtype=float)
+    neutral_m = np.asarray(neutral_m, dtype=float)
+
+    idx_8k = int(np.argmin(np.abs(out_f - 8000.0)))
+    idx_16k = int(np.argmin(np.abs(out_f - 16000.0)))
+    idx_20k = int(np.argmin(np.abs(out_f - 20000.0)))
+
+    assert np.all(np.isfinite(out_m))
+    assert out_m[idx_16k] > neutral_m[idx_16k]
+    assert float(out_m[idx_20k] - out_m[idx_16k]) <= 0.75, (
+        "HF compensation should shelf above the cap instead of continuing to "
+        "lift the target toward 20 kHz"
+    )
+    lift_16k = float(out_m[idx_16k] - neutral_m[idx_16k])
+    lift_20k = float(out_m[idx_20k] - neutral_m[idx_20k])
+    assert lift_20k <= lift_16k + 1e-9
+    assert lift_20k >= lift_16k - 0.15
+
+
+def test_hf_slope_window_guard_skips_invalid_cap():
+    assert _target_synthesis_hf_slope_hi_hz(2000.0) == pytest.approx(10000.0)
+    assert _target_synthesis_hf_slope_hi_hz(10000.0) is None
+    assert _target_synthesis_hf_slope_hi_hz(12000.0) is None
 
 
 def test_rt60_long_bass_reduces_adaptive_bass_target():

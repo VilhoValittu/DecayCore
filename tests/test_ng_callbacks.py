@@ -5,6 +5,7 @@ from decaycore.ui.ng_callbacks import (
     _register_ir_window_callbacks,
     _register_bass_integration_callbacks,
     _register_mode_callbacks,
+    _register_target_callbacks,
     _sync_bass_integration_visibility,
 )
 
@@ -75,6 +76,31 @@ def test_mode_change_disables_bass_integration_when_leaving_auto(monkeypatch) ->
     assert seen_modes == ["BASIC"]
 
 
+def test_mode_change_restores_last_manual_target_when_leaving_auto_adaptive(monkeypatch) -> None:
+    ctrl.reset()
+    ctrl.register("mode", _ReactiveControl("AUTO"))
+    ctrl.register("bass_integration_enable", _ReactiveControl(False))
+    ctrl.register("camillafir_automatic_mode", ctrl._ValueHolder(True))
+    ctrl.register("hc_mode", _ReactiveControl("Adaptive"))
+    ctrl.register("auto_target_mode", _ReactiveControl("adaptive"))
+    ctrl.register("_manual_hc_mode", ctrl._ValueHolder("Harman6"))
+
+    seen_modes: list[str] = []
+    monkeypatch.setattr("decaycore.ui.ng_callbacks._sync_bass_integration_visibility", lambda: None)
+    monkeypatch.setattr("decaycore.ui.ng_callbacks._update_target_preview", lambda: None)
+    monkeypatch.setattr(
+        "decaycore.ui.ng_mode_controls.on_mode_change",
+        lambda *, mode, t: seen_modes.append(mode),
+    )
+
+    _register_mode_callbacks(t=_t)
+    ctrl.set_value("mode", "BASIC")
+
+    assert ctrl.value("hc_mode") == "Harman6"
+    assert ctrl.value("camillafir_automatic_mode") is False
+    assert seen_modes == ["BASIC"]
+
+
 def test_enabling_bass_integration_forces_auto_mode(monkeypatch) -> None:
     ctrl.reset()
     ctrl.register("mode", _ReactiveControl("BASIC"))
@@ -89,6 +115,24 @@ def test_enabling_bass_integration_forces_auto_mode(monkeypatch) -> None:
 
     assert ctrl.value("mode") == "AUTO"
     assert ctrl.value("camillafir_automatic_mode") is True
+
+
+def test_auto_target_mode_selected_restores_last_manual_target_from_adaptive(monkeypatch) -> None:
+    ctrl.reset()
+    ctrl.register("mode", _ReactiveControl("AUTO"))
+    ctrl.register("hc_mode", _ReactiveControl("Adaptive"))
+    ctrl.register("auto_goal", _ReactiveControl("balanced"))
+    ctrl.register("auto_target_mode", _ReactiveControl("adaptive"))
+    ctrl.register("hc_custom_file", ctrl._ValueHolder(None))
+    ctrl.register("_manual_hc_mode", ctrl._ValueHolder("Harman8"))
+
+    monkeypatch.setattr("decaycore.ui.ng_callbacks._update_target_preview", lambda: None)
+    monkeypatch.setattr("decaycore.ui.ng_mode_controls.update_target_curve_controls_ui", lambda: None)
+
+    _register_target_callbacks(t=_t)
+    ctrl.set_value("auto_target_mode", "selected")
+
+    assert ctrl.value("hc_mode") == "Harman8"
 
 
 def test_bass_integration_scopes_stay_hidden_outside_auto_mode() -> None:

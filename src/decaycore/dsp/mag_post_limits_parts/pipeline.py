@@ -689,8 +689,11 @@ def _run_transition_fade_stage(  # noqa: C901 - transition fade keeps the band-e
 
     band_width = max(mag_c_max_fade - mag_c_min_fade, 0.0)
     if band_width > 0.0:
-        min_f_start = mag_c_max_fade - 0.25 * band_width
-        f_start = max(mag_c_max_fade - trans_width_fade, min_f_start, mag_c_min_fade)
+        # Fade covers at least 25 % of the correction band so that a narrow
+        # trans_width doesn't leave the upper 75 % fully unconstrained when
+        # mag_c_max is very high (e.g. 20 000 Hz).
+        min_fade_width = max(trans_width_fade, 0.25 * band_width)
+        f_start = max(mag_c_max_fade - min_fade_width, mag_c_min_fade)
     else:
         f_start = max(mag_c_max_fade - trans_width_fade, mag_c_min_fade)
     f_mask = (freq_axis > f_start) & (freq_axis <= mag_c_max_fade)
