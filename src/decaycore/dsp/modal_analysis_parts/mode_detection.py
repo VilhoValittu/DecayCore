@@ -308,7 +308,9 @@ def _classify_event(
     if width_oct > 1.0 / 3.0:
         return "broad_buildup", tuple(reasons or ["broad_buildup"])
     support = gd_excess_ms >= 10.0 or area_db_oct >= 0.16 or lr_consistency >= 0.65
-    if peak_db >= 2.0 and min_width_oct <= width_oct <= 1.0 / 3.0 and confidence >= 0.35 and support:
+    strong_decay_support = gd_excess_ms >= 15.0 and area_db_oct >= 0.12
+    confidence_ok = confidence >= 0.20 or strong_decay_support
+    if peak_db >= 2.0 and min_width_oct <= width_oct <= 1.0 / 3.0 and confidence_ok and support:
         return "room_mode", tuple(reasons)
     return "uncertain", tuple(reasons or ["limited_support"])
 
@@ -391,7 +393,10 @@ def _build_room_mode_event(
         "local_comb": 0.10,
     }.get(kind, 0.20)
     lr_factor = 1.0 if left_mag.size != freq.size else float(0.65 + 0.35 * lr_consistency)
-    correction_priority = float(np.clip(severity * conf_mean * kind_factor * lr_factor, 0.0, 1.0))
+    modal_confidence = conf_mean
+    if kind == "room_mode" and gd_excess >= 15.0 and area_db_oct >= 0.12:
+        modal_confidence = max(modal_confidence, 0.35)
+    correction_priority = float(np.clip(severity * modal_confidence * kind_factor * lr_factor, 0.0, 1.0))
     cut_priority = float(np.clip(correction_priority * (0.65 + 0.35 * normalized_gd), 0.0, 1.0))
     safe_cut_db = float(np.clip(peak_db * (0.30 + 0.40 * correction_priority), 0.0, min(6.0, peak_db)))
     safe_width_oct = float(np.clip(width_oct * 1.25, 1.0 / 36.0, 1.0 / 2.0))
@@ -405,7 +410,7 @@ def _build_room_mode_event(
         area_db_oct=float(max(0.0, area_db_oct)),
         gd_excess_ms=float(gd_excess),
         decay_severity=float(decay_severity),
-        confidence=float(conf_mean),
+        confidence=float(modal_confidence),
         lr_consistency=float(lr_consistency),
         severity=float(severity),
         correction_priority=float(correction_priority),
@@ -497,7 +502,7 @@ def detect_room_modes(
 
         local = np.zeros(excess.size, dtype=bool)
         local[1:-1] = (excess[1:-1] >= excess[:-2]) & (excess[1:-1] >= excess[2:])
-        candidate_idxs = np.flatnonzero(local & (excess >= float(min_peak_db)) & (conf >= 0.20))
+        candidate_idxs = np.flatnonzero(local & (excess >= float(min_peak_db)))
         if candidate_idxs.size == 0:
             return _empty_result()
 

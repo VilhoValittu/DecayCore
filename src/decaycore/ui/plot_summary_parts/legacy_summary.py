@@ -87,6 +87,52 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):  # noqa: C901 - 
         except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
             return "n/a"
 
+    def _has_confpull_telemetry(st: dict) -> bool:
+        keys = (
+            "conf_pull_post_floor",
+            "conf_pull_post_ceil",
+            "conf_pull_post_active_pct",
+            "conf_pull_post_strength_mean",
+            "conf_pull_post_strength_max",
+        )
+        for key in keys:
+            try:
+                value = st.get(key, None)
+                if value is not None and np.isfinite(float(value)):
+                    return True
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+                continue
+        return False
+
+    def _fmt_confpull_max_hz(value) -> str:
+        if value is None:
+            return "none"
+        try:
+            x = float(value)
+            if np.isfinite(x):
+                return f"{x:.0f} Hz"
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+            return "n/a"
+        return "n/a"
+
+    def _fmt_confpull_side(side: str, st: dict) -> str:
+        if not _has_confpull_telemetry(st):
+            return f"{side}: n/a"
+        floor = _safe_float(st.get("conf_pull_post_floor", float("nan")), float("nan"))
+        ceil = _safe_float(st.get("conf_pull_post_ceil", float("nan")), float("nan"))
+        gamma_cut = _safe_float(st.get("conf_pull_post_gamma_cut", float("nan")), float("nan"))
+        gamma_boost = _safe_float(st.get("conf_pull_post_gamma_boost", float("nan")), float("nan"))
+        active = _safe_float(st.get("conf_pull_post_active_pct", float("nan")), float("nan"))
+        mean = _safe_float(st.get("conf_pull_post_strength_mean", float("nan")), float("nan"))
+        max_v = _safe_float(st.get("conf_pull_post_strength_max", float("nan")), float("nan"))
+        max_hz = _safe_float(st.get("conf_pull_post_strength_max_hz", float("nan")), float("nan"))
+        max_hz_txt = f" @ {max_hz:.1f} Hz" if np.isfinite(max_hz) else ""
+        return (
+            f"{side}: floor/ceil {floor:.2f}/{ceil:.2f}, max {_fmt_confpull_max_hz(st.get('conf_pull_post_max_hz', None))}, "
+            f"cut/boost gamma {gamma_cut:.2f}/{gamma_boost:.2f}, active {active:.1f}%, "
+            f"pull mean/max {mean:.2f}/{max_v:.2f}{max_hz_txt}"
+        )
+
     def _report_offset_db(st: dict) -> float:
         try:
             if "cmp_offset_db" in st:
@@ -428,6 +474,10 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):  # noqa: C901 - 
         lines.append(f"Band RT60 L: {_fmt_bands(l_bands)}")
         lines.append(f"Band RT60 R: {_fmt_bands(r_bands)}")
     lines.append(f"Confidence: L {l_conf:.1f}% | R {r_conf:.1f}%")
+    if _has_confpull_telemetry(l_stats) or _has_confpull_telemetry(r_stats):
+        lines.append("Confidence pull telemetry (separate from average confidence):")
+        lines.append(_fmt_confpull_side("L", l_stats))
+        lines.append(_fmt_confpull_side("R", r_stats))
     _schr = _fmt_schroeder(l_stats, r_stats, settings)
     if _schr:
         lines.append(f"Schroeder frequency estimate: {_schr}")

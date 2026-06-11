@@ -534,9 +534,10 @@ def _run_bass_boost_restore_stage(
             _pre_post_restore = np.asarray(gain_db, dtype=float).copy()
             restore_lo = float(max(20.0, float(low_hz) + 1e-6))
             restore_hi = float(max(restore_lo, bass_boost_cap_hz))
-            tgt_restore = np.asarray(gain_apply, dtype=float).copy()
-            tgt_restore = np.minimum(tgt_restore, np.asarray(boost_cap_db, dtype=float))
-            tgt_restore = np.maximum(tgt_restore, -np.asarray(cut_cap_db, dtype=float))
+            restore_src = np.asarray(gain_apply, dtype=float)
+            boost_restore_target = np.minimum(restore_src, np.asarray(boost_cap_db, dtype=float))
+            boost_restore_target = np.maximum(boost_restore_target, -np.asarray(cut_cap_db, dtype=float))
+            tgt_restore = np.where(restore_src > 0.0, boost_restore_target, _pre_post_restore)
             gain_db, _restore_meta = apply_bass_boost_post_restore(
                 gain_db,
                 tgt_restore,
@@ -822,7 +823,7 @@ def apply_post_limits_and_metrics(
     try:
         logger.info(
             f"CFG CHECK: conf_pull_floor={cfg_reader.float('conf_pull_floor', 0.05)}, "
-            f"gamma_cut={cfg_reader.float('conf_pull_gamma_cut', 0.55)}, "
+            f"gamma_cut={cfg_reader.float('conf_pull_gamma_cut', 0.45)}, "
             f"low_bass_cut_strength={cfg_reader.float_allow_zero('low_bass_cut_strength', 0.0)}"
         )
     except (AttributeError, TypeError, ValueError, FloatingPointError, IndexError):

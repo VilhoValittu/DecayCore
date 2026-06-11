@@ -103,7 +103,7 @@ def build_combined_sub_transfer(
     *subs: TransferData,
     mode: str = "average",
     max_lag_ms: float = COMBINED_SUB_ALIGNMENT_MAX_LAG_MS,
-    min_confidence: float = 0.60,
+    min_confidence: float = 0.35,
     label: str = "",
 ) -> tuple[TransferData, dict[str, Any]]:
     freqs = np.asarray(template.freqs_hz, dtype=float)
@@ -261,7 +261,7 @@ def build_bundle_combined_sub_transfer(
     mode: str | None = None,
     label: str = "",
     max_lag_ms: float = COMBINED_SUB_ALIGNMENT_MAX_LAG_MS,
-    min_confidence: float = 0.60,
+    min_confidence: float = 0.35,
 ) -> tuple[TransferData, dict[str, Any]]:
     ch = str(channel or "l").strip().lower()
     template = bundle.r_main if ch == "r" else bundle.l_main
@@ -378,7 +378,7 @@ def sum_complex_responses_aligned(
     main: TransferData,
     *subs: TransferData,
     max_lag_ms: float = COMBINED_SUB_ALIGNMENT_MAX_LAG_MS,
-    min_confidence: float = 0.60,
+    min_confidence: float = 0.35,
     label: str = "",
 ) -> tuple[TransferData, dict[str, Any]]:
     """

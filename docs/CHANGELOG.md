@@ -8,6 +8,34 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
+## [1.1.0] - 11-6-2026
+
+### AUTO Mode — More room-aware correction decisions
+
+DecayCore's AUTO mode now makes correction decisions from a stronger acoustic model. Modal support, decay need, confidence, repeatability, null risk, and reflection risk are evaluated together, helping the filter focus on problems the measurement actually supports while staying conservative around uncertain or risky regions.
+
+### Residual peaks — Smarter handling of stubborn bass problems
+
+Residual peak analysis is now more modal-aware. DecayCore can distinguish real room-mode buildup from ordinary ripple more reliably, promote well-supported modal residuals, and refine the winner around the frequencies that matter most. This improves cleanup of stubborn low-frequency peaks without turning AUTO mode into an over-correction engine.
+
+### Bass correction — Better confidence where the room allows it
+
+Low-frequency correction is now easier to unlock when the measurement is consistent. Q-factor estimation, robust gradient checks, adaptive RT60 delta limits, and tuned confidence thresholds help DecayCore separate correctable bass buildup from low-confidence measurement artifacts.
+
+### Hybrid IIR + FIR — More useful modal targeting
+
+Hybrid IIR modal cuts are now better integrated with residual peak winner polish. When a supported modal peak remains after FIR correction, AUTO mode can explore a targeted Hybrid IIR option with safer frequency bounds and confidence-aware gating. The default upper modal range has been expanded to 200 Hz for rooms where the evidence supports it.
+
+### Advanced controls and reporting — Clearer, more inspectable results
+
+Advanced confidence-pull controls now expose frequency range and separate cut/boost shaping behavior. Presets have been updated, and result summaries report the applied confidence-pull behavior more clearly, making it easier to understand why the final filter is cautious, assertive, or somewhere in between.
+
+### Reliability — Cache signatures updated for the new acoustic policy
+
+AUTO cache signatures now include the updated residual peak scoring, gain authority, confidence model, and Hybrid IIR policy details. This prevents older cached decisions from being reused under the new 1.1.0 acoustic logic.
+
+---
+
 ## [1.0.9.3] - 9-6-2026
 
 ### Target Synthesis — Enhanced cache and algorithm stability

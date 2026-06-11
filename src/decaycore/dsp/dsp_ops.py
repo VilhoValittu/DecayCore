@@ -23,11 +23,11 @@ def apply_confidence_weighted_target_pull(
     confidence_mask,
     *,
     conf_floor: float = 0.07,
-    conf_ceil: float = 0.95,
+    conf_ceil: float = 0.85,
     freq_axis=None,
     freq_limit_hz: float | None = 400.0,
-    gamma_cut: float = 0.70,
-    gamma_boost: float = 1.20,
+    gamma_cut: float = 0.45,
+    gamma_boost: float = 0.35,
     return_telemetry: bool = False,
 ):
     try:

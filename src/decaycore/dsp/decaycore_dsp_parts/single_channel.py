@@ -110,6 +110,20 @@ def _authority_array_mode(include_response_arrays: bool) -> bool | str:
     return True if bool(include_response_arrays) else "scoring"
 
 
+def _strip_ui_authority_arrays_for_score_only(stats: dict, *, include_response_arrays: bool) -> None:
+    if bool(include_response_arrays):
+        return
+    for key in (
+        "authority_cut",
+        "authority_boost",
+        "authority_phase",
+        "authority_reflection_risk",
+        "authority_repeatability",
+        "authority_minphase_likelihood",
+    ):
+        stats.pop(key, None)
+
+
 def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limits, and stats in one place
     freqs,
     meas_mags,
@@ -424,6 +438,7 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
             confidence_mask=conf_mask,
             group_delay_ms=authority_gd_ms,
             reflection_nodes=reflections,
+            rt60_by_band=rt60_bands,
             mag_c_min=float(getattr(cfg, "mag_c_min", 20.0) or 20.0),
             mag_c_max=float(getattr(cfg, "mag_c_max", 300.0) or 300.0),
             phase_limit_hz=float(getattr(cfg, "phase_c_max", 600.0) or 600.0),
@@ -605,6 +620,7 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
     except (TypeError, ValueError, FloatingPointError, IndexError, KeyError):
         pass
 
+    _strip_ui_authority_arrays_for_score_only(stats, include_response_arrays=bool(include_response_arrays))
     return _assemble_generate_filter_result(impulse, stats)
 
 

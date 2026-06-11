@@ -308,6 +308,65 @@ def _normalized_policy_divergence_ratios(
     return ratios
 
 
+def band_lr_spectral_xcorr_from_stats(
+    left_stats: dict | None,
+    right_stats: dict | None,
+    *,
+    lo_hz: float,
+    hi_hz: float,
+    corrected: bool = True,
+    n_lag_bins: int = 16,
+) -> tuple[float, float]:
+    """Cross-correlation of level-normalised L/R spectral shapes in a band.
+
+    Returns (peak_corr, lag_octaves):
+    - peak_corr: Pearson correlation at best log-frequency lag, -1..1
+    - lag_octaves: log-frequency shift at best correlation (>0 means L leads R)
+
+    Detects whether channels differ in spectral shape (room-mode pattern) vs.
+    just overall level — useful for diagnosing asymmetric room placement.
+    NaN is returned when data are insufficient.
+    """
+    kind = "corrected" if bool(corrected) else "raw"
+    f_l, y_l = _stats_curve_from_kind(left_stats, kind)
+    f_r, y_r = _stats_curve_from_kind(right_stats, kind)
+    if f_l is None or y_l is None or f_r is None or y_r is None:
+        return float("nan"), float("nan")
+
+    lo = max(float(lo_hz), float(np.min(f_l)), float(np.min(f_r)))
+    hi = min(float(hi_hz), float(np.max(f_l)), float(np.max(f_r)))
+    if hi <= lo * 1.1:
+        return float("nan"), float("nan")
+
+    n_pts = max(32, int(round(np.log2(hi / lo) * 20)))
+    f_grid = np.logspace(np.log10(lo), np.log10(hi), n_pts)
+
+    yl_i = _interp_curve(f_l, y_l, f_grid)
+    yr_i = _interp_curve(f_r, y_r, f_grid)
+    if yl_i is None or yr_i is None:
+        return float("nan"), float("nan")
+
+    # Remove overall level offset so we compare spectral shape only.
+    yl_n = yl_i - float(np.nanmean(yl_i))
+    yr_n = yr_i - float(np.nanmean(yr_i))
+
+    n_lag = min(int(n_lag_bins), n_pts // 4)
+    xcorr = np.correlate(yl_n, yr_n, mode="full")
+    mid = len(xcorr) // 2
+    norm = float(np.sqrt(np.sum(yl_n ** 2) * np.sum(yr_n ** 2))) + 1e-12
+    xcorr_n = xcorr / norm
+
+    window = xcorr_n[mid - n_lag: mid + n_lag + 1]
+    best_idx = int(np.argmax(window))
+    best_lag_bins = best_idx - n_lag
+
+    oct_per_bin = float(np.log2(hi / lo)) / float(max(n_pts - 1, 1))
+    lag_oct = float(best_lag_bins) * oct_per_bin
+
+    peak_corr = float(np.clip(window[best_idx], -1.0, 1.0))
+    return peak_corr, lag_oct
+
+
 def worst_channel_relief_db(
     shared_left_stats: dict | None,
     shared_right_stats: dict | None,

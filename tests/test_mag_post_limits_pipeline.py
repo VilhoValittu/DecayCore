@@ -548,3 +548,45 @@ def test_bass_boost_restore_trace_stays_within_caps():
     assert restore
     assert restore[0]["restored_allowed_correction"] is True
     assert float(np.max(out.gain_db)) <= 2.0 + 1e-6
+
+
+def test_bass_boost_restore_does_not_relax_bass_cuts():
+    st = {}
+    gain_apply = np.full(128, -2.0, dtype=float)
+    cfg = SimpleNamespace(
+        max_boost_db=2.0,
+        max_cut_db=15.0,
+        low_bass_cut_enable=False,
+        low_bass_cut_hz=0.0,
+        low_bass_cut_strength=0.0,
+        exc_prot=False,
+        exc_freq=0.0,
+        bass_boost_cap_enable=False,
+        bass_boost_post_restore_enable=True,
+        bass_boost_post_restore_strength=1.0,
+        reg_strength=0.0,
+        is_wav_source=False,
+        mag_c_min=20.0,
+        mag_c_max=400.0,
+        trans_width=80.0,
+        max_slope_db_per_oct=0.0,
+        max_slope_boost_db_per_oct=0.0,
+        max_slope_cut_db_per_oct=0.0,
+        conf_pull_floor=0.05,
+        conf_pull_gamma_cut=0.55,
+        mid_refit_hz_lo=200.0,
+        mid_refit_hz_hi=2000.0,
+        do_normalize=False,
+        global_gain_db=0.0,
+    )
+    freq_axis, _, inputs = _make_inputs(gain_apply=gain_apply, cfg=cfg, st=st)
+
+    out = apply_post_limits_and_metrics(inputs, apply_mid_refit_pre_slope=lambda gain_db, *_args, **_kwargs: gain_db * 2.0)
+
+    bass_mask = (freq_axis >= 25.0) & (freq_axis <= 180.0)
+    assert np.any(bass_mask)
+    assert float(np.max(out.gain_db[bass_mask])) < -3.9
+    assert st["bass_boost_post_restore_bins"] == 0
+    restore = [item for item in st["mag_authority_trace"] if item["stage"] == "after_bass_boost_restore"]
+    assert restore
+    assert restore[0]["changed_bins"] == 0

@@ -87,14 +87,14 @@ _BASS_ALLPASS_ALGO_V = 1
 _BASS_INTEGRATION_COMBINE_ALGO_V = 1
 _DIRECT_DAC_SUB_TARGET_POLICY_V = 1
 _AUTO_TDC_DECAY_SCORING_ALGO_V = 2
-_AUTO_BROAD_RESIDUAL_PEAK_SCORING_ALGO_V = 1
+_AUTO_BROAD_RESIDUAL_PEAK_SCORING_ALGO_V = 2
 _AUTO_CORRECTION_SHARPNESS_SCORING_ALGO_V = 1
 _AUTO_DIP_FILL_RISK_SCORING_ALGO_V = 1
 _AUTO_CHANNEL_OVERFIT_SCORING_ALGO_V = 1
 _AUTO_VOICE_CLARITY_SCORING_ALGO_V = 1
 _AUTO_RESIDUAL_PEAK_WINNER_POLISH_POLICY_V = 2
-_AUTO_GAIN_AUTHORITY_POLICY_V = 1
-_AUTO_CONFIDENCE_MODEL_POLICY_V = 1
+_AUTO_GAIN_AUTHORITY_POLICY_V = 2
+_AUTO_CONFIDENCE_MODEL_POLICY_V = 2
 _AUTO_BASS_INTEGRATION_FEASIBILITY_POLICY_V = 1
 _AUTO_PHASE_GD_GUARD_POLICY_V = 1
 _AUTO_MEASUREMENT_METADATA_IDENTITY_V = 1
@@ -274,14 +274,17 @@ def _auto_signature_payload(
                 _auto_safe_float(base_data.get("hybrid_iir_max_filters_per_channel", 3), 3)
             ),
             "min_freq_hz": float(_auto_safe_float(base_data.get("hybrid_iir_min_freq_hz", 20.0), 20.0)),
-            "max_freq_hz": float(_auto_safe_float(base_data.get("hybrid_iir_max_freq_hz", 150.0), 150.0)),
+            "max_freq_hz": float(_auto_safe_float(base_data.get("hybrid_iir_max_freq_hz", 200.0), 200.0)),
             "min_peak_db": float(_auto_safe_float(base_data.get("hybrid_iir_min_peak_db", 4.0), 4.0)),
             "min_q": float(_auto_safe_float(base_data.get("hybrid_iir_min_q", 3.0), 3.0)),
             "max_q": float(_auto_safe_float(base_data.get("hybrid_iir_max_q", 12.0), 12.0)),
             "max_cut_db": float(_auto_safe_float(base_data.get("hybrid_iir_max_cut_db", 6.0), 6.0)),
-            "min_confidence": float(_auto_safe_float(base_data.get("hybrid_iir_min_confidence", 0.65), 0.65)),
+            "min_confidence": float(_auto_safe_float(base_data.get("hybrid_iir_min_confidence", 0.30), 0.30)),
             "min_gd_excess_ms": float(
                 _auto_safe_float(base_data.get("hybrid_iir_min_gd_excess_ms", 15.0), 15.0)
+            ),
+            "min_cut_priority": float(
+                _auto_safe_float(base_data.get("hybrid_iir_min_cut_priority", 0.0), 0.0)
             ),
         },
         "gain_authority_policy": {
@@ -314,10 +317,10 @@ def _auto_signature_payload(
         "confidence_model": {
             "policy_v": int(_AUTO_CONFIDENCE_MODEL_POLICY_V),
             "conf_pull_floor": float(_auto_safe_float(base_data.get("conf_pull_floor", 0.05), 0.05)),
-            "conf_pull_ceil": float(_auto_safe_float(base_data.get("conf_pull_ceil", 0.95), 0.95)),
+            "conf_pull_ceil": float(_auto_safe_float(base_data.get("conf_pull_ceil", 0.85), 0.85)),
             "conf_pull_max_hz": float(_auto_safe_float(base_data.get("conf_pull_max_hz", float("nan")), float("nan"))),
-            "conf_pull_gamma_cut": float(_auto_safe_float(base_data.get("conf_pull_gamma_cut", 0.55), 0.55)),
-            "conf_pull_gamma_boost": float(_auto_safe_float(base_data.get("conf_pull_gamma_boost", 1.35), 1.35)),
+            "conf_pull_gamma_cut": float(_auto_safe_float(base_data.get("conf_pull_gamma_cut", 0.45), 0.45)),
+            "conf_pull_gamma_boost": float(_auto_safe_float(base_data.get("conf_pull_gamma_boost", 0.35), 0.35)),
             "conf_pull_conf_smooth_sigma": float(
                 _auto_safe_float(base_data.get("conf_pull_conf_smooth_sigma", 2.0), 2.0)
             ),
@@ -326,6 +329,12 @@ def _auto_signature_payload(
             ),
             "conf_pull_bass_floor_min": float(
                 _auto_safe_float(base_data.get("conf_pull_bass_floor_min", 0.25), 0.25)
+            ),
+            "conf_pull_bass_boost_floor_min": float(
+                _auto_safe_float(base_data.get("conf_pull_bass_boost_floor_min", 0.55), 0.55)
+            ),
+            "conf_pull_bass_boost_restore": float(
+                _auto_safe_float(base_data.get("conf_pull_bass_boost_restore", 0.70), 0.70)
             ),
             "bass_first_ai": bool(base_data.get("bass_first_ai", True)),
             "bass_first_mode_max_hz": float(

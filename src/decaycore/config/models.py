@@ -413,7 +413,7 @@ class FilterConfig:
     bass_boost_cap_enable: bool = True
     bass_boost_cap_hz: float = 200.0
     bass_boost_cap_extra_db: float = 5.0
-    bass_boost_cap_conf_min: float = 0.55
+    bass_boost_cap_conf_min: float = 0.30
     bass_boost_post_restore_enable: bool = True
     bass_boost_post_restore_strength: float = 0.90
     acoustic_authority_limits_enable: bool = True
@@ -444,12 +444,12 @@ class FilterConfig:
     hybrid_iir_enabled: bool = False
     hybrid_iir_max_filters_per_channel: int = 3
     hybrid_iir_min_freq_hz: float = 20.0
-    hybrid_iir_max_freq_hz: float = 150.0
+    hybrid_iir_max_freq_hz: float = 200.0
     hybrid_iir_min_peak_db: float = 4.0
     hybrid_iir_min_q: float = 3.0
     hybrid_iir_max_q: float = 12.0
     hybrid_iir_max_cut_db: float = 6.0
-    hybrid_iir_min_confidence: float = 0.65
+    hybrid_iir_min_confidence: float = 0.30
     hybrid_iir_min_gd_excess_ms: float = 15.0
     hybrid_iir_min_cut_priority: float = 0.0
 
@@ -551,18 +551,18 @@ class FilterConfig:
     low_bass_cut_hz: float = 20.0
     room_volume_m3: float = 40.0
 
-    conf_pull_floor: float = 0.15
-    conf_pull_ceil: float = 0.95
+    conf_pull_floor: float = 0.05
+    conf_pull_ceil: float = 0.85
     conf_pull_max_hz: Optional[float] = 200.0
-    conf_pull_gamma_cut: float = 0.55
-    conf_pull_gamma_boost: float = 0.20
+    conf_pull_gamma_cut: float = 0.45
+    conf_pull_gamma_boost: float = 0.35
 
     conf_pull_conf_smooth_sigma: float = 2.0
     conf_pull_bass_floor_hz: float = 120.0
     conf_pull_bass_floor_min: float = 0.25
     conf_pull_bass_boost_floor_hz: float = 200.0
-    conf_pull_bass_boost_floor_min: float = 0.25
-    conf_pull_bass_boost_restore: float = 0.35
+    conf_pull_bass_boost_floor_min: float = 0.55
+    conf_pull_bass_boost_restore: float = 0.70
 
     low_bass_cut_enable: bool = True
     low_bass_cut_strength: float = 0.0

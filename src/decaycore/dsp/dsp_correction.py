@@ -14,6 +14,7 @@ import numpy as np
 
 from decaycore.auto_mode.auto_mode_profile import profiled_section
 
+from .acoustic_authority import acoustic_authority_to_stats, build_acoustic_authority_map
 from .correction_baseline import _prepare_correction_baseline
 from .correction_mag import _run_mag_correction_pipeline
 from .correction_types import (
@@ -28,6 +29,59 @@ def _sanitize_freq_axis(freq_axis: np.ndarray) -> np.ndarray:
     """Normalisoi taajuusakselin 1D-float-taulukoksi ilman algoritmimuutosta."""
     axis = np.asarray(freq_axis, dtype=float)
     return axis.ravel() if axis.ndim != 1 else axis
+
+
+def _store_correction_authority_stats(
+    *,
+    cfg,
+    freq_axis: np.ndarray,
+    st: dict,
+    m_anal: np.ndarray,
+    calc_offset_db: float,
+    target_mags: np.ndarray,
+    gain_db: np.ndarray,
+    conf_mask: np.ndarray,
+    reflections,
+    rt60_bands,
+    logger,
+) -> None:
+    try:
+        authority_gd_ms = st.get("group_delay_ms", None) if isinstance(st, dict) else None
+        if authority_gd_ms is None and isinstance(st, dict):
+            authority_gd_ms = st.get("gd_ms", None)
+        authority = build_acoustic_authority_map(
+            freq_axis,
+            np.asarray(m_anal, dtype=float) - float(calc_offset_db),
+            target_mag_db=target_mags,
+            corrected_mag_db=gain_db,
+            confidence_mask=conf_mask,
+            group_delay_ms=authority_gd_ms,
+            reflection_nodes=reflections,
+            rt60_by_band=rt60_bands,
+            mag_c_min=float(getattr(cfg, "mag_c_min", 20.0) or 20.0),
+            mag_c_max=float(getattr(cfg, "mag_c_max", 300.0) or 300.0),
+            phase_limit_hz=float(getattr(cfg, "phase_c_max", 600.0) or 600.0),
+        )
+        st.update(acoustic_authority_to_stats(authority, include_arrays=True))
+        st["acoustic_authority_stage"] = "pre_mag_post_limits"
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ) as exc:
+        try:
+            logger.warning("acoustic authority map failed before mag correction", exc_info=True)
+        except (AttributeError, TypeError, ValueError):
+            pass
+        if isinstance(st, dict):
+            st["acoustic_authority_error"] = str(exc)
 
 
 def run_correction_stage(
@@ -155,6 +209,19 @@ def _run_correction_stage(inputs: CorrectionInputs) -> CorrectionOutputs:
         cmp=cmp,
         native=baseline.native_telemetry,
         comparison=baseline.comparison_telemetry,
+    )
+    _store_correction_authority_stats(
+        cfg=cfg,
+        freq_axis=freq_axis,
+        st=st,
+        m_anal=m_anal,
+        calc_offset_db=float(calc_offset_db),
+        target_mags=target_mags,
+        gain_db=gain_db,
+        conf_mask=conf_mask,
+        reflections=reflections,
+        rt60_bands=rt60_bands,
+        logger=logger,
     )
 
     # Magnitude-korjaus: confidence, regularisointi, smoothing, rajat ja metriikat.

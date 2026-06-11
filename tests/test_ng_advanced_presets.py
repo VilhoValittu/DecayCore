@@ -27,6 +27,11 @@ _STRINGS = {
     "adv_summary_floor": "Floor",
     "adv_summary_ceil": "Ceil",
     "adv_summary_span": "Active span",
+    "adv_summary_max_hz": "Max Hz",
+    "adv_summary_cut_gamma": "Cut gamma",
+    "adv_summary_boost_gamma": "Boost gamma",
+    "adv_summary_bass_boost_floor": "Bass boost floor",
+    "adv_summary_bass_restore": "Bass restore",
     "state_on": "ON",
     "state_off": "OFF",
     "df_smoothing_label": "Frequency correction consistency",
@@ -69,8 +74,13 @@ def _register_defaults() -> None:
         "hpf_slope": 24,
         "bass_first_ai": False,
         "bass_first_mode_max_hz": 200.0,
-        "conf_pull_floor": 0.10,
-        "conf_pull_ceil": 0.90,
+        "conf_pull_floor": 0.05,
+        "conf_pull_ceil": 0.85,
+        "conf_pull_max_hz": 200.0,
+        "conf_pull_gamma_cut": 0.45,
+        "conf_pull_gamma_boost": 0.35,
+        "conf_pull_bass_boost_floor_min": 0.55,
+        "conf_pull_bass_boost_restore": 0.70,
     }.items():
         ctrl.register(name, _DummyControl(value))
 
@@ -101,12 +111,21 @@ def test_apply_conf_pull_preset_uses_requested_range():
     _register_defaults()
 
     apply_conf_pull_preset(NORMAL)
-    assert ctrl.value("conf_pull_floor") == 0.10
-    assert ctrl.value("conf_pull_ceil") == 0.90
+    assert ctrl.value("conf_pull_floor") == 0.05
+    assert ctrl.value("conf_pull_ceil") == 0.85
+    assert ctrl.value("conf_pull_max_hz") == 200.0
+    assert ctrl.value("conf_pull_gamma_cut") == 0.45
+    assert ctrl.value("conf_pull_gamma_boost") == 0.35
+    assert ctrl.value("conf_pull_bass_boost_floor_min") == 0.55
+    assert ctrl.value("conf_pull_bass_boost_restore") == 0.70
 
     apply_conf_pull_preset(SAFE)
     assert ctrl.value("conf_pull_floor") == 0.20
+    assert ctrl.value("conf_pull_ceil") == 0.95
+
+    apply_conf_pull_preset(AGGRESSIVE)
     assert ctrl.value("conf_pull_ceil") == 0.75
+    assert ctrl.value("conf_pull_gamma_cut") == 0.35
 
 
 def test_build_shaping_summary_reports_hidden_effective_state():
@@ -139,4 +158,7 @@ def test_build_conf_pull_summary_reports_active_span():
 
     summary = build_conf_pull_summary(t=_t)
 
-    assert summary == "Floor: 0.1 | Ceil: 0.9 | Active span: 0.8"
+    assert summary == (
+        "Floor: 0.05 | Ceil: 0.85 | Active span: 0.8 | Max Hz: 200 Hz | "
+        "Cut gamma: 0.45 | Boost gamma: 0.35 | Bass boost floor: 0.55 | Bass restore: 0.7"
+    )

@@ -81,6 +81,27 @@ _SYNTH_HARMAN6_SLOPE_DB_OCT = _slope_db_oct(_SYNTH_FREQS[1:], _SYNTH_BASE_MAGS[1
 _RT60_TARGET_DELTA_LIMIT_DB = 4.0
 
 
+def _adaptive_rt60_delta_limit(bands: dict[float, float]) -> float:
+    """Scale the RT60 delta clip by how consistent the measured RT60 bands are.
+
+    Consistent bands (low CV) → measurement is reliable → allow up to the
+    full 4.0 dB delta.  Highly variable bands → be conservative → cap at 2.0 dB.
+    Falls back to the full limit when fewer than 3 valid bands are present.
+    """
+    if not bands:
+        return float(_RT60_TARGET_DELTA_LIMIT_DB)
+    vals = [float(v) for v in bands.values() if np.isfinite(v) and v > 0.0]
+    if len(vals) < 3:
+        return float(_RT60_TARGET_DELTA_LIMIT_DB)
+    mean_rt = float(np.mean(vals))
+    if mean_rt <= 0.0:
+        return float(_RT60_TARGET_DELTA_LIMIT_DB)
+    cv = float(np.std(vals) / mean_rt)
+    lo_limit = float(_RT60_TARGET_DELTA_LIMIT_DB) * 0.5   # 2.0 dB at high CV
+    hi_limit = float(_RT60_TARGET_DELTA_LIMIT_DB)          # 4.0 dB at low CV
+    return float(np.clip(np.interp(cv, [0.05, 0.6], [hi_limit, lo_limit]), lo_limit, hi_limit))
+
+
 def _coerce_rt60_bands(value) -> dict[float, float]:
     if not isinstance(value, dict):
         return {}
@@ -371,6 +392,7 @@ def synthesize_target_from_measurements(
         tilt_frac=float(tilt_comp_frac),
         hf_comp_frac=float(hf_comp_frac),
     )
+    rt60_bands = _combined_rt60_bands(measurements)
     bass_eff, tilt_eff = _rt60_adjusted_compensation(
         measurements,
         bass_comp_frac=float(bass_comp_frac),
@@ -390,7 +412,8 @@ def synthesize_target_from_measurements(
             tilt_frac=float(tilt_eff),
             hf_comp_frac=float(hf_comp_frac),
         )
-        rt60_delta = np.clip(m_rt60 - m_base, -_RT60_TARGET_DELTA_LIMIT_DB, _RT60_TARGET_DELTA_LIMIT_DB)
+        delta_limit = _adaptive_rt60_delta_limit(rt60_bands)
+        rt60_delta = np.clip(m_rt60 - m_base, -delta_limit, delta_limit)
         m_work = m_base + rt60_delta
     else:
         m_work = m_base

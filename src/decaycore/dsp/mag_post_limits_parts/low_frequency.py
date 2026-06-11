@@ -106,7 +106,7 @@ def _prepare_boost_caps(
     cap_enable = cfg_reader.bool("bass_boost_cap_enable", True)
     bass_boost_cap_extra_db = float(max(0.0, cfg_reader.float_allow_zero("bass_boost_cap_extra_db", 5.0)))
     bass_boost_cap_hz = float(max(20.0, cfg_reader.float("bass_boost_cap_hz", 200.0)))
-    bass_boost_cap_conf_min = float(np.clip(cfg_reader.float("bass_boost_cap_conf_min", 0.55), 0.0, 0.99))
+    bass_boost_cap_conf_min = float(np.clip(cfg_reader.float("bass_boost_cap_conf_min", 0.30), 0.0, 0.99))
     bass_boost_post_restore_enable = cfg_reader.bool("bass_boost_post_restore_enable", True)
     bass_boost_post_restore_strength = float(
         np.clip(cfg_reader.float_allow_zero("bass_boost_post_restore_strength", 1.05), 0.0, 1.0)

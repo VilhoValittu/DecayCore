@@ -96,3 +96,57 @@ def test_confpull_post_slope_preserves_guarded_bass_boost_in_isolation_mode():
     assert 0.0 < float(st.get("conf_pull_post_bass_boost_restore", -1.0)) <= 0.85
     assert float(np.min(out[boost_band])) > 0.0
     assert float(np.max(out[boost_band])) <= 2.0 + 1e-9
+
+
+def test_confpull_default_fallback_preserves_more_moderate_confidence_bass_boost():
+    n = 128
+    freq_axis = np.geomspace(10.0, 500.0, n).astype(float)
+    mask_c = np.ones(n, dtype=bool)
+    conf_mask = np.full(n, 0.60, dtype=float)
+    gain_db = np.zeros(n, dtype=float)
+    boost_band = (freq_axis >= 35.0) & (freq_axis <= 130.0)
+    gain_db[boost_band] = 2.0
+    measured_ref = np.zeros(n, dtype=float)
+
+    strict_cfg = SimpleNamespace(
+        conf_pull_floor=0.05,
+        conf_pull_ceil=0.95,
+        conf_pull_max_hz=300.0,
+        conf_pull_gamma_cut=0.55,
+        conf_pull_gamma_boost=1.35,
+        conf_pull_conf_smooth_sigma=2.0,
+        conf_pull_bass_floor_hz=120.0,
+        conf_pull_bass_floor_min=0.25,
+        conf_pull_bass_boost_floor_hz=200.0,
+        conf_pull_bass_boost_floor_min=0.45,
+        conf_pull_bass_boost_restore=0.55,
+    )
+    loose_cfg = SimpleNamespace()
+
+    strict = _apply_confpull_post_slope(
+        gain_db_in=gain_db,
+        mask_c_in=mask_c,
+        measured_ref_db=measured_ref,
+        cfg=strict_cfg,
+        st={},
+        conf_mask=conf_mask,
+        freq_axis=freq_axis,
+        logger=_NullLogger(),
+        apply_confidence_weighted_target_pull=apply_confidence_weighted_target_pull,
+    )
+    loose = _apply_confpull_post_slope(
+        gain_db_in=gain_db,
+        mask_c_in=mask_c,
+        measured_ref_db=measured_ref,
+        cfg=loose_cfg,
+        st={},
+        conf_mask=conf_mask,
+        freq_axis=freq_axis,
+        logger=_NullLogger(),
+        apply_confidence_weighted_target_pull=apply_confidence_weighted_target_pull,
+    )
+    strict = np.asarray(strict, dtype=float)
+    loose = np.asarray(loose, dtype=float)
+
+    assert float(np.mean(loose[boost_band])) > float(np.mean(strict[boost_band]))
+    assert float(np.max(loose[boost_band])) <= 2.0 + 1e-9

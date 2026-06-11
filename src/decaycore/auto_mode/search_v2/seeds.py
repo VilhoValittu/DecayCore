@@ -88,6 +88,14 @@ def _restore_auto_mag_c_min_seed(search_data: dict, seed_hz: float) -> None:
     search_data["mag_c_min"] = float(seed_hz)
 
 
+def _seed_preset_for_selected_target(seed_preset: dict, selected_hc_mode: str | None) -> dict:
+    seed = dict(seed_preset or {})
+    hc = str(selected_hc_mode or "").strip()
+    if hc and "hc_mode" in seed:
+        seed["hc_mode"] = str(hc)
+    return seed
+
+
 def _apply_explicit_seed(
     *,
     search_base_data: dict,
@@ -110,6 +118,11 @@ def _apply_explicit_seed(
         logger.debug("Failed to read automatic-mode prior seed preset", exc_info=True)
         prior_seed_preset = {}
     if seed_preset:
+        selected_hc_mode = str(
+            cache_base_data.get("hc_mode", search_base_data.get("hc_mode", "")) or ""
+        ).strip()
+        seed_preset = _seed_preset_for_selected_target(seed_preset, selected_hc_mode)
+        search_base_data["_auto_target_seed_preset"] = dict(seed_preset)
         mag_c_min_seed_hz = auto_api._auto_safe_float(
             search_base_data.get("_auto_mag_c_min_hz", search_base_data.get("mag_c_min", float("nan"))),
             float("nan"),
@@ -136,6 +149,10 @@ def _apply_seed_payload(
 ) -> bool:
     if not (isinstance(seed_preset, dict) and seed_preset):
         return False
+    selected_hc_mode = str(
+        cache_base_data.get("hc_mode", search_base_data.get("hc_mode", "")) or ""
+    ).strip()
+    seed_preset = _seed_preset_for_selected_target(seed_preset, selected_hc_mode)
     mag_c_min_seed_hz = auto_api._auto_safe_float(
         search_base_data.get("_auto_mag_c_min_hz", search_base_data.get("mag_c_min", float("nan"))),
         float("nan"),

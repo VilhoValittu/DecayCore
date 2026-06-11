@@ -136,11 +136,28 @@ def analyze_acoustic_confidence(freq_axis, complex_meas, fs):
     raw_nodes = []
     for p in peaks:
         idx = valid_idx[p]
+        f_peak = float(freq_axis[idx])
+        peak_val = float(gd_diff[idx])
+        half_val = peak_val / 2.0
+
+        # Estimate Q from half-height bandwidth in the GD-deviation curve.
+        # Walk left/right from peak to find the -3 dB (half-height) crossing.
+        li, ri = p, p
+        while li > 0 and gd_diff[valid_idx[li - 1]] > half_val:
+            li -= 1
+        while ri < len(valid_idx) - 1 and gd_diff[valid_idx[ri + 1]] > half_val:
+            ri += 1
+        f_lo_bw = float(freq_axis[valid_idx[li]])
+        f_hi_bw = float(freq_axis[valid_idx[ri]])
+        bw = max(f_hi_bw - f_lo_bw, f_peak * 0.02)
+        q_est = round(f_peak / bw, 1)
+
         raw_nodes.append({
-            "freq": round(float(freq_axis[idx]), 1),
-            "gd_error": round(float(gd_diff[idx]), 2),
-            "dist": round(float((gd_diff[idx] / 1000.0 * 343.0) / 2.0), 2),
-            "type": "Resonance" if float(freq_axis[idx]) < 200.0 else "Reflection",
+            "freq": round(f_peak, 1),
+            "gd_error": round(peak_val, 2),
+            "dist": round((peak_val / 1000.0 * 343.0) / 2.0, 2),
+            "q_est": q_est,
+            "type": "Resonance" if f_peak < 200.0 else "Reflection",
         })
 
     reflection_nodes = sorted(raw_nodes, key=lambda x: x["gd_error"], reverse=True)[:15]

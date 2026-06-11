@@ -317,7 +317,7 @@ def build_advanced_tab(*, t: Callable, get_val: Callable, max_safe_boost: float)
                         "hybrid_iir_max_freq_hz",
                         ui.number(
                             label=t("hybrid_iir_max_freq_hz"),
-                            value=float(get_val("hybrid_iir_max_freq_hz", 150.0) or 150.0),
+                            value=float(get_val("hybrid_iir_max_freq_hz", 200.0) or 200.0),
                             format="%.1f",
                         ).props("dense outlined").classes("flex-1"),
                     )
@@ -334,7 +334,7 @@ def build_advanced_tab(*, t: Callable, get_val: Callable, max_safe_boost: float)
                         "hybrid_iir_min_confidence",
                         ui.number(
                             label=t("hybrid_iir_min_confidence"),
-                            value=float(get_val("hybrid_iir_min_confidence", 0.65) or 0.65),
+                            value=float(get_val("hybrid_iir_min_confidence", 0.30) or 0.30),
                             format="%.2f",
                         ).props("dense outlined").classes("flex-1"),
                     )
@@ -420,10 +420,69 @@ def build_advanced_tab(*, t: Callable, get_val: Callable, max_safe_boost: float)
                             format="%.2f",
                         ).props("dense outlined").classes("flex-1"),
                     )
+                    ctrl.register(
+                        "conf_pull_max_hz",
+                        ui.number(
+                            label=t("conf_pull_max_hz_label"),
+                            value=float(get_val("conf_pull_max_hz", 200.0) or 200.0),
+                            format="%.1f",
+                        ).props("dense outlined").classes("flex-1"),
+                    )
+                with ui.row().classes("w-full gap-4"):
+                    ctrl.register(
+                        "conf_pull_gamma_cut",
+                        ui.number(
+                            label=t("conf_pull_gamma_cut_label"),
+                            value=float(get_val("conf_pull_gamma_cut", 0.45) or 0.45),
+                            format="%.2f",
+                            min=0.05,
+                            max=2.0,
+                            step=0.05,
+                        ).props("dense outlined").classes("flex-1"),
+                    )
+                    ctrl.register(
+                        "conf_pull_gamma_boost",
+                        ui.number(
+                            label=t("conf_pull_gamma_boost_label"),
+                            value=float(get_val("conf_pull_gamma_boost", 0.35) or 0.35),
+                            format="%.2f",
+                            min=0.05,
+                            max=2.0,
+                            step=0.05,
+                        ).props("dense outlined").classes("flex-1"),
+                    )
+                with ui.row().classes("w-full gap-4"):
+                    ctrl.register(
+                        "conf_pull_bass_boost_floor_min",
+                        ui.number(
+                            label=t("conf_pull_bass_boost_floor_min_label"),
+                            value=float(get_val("conf_pull_bass_boost_floor_min", 0.55) or 0.55),
+                            format="%.2f",
+                            min=0.0,
+                            max=1.0,
+                            step=0.05,
+                        ).props("dense outlined").classes("flex-1"),
+                    )
+                    ctrl.register(
+                        "conf_pull_bass_boost_restore",
+                        ui.number(
+                            label=t("conf_pull_bass_boost_restore_label"),
+                            value=float(get_val("conf_pull_bass_boost_restore", 0.70) or 0.70),
+                            format="%.2f",
+                            min=0.0,
+                            max=1.0,
+                            step=0.05,
+                        ).props("dense outlined").classes("flex-1"),
+                    )
     # Hide notice label initially (BASIC is default; on_mode_change drives this).
     ctrl.get_container("conf_pull_notice_scope").set_visibility(False)
     ctrl.set_enabled("conf_pull_floor", False)
     ctrl.set_enabled("conf_pull_ceil", False)
+    ctrl.set_enabled("conf_pull_max_hz", False)
+    ctrl.set_enabled("conf_pull_gamma_cut", False)
+    ctrl.set_enabled("conf_pull_gamma_boost", False)
+    ctrl.set_enabled("conf_pull_bass_boost_floor_min", False)
+    ctrl.set_enabled("conf_pull_bass_boost_restore", False)
 
     ui.separator()
 

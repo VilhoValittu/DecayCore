@@ -48,6 +48,8 @@ import numpy as np
 
 
 
+MODAL_ANALYSIS_VERSION = 2
+
 __all__ = ["RoomModeEvent", "ModalAnalysisResult", "detect_room_modes", "modal_support_for_band"]
 
 @dataclass(frozen=True)
@@ -83,7 +85,7 @@ class ModalAnalysisResult:
     mode_count: int
     modal_area_db_oct: float
     voice_band_modal_risk: float
-    analysis_version: int = 1
+    analysis_version: int = MODAL_ANALYSIS_VERSION
 
 def _empty_result() -> ModalAnalysisResult:
     return ModalAnalysisResult(

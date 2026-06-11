@@ -49,7 +49,7 @@ from ..runtime_context import (
 
 from .residual_analysis import compute_broad_residual_peak_metrics
 
-BROAD_RESIDUAL_PEAK_SCORING_VERSION = 1
+BROAD_RESIDUAL_PEAK_SCORING_VERSION = 2
 
 def _auto_residual_peak_metrics_from_stats(
     st: dict | None,
@@ -126,6 +126,9 @@ def _auto_merge_residual_peak_metrics(left_metrics, right_metrics) -> dict:
             "top3_residual_peak_mean_db": float(np.mean(np.asarray(top_vals, dtype=float))) if top_vals else 0.0,
             "residual_peak_count": int(count),
             "residual_peak_candidates": [dict(p) for p in peaks[:6]],
+            "residual_peak_modal_promoted_count": int(
+                sum(1 for p in peaks if str(p.get("source", "") or "") == "modal_residual")
+            ),
             "broad_residual_peak_scoring_version": int(BROAD_RESIDUAL_PEAK_SCORING_VERSION),
         }
 
@@ -152,6 +155,13 @@ def _auto_merge_residual_peak_metrics(left_metrics, right_metrics) -> dict:
         "top3_residual_peak_mean_db": float(np.mean(np.asarray(top_vals, dtype=float))) if top_vals else float("nan"),
         "residual_peak_count": int(count),
         "residual_peak_candidates": [],
+        "residual_peak_modal_promoted_count": int(
+            sum(
+                int(max(0, shared._auto_safe_float(dict(src or {}).get("residual_peak_modal_promoted_count", 0), 0.0)))
+                for src in (left_metrics, right_metrics)
+                if isinstance(src, dict)
+            )
+        ),
         "broad_residual_peak_scoring_version": int(BROAD_RESIDUAL_PEAK_SCORING_VERSION),
     }
 

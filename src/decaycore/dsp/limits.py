@@ -87,8 +87,8 @@ def soft_clip_gain(gain_db, max_boost_db, max_cut_db):
     Katon ylittava osa pehmennetaan, ja myohemmat hard clamp -vaiheet
     pitavat lopullisen arvon asetetussa katossa.
 
-    Negatiiviset arvot rajataan alarajaan `max_cut_db` vanhalla
-    konservatiivisella tanh-kaytoksella.
+    Negatiiviset arvot paastetaan muuttumattomina cut-kattoon asti.
+    Rajaa ylittava osa pehmennetaan samalla mekanismilla kuin boost.
     """
     g = np.asarray(gain_db, dtype=float)
     out = np.empty_like(g)
@@ -108,7 +108,16 @@ def soft_clip_gain(gain_db, max_boost_db, max_cut_db):
             out[pos] = 0.0
     if np.any(neg):
         mc = float(max_cut_db) if max_cut_db > 0 else 0.0
-        out[neg] = -mc * np.tanh((-g[neg]) / (mc + 1e-12)) if mc > 0 else g[neg]
+        if mc > 0:
+            cut_vals = -g[neg]
+            over_c = np.maximum(0.0, cut_vals - mc)
+            out[neg] = -np.where(
+                cut_vals <= mc,
+                cut_vals,
+                mc + mc * np.tanh(over_c / (mc + 1e-12)),
+            )
+        else:
+            out[neg] = g[neg]
     return out
 
 

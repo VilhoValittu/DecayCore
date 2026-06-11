@@ -184,12 +184,14 @@ def test_residual_peak_penalty_cap_is_configurable():
     assert float(uncapped["residual_peak_penalty"]) > float(capped["residual_peak_penalty"])
 
 
-def test_residual_peak_metrics_keep_110hz_narrow_modal_peak_visible():
+def test_residual_peak_metrics_promote_110hz_narrow_modal_peak():
     metrics = _synthetic_residual_peak_metrics(peak_hz=110.0, peak_db=9.0, width_oct=0.025)
 
-    assert int(metrics["residual_peak_count"]) == 0
-    assert float(metrics["worst_residual_peak_raw_db"]) == pytest.approx(0.0, abs=1e-9)
-    assert float(metrics["residual_peak_severity"]) == pytest.approx(0.0, abs=1e-9)
+    assert int(metrics["residual_peak_count"]) >= 1
+    assert int(metrics["residual_peak_modal_promoted_count"]) >= 1
+    assert float(metrics["worst_residual_peak_hz"]) == pytest.approx(110.0, rel=0.06)
+    assert float(metrics["worst_residual_peak_raw_db"]) > 6.0
+    assert str(metrics["residual_peak_candidates"][0].get("source")) == "modal_residual"
 
 
 def test_broad_residual_peak_scorer_penalizes_wide_90hz_peak():
@@ -221,6 +223,59 @@ def test_narrow_spike_is_ignored_by_broad_peak_scorer():
     metrics = _synthetic_residual_peak_metrics(peak_hz=90.0, peak_db=8.0, width_oct=0.018)
 
     assert int(metrics["residual_peak_count"]) == 0
+    assert float(metrics["worst_residual_peak_raw_db"]) == pytest.approx(0.0, abs=1e-9)
+
+
+def test_modal_supported_narrow_bass_peak_is_promoted_to_residual_peak():
+    freq_axis = np.geomspace(20.0, 250.0, 420)
+    err = 8.0 * np.exp(-0.5 * (np.log2(freq_axis / 96.0) / 0.018) ** 2)
+    gd = 36.0 * np.exp(-0.5 * (np.log2(freq_axis / 96.0) / 0.025) ** 2)
+
+    metrics = compute_broad_residual_peak_metrics(
+        {
+            "freq_axis": freq_axis,
+            "measured_mags": err,
+            "target_mags": np.zeros_like(freq_axis),
+            "realized_filter_mags": np.zeros_like(freq_axis),
+            "group_delay_ms": gd,
+            "confidence_mask": np.full_like(freq_axis, 0.9),
+        },
+        lo_hz=20.0,
+        hi_hz=250.0,
+        threshold_db=3.0,
+        hard_gate_db=6.0,
+    )
+
+    assert int(metrics["residual_peak_modal_promoted_count"]) >= 1
+    assert int(metrics["residual_peak_count"]) >= 1
+    assert float(metrics["worst_residual_peak_hz"]) == pytest.approx(96.0, rel=0.06)
+    assert float(metrics["worst_residual_peak_raw_db"]) > 6.0
+    assert any(
+        str(peak.get("source", "") or "") == "modal_residual"
+        for peak in metrics["residual_peak_candidates"]
+    )
+
+
+def test_unsupported_narrow_comb_spike_is_not_promoted_to_residual_peak():
+    freq_axis = np.geomspace(20.0, 250.0, 420)
+    err = 8.0 * np.exp(-0.5 * (np.log2(freq_axis / 96.0) / 0.018) ** 2)
+
+    metrics = compute_broad_residual_peak_metrics(
+        {
+            "freq_axis": freq_axis,
+            "measured_mags": err,
+            "target_mags": np.zeros_like(freq_axis),
+            "realized_filter_mags": np.zeros_like(freq_axis),
+            "confidence_mask": np.full_like(freq_axis, 0.03),
+        },
+        lo_hz=20.0,
+        hi_hz=250.0,
+        threshold_db=3.0,
+        hard_gate_db=6.0,
+    )
+
+    assert int(metrics["residual_peak_count"]) == 0
+    assert int(metrics["residual_peak_modal_promoted_count"]) == 0
     assert float(metrics["worst_residual_peak_raw_db"]) == pytest.approx(0.0, abs=1e-9)
 
 
@@ -1178,6 +1233,87 @@ def test_residual_peak_winner_polish_accepts_clear_peak_improvement_with_small_r
     assert bool(meta["applied"]) is True
     assert float(meta["worst_peak_before_db"]) == pytest.approx(4.0)
     assert float(meta["worst_peak_after_db"]) == pytest.approx(3.05)
+
+
+def test_residual_peak_winner_polish_can_accept_hybrid_iir_modal_cut_variant():
+    def fake_materialize_preset_result(
+        preset,
+        *,
+        include_response_arrays,
+        summarize,
+        base_data_override,
+    ):
+        _ = include_response_arrays, summarize, base_data_override
+        if bool(dict(preset or {}).get("hybrid_iir_enabled", False)):
+            metrics = {
+                "rank_score": 89.95,
+                "avg_score": 94.75,
+                "max_net_boost_db": 3.0,
+                "worst_residual_peak_raw_db": 3.55,
+                "worst_residual_peak_db": 3.55,
+                "worst_residual_peak_hz": 96.0,
+                "top3_residual_peak_mean_db": 3.1,
+                "residual_peak_candidates": [],
+            }
+        else:
+            metrics = {
+                "rank_score": 89.85,
+                "avg_score": 94.80,
+                "max_net_boost_db": 3.0,
+                "worst_residual_peak_raw_db": 4.90,
+                "worst_residual_peak_db": 4.90,
+                "worst_residual_peak_hz": 96.0,
+                "top3_residual_peak_mean_db": 4.2,
+                "residual_peak_candidates": [],
+            }
+        return object(), metrics, dict(preset or {})
+
+    def fake_cache_ready_preset(preset, *, best_metrics=None):
+        _ = best_metrics
+        return dict(preset or {})
+
+    best_preset, best_metrics, improved, meta = apply_residual_peak_winner_polish(
+        best_preset={"max_slope_cut_db_per_oct": 0.0},
+        best_metrics={
+            "rank_score": 90.0,
+            "avg_score": 95.0,
+            "max_net_boost_db": 3.0,
+            "worst_residual_peak_raw_db": 5.0,
+            "worst_residual_peak_db": 5.0,
+            "worst_residual_peak_hz": 96.0,
+            "worst_residual_peak_width_oct": 0.04,
+            "residual_peak_threshold_db": 3.0,
+            "top3_residual_peak_mean_db": 4.5,
+            "residual_peak_modal_priority": 0.45,
+            "residual_peak_modal_confidence": 0.8,
+            "residual_peak_modal_promoted_count": 1,
+            "residual_peak_candidates": [
+                {
+                    "source": "modal_residual",
+                    "freq_hz": 96.0,
+                    "modal_priority": 0.45,
+                    "modal_confidence": 0.8,
+                }
+            ],
+        },
+        base_data_ref={"mag_c_min": 20.0, "mag_c_max": 250.0},
+        phase_label="test",
+        goal="balanced",
+        enabled=True,
+        max_variants=4,
+        min_improvement_db=0.75,
+        status_cb=None,
+        materialize_preset_result=fake_materialize_preset_result,
+        cache_ready_preset=fake_cache_ready_preset,
+    )
+
+    assert bool(improved) is True
+    assert bool(best_preset["hybrid_iir_enabled"]) is True
+    assert float(best_metrics["worst_residual_peak_raw_db"]) == pytest.approx(3.55)
+    assert any(
+        item.get("knob") == "hybrid_iir_enabled"
+        for item in list(meta.get("accepted_variants", []) or [])
+    )
 
 
 def test_materialize_score_only_cache_reuses_exact_preset():

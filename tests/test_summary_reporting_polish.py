@@ -128,6 +128,30 @@ def test_format_summary_content_reports_tdc_peak_details():
     assert "TDC events used: L 1 | R 1" in summary
 
 
+def test_format_summary_content_reports_confidence_pull_telemetry():
+    stats = {
+        "rt60_val": 0.30,
+        "cmp_avg_confidence": 80.0,
+        "avg_confidence": 80.0,
+        "reflections": [],
+        "conf_pull_post_floor": 0.05,
+        "conf_pull_post_ceil": 0.85,
+        "conf_pull_post_max_hz": 200.0,
+        "conf_pull_post_gamma_cut": 0.45,
+        "conf_pull_post_gamma_boost": 0.35,
+        "conf_pull_post_active_pct": 42.5,
+        "conf_pull_post_strength_mean": 0.18,
+        "conf_pull_post_strength_max": 0.62,
+        "conf_pull_post_strength_max_hz": 91.2,
+    }
+
+    summary = plots.format_summary_content({}, stats, stats)
+
+    assert "Confidence pull telemetry (separate from average confidence):" in summary
+    assert "L: floor/ceil 0.05/0.85, max 200 Hz, cut/boost gamma 0.45/0.35" in summary
+    assert "active 42.5%, pull mean/max 0.18/0.62 @ 91.2 Hz" in summary
+
+
 def test_format_summary_content_reports_magnitude_authority_trace():
     stats = {
         "rt60_val": 0.30,

@@ -113,6 +113,7 @@ def _residual_authority_arrays(st, freq_axis: np.ndarray, smooth_oct: float) -> 
         _smooth_authority_array(_pick_authority_array(st, "authority_boost", "boost_authority"), freq_axis, smooth_oct),
         _smooth_authority_array(_pick_authority_array(st, "authority_cut", "cut_authority"), freq_axis, smooth_oct),
         _smooth_authority_array(_pick_authority_array(st, "authority_modal_support", "modal_support"), freq_axis, smooth_oct),
+        _smooth_authority_array(_pick_authority_array(st, "authority_decay_need", "decay_need"), freq_axis, smooth_oct),
         _smooth_authority_array(_pick_authority_array(st, "authority_reflection_risk", "reflection_risk"), freq_axis, smooth_oct, preserve_peaks=True),
     )
 
@@ -138,7 +139,14 @@ def _residual_build_authority_caps(
     smooth_oct = cfg_reader.float_allow_zero("residual_authority_smooth_oct", 1.0 / 9.0)
     if (not np.isfinite(smooth_oct)) or smooth_oct <= 0.0:
         smooth_oct = 1.0 / 9.0
-    authority_null_risk, authority_boost, authority_cut, authority_modal_support, authority_reflection_risk = _residual_authority_arrays(
+    (
+        authority_null_risk,
+        authority_boost,
+        authority_cut,
+        authority_modal_support,
+        authority_decay_need,
+        authority_reflection_risk,
+    ) = _residual_authority_arrays(
         st,
         freq_axis,
         smooth_oct,
@@ -149,6 +157,7 @@ def _residual_build_authority_caps(
         authority_boost=authority_boost,
         authority_cut=authority_cut,
         authority_modal_support=authority_modal_support,
+        authority_decay_need=authority_decay_need,
         authority_reflection_risk=authority_reflection_risk,
         residual_pass_mode=residual_mode,
         max_boost_db=authority_max_boost_db,

@@ -51,8 +51,12 @@ def gd_grad_metrics(freq_axis: np.ndarray, phase_rad: np.ndarray, *, mask: np.nd
         gd_grad = np.nan_to_num(np.gradient(gd_ms, np.log2(np.maximum(ff, 1e-9))), nan=0.0, posinf=0.0, neginf=0.0)
         if gd_grad.size == 0:
             return out
-        idx = int(np.argmax(np.abs(gd_grad)))
-        out["max_ms_per_oct"] = float(np.max(np.abs(gd_grad)))
+        abs_grad = np.abs(gd_grad)
+        idx = int(np.argmax(abs_grad))
+        # 95th-percentile is robust against single-bin spikes from resonances or
+        # measurement artifacts that would otherwise trigger limiting unnecessarily.
+        robust_max = float(np.percentile(abs_grad, 95.0)) if abs_grad.size >= 8 else float(abs_grad[idx])
+        out["max_ms_per_oct"] = robust_max
         out["at_hz"] = float(ff[idx]) if ff.size else None
         return out
     except (TypeError, ValueError, FloatingPointError, IndexError):

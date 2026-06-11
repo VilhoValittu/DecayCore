@@ -2703,8 +2703,17 @@ def test_auto_signature_payload_exposes_policy_versions_and_metadata_identity():
     assert payload["measurement_metadata_identity"] == _auto_measurement_metadata_identity(measurements)
     assert payload["signature_policy_versions"]["gain_authority_policy_v"] >= 1
     assert payload["gain_authority_policy"]["max_boost_db"] == 3.0
+    assert payload["confidence_model"]["policy_v"] >= 2
+    assert payload["confidence_model"]["conf_pull_ceil"] == 0.85
+    assert payload["confidence_model"]["conf_pull_gamma_cut"] == 0.45
     assert payload["confidence_model"]["conf_pull_gamma_boost"] == 1.35
-    assert payload["residual_peak_scorer"]["scorer_v"] >= 1
+    assert payload["confidence_model"]["conf_pull_bass_boost_floor_min"] == 0.55
+    assert payload["confidence_model"]["conf_pull_bass_boost_restore"] == 0.70
+    assert payload["hybrid_iir"]["policy_v"] >= 3
+    assert payload["hybrid_iir"]["max_freq_hz"] == 200.0
+    assert payload["hybrid_iir"]["min_confidence"] == 0.30
+    assert payload["hybrid_iir"]["min_cut_priority"] == 0.0
+    assert payload["residual_peak_scorer"]["scorer_v"] >= 2
     assert payload["bass_integration_feasibility"]["policy_v"] >= 1
     assert payload["phase_gd_guard"]["policy_v"] >= 1
 

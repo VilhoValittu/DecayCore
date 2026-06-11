@@ -86,6 +86,16 @@ def test_hybrid_iir_translation_keys_exist():
         "hybrid_iir_max_cut_db",
         "hybrid_iir_min_confidence",
         "hybrid_iir_min_gd_excess_ms",
+        "conf_pull_max_hz_label",
+        "conf_pull_gamma_cut_label",
+        "conf_pull_gamma_boost_label",
+        "conf_pull_bass_boost_floor_min_label",
+        "conf_pull_bass_boost_restore_label",
+        "adv_summary_max_hz",
+        "adv_summary_cut_gamma",
+        "adv_summary_boost_gamma",
+        "adv_summary_bass_boost_floor",
+        "adv_summary_bass_restore",
     }
     for lang in ("en", "fi"):
         missing = required.difference(TRANSLATIONS[lang])

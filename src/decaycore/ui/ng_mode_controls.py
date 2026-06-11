@@ -90,6 +90,11 @@ def on_mode_change(*, mode: str, t: Callable) -> None:
     ctrl.set_visibility("conf_pull_notice_scope", not is_advanced)
     ctrl.set_enabled("conf_pull_floor", is_advanced)
     ctrl.set_enabled("conf_pull_ceil", is_advanced)
+    ctrl.set_enabled("conf_pull_max_hz", is_advanced)
+    ctrl.set_enabled("conf_pull_gamma_cut", is_advanced)
+    ctrl.set_enabled("conf_pull_gamma_boost", is_advanced)
+    ctrl.set_enabled("conf_pull_bass_boost_floor_min", is_advanced)
+    ctrl.set_enabled("conf_pull_bass_boost_restore", is_advanced)
 
     # AUTO-mode controls disable
     _update_auto_mode_fields_state(is_auto=is_auto, t=t)

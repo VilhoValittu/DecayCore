@@ -113,6 +113,33 @@ def test_hybrid_iir_rejects_uncertain_or_broad_candidates():
     assert "peak_below_threshold" in reasons
 
 
+def test_hybrid_iir_strong_modal_evidence_can_rescue_moderate_confidence():
+    freq = np.linspace(20.0, 200.0, 512)
+    policy = HybridIIRPolicy(enabled=True, min_confidence=0.40)
+    result = design_hybrid_iir(
+        [_room_mode_event(confidence=0.28, cut_priority=0.9, gd_excess_ms=35.0)],
+        freq,
+        48000,
+        policy,
+    )
+
+    assert len(result.biquads) == 1
+    assert result.biquads[0].confidence == pytest.approx(0.28)
+
+
+def test_hybrid_iir_default_range_includes_upper_bass_schroeder_modes():
+    freq = np.linspace(20.0, 220.0, 512)
+    result = design_hybrid_iir(
+        [_room_mode_event(freq_hz=181.0, q_estimate=7.0, width_hz=12.0)],
+        freq,
+        48000,
+        HybridIIRPolicy(enabled=True),
+    )
+
+    assert len(result.biquads) == 1
+    assert result.biquads[0].freq_hz == pytest.approx(181.0)
+
+
 def test_hybrid_iir_clamps_q_and_cut():
     freq = np.linspace(20.0, 200.0, 512)
     policy = HybridIIRPolicy(enabled=True, max_cut_db=6.0, max_q=8.0)
@@ -284,6 +311,15 @@ def test_hybrid_iir_signature_tracks_thresholds():
     assert a != b
 
 
+def test_hybrid_iir_signature_tracks_min_cut_priority():
+    a = _hybrid_signature_payload(hybrid_iir_enabled=True, hybrid_iir_min_cut_priority=0.0)
+    b = _hybrid_signature_payload(hybrid_iir_enabled=True, hybrid_iir_min_cut_priority=0.35)
+
+    assert a["hybrid_iir"]["min_cut_priority"] == pytest.approx(0.0)
+    assert b["hybrid_iir"]["min_cut_priority"] == pytest.approx(0.35)
+    assert a != b
+
+
 def test_detect_room_modes_identifies_clear_modal_peak():
     freq_axis = np.geomspace(20.0, 300.0, 360)
     peak = _bump(freq_axis, 113.0, 6.0, 0.09)
@@ -302,6 +338,45 @@ def test_detect_room_modes_identifies_clear_modal_peak():
     assert result.events[0].kind == "room_mode"
     assert result.events[0].correction_priority > 0.5
     assert result.events[0].safe_cut_db > 1.0
+
+
+def test_detect_room_modes_uses_decay_evidence_when_local_confidence_is_low():
+    freq_axis = np.geomspace(20.0, 240.0, 512)
+    peak = _bump(freq_axis, 181.0, 6.0, 0.08)
+    gd = 42.0 * np.exp(-0.5 * (np.log2(freq_axis / 181.0) / 0.09) ** 2)
+
+    result = detect_room_modes(
+        freq_axis,
+        peak,
+        target_mag_db=np.zeros_like(freq_axis),
+        group_delay_ms=gd,
+        confidence_mask=np.full_like(freq_axis, 0.03),
+        hi_hz=200.0,
+    )
+
+    assert result.analysis_version >= 2
+    assert result.mode_count >= 1
+    assert result.events[0].freq_hz == pytest.approx(181.0, rel=0.05)
+    assert result.events[0].kind == "room_mode"
+    assert result.events[0].confidence >= 0.35
+    assert result.events[0].cut_priority > 0.0
+
+
+def test_detect_room_modes_low_confidence_without_decay_support_stays_uncertain():
+    freq_axis = np.geomspace(20.0, 240.0, 512)
+    peak = _bump(freq_axis, 90.0, 6.0, 0.08)
+
+    result = detect_room_modes(
+        freq_axis,
+        peak,
+        target_mag_db=np.zeros_like(freq_axis),
+        group_delay_ms=np.zeros_like(freq_axis),
+        confidence_mask=np.full_like(freq_axis, 0.03),
+        hi_hz=200.0,
+    )
+
+    assert result.mode_count >= 1
+    assert result.events[0].kind != "room_mode"
 
 
 def test_detect_room_modes_does_not_promote_narrow_comb_spike():
@@ -462,7 +537,7 @@ def test_residual_peak_penalty_increases_with_modal_support():
     assert with_modal["residual_peak_hard_gate_db"] == no_modal["residual_peak_hard_gate_db"]
 
 
-def test_modal_residual_fallback_penalizes_broad_bass_buildup_when_peak_detector_misses():
+def test_modal_residual_promotion_penalizes_broad_bass_buildup_before_fallback():
     freq_axis = np.geomspace(20.0, 300.0, 420)
     measured = _bump(freq_axis, 90.0, 5.5, 0.25)
     st = {
@@ -484,13 +559,12 @@ def test_modal_residual_fallback_penalizes_broad_bass_buildup_when_peak_detector
         },
     )
 
-    assert int(scored["residual_peak_metrics"]["residual_peak_count"]) == 0
-    assert bool(scored["modal_residual_fallback_used"]) is True
-    assert scored["modal_residual_fallback_kind"] == "broad_buildup"
-    assert float(scored["modal_residual_fallback_hz"]) == pytest.approx(90.0, rel=0.08)
-    assert float(scored["modal_residual_fallback_peak_db"]) > 3.0
-    assert float(scored["modal_residual_fallback_penalty"]) > 0.0
-    assert float(scored["residual_peak_penalty"]) >= float(scored["modal_residual_fallback_penalty"])
+    assert int(scored["residual_peak_metrics"]["residual_peak_count"]) >= 1
+    assert int(scored["residual_peak_metrics"]["residual_peak_modal_promoted_count"]) >= 1
+    assert bool(scored["modal_residual_fallback_used"]) is False
+    assert float(scored["residual_peak_metrics"]["worst_residual_peak_hz"]) == pytest.approx(90.0, rel=0.08)
+    assert float(scored["worst_residual_peak_raw_db"]) > 3.0
+    assert float(scored["residual_peak_penalty"]) > 0.0
 
 
 def test_modal_residual_fallback_lowers_rank_against_corrected_candidate(monkeypatch):
@@ -519,8 +593,9 @@ def test_modal_residual_fallback_lowers_rank_against_corrected_candidate(monkeyp
     bad_metrics = _auto_score_result(SimpleNamespace(l_st=bad, r_st=bad, metrics={}), base_data=base_data)
     good_metrics = _auto_score_result(SimpleNamespace(l_st=good, r_st=good, metrics={}), base_data=base_data)
 
-    assert bool(bad_metrics["modal_residual_fallback_used"]) is True
-    assert float(bad_metrics["modal_residual_fallback_penalty"]) > 0.0
+    assert bool(bad_metrics["modal_residual_fallback_used"]) is False
+    assert int(bad_metrics["residual_peak_modal_promoted_count"]) >= 1
+    assert float(bad_metrics["worst_residual_peak_raw_db"]) > 3.0
     assert float(good_metrics["modal_residual_fallback_penalty"]) == pytest.approx(0.0, abs=1e-9)
     assert float(bad_metrics["rank_score_components"]["residual_peak_penalty"]) > 0.0
     assert float(good_metrics["rank_score"]) > float(bad_metrics["rank_score"])

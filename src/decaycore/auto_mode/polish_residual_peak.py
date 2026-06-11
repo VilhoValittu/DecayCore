@@ -205,10 +205,49 @@ def _residual_peak_candidate_signature(cand_test: dict) -> str:
         return str(sorted(dict(cand_test or {}).items()))
 
 
+def _has_modally_supported_residual_peak(metrics: dict | None) -> bool:
+    m = dict(metrics or {})
+    if _auto_safe_float(m.get("residual_peak_modal_priority", 0.0), 0.0) >= 0.12:
+        return True
+    if _auto_safe_float(m.get("residual_peak_modal_promoted_count", 0), 0.0) > 0.0:
+        return True
+    for raw in list(m.get("residual_peak_candidates", []) or []):
+        if not isinstance(raw, dict):
+            continue
+        peak = dict(raw)
+        if str(peak.get("source", "") or "") == "modal_residual":
+            return True
+        if (
+            _auto_safe_float(peak.get("modal_priority", 0.0), 0.0) >= 0.12
+            and _auto_safe_float(peak.get("modal_confidence", 0.0), 0.0) >= 0.25
+        ):
+            return True
+    return False
+
+
+def _residual_peak_freq_bounds(cur_best_metrics: dict | None, base_data_ref: dict | None) -> tuple[float, float]:
+    data = dict(base_data_ref or {})
+    peak_hz = _auto_safe_float(dict(cur_best_metrics or {}).get("worst_residual_peak_hz"), float("nan"))
+    width_oct = _auto_safe_float(dict(cur_best_metrics or {}).get("worst_residual_peak_width_oct"), float("nan"))
+    base_lo = max(20.0, _auto_safe_float(data.get("mag_c_min", data.get("mag_c_min_hz", 20.0)), 20.0))
+    base_hi = min(
+        200.0,
+        _auto_safe_float(data.get("mag_c_max", data.get("mag_c_max_hz", 200.0)), 200.0),
+    )
+    if np.isfinite(peak_hz) and float(peak_hz) > 0.0:
+        half = float(np.clip(_auto_safe_float(width_oct, 0.16), 0.08, 0.35))
+        base_lo = max(20.0, min(base_lo, float(peak_hz) / float(2.0**half)))
+        base_hi = min(200.0, max(base_hi, float(peak_hz) * float(2.0**half)))
+    if float(base_hi) <= float(base_lo):
+        base_hi = min(200.0, float(base_lo) + 1.0)
+    return float(base_lo), float(base_hi)
+
+
 def _residual_peak_variant_factories(
     *,
     cur_best_preset: dict,
     base_data_ref: dict | None,
+    cur_best_metrics: dict | None,
     modal_priority: float,
 ) -> list:
     def _current_value(key: str, default: float) -> float:
@@ -249,17 +288,39 @@ def _residual_peak_variant_factories(
         }
 
     def _conf_pull_variant(delta: float):
-        value = float(np.clip(_current_value("conf_pull_gamma_cut", 0.55) + float(delta), 0.35, 0.90))
+        value = float(np.clip(_current_value("conf_pull_gamma_cut", 0.45) + float(delta), 0.35, 0.90))
         cand = dict(cur_best_preset or {})
         cand["conf_pull_gamma_cut"] = round(float(value), 4)
-        if abs(float(cand["conf_pull_gamma_cut"]) - _current_value("conf_pull_gamma_cut", 0.55)) <= 1e-9:
+        if abs(float(cand["conf_pull_gamma_cut"]) - _current_value("conf_pull_gamma_cut", 0.45)) <= 1e-9:
             return None
         return cand, {"knob": "conf_pull_gamma_cut", "value": float(cand["conf_pull_gamma_cut"])}
+
+    def _hybrid_iir_variant():
+        if bool(cur_best_preset.get("hybrid_iir_enabled", dict(base_data_ref or {}).get("hybrid_iir_enabled", False))):
+            return None
+        if not _has_modally_supported_residual_peak(cur_best_metrics):
+            return None
+        lo_hz, hi_hz = _residual_peak_freq_bounds(cur_best_metrics, base_data_ref)
+        threshold = _auto_safe_float(dict(cur_best_metrics or {}).get("residual_peak_threshold_db", 3.0), 3.0)
+        cand = dict(cur_best_preset or {})
+        cand["hybrid_iir_enabled"] = True
+        cand["hybrid_iir_min_freq_hz"] = float(lo_hz)
+        cand["hybrid_iir_max_freq_hz"] = float(hi_hz)
+        cand["hybrid_iir_min_peak_db"] = float(np.clip(min(_current_value("hybrid_iir_min_peak_db", 4.0), max(3.0, threshold)), 1.5, 8.0))
+        cand["hybrid_iir_min_cut_priority"] = float(np.clip(_current_value("hybrid_iir_min_cut_priority", 0.0), 0.0, 1.0))
+        cand["hybrid_iir_max_cut_db"] = float(np.clip(_current_value("hybrid_iir_max_cut_db", 6.0), 0.0, 6.0))
+        return cand, {
+            "knob": "hybrid_iir_enabled",
+            "value": True,
+            "min_freq_hz": float(lo_hz),
+            "max_freq_hz": float(hi_hz),
+        }
 
     variant_factories = [
         lambda: _slope_variant(1),
         lambda: _slope_variant(2),
         lambda: _conf_pull_variant(-0.06),
+        _hybrid_iir_variant,
     ]
     if modal_priority >= 0.25:
         variant_factories.extend(
@@ -427,6 +488,7 @@ def _prepare_residual_peak_winner_polish_context(
     variant_factories = _residual_peak_variant_factories(
         cur_best_preset=cur_best_preset,
         base_data_ref=base_data_ref,
+        cur_best_metrics=cur_best_metrics,
         modal_priority=float(modal_priority),
     )
     return {

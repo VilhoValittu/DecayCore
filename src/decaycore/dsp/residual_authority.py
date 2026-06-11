@@ -54,6 +54,7 @@ def build_residual_authority_caps(
     authority_boost=None,
     authority_cut=None,
     authority_modal_support=None,
+    authority_decay_need=None,
     authority_reflection_risk=None,
     residual_pass_mode: str = "modal_polish",
     max_boost_db: float = 2.0,
@@ -106,6 +107,8 @@ def build_residual_authority_caps(
     cut_authority = _authority_array(authority_cut, freq, 1.0)
     modal_default = 1.0 if mode == "general_fit" else 0.0
     modal_support = _authority_array(authority_modal_support, freq, modal_default)
+    decay_need = _authority_array(authority_decay_need, freq, 0.0)
+    modal_effective = np.maximum(modal_support, 0.85 * decay_need)
 
     reflection_ok = reflection_risk <= refl_max
     boost_allowed = (
@@ -113,7 +116,7 @@ def build_residual_authority_caps(
         & (null_risk <= null_boost_max)
         & reflection_ok
     )
-    modal_polish_mask = (modal_support >= modal_min) & reflection_ok
+    modal_polish_mask = (modal_effective >= modal_min) & reflection_ok
 
     if mode == "general_fit":
         cut_allowed = (
@@ -128,7 +131,7 @@ def build_residual_authority_caps(
         cut_cap *= 1.0 - 0.45 * reflection_risk
     else:
         cut_allowed = (
-            (modal_support >= modal_min)
+            (modal_effective >= modal_min)
             & (cut_authority >= cut_min)
             & reflection_ok
             & (null_risk <= null_cut_max)
@@ -136,10 +139,10 @@ def build_residual_authority_caps(
         boost_cap = max_boost * boost_authority
         boost_cap *= 1.0 - 0.90 * null_risk
         boost_cap *= 1.0 - 0.75 * reflection_risk
-        boost_cap *= 0.35 + 0.65 * modal_support
+        boost_cap *= 0.35 + 0.65 * modal_effective
         cut_cap = max_cut
         cut_cap *= 0.25 + 0.75 * cut_authority
-        cut_cap *= 0.35 + 0.65 * modal_support
+        cut_cap *= 0.35 + 0.65 * modal_effective
         cut_cap *= 1.0 - 0.45 * reflection_risk
 
     boost_cap = np.clip(np.nan_to_num(boost_cap, nan=0.0, posinf=max_boost, neginf=0.0), 0.0, max_boost)
@@ -162,7 +165,7 @@ def build_residual_authority_caps(
             "low_authority_bins": int(
                 np.count_nonzero((boost_authority < boost_min) & (cut_authority < cut_min))
             ),
-            "low_modal_support_bins": int(np.count_nonzero(modal_support < modal_min)),
+            "low_modal_support_bins": int(np.count_nonzero(modal_effective < modal_min)),
         },
     }
 

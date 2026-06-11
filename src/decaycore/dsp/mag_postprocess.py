@@ -81,17 +81,17 @@ def _ps_invalid(ps: np.ndarray | None, mask: np.ndarray) -> bool:
 
 def _confpull_post_load_settings(cfg: Any) -> dict[str, float | None | bool]:
     conf_floor = float(getattr(cfg, "conf_pull_floor", 0.05) or 0.05)
-    conf_ceil = float(getattr(cfg, "conf_pull_ceil", 0.95) or 0.95)
+    conf_ceil = float(getattr(cfg, "conf_pull_ceil", 0.85) or 0.85)
     conf_max_hz = getattr(cfg, "conf_pull_max_hz", 200.0)
     conf_max_hz = None if conf_max_hz is None else float(conf_max_hz)
-    gamma_cut = float(getattr(cfg, "conf_pull_gamma_cut", 0.55) or 0.55)
+    gamma_cut = float(getattr(cfg, "conf_pull_gamma_cut", 0.45) or 0.45)
     gamma_boost = float(getattr(cfg, "conf_pull_gamma_boost", 0.35) or 0.35)
     conf_sigma = float(getattr(cfg, "conf_pull_conf_smooth_sigma", 2.0) or 2.0)
     bass_floor_hz = float(getattr(cfg, "conf_pull_bass_floor_hz", 120.0) or 120.0)
     bass_floor_min = float(getattr(cfg, "conf_pull_bass_floor_min", 0.25) or 0.25)
     bass_boost_floor_hz = float(getattr(cfg, "conf_pull_bass_boost_floor_hz", 200.0) or 200.0)
-    bass_boost_floor_min = float(getattr(cfg, "conf_pull_bass_boost_floor_min", 0.45) or 0.45)
-    bass_boost_restore = float(getattr(cfg, "conf_pull_bass_boost_restore", 0.55) or 0.0)
+    bass_boost_floor_min = float(getattr(cfg, "conf_pull_bass_boost_floor_min", 0.55) or 0.55)
+    bass_boost_restore = float(getattr(cfg, "conf_pull_bass_boost_restore", 0.70) or 0.0)
     bass_adaptive_isolation_mode = bool(getattr(cfg, "bass_adaptive_isolation_mode", False))
     if bass_adaptive_isolation_mode:
         bass_boost_floor_hz = min(max(0.0, bass_boost_floor_hz), 200.0)

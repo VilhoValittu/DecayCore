@@ -49,7 +49,7 @@ from ..runtime_context import (
 
 from .metrics_common import _auto_stats_band_n, _auto_stats_pick_arr, _finite_json_float
 
-BROAD_RESIDUAL_PEAK_SCORING_VERSION = 1
+BROAD_RESIDUAL_PEAK_SCORING_VERSION = 2
 MODAL_INTELLIGENCE_METRICS_VERSION = 1
 
 def _auto_min_broad_peak_width_oct(freq_hz: float) -> float:
@@ -173,6 +173,7 @@ def _broad_residual_empty_result(*, threshold_eff: float, hard_gate_eff: float) 
         "top3_residual_peak_mean_db": float("nan"),
         "residual_peak_count": 0,
         "residual_peak_candidates": [],
+        "residual_peak_modal_promoted_count": 0,
         "voice_band_worst_residual_peak_db": 0.0,
         "broad_residual_peak_scoring_version": int(BROAD_RESIDUAL_PEAK_SCORING_VERSION),
     }
@@ -193,13 +194,14 @@ def _broad_residual_prepare_series(
     *,
     lo: float,
     hi: float,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
     _n_lim = _auto_stats_band_n(st, float(hi) * 2.5)
     f = _auto_stats_pick_arr(st, "freq_axis", _max_n=_n_lim)
     measured = _auto_stats_pick_arr(st, "measured_mags", _max_n=_n_lim)
     target = _auto_stats_pick_arr(st, "target_mags", _max_n=_n_lim)
     realized = _auto_stats_pick_arr(st, "realized_filter_mags", "filter_mags", "predicted_filter_mags", _max_n=_n_lim)
     conf = _auto_stats_pick_arr(st, "confidence_mask", _max_n=_n_lim)
+    gd = _auto_stats_pick_arr(st, "group_delay_ms", "gd_ms", "gd_curve_ms", _max_n=_n_lim)
     n = int(min(f.size, measured.size, target.size, realized.size))
     if n < 8:
         return None
@@ -231,7 +233,16 @@ def _broad_residual_prepare_series(
         conf_use = np.clip(conf_use, 0.0, 1.0)
     else:
         conf_use = np.ones_like(f_use, dtype=float)
-    return np.asarray(f_use, dtype=float), np.asarray(err_use, dtype=float), np.asarray(conf_use, dtype=float)
+    if gd.size >= n:
+        gd_use = np.asarray(gd[:n], dtype=float)[valid][order]
+    else:
+        gd_use = np.asarray([], dtype=float)
+    return (
+        np.asarray(f_use, dtype=float),
+        np.asarray(err_use, dtype=float),
+        np.asarray(conf_use, dtype=float),
+        np.asarray(gd_use, dtype=float),
+    )
 
 
 def _broad_residual_smooth_series(
@@ -392,9 +403,162 @@ def _broad_residual_build_raw_peaks(
                 "weighted_peak_db": float(severity_vals[int(pos)]),
                 "threshold_db": float(threshold_eff),
                 "hard_gate_db": float(hard_gate_eff),
+                "source": "broad_residual",
             }
         )
     return list(raw_peaks)
+
+
+def _modal_residual_event_is_supported(event: RoomModeEvent, *, threshold_eff: float) -> bool:
+    kind = str(getattr(event, "kind", "") or "").strip().lower()
+    if kind not in {"room_mode", "broad_buildup"}:
+        return False
+    peak_db = shared._auto_safe_float(getattr(event, "peak_db", 0.0), 0.0)
+    confidence = float(np.clip(shared._auto_safe_float(getattr(event, "confidence", 0.0), 0.0), 0.0, 1.0))
+    gd_excess_ms = shared._auto_safe_float(getattr(event, "gd_excess_ms", 0.0), 0.0)
+    lr_consistency = float(np.clip(shared._auto_safe_float(getattr(event, "lr_consistency", 0.0), 0.0), 0.0, 1.0))
+    priority = float(
+        np.clip(
+            max(
+                shared._auto_safe_float(getattr(event, "cut_priority", 0.0), 0.0),
+                shared._auto_safe_float(getattr(event, "correction_priority", 0.0), 0.0),
+            ),
+            0.0,
+            1.0,
+        )
+    )
+    if float(peak_db) < float(threshold_eff):
+        return False
+    if kind == "broad_buildup":
+        return bool(confidence >= 0.45 and priority >= 0.12)
+    return bool(confidence >= 0.25 and (priority >= 0.12 or gd_excess_ms >= 10.0 or lr_consistency >= 0.65))
+
+
+def _local_residual_value(
+    *,
+    f_use: np.ndarray,
+    err_use: np.ndarray,
+    center_hz: float,
+    width_oct: float,
+) -> float:
+    freq = np.asarray(f_use, dtype=float).reshape(-1)
+    err = np.asarray(err_use, dtype=float).reshape(-1)
+    if freq.size == 0 or err.size != freq.size:
+        return 0.0
+    center = max(float(center_hz), 1e-9)
+    width = max(float(shared._auto_safe_float(width_oct, 0.0)), 1.0 / 96.0)
+    half = float(np.clip(width * 0.75, 1.0 / 96.0, 1.0 / 4.0))
+    band = np.abs(np.log2(np.maximum(freq, 1e-9) / center)) <= half
+    vals = np.maximum(0.0, err[band])
+    vals = vals[np.isfinite(vals)]
+    if vals.size:
+        return float(np.nanmax(vals))
+    idx = int(np.argmin(np.abs(np.log2(np.maximum(freq, 1e-9) / center))))
+    return float(max(0.0, shared._auto_safe_float(err[idx], 0.0)))
+
+
+def _modal_residual_promoted_peaks(
+    *,
+    f_use: np.ndarray,
+    err_use: np.ndarray,
+    conf_use: np.ndarray,
+    gd_use: np.ndarray,
+    threshold_eff: float,
+    hard_gate_eff: float,
+    lo: float,
+    hi: float,
+) -> list[dict]:
+    try:
+        modal = detect_room_modes(
+            f_use,
+            err_use,
+            target_mag_db=np.zeros_like(np.asarray(err_use, dtype=float)),
+            group_delay_ms=gd_use if np.asarray(gd_use).size == np.asarray(f_use).size else None,
+            confidence_mask=conf_use,
+            lo_hz=float(lo),
+            hi_hz=float(hi),
+            min_peak_db=float(max(1.5, min(float(threshold_eff), 4.0))),
+            min_width_oct=1.0 / 96.0,
+            detect_smooth_oct=96.0,
+        )
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        return []
+
+    promoted: list[dict] = []
+    for event in tuple(getattr(modal, "events", ()) or ()):
+        if not _modal_residual_event_is_supported(event, threshold_eff=float(threshold_eff)):
+            continue
+        freq = shared._auto_safe_float(getattr(event, "freq_hz", float("nan")), float("nan"))
+        if not (np.isfinite(freq) and float(lo) <= float(freq) <= float(hi)):
+            continue
+        width_oct = max(1.0 / 192.0, shared._auto_safe_float(getattr(event, "width_oct", 0.0), 0.0))
+        residual_db = max(
+            shared._auto_safe_float(getattr(event, "peak_db", 0.0), 0.0),
+            _local_residual_value(
+                f_use=f_use,
+                err_use=err_use,
+                center_hz=float(freq),
+                width_oct=float(width_oct),
+            ),
+        )
+        if float(residual_db) < float(threshold_eff):
+            continue
+        confidence = float(np.clip(shared._auto_safe_float(getattr(event, "confidence", 0.0), 0.0), 0.0, 1.0))
+        priority = float(
+            np.clip(
+                max(
+                    shared._auto_safe_float(getattr(event, "cut_priority", 0.0), 0.0),
+                    shared._auto_safe_float(getattr(event, "correction_priority", 0.0), 0.0),
+                ),
+                0.0,
+                1.0,
+            )
+        )
+        width_hz = max(0.0, shared._auto_safe_float(getattr(event, "width_hz", 0.0), 0.0))
+        area_db_oct = max(0.0, shared._auto_safe_float(getattr(event, "area_db_oct", 0.0), 0.0))
+        severity = (
+            max(0.0, float(residual_db) - float(threshold_eff))
+            + 0.55 * max(0.0, shared._auto_safe_float(getattr(event, "peak_db", 0.0), 0.0))
+            + 0.75 * float(priority)
+            + 0.25 * area_db_oct
+        ) * max(0.35, confidence)
+        promoted.append(
+            {
+                "freq_hz": float(freq),
+                "excess_db": float(max(0.0, float(residual_db) - float(threshold_eff))),
+                "prominence_db": float(max(0.0, shared._auto_safe_float(getattr(event, "peak_db", 0.0), 0.0))),
+                "residual_db": float(residual_db),
+                "confidence_mean": float(confidence),
+                "width_hz": float(width_hz),
+                "width_oct": float(width_oct),
+                "min_width_oct": 1.0 / 96.0,
+                "area_db_oct": float(area_db_oct),
+                "frequency_weight": 1.0,
+                "inside_correction_band": True,
+                "severity": float(max(0.0, severity)),
+                "weighted_peak_db": float(max(0.0, severity)),
+                "threshold_db": float(threshold_eff),
+                "hard_gate_db": float(hard_gate_eff),
+                "source": "modal_residual",
+                "modal_kind": str(getattr(event, "kind", "") or ""),
+                "modal_confidence": float(confidence),
+                "modal_priority": float(priority),
+                "modal_gd_excess_ms": float(shared._auto_safe_float(getattr(event, "gd_excess_ms", 0.0), 0.0)),
+                "modal_safe_cut_db": float(max(0.0, shared._auto_safe_float(getattr(event, "safe_cut_db", 0.0), 0.0))),
+            }
+        )
+    return promoted
 
 
 def _broad_residual_merge_peaks(raw_peaks: list[dict]) -> list[dict]:
@@ -466,6 +630,9 @@ def _broad_residual_finalize(
         "top3_residual_peak_mean_db": float(np.mean(np.asarray(top_vals, dtype=float))) if top_vals else 0.0,
         "residual_peak_count": int(len(merged)),
         "residual_peak_candidates": [dict(p) for p in merged[: max(top_n_eff, 3)]],
+        "residual_peak_modal_promoted_count": int(
+            sum(1 for p in merged if str(p.get("source", "") or "") == "modal_residual")
+        ),
         "voice_band_worst_residual_peak_db": float(voice_band_worst),
         "broad_residual_peak_scoring_version": int(BROAD_RESIDUAL_PEAK_SCORING_VERSION),
     }
@@ -505,7 +672,7 @@ def compute_broad_residual_peak_metrics(
     )
     if prepared is None:
         return dict(out_empty)
-    f_use, err_use, conf_use = prepared
+    f_use, err_use, conf_use, gd_use = prepared
     detect, baseline = _broad_residual_smooth_series(
         f_use=f_use,
         err_use=err_use,
@@ -521,26 +688,37 @@ def compute_broad_residual_peak_metrics(
         & (peak_excess > float(max(0.0, min_prom_db)))
         & (detect >= float(threshold_eff))
     )
-    if int(np.count_nonzero(peak_mask)) <= 0:
-        return _broad_residual_zero_peak_result(out_empty)
-
-    idxs = _broad_residual_peak_indices(
-        f_use=f_use,
-        detect=detect,
-        peak_mask=peak_mask,
-        peak_excess=peak_excess,
-    )
-    raw_peaks = _broad_residual_build_raw_peaks(
-        f_use=f_use,
-        detect=detect,
-        peak_excess=peak_excess,
-        idxs=idxs,
-        conf_use=conf_use,
-        threshold_eff=float(threshold_eff),
-        hard_gate_eff=float(hard_gate_eff),
-        lo=float(lo),
-        hi=float(hi),
-        conf_floor=float(conf_floor),
+    raw_peaks: list[dict] = []
+    if int(np.count_nonzero(peak_mask)) > 0:
+        idxs = _broad_residual_peak_indices(
+            f_use=f_use,
+            detect=detect,
+            peak_mask=peak_mask,
+            peak_excess=peak_excess,
+        )
+        raw_peaks = _broad_residual_build_raw_peaks(
+            f_use=f_use,
+            detect=detect,
+            peak_excess=peak_excess,
+            idxs=idxs,
+            conf_use=conf_use,
+            threshold_eff=float(threshold_eff),
+            hard_gate_eff=float(hard_gate_eff),
+            lo=float(lo),
+            hi=float(hi),
+            conf_floor=float(conf_floor),
+        )
+    raw_peaks.extend(
+        _modal_residual_promoted_peaks(
+            f_use=f_use,
+            err_use=err_use,
+            conf_use=conf_use,
+            gd_use=gd_use,
+            threshold_eff=float(threshold_eff),
+            hard_gate_eff=float(hard_gate_eff),
+            lo=float(lo),
+            hi=float(hi),
+        )
     )
     if not raw_peaks:
         return _broad_residual_zero_peak_result(out_empty)

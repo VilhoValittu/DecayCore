@@ -27,7 +27,7 @@ from ..rank_combiner import combine_rank_score
 from ..residual_peaks import _build_modal_tdc_debug
 from ..score_result_finalize import finalize_score_result_metrics
 
-BROAD_RESIDUAL_PEAK_SCORING_VERSION = 1
+BROAD_RESIDUAL_PEAK_SCORING_VERSION = 2
 CORRECTION_SHARPNESS_SCORING_VERSION = 1
 DIP_FILL_RISK_SCORING_VERSION = 1
 CHANNEL_OVERFIT_SCORING_VERSION = 1
@@ -340,6 +340,9 @@ def _auto_score_result(
         ),
         "top3_residual_peak_mean_db": float(top3_residual_peak_mean_db) if np.isfinite(top3_residual_peak_mean_db) else float("nan"),
         "residual_peak_count": int(residual_peak_metrics.get("residual_peak_count", 0) or 0),
+        "residual_peak_modal_promoted_count": int(
+            residual_peak_metrics.get("residual_peak_modal_promoted_count", 0) or 0
+        ),
         "residual_peak_penalty": float(residual_peak_penalty),
         "residual_peak_penalty_cap": float(residual_peak_penalty_cap),
         "residual_peak_candidates": list(residual_peak_metrics.get("residual_peak_candidates", []) or []),

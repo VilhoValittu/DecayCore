@@ -44,7 +44,8 @@ def test_positive_soft_clip_preserves_boost_up_to_cap() -> None:
     assert float(out[1]) == pytest.approx(12.0)
     assert float(out[2]) > 12.0
     assert float(out[2]) < 18.0
-    assert float(out[3]) > -15.0
+    assert float(out[3]) < -15.0
+    assert float(out[3]) > -18.0
 
 
 def test_peak_priority_error_shaping_preserves_boost_up_to_cap() -> None:

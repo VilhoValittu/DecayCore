@@ -47,6 +47,11 @@ BASS_SAFETY_SUMMARY_FIELDS = (
 CONF_PULL_SUMMARY_FIELDS = (
     "conf_pull_floor",
     "conf_pull_ceil",
+    "conf_pull_max_hz",
+    "conf_pull_gamma_cut",
+    "conf_pull_gamma_boost",
+    "conf_pull_bass_boost_floor_min",
+    "conf_pull_bass_boost_restore",
 )
 
 
@@ -125,15 +130,30 @@ _BASS_SAFETY_PRESETS = {
 _CONF_PULL_PRESETS = {
     SAFE: {
         "conf_pull_floor": 0.20,
-        "conf_pull_ceil": 0.75,
+        "conf_pull_ceil": 0.95,
+        "conf_pull_max_hz": 160.0,
+        "conf_pull_gamma_cut": 0.65,
+        "conf_pull_gamma_boost": 0.70,
+        "conf_pull_bass_boost_floor_min": 0.45,
+        "conf_pull_bass_boost_restore": 0.45,
     },
     NORMAL: {
-        "conf_pull_floor": 0.10,
-        "conf_pull_ceil": 0.90,
+        "conf_pull_floor": 0.05,
+        "conf_pull_ceil": 0.85,
+        "conf_pull_max_hz": 200.0,
+        "conf_pull_gamma_cut": 0.45,
+        "conf_pull_gamma_boost": 0.35,
+        "conf_pull_bass_boost_floor_min": 0.55,
+        "conf_pull_bass_boost_restore": 0.70,
     },
     AGGRESSIVE: {
         "conf_pull_floor": 0.05,
-        "conf_pull_ceil": 1.00,
+        "conf_pull_ceil": 0.75,
+        "conf_pull_max_hz": 220.0,
+        "conf_pull_gamma_cut": 0.35,
+        "conf_pull_gamma_boost": 0.30,
+        "conf_pull_bass_boost_floor_min": 0.65,
+        "conf_pull_bass_boost_restore": 0.85,
     },
 }
 
@@ -204,10 +224,20 @@ def build_conf_pull_summary(*, t: Callable) -> str:
     floor_v = _as_float(ctrl.value("conf_pull_floor", 0.0), 0.0)
     ceil_v = _as_float(ctrl.value("conf_pull_ceil", 1.0), 1.0)
     span_v = ceil_v - floor_v
+    max_hz = _as_float(ctrl.value("conf_pull_max_hz", 200.0), 200.0)
+    gamma_cut = _as_float(ctrl.value("conf_pull_gamma_cut", 0.45), 0.45)
+    gamma_boost = _as_float(ctrl.value("conf_pull_gamma_boost", 0.35), 0.35)
+    boost_floor = _as_float(ctrl.value("conf_pull_bass_boost_floor_min", 0.55), 0.55)
+    boost_restore = _as_float(ctrl.value("conf_pull_bass_boost_restore", 0.70), 0.70)
     parts = [
         f"{t('adv_summary_floor')}: {_fmt_float(floor_v, 2)}",
         f"{t('adv_summary_ceil')}: {_fmt_float(ceil_v, 2)}",
         f"{t('adv_summary_span')}: {_fmt_float(span_v, 2)}",
+        f"{t('adv_summary_max_hz')}: {_fmt_float(max_hz, 0)} Hz",
+        f"{t('adv_summary_cut_gamma')}: {_fmt_float(gamma_cut, 2)}",
+        f"{t('adv_summary_boost_gamma')}: {_fmt_float(gamma_boost, 2)}",
+        f"{t('adv_summary_bass_boost_floor')}: {_fmt_float(boost_floor, 2)}",
+        f"{t('adv_summary_bass_restore')}: {_fmt_float(boost_restore, 2)}",
     ]
     return " | ".join(parts)
 
@@ -314,6 +344,5 @@ def _fmt_rail(value: object, *, t: Callable) -> str:
 
 def _state_label(enabled: bool, *, t: Callable) -> str:
     return t("state_on") if enabled else t("state_off")
-
 
 

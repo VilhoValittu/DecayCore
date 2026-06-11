@@ -158,3 +158,39 @@ def test_build_measurement_status_line_shows_loaded_sub_slots_for_bass_integrati
 
     assert text == "Meas  L ✓  R ✓  Sub1 ✓  Sub2 ✓"
     assert severity == "ok"
+
+
+def test_auto_details_autoscroll_only_when_running_and_body_changes():
+    assert (
+        ng_run_section._should_autoscroll_auto_details(
+            previous_body="a",
+            current_body="a\nb",
+            run_active=True,
+        )
+        is True
+    )
+    assert (
+        ng_run_section._should_autoscroll_auto_details(
+            previous_body="a",
+            current_body="a\nb",
+            run_active=False,
+        )
+        is False
+    )
+    assert (
+        ng_run_section._should_autoscroll_auto_details(
+            previous_body="a",
+            current_body="a",
+            run_active=True,
+        )
+        is False
+    )
+
+
+def test_auto_details_autoscroll_js_uses_previous_scroll_height():
+    js = ng_run_section._auto_details_autoscroll_js(123)
+
+    assert "document.getElementById('c123')" in js
+    assert "previousScrollHeight - sc.scrollTop - sc.clientHeight" in js
+    assert "previousRemaining < 80" in js
+    assert "cfAutoDetailsScrollHeight" in js

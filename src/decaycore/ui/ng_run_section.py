@@ -216,6 +216,34 @@ def _build_measurement_status_line(*, bass_integration_enabled, value_getter, tr
     return "  ".join(parts), severity
 
 
+def _should_autoscroll_auto_details(*, previous_body: str | None, current_body: str, run_active: bool) -> bool:
+    if not bool(run_active):
+        return False
+    return bool(current_body) and str(current_body) != str(previous_body or "")
+
+
+def _auto_details_autoscroll_js(element_id) -> str:
+    element_key = f"c{element_id}"
+    return f"""
+        setTimeout(() => {{
+            const sc =
+                document.getElementById({element_key!r}) ||
+                document.querySelector('.cf-auto-details-scroll');
+            if (!sc) {{
+                return;
+            }}
+            const previousScrollHeight = Number(sc.dataset.cfAutoDetailsScrollHeight || '0');
+            const previousRemaining = previousScrollHeight > 0
+                ? previousScrollHeight - sc.scrollTop - sc.clientHeight
+                : 0;
+            if (previousRemaining < 80) {{
+                sc.scrollTop = sc.scrollHeight;
+            }}
+            sc.dataset.cfAutoDetailsScrollHeight = String(sc.scrollHeight);
+        }}, 50);
+    """
+
+
 def build_global_progress_bar() -> None:
     """Render the progress bar and status area in the sticky header.
 
@@ -255,6 +283,7 @@ def build_global_progress_bar() -> None:
             auto_details_scroll = ui.element("div").classes("cf-auto-details-scroll")
             with auto_details_scroll:
                 auto_details_label = ui.label("").classes("whitespace-pre text-xs")
+    auto_details_render_state = {"body": None}
 
     def _refresh_status() -> None:
         snap = ui_state.get_status_snapshot()
@@ -316,22 +345,21 @@ def build_global_progress_bar() -> None:
         auto_bar.set_visibility(bool(auto_txt))
 
         details = snap.get("auto_status_detail_body", "") or ""
-        auto_details_label.set_text(details)
+        previous_details = auto_details_render_state.get("body")
+        details_changed = str(details) != str(previous_details or "")
+        if details_changed:
+            auto_details_label.set_text(details)
+            auto_details_render_state["body"] = str(details)
         auto_details_exp.set_visibility(bool(details))
-        if details:
+        if _should_autoscroll_auto_details(
+            previous_body=previous_details if isinstance(previous_details, str) else None,
+            current_body=str(details),
+            run_active=bool(_run_clock["active"]),
+        ):
             try:
                 from nicegui import ui
-                ui.run_javascript("""
-                    setTimeout(() => {
-                        const sc = document.querySelector('.cf-auto-details-scroll');
-                        if (sc) {
-                            const remainingScroll = sc.scrollHeight - sc.scrollTop - sc.clientHeight;
-                            if (remainingScroll < 50) {
-                                sc.scrollTop = sc.scrollHeight;
-                            }
-                        }
-                    }, 50);
-                """)
+
+                ui.run_javascript(_auto_details_autoscroll_js(getattr(auto_details_scroll, "id", "")))
             except (
                 AttributeError,
                 TypeError,

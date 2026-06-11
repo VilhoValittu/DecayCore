@@ -37,7 +37,8 @@ def test_generate_filter_smoke(lr_measurements):
     assert len(imp) == cfg.num_taps
     assert isinstance(st, dict)
     assert "offset_db" in st
-    assert st["acoustic_authority_version"] == 1
+    assert st["acoustic_authority_version"] == 2
+    assert st["acoustic_authority_limits_source"] == "stats"
 
 
 def test_generate_filter_score_only_omits_ui_payload_arrays(lr_measurements):
@@ -59,6 +60,7 @@ def test_generate_filter_score_only_omits_ui_payload_arrays(lr_measurements):
     assert len(st["filter_mags"]) == len(st["freq_axis"])
     assert len(st["authority_voice_risk"]) == len(st["freq_axis"])
     assert len(st["authority_modal_support"]) == len(st["freq_axis"])
+    assert len(st["authority_decay_need"]) == len(st["freq_axis"])
     assert len(st["authority_null_risk"]) == len(st["freq_axis"])
     assert "measured_mags_raw" not in st
     assert "fir_only_predicted_filter_mags" not in st

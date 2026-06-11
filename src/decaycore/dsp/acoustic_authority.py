@@ -27,13 +27,14 @@ class AcousticAuthority:
     phase_authority: np.ndarray
 
     modal_support: np.ndarray
+    decay_need: np.ndarray
     null_risk: np.ndarray
     reflection_risk: np.ndarray
     repeatability: np.ndarray
     minphase_likelihood: np.ndarray
     voice_risk: np.ndarray
 
-    version: int = 1
+    version: int = 2
 
 
 def _as_float_array(value) -> np.ndarray:
@@ -193,6 +194,43 @@ def _modal_support_curve(
     return _clip01(support)
 
 
+def _modal_decay_need_curve(
+    freq_axis: np.ndarray,
+    events: Sequence[RoomModeEvent | dict],
+) -> np.ndarray:
+    need = np.zeros_like(freq_axis, dtype=float)
+    for event in tuple(events or ()):
+        freq_hz = _safe_float(_event_value(event, "freq_hz", _event_value(event, "freq", 0.0)), 0.0)
+        width_oct = _safe_float(
+            _event_value(event, "safe_width_oct", 0.0),
+            0.0,
+        ) or _safe_float(_event_value(event, "width_oct", 0.0), 0.0) or (1.0 / 12.0)
+        width_oct = float(max(1.0 / 48.0, width_oct))
+        decay = float(np.clip(_safe_float(_event_value(event, "decay_severity", 0.0), 0.0), 0.0, 1.0))
+        gd_excess = float(np.clip(_safe_float(_event_value(event, "gd_excess_ms", 0.0), 0.0) / 60.0, 0.0, 1.0))
+        cut_priority = float(np.clip(_safe_float(_event_value(event, "cut_priority", 0.0), 0.0), 0.0, 1.0))
+        confidence = float(np.clip(_safe_float(_event_value(event, "confidence", 0.0), 0.0), 0.0, 1.0))
+        severity = float(np.clip(_safe_float(_event_value(event, "severity", 0.0), 0.0), 0.0, 1.0))
+        kind = str(_event_value(event, "kind", "unknown") or "unknown")
+        kind_factor = {
+            "room_mode": 1.00,
+            "broad_buildup": 0.65,
+            "uncertain": 0.25,
+            "local_comb": 0.05,
+        }.get(kind, 0.20)
+        strength = float(
+            np.clip(
+                kind_factor
+                * confidence
+                * (0.50 * decay + 0.25 * gd_excess + 0.15 * cut_priority + 0.10 * severity),
+                0.0,
+                1.0,
+            )
+        )
+        need = np.maximum(need, strength * _log_gaussian(freq_axis, freq_hz, width_oct))
+    return _clip01(need)
+
+
 def _reflection_risk_curve(freq_axis, reflection_nodes, confidence, modal_support) -> np.ndarray:
     f = _as_float_array(freq_axis)
     risk = np.zeros_like(f, dtype=float)
@@ -253,6 +291,7 @@ def build_acoustic_authority_map(
     group_delay_ms=None,
     reflection_nodes=None,
     modal_events=None,
+    rt60_by_band=None,
     left_mag_db=None,
     right_mag_db=None,
     repeatability_curve=None,
@@ -281,11 +320,13 @@ def build_acoustic_authority_map(
             confidence_mask=confidence,
             left_mag_db=left_mag_db,
             right_mag_db=right_mag_db,
+            rt60_by_band=rt60_by_band,
             lo_hz=float(mag_c_min),
             hi_hz=float(mag_c_max),
         )
         events = tuple(modal_result.events)
     modal_support = _modal_support_curve(freq, events)
+    decay_need = _modal_decay_need_curve(freq, events)
 
     baseline = _smooth_log_box(freq, measured, 0.45)
     dip_db = baseline - measured
@@ -311,7 +352,7 @@ def build_acoustic_authority_map(
     minphase_likelihood = np.maximum(minphase_likelihood, 0.25 * modal_support)
     minphase_likelihood = _clip01(minphase_likelihood)
 
-    cut_authority = 0.45 * confidence + 0.35 * modal_support + 0.20 * repeatability
+    cut_authority = 0.38 * confidence + 0.22 * modal_support + 0.22 * decay_need + 0.18 * repeatability
     cut_authority *= 1.0 - 0.35 * reflection_risk
     cut_authority = _clip01(cut_authority)
 
@@ -336,6 +377,7 @@ def build_acoustic_authority_map(
         boost_authority=boost_authority,
         phase_authority=phase_authority,
         modal_support=modal_support,
+        decay_need=decay_need,
         null_risk=null_risk,
         reflection_risk=reflection_risk,
         repeatability=repeatability,
@@ -350,6 +392,7 @@ def acoustic_authority_to_stats(authority: AcousticAuthority, *, include_arrays:
     boost = _clip01(authority.boost_authority)
     phase = _clip01(authority.phase_authority)
     modal = _clip01(authority.modal_support)
+    decay = _clip01(authority.decay_need)
     null = _clip01(authority.null_risk)
     reflection = _clip01(authority.reflection_risk)
     repeatability = _clip01(authority.repeatability)
@@ -364,6 +407,7 @@ def acoustic_authority_to_stats(authority: AcousticAuthority, *, include_arrays:
         "authority_null_risk_peak": _peak(null),
         "authority_reflection_risk_peak": _peak(reflection),
         "authority_modal_support_peak": _peak(modal),
+        "authority_decay_need_peak": _peak(decay),
         "authority_voice_risk_peak": _peak(voice),
         "authority_cut_mean_20_300": _mean(_band_values(cut, freq, 20.0, 300.0)),
         "authority_boost_mean_20_300": _mean(_band_values(boost, freq, 20.0, 300.0)),
@@ -371,6 +415,7 @@ def acoustic_authority_to_stats(authority: AcousticAuthority, *, include_arrays:
         "authority_null_risk_peak_20_300": _peak(_band_values(null, freq, 20.0, 300.0)),
         "authority_voice_risk_peak_70_180": _peak(_band_values(voice, freq, 70.0, 180.0)),
         "authority_modal_support_peak_20_300": _peak(_band_values(modal, freq, 20.0, 300.0)),
+        "authority_decay_need_peak_20_300": _peak(_band_values(decay, freq, 20.0, 300.0)),
     }
     if include_arrays:
         scoring_only = str(include_arrays).strip().lower() == "scoring"
@@ -378,6 +423,7 @@ def acoustic_authority_to_stats(authority: AcousticAuthority, *, include_arrays:
             stats.update(
                 {
                     "authority_modal_support": modal.tolist(),
+                    "authority_decay_need": decay.tolist(),
                     "authority_null_risk": null.tolist(),
                     "authority_voice_risk": voice.tolist(),
                 }
@@ -389,6 +435,7 @@ def acoustic_authority_to_stats(authority: AcousticAuthority, *, include_arrays:
                 "authority_boost": boost.tolist(),
                 "authority_phase": phase.tolist(),
                 "authority_modal_support": modal.tolist(),
+                "authority_decay_need": decay.tolist(),
                 "authority_null_risk": null.tolist(),
                 "authority_reflection_risk": reflection.tolist(),
                 "authority_repeatability": repeatability.tolist(),

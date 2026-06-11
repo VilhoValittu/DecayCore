@@ -11,7 +11,7 @@
 import os
 import re
 
-DEFAULT_VERSION = "v1.0.9.3"
+DEFAULT_VERSION = "v1.1.0"
 
 
 def normalize_version(value: str | None, *, default: str = DEFAULT_VERSION) -> str:

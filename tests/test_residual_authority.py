@@ -124,6 +124,27 @@ def test_modal_peak_allows_cut_polish():
     assert float(caps["residual_cut_cap_db"][band].max()) > 2.0
 
 
+def test_decay_need_can_enable_modal_cut_polish():
+    freq = np.geomspace(10.0, 20000.0, 2048)
+    decay_need = np.zeros_like(freq)
+    cut = np.ones_like(freq)
+    band = _near(freq, 55.0)
+    decay_need[band] = 1.0
+
+    caps = build_residual_authority_caps(
+        freq,
+        authority_cut=cut,
+        authority_modal_support=np.zeros_like(freq),
+        authority_decay_need=decay_need,
+        authority_null_risk=np.zeros_like(freq),
+        authority_reflection_risk=np.zeros_like(freq),
+        residual_pass_mode="modal_polish",
+    )
+
+    assert bool(caps["residual_cut_allowed"][band].any())
+    assert float(caps["residual_cut_cap_db"][band].max()) > 2.0
+
+
 def test_low_modal_support_blocks_modal_polish_cut():
     freq = np.geomspace(10.0, 20000.0, 2048)
 

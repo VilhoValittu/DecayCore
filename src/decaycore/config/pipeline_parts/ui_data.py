@@ -78,9 +78,12 @@ _AUTO_MODE_DEFAULT_CFG_TO_UI = {
     "lvl_min": "lvl_min",
     "lvl_max": "lvl_max",
     "conf_pull_floor": "conf_pull_floor",
+    "conf_pull_ceil": "conf_pull_ceil",
     "conf_pull_max_hz": "conf_pull_max_hz",
     "conf_pull_gamma_cut": "conf_pull_gamma_cut",
     "conf_pull_gamma_boost": "conf_pull_gamma_boost",
+    "conf_pull_bass_boost_floor_min": "conf_pull_bass_boost_floor_min",
+    "conf_pull_bass_boost_restore": "conf_pull_bass_boost_restore",
     "low_bass_cut_strength": "low_bass_cut_strength",
     "filter_type_str": "filter_type",
     "plot_smoothing_level": "plot_smoothing_level",
@@ -181,19 +184,23 @@ _LIST_BOOL_KEYS = [
 
 _HIDDEN_CONF_DEFAULTS_ADVANCED = {
     "conf_pull_floor": 0.05,
-    "conf_pull_ceil": 0.95,
+    "conf_pull_ceil": 0.85,
     "conf_pull_max_hz": 180.0,
-    "conf_pull_gamma_cut": 0.55,
+    "conf_pull_gamma_cut": 0.45,
     "conf_pull_gamma_boost": 0.35,
+    "conf_pull_bass_boost_floor_min": 0.55,
+    "conf_pull_bass_boost_restore": 0.70,
     "low_bass_cut_strength": 0.0,
 }
 
 _HIDDEN_CONF_DEFAULTS_BASIC_AUTO = {
     "conf_pull_floor": 0.05,
-    "conf_pull_ceil": 0.95,
+    "conf_pull_ceil": 0.85,
     "conf_pull_max_hz": 200.0,
-    "conf_pull_gamma_cut": 0.55,
+    "conf_pull_gamma_cut": 0.45,
     "conf_pull_gamma_boost": 0.35,
+    "conf_pull_bass_boost_floor_min": 0.55,
+    "conf_pull_bass_boost_restore": 0.70,
     "low_bass_cut_strength": 0.0,
 }
 

@@ -1,6 +1,7 @@
 import math
 
 import numpy as np
+import pytest
 
 from decaycore.dsp.acoustic_authority import (
     AcousticAuthority,
@@ -24,6 +25,7 @@ def _authority_arrays(authority: AcousticAuthority):
         authority.boost_authority,
         authority.phase_authority,
         authority.modal_support,
+        authority.decay_need,
         authority.null_risk,
         authority.reflection_risk,
         authority.repeatability,
@@ -113,8 +115,51 @@ def test_acoustic_authority_modal_peak_allows_cut():
     )
 
     assert float(authority.modal_support[idx]) > 0.6
+    assert float(authority.decay_need[idx]) > 0.5
     assert float(authority.cut_authority[idx]) > float(authority.boost_authority[idx])
     assert float(authority.cut_authority[idx]) > 0.55
+
+
+def test_acoustic_authority_decay_need_increases_modal_cut_authority():
+    freq = np.geomspace(10.0, 20000.0, 1024)
+    measured = _bump(freq, 55.0, 7.0, 0.12)
+    idx = _nearest_idx(freq, 55.0)
+
+    base_event = dict(
+        freq_hz=55.0,
+        peak_db=7.0,
+        width_hz=12.0,
+        width_oct=0.22,
+        q_estimate=4.0,
+        area_db_oct=1.0,
+        gd_excess_ms=10.0,
+        confidence=0.9,
+        severity=0.75,
+        correction_priority=0.75,
+        cut_priority=0.75,
+        safe_cut_db=4.0,
+        safe_width_oct=0.24,
+        kind="room_mode",
+    )
+    low_decay = RoomModeEvent(decay_severity=0.05, **base_event)
+    high_decay = RoomModeEvent(decay_severity=0.9, **base_event)
+
+    low = build_acoustic_authority_map(
+        freq,
+        measured,
+        confidence_mask=np.full_like(freq, 0.9),
+        modal_events=[low_decay],
+    )
+    high = build_acoustic_authority_map(
+        freq,
+        measured,
+        confidence_mask=np.full_like(freq, 0.9),
+        modal_events=[high_decay],
+    )
+
+    assert float(high.decay_need[idx]) > float(low.decay_need[idx])
+    assert float(high.cut_authority[idx]) > float(low.cut_authority[idx])
+    assert float(high.boost_authority[idx]) == pytest.approx(float(low.boost_authority[idx]), abs=0.08)
 
 
 def test_acoustic_authority_reflection_node_reduces_phase_authority():
@@ -154,7 +199,8 @@ def test_acoustic_authority_stats_are_json_friendly():
 
     stats = acoustic_authority_to_stats(authority, include_arrays=True)
 
-    assert stats["acoustic_authority_version"] == 1
+    assert stats["acoustic_authority_version"] == 2
     assert len(stats["authority_cut"]) == freq.size
+    assert len(stats["authority_decay_need"]) == freq.size
     assert "authority_boost_mean_20_300" in stats
     _assert_jsonish(stats)
