@@ -8,6 +8,20 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
+## [1.1.1] - 11-6-2026
+
+### Measurement blending — smarter multi-position merging
+
+DecayCore now combines multi-position measurements more carefully. Low frequencies still benefit from shared room averaging, the middle range blends smoothly, and the high end stays anchored to the main listening position. That means cleaner results and fewer unwanted high-frequency dips.
+
+### Acoustic confidence — more reliable decisions in real rooms
+
+Confidence and modal detection are now more robust against noisy measurement data. New frequency-local thresholds help DecayCore keep clear bass problems in focus while ignoring misleading high-frequency noise.
+
+### RT60 and stability — stronger support for difficult measurements
+
+RT60 fitting is now more resistant to spikes and outliers, giving DecayCore a steadier view of room decay. Cache handling has also been updated so the new analysis logic stays consistent and predictable in AUTO mode.
+
 ## [1.1.0] - 11-6-2026
 
 ### AUTO Mode — More room-aware correction decisions

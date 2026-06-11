@@ -171,6 +171,33 @@ def test_release_workflow_verifies_manual_in_macos_app_bundle_layout():
     assert '7z l "out/DecayCore_${VERSION}_macos_arm64.7z" | grep -q "Start_Decay.command"' in workflow_text
 
 
+def test_release_workflow_adds_linux_arm64_release_asset():
+    workflow_path = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "release-build.yml"
+    workflow_text = workflow_path.read_text(encoding="utf-8")
+
+    assert "build_linux_arm64:" in workflow_text
+    assert "name: Build Linux ARM64" in workflow_text
+    assert "runs-on: ubuntu-22.04-arm" in workflow_text
+    assert 'python-version: "3.11"' in workflow_text
+    assert "libsndfile1" in workflow_text
+    assert "libportaudio2" in workflow_text
+    assert "portaudio19-dev" in workflow_text
+    assert "p7zip-full" in workflow_text
+    assert "python -m pip install --upgrade -r requirements-linux.txt" in workflow_text
+    assert "python -m pip install -r requirements-measurement.txt" in workflow_text
+    assert "pyinstaller --clean --noconfirm DecayCore_linux.spec" in workflow_text
+    assert 'cat > "dist/DecayCore/run.sh" << \'EOF\'' in workflow_text
+    assert 'exec "$DIR/DecayCore" "$@"' in workflow_text
+    assert '(cd dist && 7z a -t7z -mx=9 -mmt=on -m0=lzma2 "../out/DecayCore_${VERSION}_linux_arm64.7z" "DecayCore")' in workflow_text
+    assert '7z l "out/DecayCore_${VERSION}_linux_arm64.7z" | grep -q "DecayCore/run.sh"' in workflow_text
+    assert '7z l "out/DecayCore_${VERSION}_linux_arm64.7z" | grep -q "DecayCore/DecayCore"' in workflow_text
+    assert '7z l "out/DecayCore_${VERSION}_linux_arm64.7z" | grep -q "DecayCore/_internal"' in workflow_text
+    assert "Download Linux ARM64 build artifact" in workflow_text
+    assert "name: DecayCore-linux-arm64" in workflow_text
+    assert "path: out/DecayCore_${VERSION}_linux_arm64.7z" in workflow_text
+    assert "needs: [build_macos_arm64, build_linux_arm64]" in workflow_text
+
+
 def test_release_workflow_skips_matplotlib_warmup_when_dependency_is_missing():
     workflow_path = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "release-build.yml"
     workflow_text = workflow_path.read_text(encoding="utf-8")
@@ -186,7 +213,7 @@ def test_release_workflow_installs_rust_scoring_extension_before_packaging():
 
     assert "pip install pyinstaller maturin" in workflow_text
     assert "python -m pip install pyinstaller maturin" in workflow_text
-    assert workflow_text.count("python -m pip install ./decaycore-scoring") == 1
+    assert workflow_text.count("python -m pip install ./decaycore-scoring") == 2
 
 
 def test_installation_guide_mentions_linux_portaudio_runtime_dependency():
@@ -196,3 +223,12 @@ def test_installation_guide_mentions_linux_portaudio_runtime_dependency():
     assert "libportaudio2" in installation_text
     assert "measurement audio" in installation_text.lower()
     assert "Start_Decay.command" in installation_text
+
+
+def test_installation_guide_mentions_linux_arm64_release_package():
+    installation_path = Path(__file__).resolve().parents[1] / "docs" / "Installation.md"
+    installation_text = installation_path.read_text(encoding="utf-8")
+
+    assert "DecayCore_<version>_linux_arm64.7z" in installation_text
+    assert "Raspberry Pi / Linux ARM64" in installation_text
+    assert "32-bit Raspberry Pi OS" in installation_text

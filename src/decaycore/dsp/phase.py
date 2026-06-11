@@ -30,18 +30,41 @@ def limit_phase_deg(phase_rad, max_deg=45.0):
     return np.clip(phase_rad, -max_rad, max_rad)
 
 
-def calculate_minimum_phase(mags_lin_fft, max_phase_deg=45.0):
+def calculate_minimum_phase(mags_lin_fft, max_phase_deg=45.0, oversample=4):
     """
-    Laskee minimivaiheen amplitudispektrista Hilbert-muunnoksen avulla.
+    Laskee minimivaiheen amplitudispektrista homomorfisella
+    reaalikepstrimenetelmalla.
 
-    Lopputulos unwrapataan ja rajataan turvalliseen vaihealueeseen
+    Log-magnitudi interpoloidaan `oversample`-kertaa tihealle akselille,
+    siita lasketaan reaalikepstri, kepstri taitetaan kausaaliseksi ja
+    minimivaihe luetaan taitetun kepstrin spektrin imaginaariosasta.
+    Ylinaytteistys vahentaa kepstrin aliasoitumista, joka nakyy
+    epatarkkuutena jyrkissa magnitudin transitioissa. Vaihe on
+    rakenteellisesti jatkuva (ei unwrap-tarvetta), ja se rajataan lopuksi
     `limit_phase_deg()`-funktion kautta.
     """
     ln_mag = np.log(np.maximum(np.abs(mags_lin_fft), 1e-10))
-    full_ln_mag = np.concatenate((ln_mag, ln_mag[-2:0:-1]))
-    analytic = scipy.signal.hilbert(full_ln_mag)
-    min_phase_rad = -np.imag(analytic)[:len(mags_lin_fft)]
-    min_phase_rad = np.unwrap(min_phase_rad)
+    n_half = len(ln_mag)
+    try:
+        os_factor = max(1, int(oversample))
+    except (TypeError, ValueError, OverflowError):
+        os_factor = 4
+    if n_half < 4:
+        return limit_phase_deg(np.zeros(n_half, dtype=float), max_phase_deg)
+
+    n_os = os_factor * 2 * (n_half - 1)
+    x_orig = np.arange(n_half, dtype=float)
+    x_dense = np.linspace(0.0, float(n_half - 1), n_os // 2 + 1)
+    ln_dense = np.interp(x_dense, x_orig, ln_mag)
+
+    cepstrum = np.fft.irfft(ln_dense, n=n_os)
+    fold = np.zeros(n_os, dtype=float)
+    fold[0] = 1.0
+    fold[n_os // 2] = 1.0
+    fold[1:n_os // 2] = 2.0
+    min_log_spec = np.fft.rfft(cepstrum * fold, n=n_os)
+
+    min_phase_rad = np.interp(x_orig, x_dense, np.imag(min_log_spec))
     return limit_phase_deg(min_phase_rad, max_phase_deg)
 
 

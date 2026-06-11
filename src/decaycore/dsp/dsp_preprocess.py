@@ -18,20 +18,20 @@ from copy import deepcopy
 
 import numpy as np
 
+from .cache_utils import BoundedLruCache
 from .decaycore_analysis import analyze_acoustic_confidence
 from .decaycore_leveling import compute_leveling
 from .phase import remove_time_of_flight
 from .smoothing import apply_adaptive_fdw, apply_smoothing_std, psychoacoustic_smoothing
 from .dsp_types import DspContext, PreprocessResult
 
-_PREPROCESS_CACHE: dict = {}
+_PREPROCESS_CACHE = BoundedLruCache(16)
 
 # Caches the measurement-fixed portion of run_preprocess (everything before
 # AFDW). Key is based on object identity of the input arrays plus a lightweight
 # fingerprint so different arrays with the same id after GC are detected.
 # Trials that differ only in fdw_cycles or enable_afdw still hit this cache.
-_MEAS_FIXED_CACHE: dict = {}
-_MEAS_FIXED_MAX: int = 8
+_MEAS_FIXED_CACHE = BoundedLruCache(8)
 _MEAS_FIXED_STATS: dict = {"hits": 0, "misses": 0}
 
 
@@ -347,9 +347,7 @@ def _store_meas_fixed_entry(cache_key: tuple | None, payload: dict) -> None:
     _MEAS_FIXED_STATS["misses"] = _MEAS_FIXED_STATS.get("misses", 0) + 1
     if cache_key is None:
         return
-    if len(_MEAS_FIXED_CACHE) >= _MEAS_FIXED_MAX:
-        _MEAS_FIXED_CACHE.clear()
-    _MEAS_FIXED_CACHE[cache_key] = payload
+    _MEAS_FIXED_CACHE.put(cache_key, payload)
 
 
 def _compute_meas_fixed_payload(
@@ -497,9 +495,7 @@ def _run_preprocess_build_result(meas_data: dict, *, n_fft: int) -> PreprocessRe
 def _store_preprocess_cache_result(cache_key: tuple | None, result: PreprocessResult) -> None:
     if cache_key is None:
         return
-    if len(_PREPROCESS_CACHE) >= 16:
-        _PREPROCESS_CACHE.clear()
-    _PREPROCESS_CACHE[cache_key] = clone_preprocess_result(result)
+    _PREPROCESS_CACHE.put(cache_key, clone_preprocess_result(result))
 
 
 def run_preprocess(freqs, meas_mags, raw_phases, cfg, *, stereo_link_ctx=None, presolve_mode: bool = False) -> PreprocessResult:

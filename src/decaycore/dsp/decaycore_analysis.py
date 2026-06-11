@@ -11,9 +11,12 @@
 import numpy as np
 import scipy.signal
 import scipy.ndimage
+import scipy.stats
 
-_SOS_CACHE: dict[tuple, np.ndarray] = {}
-_SOS_CACHE_MAX = 256
+from decaycore.dsp.cache_utils import BoundedLruCache
+from decaycore.dsp.mode_q import estimate_peak_q
+
+_SOS_CACHE = BoundedLruCache(256)
 
 
 def clear_analysis_cache() -> None:
@@ -23,14 +26,11 @@ def clear_analysis_cache() -> None:
 
 def _get_bandpass_sos(nyq: float, order: int, fl: float, fh: float) -> np.ndarray:
     key = (round(nyq, 1), int(order), round(fl, 4), round(fh, 4))
-    try:
-        return _SOS_CACHE[key]
-    except KeyError:
+    sos = _SOS_CACHE.get(key)
+    if sos is None:
         sos = scipy.signal.butter(order, [fl / nyq, fh / nyq], btype="bandpass", output="sos")
-        if len(_SOS_CACHE) >= _SOS_CACHE_MAX:
-            _SOS_CACHE.pop(next(iter(_SOS_CACHE)))
-        _SOS_CACHE[key] = sos
-        return sos
+        _SOS_CACHE.put(key, sos)
+    return sos
 
 
 def _sigma_bins_from_hz(freq_axis, sigma_hz: float, fallback_bins: float = 3.0) -> float:
@@ -63,14 +63,26 @@ def _distance_bins_from_hz(freq_axis, distance_hz: float, fallback_bins: int = 1
         return int(fallback_bins)
 
 
+# Theil-Sen on O(k^2) pareittain; EDC-ikkuna voi olla kymmenia tuhansia
+# naytteita, joten sovitus tehdaan tasavalisesti harvennetulle osajoukolle.
+_RT60_FIT_MAX_POINTS = 256
+
+
 def _fit_rt60_window(t_u: np.ndarray, d_u: np.ndarray, lo_db: float, hi_db: float):
     mask = (d_u <= lo_db) & (d_u >= hi_db)
     if np.count_nonzero(mask) < 12:
         return None
     tt = t_u[mask]
     yy = d_u[mask]
-    A = np.vstack([tt, np.ones_like(tt)]).T
-    a, b = np.linalg.lstsq(A, yy, rcond=None)[0]
+    if tt.size > _RT60_FIT_MAX_POINTS:
+        sel = np.linspace(0, tt.size - 1, _RT60_FIT_MAX_POINTS).astype(int)
+        ts, ys = tt[sel], yy[sel]
+    else:
+        ts, ys = tt, yy
+    try:
+        a, b, _lo, _hi = scipy.stats.theilslopes(ys, ts)
+    except (ValueError, FloatingPointError):
+        return None
     yhat = a * tt + b
     ss_res = float(np.sum((yy - yhat) ** 2))
     ss_tot = float(np.sum((yy - np.mean(yy)) ** 2)) + 1e-12
@@ -101,6 +113,47 @@ def calculate_group_delay(freqs, phases_deg):
     return scipy.ndimage.gaussian_filter1d(gd_ms, sigma=sigma_bins)
 
 
+_GD_THR_FLOOR_MS = 2.5
+_GD_THR_CEIL_MS = 8.0
+_GD_THR_MIN_BAND_SAMPLES = 16
+
+
+def _local_gd_threshold_curve(freq_axis, gd_diff, valid_idx, global_thr_ms):
+    """Taajuuslokaali GD-kynnyskayra: p70 oktaavikaistoittain, log-f-interpolointi.
+
+    Kaistat, joissa on liian vahan naytteita, perivat globaalin kynnyksen.
+    Kaistakohtainen kynnys rajataan samaan [2.5, 8.0] ms ikkunaan kuin
+    globaali kynnys, joten lokaali painotus ei voi loysata kokonaisrajoja.
+    """
+    out = np.full(len(freq_axis), float(global_thr_ms), dtype=float)
+    if valid_idx.size < 4 * _GD_THR_MIN_BAND_SAMPLES:
+        return out
+    f_v = np.asarray(freq_axis, dtype=float)[valid_idx]
+    g_v = np.asarray(gd_diff, dtype=float)[valid_idx]
+    f_lo = max(20.0, float(f_v[0]))
+    f_hi = float(f_v[-1])
+    if not (np.isfinite(f_lo) and np.isfinite(f_hi)) or f_hi <= f_lo * 1.5:
+        return out
+    n_bands = int(np.ceil(np.log2(f_hi / f_lo)))
+    edges = f_lo * 2.0 ** np.arange(n_bands + 1, dtype=float)
+    edges[-1] = f_hi
+    centers: list[float] = []
+    thrs: list[float] = []
+    for e0, e1 in zip(edges[:-1], edges[1:]):
+        m = (f_v >= e0) & (f_v <= e1)
+        if int(np.count_nonzero(m)) < _GD_THR_MIN_BAND_SAMPLES:
+            thr = float(global_thr_ms)
+        else:
+            p70 = float(np.percentile(g_v[m], 70.0))
+            thr = float(np.clip(max(_GD_THR_FLOOR_MS, p70), _GD_THR_FLOOR_MS, _GD_THR_CEIL_MS))
+        centers.append(float(np.sqrt(e0 * e1)))
+        thrs.append(thr)
+    if len(centers) < 2:
+        return out
+    log_f = np.log2(np.maximum(np.asarray(freq_axis, dtype=float), 1e-3))
+    return np.interp(log_f, np.log2(np.asarray(centers)), np.asarray(thrs))
+
+
 def analyze_acoustic_confidence(freq_axis, complex_meas, fs):
     phase_rad = np.unwrap(np.angle(complex_meas))
     df = np.gradient(freq_axis) + 1e-12
@@ -118,7 +171,8 @@ def analyze_acoustic_confidence(freq_axis, complex_meas, fs):
         threshold_ms = float(np.clip(max(2.5, p70), 2.5, 8.0))
     else:
         threshold_ms = 2.5
-    x = 1.5 * (gd_diff - threshold_ms)
+    threshold_curve = _local_gd_threshold_curve(freq_axis, gd_diff, valid_idx, threshold_ms)
+    x = 1.5 * (gd_diff - threshold_curve)
     x = np.clip(x, -60.0, 60.0)
     confidence_mask = 1.0 / (1.0 + np.exp(x))
     peaks = np.array([], dtype=int)
@@ -134,23 +188,14 @@ def analyze_acoustic_confidence(freq_axis, complex_meas, fs):
         )
 
     raw_nodes = []
-    for p in peaks:
+    q_vals, _bw_hz = estimate_peak_q(
+        freq_axis[valid_idx], gd_diff[valid_idx], peaks, min_bw_ratio=0.02
+    )
+    for p, q_val in zip(peaks, q_vals):
         idx = valid_idx[p]
         f_peak = float(freq_axis[idx])
         peak_val = float(gd_diff[idx])
-        half_val = peak_val / 2.0
-
-        # Estimate Q from half-height bandwidth in the GD-deviation curve.
-        # Walk left/right from peak to find the -3 dB (half-height) crossing.
-        li, ri = p, p
-        while li > 0 and gd_diff[valid_idx[li - 1]] > half_val:
-            li -= 1
-        while ri < len(valid_idx) - 1 and gd_diff[valid_idx[ri + 1]] > half_val:
-            ri += 1
-        f_lo_bw = float(freq_axis[valid_idx[li]])
-        f_hi_bw = float(freq_axis[valid_idx[ri]])
-        bw = max(f_hi_bw - f_lo_bw, f_peak * 0.02)
-        q_est = round(f_peak / bw, 1)
+        q_est = round(float(q_val), 1)
 
         raw_nodes.append({
             "freq": round(f_peak, 1),

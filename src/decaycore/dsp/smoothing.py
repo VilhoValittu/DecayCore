@@ -9,12 +9,12 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 import hashlib
-from collections import OrderedDict
 import numpy as np
 import numba
 import logging
 
 from decaycore.auto_mode.auto_mode_profile import profiled_section
+from decaycore.dsp.cache_utils import BoundedLruCache
 
 
 
@@ -27,8 +27,8 @@ AFDW_BW_MAX_OCT = 1.0 / 2.0
 # Smoothing plan cache
 # ---------------------------------------------------------------------------
 
-_SMOOTHING_PLAN_CACHE: OrderedDict = OrderedDict()
 _SMOOTHING_PLAN_CACHE_MAX = 512
+_SMOOTHING_PLAN_CACHE = BoundedLruCache(_SMOOTHING_PLAN_CACHE_MAX)
 
 
 def _make_smoothing_plan(freqs: np.ndarray, octave_fraction: float) -> dict:
@@ -66,12 +66,8 @@ def _get_smoothing_plan(freqs: np.ndarray, octave_fraction: float) -> dict:
     key = (n, float(freqs[0]) if n > 0 else 0.0, float(freqs[-1]) if n > 0 else 0.0, round(octave_fraction, 8))
     plan = _SMOOTHING_PLAN_CACHE.get(key)
     if plan is None:
-        if len(_SMOOTHING_PLAN_CACHE) >= _SMOOTHING_PLAN_CACHE_MAX:
-            _SMOOTHING_PLAN_CACHE.popitem(last=False)  # evict oldest (LRU)
         plan = _make_smoothing_plan(freqs, octave_fraction)
-        _SMOOTHING_PLAN_CACHE[key] = plan
-    else:
-        _SMOOTHING_PLAN_CACHE.move_to_end(key)
+        _SMOOTHING_PLAN_CACHE.put(key, plan)
     return plan
 
 
@@ -178,8 +174,8 @@ def smooth_meas_freq_dep(m_db: np.ndarray, freq_axis: np.ndarray) -> np.ndarray:
 
 # Module-level cache for adaptive FDW bandwidth stacks.
 # Key: (n_freqs, f0, f_last, full_magnitude_hash) -> sm_stack array
-_AFDW_STACK_CACHE: OrderedDict = OrderedDict()
 _AFDW_STACK_CACHE_MAX = 64
+_AFDW_STACK_CACHE = BoundedLruCache(_AFDW_STACK_CACHE_MAX)
 
 
 def apply_adaptive_fdw(freqs, mags, confidence_mask, base_cycles=15.0, min_cycles=5.0):
@@ -236,11 +232,7 @@ def _apply_adaptive_fdw_impl(freqs, mags, confidence_mask, base_cycles=15.0, min
         sm_stack = np.empty((len(bw_list), n), dtype=float)
         for i, bw in enumerate(bw_list):
             sm_stack[i] = _apply_smoothing_mag_only(f, m, float(bw))
-        if len(_AFDW_STACK_CACHE) >= _AFDW_STACK_CACHE_MAX:
-            _AFDW_STACK_CACHE.popitem(last=False)
-        _AFDW_STACK_CACHE[_stack_key] = sm_stack
-    else:
-        _AFDW_STACK_CACHE.move_to_end(_stack_key)
+        _AFDW_STACK_CACHE.put(_stack_key, sm_stack)
 
     hi = np.searchsorted(bw_list, t, side='right')
     hi = np.clip(hi, 1, len(bw_list) - 1)

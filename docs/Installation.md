@@ -57,6 +57,22 @@ sudo apt install libportaudio2
 
 ---
 
+### Raspberry Pi / Linux ARM64
+
+1. Download `DecayCore_<version>_linux_arm64.7z` from Releases.
+2. Extract the archive.
+3. Open Terminal in the extracted folder and run:
+
+```bash
+./run.sh
+```
+
+4. Use this build for Raspberry Pi 4/5 running a 64-bit operating system, Debian/Ubuntu Linux ARM64 systems, and other 64-bit ARM Linux machines.
+5. This build does not support 32-bit Raspberry Pi OS.
+6. Open `http://127.0.0.1:8080` if the browser does not open automatically.
+
+---
+
 ### macOS (Apple Silicon)
 
 1. Download `DecayCore_<version>_macos_arm64.7z` from Releases.

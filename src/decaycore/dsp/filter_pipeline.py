@@ -93,6 +93,7 @@ def _apply_hybrid_iir_preconditioning(
             np.asarray(freq_axis, dtype=float),
             int(getattr(cfg, "fs", 0) or 0),
             policy,
+            measured_mag_db=np.asarray(m_anal, dtype=float) - float(calc_offset_db),
         )
     except (
 

@@ -13,6 +13,8 @@ import numpy as np
 import scipy.signal
 import scipy.ndimage
 
+from decaycore.dsp.mode_q import estimate_peak_q
+
 _LOGGER = logging.getLogger(__name__)
 
 def _clamp01(x):
@@ -113,14 +115,9 @@ def _mode_q_norm(f: np.ndarray, mag_peak: np.ndarray, *, q0: float, q1: float) -
     try:
         peaks, _props = scipy.signal.find_peaks(mag_peak, prominence=1.0, distance=max(3, int(0.02 * len(f))))
         if len(peaks) > 0:
-            results_half = scipy.signal.peak_widths(mag_peak, peaks, rel_height=0.5)
-            widths_bins = results_half[0]
-            for peak_idx, width_bins in zip(peaks, widths_bins):
-                lo = max(0, int(peak_idx - width_bins / 2))
-                hi = min(len(f) - 1, int(peak_idx + width_bins / 2))
-                bw_hz = max(1e-6, f[hi] - f[lo])
-                q_value = f[peak_idx] / bw_hz if bw_hz > 0 else 0.0
-                peak_q_values.append(q_value)
+            q_values, _bw_hz = estimate_peak_q(f, mag_peak, peaks, min_bw_ratio=0.0)
+            for peak_idx, q_value in zip(peaks, q_values):
+                peak_q_values.append(float(q_value))
                 q_norm[peak_idx] = _clamp01((q_value - q0) / (q1 - q0 + 1e-12))
             q_norm = scipy.ndimage.gaussian_filter1d(q_norm, sigma=6)
     except (TypeError, ValueError, FloatingPointError, IndexError):

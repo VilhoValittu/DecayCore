@@ -10,10 +10,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Sequence
 
 import numpy as np
+import scipy.optimize
 
 from .modal_analysis import RoomModeEvent
 
@@ -100,6 +101,7 @@ class HybridBiquad:
     confidence: float
     gd_excess_ms: float
     cut_priority: float
+    fit_refined: bool = False
 
     def to_camilladsp(self) -> dict[str, float | str]:
         return {
@@ -131,6 +133,7 @@ class HybridIIRResult:
             "hybrid_iir_biquads": [b.to_camilladsp() for b in self.biquads],
             "hybrid_iir_rejected": [dict(item) for item in self.rejected],
             "hybrid_iir_filter_count": int(len(self.biquads)),
+            "hybrid_iir_fit_refined_count": int(sum(1 for b in self.biquads if bool(getattr(b, "fit_refined", False)))),
             "hybrid_iir_mag_db": np.asarray(self.mag_db, dtype=float).tolist(),
             "hybrid_iir_phase_rad": np.asarray(self.phase_rad, dtype=float).tolist(),
         }
@@ -141,11 +144,18 @@ def design_hybrid_iir(
     freq_axis: np.ndarray,
     fs: int | float,
     policy: HybridIIRPolicy,
+    measured_mag_db: np.ndarray | None = None,
 ) -> HybridIIRResult:
     policy = policy.normalized()
     freq = np.asarray(freq_axis, dtype=float).reshape(-1)
     if not policy.enabled or policy.max_filters_per_channel <= 0 or freq.size == 0:
         return HybridIIRResult(enabled=bool(policy.enabled))
+
+    mag_meas = None
+    if measured_mag_db is not None:
+        mm = np.asarray(measured_mag_db, dtype=float).reshape(-1)
+        if mm.size == freq.size:
+            mag_meas = mm
 
     selected: list[HybridBiquad] = []
     rejected: list[dict[str, Any]] = []
@@ -154,6 +164,8 @@ def design_hybrid_iir(
         if biquad is None:
             rejected.append(_rejection(event, reason))
             continue
+        if mag_meas is not None:
+            biquad = _refine_biquad_against_measurement(biquad, event, freq, mag_meas, float(fs), policy)
         selected.append(biquad)
         if len(selected) >= int(policy.max_filters_per_channel):
             break
@@ -171,6 +183,109 @@ def design_hybrid_iir(
         mag_db=np.nan_to_num(mag_db, nan=0.0, posinf=0.0, neginf=0.0),
         phase_rad=np.nan_to_num(phase_rad, nan=0.0, posinf=0.0, neginf=0.0),
     )
+
+
+_MODE_FIT_MIN_POINTS = 9
+# Sovitus hyvaksytaan vain, jos loydetty piikki on vahintaan puolet eventin
+# huipusta ja jaannos on pieni suhteessa piikkiin - muuten data ei tue mallia.
+_MODE_FIT_MIN_GAIN_RATIO = 0.50
+_MODE_FIT_MAX_RESIDUAL_PER_GAIN = 0.30
+
+
+def _peaking_mag_db_model(freq: np.ndarray, fs: float, f0: float, q: float, gain_db: float) -> np.ndarray:
+    """RBJ-peaking-magnitudi (dB) mallifunktiona; sallii positiivisen gainin.
+
+    Erillaan `peaking_eq_coefficients()`-funktiosta, joka rajaa gainin
+    leikkaukseksi - moodi sovitetaan boostina mitattuun ylimaaraan.
+    """
+    fs = max(1.0, float(fs))
+    f0 = float(np.clip(f0, 1e-6, fs * 0.499))
+    q = max(1e-6, float(q))
+    w0 = 2.0 * np.pi * f0 / fs
+    alpha = np.sin(w0) / (2.0 * q)
+    a_amp = 10.0 ** (float(gain_db) / 40.0)
+    b0 = 1.0 + alpha * a_amp
+    b1 = -2.0 * np.cos(w0)
+    b2 = 1.0 - alpha * a_amp
+    a0 = 1.0 + alpha / max(a_amp, 1e-12)
+    a2 = 1.0 - alpha / max(a_amp, 1e-12)
+    omega = 2.0 * np.pi * np.clip(np.asarray(freq, dtype=float), 0.0, fs / 2.0) / fs
+    z1 = np.exp(-1j * omega)
+    z2 = np.exp(-2j * omega)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        h = (b0 + b1 * z1 + b2 * z2) / (a0 + b1 * z1 + a2 * z2)
+    return 20.0 * np.log10(np.maximum(np.abs(h), 1e-12))
+
+
+def _refine_biquad_against_measurement(
+    biquad: HybridBiquad,
+    event: RoomModeEvent,
+    freq: np.ndarray,
+    mag_db: np.ndarray,
+    fs: float,
+    policy: HybridIIRPolicy,
+) -> HybridBiquad:
+    """Tarkentaa biquadin f0:n ja Q:n sovittamalla peaking-mallin mitattuun
+    lokaaliin poikkeamaan pienimman neliosumman menetelmalla.
+
+    Leikkaussyvyys (safe_cut) ei muutu. Sovitusrajat pitavat f0:n tapahtuman
+    leveyden sisalla ja Q:n policyn rajoissa. Epaonnistunut tai riittamaton
+    sovitus palauttaa alkuperaisen biquadin sellaisenaan.
+    """
+    try:
+        f0 = float(biquad.freq_hz)
+        if not np.isfinite(f0) or f0 <= 0.0 or fs < 4.0 * f0:
+            return biquad
+        width_oct = max(_event_float(event, "width_oct"), 1.0 / 24.0)
+        half_oct = float(np.clip(1.5 * width_oct, 1.0 / 12.0, 0.5))
+        with np.errstate(divide="ignore", invalid="ignore"):
+            dist_oct = np.abs(np.log2(np.maximum(freq, 1e-9) / f0))
+        window = (dist_oct <= half_oct) & np.isfinite(mag_db) & (freq > 0.0)
+        if int(np.count_nonzero(window)) < _MODE_FIT_MIN_POINTS:
+            return biquad
+        f_w = freq[window]
+        y_w = mag_db[window]
+        lx = np.log2(f_w)
+        lx_c = lx - float(np.median(lx))
+
+        peak_db = max(float(biquad.source_peak_db), 0.5)
+        q_init = float(np.clip(float(biquad.q), policy.min_q, policy.max_q))
+        f_bound_oct = float(min(width_oct, 1.0 / 6.0))
+        # Parametrit: (f0, Q, gain_db, offset_db, kallistuma_db_per_oct).
+        # Lineaarinen pohja sovitetaan yhdessa piikin kanssa, jotta moodin
+        # hannat eivat vuoda pohjaan ja vaarista Q:ta.
+        lo = np.asarray([f0 * 2.0 ** (-f_bound_oct), policy.min_q, 0.25 * peak_db, -6.0, -12.0], dtype=float)
+        hi = np.asarray([f0 * 2.0 ** f_bound_oct, policy.max_q, 2.0 * peak_db, 6.0, 12.0], dtype=float)
+
+        y_base = float(np.median(np.concatenate([y_w[:3], y_w[-3:]])))
+
+        def residuals(params: np.ndarray) -> np.ndarray:
+            model = (
+                _peaking_mag_db_model(f_w, fs, params[0], params[1], params[2])
+                + y_base
+                + params[3]
+                + params[4] * lx_c
+            )
+            return model - y_w
+
+        x0 = np.clip(np.asarray([f0, q_init, peak_db, 0.0, 0.0], dtype=float), lo, hi)
+        result = scipy.optimize.least_squares(residuals, x0, bounds=(lo, hi), max_nfev=200)
+        if not result.success or not np.all(np.isfinite(result.x)):
+            return biquad
+        g_fit = float(result.x[2])
+        cost = float(np.sqrt(np.mean(residuals(result.x) ** 2)))
+        if g_fit < _MODE_FIT_MIN_GAIN_RATIO * peak_db:
+            return biquad
+        if not np.isfinite(cost) or cost > _MODE_FIT_MAX_RESIDUAL_PER_GAIN * g_fit:
+            return biquad
+        return replace(
+            biquad,
+            freq_hz=float(result.x[0]),
+            q=float(np.clip(result.x[1], policy.min_q, policy.max_q)),
+            fit_refined=True,
+        )
+    except (TypeError, ValueError, FloatingPointError, RuntimeError, np.linalg.LinAlgError):
+        return biquad
 
 
 def peaking_eq_response(freq_axis: np.ndarray, fs: int | float, freq_hz: float, q: float, gain_db: float) -> np.ndarray:
