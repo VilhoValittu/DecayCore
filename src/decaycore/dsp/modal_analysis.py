@@ -18,14 +18,25 @@ import types as _types
 from . import modal_analysis_parts as _impl_package
 
 
+_SYNC_EXCLUDE = frozenset(
+    {"_functools", "_types", "_impl_package", "_sync_impl_globals", "_wrap_impl_function", "_SYNC_EXCLUDE", "_SYNC_NAMES", "_SYNC_NAMES_LEN"}
+)
+_SYNC_NAMES: list = []
+_SYNC_NAMES_LEN = -1
+
+
 def _sync_impl_globals(_func):
-    _func.__globals__.update(
-        {
-            _name: _value
-            for _name, _value in globals().items()
-            if not _name.startswith("__") and _name not in {"_functools", "_types", "_impl_package", "_sync_impl_globals", "_wrap_impl_function"}
-        }
-    )
+    # Kuuma polku: synkataan facade-globaalit impl-funktioon joka kutsulla,
+    # jotta monkeypatch facadessa nakyy implille. Nimilista lasketaan vain
+    # kun globaalien maara muuttuu; arvot haetaan silti joka kerralla.
+    global _SYNC_NAMES_LEN
+    _g = globals()
+    if len(_g) != _SYNC_NAMES_LEN:
+        _SYNC_NAMES[:] = [_name for _name in _g if not _name.startswith("__") and _name not in _SYNC_EXCLUDE]
+        _SYNC_NAMES_LEN = len(_g)
+    _fg = _func.__globals__
+    for _name in _SYNC_NAMES:
+        _fg[_name] = _g[_name]
 
 
 def _wrap_impl_function(_func):

@@ -60,7 +60,10 @@ def _as_float_array(value) -> np.ndarray:
 
 def _clip01(value) -> np.ndarray:
     arr = np.asarray(value, dtype=float)
-    arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=0.0)
+    # Finite-data pikapolku: clip tuottaa joka tapauksessa uuden taulukon,
+    # joten nan_to_num tarvitaan vain jos ei-finite-arvoja oikeasti on.
+    if not np.isfinite(arr).all():
+        arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=0.0)
     return np.clip(arr, 0.0, 1.0)
 
 
@@ -80,7 +83,10 @@ def _align_to_freq_axis(value, freq_axis, default=0.0) -> np.ndarray:
 
     arr = _as_float_array(value)
     if arr.size == n:
-        return np.nan_to_num(np.asarray(arr, dtype=float), nan=0.0, posinf=0.0, neginf=0.0)
+        arr = np.asarray(arr, dtype=float)
+        if np.isfinite(arr).all():
+            return arr.copy()
+        return np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
     if arr.size == 1:
         return np.full(n, float(arr[0]), dtype=float)
     return np.nan_to_num(fallback, nan=0.0, posinf=0.0, neginf=0.0)
@@ -88,6 +94,8 @@ def _align_to_freq_axis(value, freq_axis, default=0.0) -> np.ndarray:
 
 def _safe_log2_freq(freq_axis) -> np.ndarray:
     f = _as_float_array(freq_axis)
+    if np.isfinite(f).all():
+        return np.log2(np.maximum(f, 1e-9))
     return np.log2(np.maximum(np.nan_to_num(f, nan=1e-9, posinf=1e-9, neginf=1e-9), 1e-9))
 
 

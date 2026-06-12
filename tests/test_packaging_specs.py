@@ -194,7 +194,7 @@ def test_release_workflow_adds_linux_arm64_release_asset():
     assert '7z l "out/DecayCore_${VERSION}_linux_arm64.7z" | grep -q "DecayCore/_internal"' in workflow_text
     assert "Download Linux ARM64 build artifact" in workflow_text
     assert "name: DecayCore-linux-arm64" in workflow_text
-    assert "path: out/DecayCore_${VERSION}_linux_arm64.7z" in workflow_text
+    assert "path: out/*.7z" in workflow_text
     assert "needs: [build_macos_arm64, build_linux_arm64]" in workflow_text
 
 

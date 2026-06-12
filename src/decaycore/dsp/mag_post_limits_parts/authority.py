@@ -189,10 +189,16 @@ def _apply_acoustic_authority_caps(
         cut_gamma = float(max(0.0, cfg_reader.float_allow_zero("authority_cut_gamma", 0.75)))
         cut_min_frac = float(np.clip(cfg_reader.float_allow_zero("authority_cut_min_frac", 0.35), 0.0, 1.0))
         cut_min_cap_db = float(max(0.0, cfg_reader.float_allow_zero("authority_cut_min_cap_db", 3.0)))
-        _ = cfg_reader.float("authority_caps_smooth_oct", 1.0 / 9.0)
+        caps_smooth_oct = cfg_reader.float_allow_zero("authority_caps_smooth_oct", 1.0 / 9.0)
 
         a_boost = np.clip(np.nan_to_num(boost_authority, nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
         a_cut = np.clip(np.nan_to_num(cut_authority, nan=0.0, posinf=1.0, neginf=0.0), 0.0, 1.0)
+        if np.isfinite(caps_smooth_oct) and caps_smooth_oct > 0.0:
+            # Ilman tasoitusta per-bin rosoiset authority-käyrät leikkaavat
+            # sileän gainin sahalaitaiseksi HF:llä (mag_c_max >> 230 Hz).
+            smooth_value = 1.0 / float(np.clip(caps_smooth_oct, 1.0 / 1.0, 1.0))
+            a_boost = np.clip(smooth_gain_fractional_octave(freq_axis, a_boost, smooth_value), 0.0, 1.0)
+            a_cut = np.clip(smooth_gain_fractional_octave(freq_axis, a_cut, smooth_value), 0.0, 1.0)
         boost_factor = boost_min_frac + (1.0 - boost_min_frac) * np.power(a_boost, boost_gamma)
         cut_factor = cut_min_frac + (1.0 - cut_min_frac) * np.power(a_cut, cut_gamma)
 

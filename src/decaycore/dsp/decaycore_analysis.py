@@ -8,6 +8,8 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
+from dataclasses import dataclass
+
 import numpy as np
 import scipy.signal
 import scipy.ndimage
@@ -15,6 +17,35 @@ import scipy.stats
 
 from decaycore.dsp.cache_utils import BoundedLruCache
 from decaycore.dsp.mode_q import estimate_peak_q
+
+
+@dataclass(frozen=True)
+class Rt60WindowPolicy:
+    """RT60-sovitusikkunoiden politiikka.
+
+    Oletusarvot vastaavat ISO 3382 -kaytantoa:
+    - EDT 0..-10 dB: early decay time, herkka varhaisille heijastuksille.
+    - T20 -5..-25 dB: ohittaa suoran aanen, sietaa korkeahkon pohjakohinan.
+    - T30 -5..-35 dB: tarkin, mutta vaatii ~45 dB:n mittausdynamiikan.
+    Kandidaateista valitaan T30 > T20 > EDT -jarjestyksessa ensimmainen,
+    jonka R^2 >= r2_threshold; muuten paras saatavilla oleva sovitus.
+
+    Ei-standardeille impulssivasteille (esim. korkea pohjakohina, hyvin
+    lyhyt hanta) voi antaa matalammat ikkunat - silloin estimaatti on
+    karkeampi mutta sovitus onnistuu useammin.
+    """
+
+    edt_lo_db: float = 0.0
+    edt_hi_db: float = -10.0
+    t20_lo_db: float = -5.0
+    t20_hi_db: float = -25.0
+    t30_lo_db: float = -5.0
+    t30_hi_db: float = -35.0
+    min_fit_points: int = 12
+    r2_threshold: float = 0.90
+
+
+DEFAULT_RT60_WINDOW_POLICY = Rt60WindowPolicy()
 
 _SOS_CACHE = BoundedLruCache(256)
 
@@ -68,9 +99,9 @@ def _distance_bins_from_hz(freq_axis, distance_hz: float, fallback_bins: int = 1
 _RT60_FIT_MAX_POINTS = 256
 
 
-def _fit_rt60_window(t_u: np.ndarray, d_u: np.ndarray, lo_db: float, hi_db: float):
+def _fit_rt60_window(t_u: np.ndarray, d_u: np.ndarray, lo_db: float, hi_db: float, *, min_points: int = 12):
     mask = (d_u <= lo_db) & (d_u >= hi_db)
-    if np.count_nonzero(mask) < 12:
+    if np.count_nonzero(mask) < int(min_points):
         return None
     tt = t_u[mask]
     yy = d_u[mask]
@@ -93,13 +124,13 @@ def _fit_rt60_window(t_u: np.ndarray, d_u: np.ndarray, lo_db: float, hi_db: floa
     return rt60, r2
 
 
-def _pick_rt60_candidate(candidates: list[tuple[str, float, float]]):
+def _pick_rt60_candidate(candidates: list[tuple[str, float, float]], *, r2_threshold: float = 0.90):
     if not candidates:
         return None
     pref = {"T30": 0, "T20": 1, "EDT": 2}
     candidates.sort(key=lambda x: (pref[x[0]], -x[2]))
     for name, rt60, r2 in candidates:
-        if r2 >= 0.90:
+        if r2 >= float(r2_threshold):
             return rt60, r2, name
     name, rt60, r2 = candidates[0]
     return rt60, r2, name
@@ -209,7 +240,8 @@ def analyze_acoustic_confidence(freq_axis, complex_meas, fs):
     return confidence_mask, reflection_nodes, gd_ms
 
 
-def calculate_rt60(impulse, fs):
+def calculate_rt60(impulse, fs, policy: Rt60WindowPolicy | None = None):
+    pol = policy if policy is not None else DEFAULT_RT60_WINDOW_POLICY
     try:
         imp = np.asarray(impulse, dtype=float)
         if imp.size < int(0.1 * fs):
@@ -247,17 +279,17 @@ def calculate_rt60(impulse, fs):
         d_u = edc_db[:stop_idx + 1]
 
         candidates = []
-        r = _fit_rt60_window(t_u, d_u, 0.0, -10.0)
+        r = _fit_rt60_window(t_u, d_u, pol.edt_lo_db, pol.edt_hi_db, min_points=pol.min_fit_points)
         if r:
             candidates.append(("EDT",) + r)
-        r = _fit_rt60_window(t_u, d_u, -5.0, -25.0)
+        r = _fit_rt60_window(t_u, d_u, pol.t20_lo_db, pol.t20_hi_db, min_points=pol.min_fit_points)
         if r:
             candidates.append(("T20",) + r)
-        r = _fit_rt60_window(t_u, d_u, -5.0, -35.0)
+        r = _fit_rt60_window(t_u, d_u, pol.t30_lo_db, pol.t30_hi_db, min_points=pol.min_fit_points)
         if r:
             candidates.append(("T30",) + r)
 
-        chosen = _pick_rt60_candidate(candidates)
+        chosen = _pick_rt60_candidate(candidates, r2_threshold=pol.r2_threshold)
         if chosen is None:
             return 0.0
 
@@ -280,7 +312,7 @@ def _third_oct_centers(f_min=31.5, f_max=8000.0):
     return centers
 
 
-def calculate_rt60_bands(impulse, fs, f_min=31.5, f_max=8000.0, order=4):
+def calculate_rt60_bands(impulse, fs, f_min=31.5, f_max=8000.0, order=4, policy: Rt60WindowPolicy | None = None):
     try:
         imp = np.asarray(impulse, dtype=float)
         if imp.size < int(0.1 * fs):
@@ -300,7 +332,7 @@ def calculate_rt60_bands(impulse, fs, f_min=31.5, f_max=8000.0, order=4):
 
             sos = _get_bandpass_sos(nyq, order, fl, fh)
             x = scipy.signal.sosfiltfilt(sos, imp)
-            rt = calculate_rt60(x, fs)
+            rt = calculate_rt60(x, fs, policy)
             if 0.05 < rt < 5.0:
                 out[float(round(fc, 2))] = float(rt)
         return out

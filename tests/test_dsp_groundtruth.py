@@ -3,11 +3,17 @@
 import numpy as np
 import scipy.signal
 
-from decaycore.dsp.decaycore_analysis import analyze_acoustic_confidence, calculate_rt60
+from decaycore.dsp.decaycore_analysis import (
+    Rt60WindowPolicy,
+    analyze_acoustic_confidence,
+    calculate_rt60,
+)
+from decaycore.dsp.dsp_ops import _limit_gd_gradient_ms_per_oct
 from decaycore.dsp.hybrid_iir import HybridIIRPolicy, design_hybrid_iir, peaking_eq_response
 from decaycore.dsp.modal_analysis import RoomModeEvent
 from decaycore.dsp.mode_q import estimate_peak_q
 from decaycore.dsp.phase import calculate_minimum_phase
+from decaycore.dsp.phase_ir_phase_gradient import gd_grad_metrics
 
 
 def _synthetic_decay(fs: int, rt60_s: float, dur_s: float, seed: int, noise_floor: float = 1e-4):
@@ -222,3 +228,94 @@ def test_hybrid_iir_mode_fit_falls_back_when_no_local_peak():
     result = design_hybrid_iir([event], freq, fs, HybridIIRPolicy(enabled=True), measured_mag_db=mag)
     assert len(result.biquads) == 1
     assert result.biquads[0].freq_hz == 64.0
+
+
+def test_rt60_explicit_default_policy_matches_implicit():
+    fs = 48000
+    impulse = _synthetic_decay(fs, 0.5, dur_s=1.2, seed=3)
+
+    assert calculate_rt60(impulse, fs) == calculate_rt60(impulse, fs, Rt60WindowPolicy())
+
+
+def test_rt60_custom_window_policy_recovers_clean_decay():
+    # Matalat ikkunat puhtaalla vasteella: EDC on lineaarinen, joten
+    # mukautetut ikkunarajat tuottavat saman vaimenemisajan - todentaa,
+    # etta politiikan rajat oikeasti ohjaavat sovitusta.
+    fs = 48000
+    rt60_true = 0.5
+    impulse = _synthetic_decay(fs, rt60_true, dur_s=1.2, seed=21, noise_floor=1e-5)
+
+    shallow = Rt60WindowPolicy(t20_lo_db=-3.0, t20_hi_db=-15.0, t30_lo_db=-3.0, t30_hi_db=-18.0)
+    rt60 = calculate_rt60(impulse, fs, shallow)
+
+    assert rt60 > 0.0
+    assert abs(rt60 - rt60_true) <= 0.15 * rt60_true
+
+
+def test_rt60_policy_min_fit_points_gate():
+    fs = 48000
+    impulse = _synthetic_decay(fs, 0.5, dur_s=1.2, seed=21)
+
+    impossible = Rt60WindowPolicy(min_fit_points=10**9)
+    assert calculate_rt60(impulse, fs, impossible) == 0.0
+
+
+def _phase_from_gd_log2f(freq: np.ndarray, gd_ms: np.ndarray) -> np.ndarray:
+    gd_s = np.asarray(gd_ms, dtype=float) / 1000.0
+    seg = 0.5 * (gd_s[1:] + gd_s[:-1]) * np.diff(freq)
+    return -2.0 * np.pi * np.concatenate([[0.0], np.cumsum(seg)])
+
+
+def test_gd_curvature_limiter_smooths_sharp_kink_without_worsening_gradient():
+    # GD-aaltoilu, jonka gradientti pysyy rajan alla mutta kaarevuus ylittaa
+    # automaattisen 4x-rajan selvasti: rajoittimen pitaa tasoittaa kaarevuus
+    # eika gradientti saa pahentua (sama invariantti kuin gradienttirajalla).
+    freq = np.geomspace(20.0, 250.0, 512)
+    period_oct = 0.5
+    amp_ms = 1.2
+    gd_ms = amp_ms * np.sin(2.0 * np.pi * np.log2(freq / 20.0) / period_oct)
+    phase = _phase_from_gd_log2f(freq, gd_ms)
+    mask = np.ones_like(freq, dtype=bool)
+
+    before = gd_grad_metrics(freq, phase, mask=mask)
+    limited = _limit_gd_gradient_ms_per_oct(
+        freq,
+        phase,
+        mask=mask,
+        max_grad_ms_per_oct=30.0,
+        f_min=20.0,
+        f_max=250.0,
+        grad_smooth_sigma=0.8,
+        soft_limit=True,
+    )
+    after = gd_grad_metrics(freq, limited, mask=mask)
+
+    assert float(before["max_ms_per_oct2"]) > 80.0
+    assert float(after["max_ms_per_oct2"]) <= 0.7 * float(before["max_ms_per_oct2"])
+    assert float(after["max_ms_per_oct"]) <= float(before["max_ms_per_oct"]) + 1e-9
+
+
+def test_gd_curvature_limit_disabled_restores_legacy_behavior():
+    # max_curv_ms_per_oct2 <= 0 kytkee kaarevuusrajan pois: matalagradienttinen
+    # aaltoilu ei kayttaydy eri tavalla kuin pelkalla gradienttirajalla.
+    freq = np.geomspace(20.0, 250.0, 512)
+    gd_ms = 1.2 * np.sin(2.0 * np.pi * np.log2(freq / 20.0) / 0.5)
+    phase = _phase_from_gd_log2f(freq, gd_ms)
+    mask = np.ones_like(freq, dtype=bool)
+
+    limited_off = _limit_gd_gradient_ms_per_oct(
+        freq, phase, mask=mask, max_grad_ms_per_oct=30.0,
+        f_min=20.0, f_max=250.0, grad_smooth_sigma=0.8, soft_limit=True,
+        max_curv_ms_per_oct2=0.0,
+    )
+    off_metrics = gd_grad_metrics(freq, limited_off, mask=mask)
+    on_metrics = gd_grad_metrics(
+        freq,
+        _limit_gd_gradient_ms_per_oct(
+            freq, phase, mask=mask, max_grad_ms_per_oct=30.0,
+            f_min=20.0, f_max=250.0, grad_smooth_sigma=0.8, soft_limit=True,
+        ),
+        mask=mask,
+    )
+    # Pois kytkettyna kaarevuus jaa korkeaksi, paalle kytkettyna laskee.
+    assert float(off_metrics["max_ms_per_oct2"]) > float(on_metrics["max_ms_per_oct2"])

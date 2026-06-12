@@ -59,6 +59,10 @@ def _finite_array(value: Any) -> np.ndarray:
         arr = np.asarray(value, dtype=float).reshape(-1)
     except (TypeError, ValueError):
         return np.zeros(0, dtype=float)
+    # nan_to_num tekee useita läpikäyntejä ja väliallokaatioita; data on
+    # lähes aina jo finite, joten tarkistus ensin on selvästi halvempi.
+    if np.isfinite(arr).all():
+        return arr.copy()
     return np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
 
 

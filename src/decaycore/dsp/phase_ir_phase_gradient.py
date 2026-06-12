@@ -22,6 +22,8 @@ def gd_grad_metrics(freq_axis: np.ndarray, phase_rad: np.ndarray, *, mask: np.nd
     out = {
         "max_ms_per_oct": 0.0,
         "at_hz": None,
+        "max_ms_per_oct2": 0.0,
+        "curv_at_hz": None,
         "used_x_axis": "log2(f)",
         "df_min": None,
         "df_max": None,
@@ -58,6 +60,12 @@ def gd_grad_metrics(freq_axis: np.ndarray, phase_rad: np.ndarray, *, mask: np.nd
         robust_max = float(np.percentile(abs_grad, 95.0)) if abs_grad.size >= 8 else float(abs_grad[idx])
         out["max_ms_per_oct"] = robust_max
         out["at_hz"] = float(ff[idx]) if ff.size else None
+        gd_curv = np.nan_to_num(np.gradient(gd_grad, np.log2(np.maximum(ff, 1e-9))), nan=0.0, posinf=0.0, neginf=0.0)
+        abs_curv = np.abs(gd_curv)
+        if abs_curv.size:
+            cidx = int(np.argmax(abs_curv))
+            out["max_ms_per_oct2"] = float(np.percentile(abs_curv, 95.0)) if abs_curv.size >= 8 else float(abs_curv[cidx])
+            out["curv_at_hz"] = float(ff[cidx])
         return out
     except (TypeError, ValueError, FloatingPointError, IndexError):
         return out
@@ -97,6 +105,8 @@ def _gd_grad_limiter_info(cfg, lim_cfg: float) -> dict[str, Any]:
         "max_grad_after_ms_per_oct": None,
         "max_grad_before_hz": None,
         "max_grad_after_hz": None,
+        "max_curv_before_ms_per_oct2": None,
+        "max_curv_after_ms_per_oct2": None,
         "used_x_axis": "log2(f)",
         "df_min": None,
         "df_max": None,
@@ -119,6 +129,7 @@ def _gd_grad_limiter_measure(freq_axis, phase, phase_mask, info: dict[str, Any],
     prefix = "before" if bool(before) else "after"
     info[f"max_grad_{prefix}_ms_per_oct"] = float(metrics.get("max_ms_per_oct", 0.0) or 0.0)
     info[f"max_grad_{prefix}_hz"] = metrics.get("at_hz", None)
+    info[f"max_curv_{prefix}_ms_per_oct2"] = float(metrics.get("max_ms_per_oct2", 0.0) or 0.0)
     if bool(before):
         info["used_x_axis"] = str(metrics.get("used_x_axis", "log2(f)") or "log2(f)")
         info["df_min"] = metrics.get("df_min", None)
@@ -157,6 +168,15 @@ def _gd_grad_limiter_apply(
         gd_sigma = gd_sigma if np.isfinite(gd_sigma) else 0.8
         lim_effective = _gd_zone_limit_ms_per_oct(lim_cfg, info.get("max_grad_before_hz"))
         info["limit_ms_per_oct"] = float(lim_effective)
+        # Kaarevuusraja valitetaan vain jos config maarittaa sen, jotta
+        # vanhat/karsityt limiter_fn-toteutukset eivat kaadu uuteen kwargiin.
+        extra_kwargs = {}
+        curv_cfg = getattr(cfg, "gd_curv_limit_ms_per_oct2", None)
+        if curv_cfg is not None:
+            try:
+                extra_kwargs["max_curv_ms_per_oct2"] = float(curv_cfg)
+            except (TypeError, ValueError):
+                pass
         out = limiter_fn(
             f_arr,
             in_phase,
@@ -166,6 +186,7 @@ def _gd_grad_limiter_apply(
             f_max=float(f_hi),
             grad_smooth_sigma=float(max(0.0, gd_sigma)),
             soft_limit=True,
+            **extra_kwargs,
         )
         info["applied"] = True
         return out
@@ -263,6 +284,8 @@ def gd_grad_limiter(ir, cfg, st, *, freq_axis=None, phase_mask=None, limiter_fn=
             st["gd_grad_units_note"] = str(info.get("units_note", ""))
             st["gd_grad_limit_input"] = None if info.get("limit_input", None) is None else float(info["limit_input"])
             st["gd_grad_limiter_reverted_non_monotonic"] = bool(info.get("reverted_non_monotonic", False))
+            st["gd_curv_before_max_ms_per_oct2"] = None if info.get("max_curv_before_ms_per_oct2", None) is None else float(info["max_curv_before_ms_per_oct2"])
+            st["gd_curv_after_max_ms_per_oct2"] = None if info.get("max_curv_after_ms_per_oct2", None) is None else float(info["max_curv_after_ms_per_oct2"])
     except (TypeError, ValueError):
         pass
     return out, info

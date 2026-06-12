@@ -159,13 +159,31 @@ def _copy_array(values):
     return np.array(values, copy=True)
 
 
+def _fast_deepcopy(obj):
+    # copy.deepcopy on per-objekti-overheadiltaan kallis per-trial-kuumassa
+    # polussa; telemetria/cmp-rakenteet ovat dict/list/ndarray/skalaari-
+    # puita, jotka kopioituvat suoraan. Tuntemattomat tyypit menevat
+    # edelleen deepcopyn kautta.
+    if obj is None or isinstance(obj, (bool, int, float, complex, str, bytes)):
+        return obj
+    if isinstance(obj, np.ndarray):
+        return obj.copy()
+    if isinstance(obj, dict):
+        return {key: _fast_deepcopy(value) for key, value in obj.items()}
+    if isinstance(obj, list):
+        return [_fast_deepcopy(value) for value in obj]
+    if isinstance(obj, tuple):
+        return tuple(_fast_deepcopy(value) for value in obj)
+    return deepcopy(obj)
+
+
 def clone_preprocess_result(result: PreprocessResult) -> PreprocessResult:
     ctx = DspContext(
         n_fft=int(result.ctx.n_fft),
         freq_axis=_copy_array(result.ctx.freq_axis),
         gain_db=_copy_array(result.ctx.gain_db),
         target_mags=_copy_array(result.ctx.target_mags),
-        st=deepcopy(dict(result.ctx.st or {})),
+        st=_fast_deepcopy(dict(result.ctx.st or {})),
     )
     return PreprocessResult(
         ctx=ctx,
@@ -184,8 +202,8 @@ def clone_preprocess_result(result: PreprocessResult) -> PreprocessResult:
         p_anal_rad=_copy_array(result.p_anal_rad),
         complex_anal=_copy_array(result.complex_anal),
         conf_mask=_copy_array(result.conf_mask),
-        reflections=deepcopy(list(result.reflections or [])),
-        cmp=None if result.cmp is None else deepcopy(dict(result.cmp)),
+        reflections=_fast_deepcopy(list(result.reflections or [])),
+        cmp=None if result.cmp is None else _fast_deepcopy(dict(result.cmp)),
         analysis_mode=str(result.analysis_mode),
         is_psy=bool(result.is_psy),
     )

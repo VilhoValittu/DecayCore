@@ -212,12 +212,12 @@ def _tilt_fit_linear_log_axis(
                 xc = xc[keep]
                 y = y[keep]
 
+        y_med_kept = float(np.median(y))
         denom = float(np.dot(xc, xc))
         if denom <= 1e-12:
-            off = float(np.median(y))
-            return off, 0.0
+            return y_med_kept, 0.0
 
-        slope = float(np.dot(xc, (y - float(np.median(y)))) / denom)
+        slope = float(np.dot(xc, (y - y_med_kept)) / denom)
         max_db_per_oct = float(max_db_per_oct)
         if not np.isfinite(max_db_per_oct) or max_db_per_oct <= 0.0:
             max_db_per_oct = 2.0

@@ -22,6 +22,8 @@ Confidence and modal detection are now more robust against noisy measurement dat
 
 RT60 fitting is now more resistant to spikes and outliers, giving DecayCore a steadier view of room decay. Cache handling has also been updated so the new analysis logic stays consistent and predictable in AUTO mode.
 
+---
+
 ## [1.1.0] - 11-6-2026
 
 ### AUTO Mode — More room-aware correction decisions

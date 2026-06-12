@@ -25,6 +25,7 @@ from typing import Any
 
 import numpy as np
 import scipy.ndimage
+import scipy.signal
 
 from .dsp_telemetry import safe_put_many
 
@@ -259,6 +260,19 @@ def _smooth_gain(f: np.ndarray, gain: np.ndarray, smooth_oct: float) -> np.ndarr
         log_span = np.log2(f_pos[-1] / f_pos[0])
         bins_per_oct = len(f_pos) / max(log_span, 1e-6)
         sigma = max(bins_per_oct * smooth_oct, 0.5)
+        # Lineaarisella FFT-akselilla sigma voi olla satoja binejä, jolloin
+        # suora konvoluutio on O(n*8*sigma). FFT-konvoluutio samalla
+        # katkaistulla kernelillä ja nearest-reunalla on sama tulos
+        # liukulukutarkkuudella, mutta murto-osa ajasta.
+        if sigma > 32.0 and gain.size >= 64 and np.isfinite(gain).all():
+            radius = int(4.0 * sigma + 0.5)
+            x = np.arange(-radius, radius + 1, dtype=float)
+            kernel = np.exp(-0.5 * (x / sigma) ** 2)
+            kernel /= kernel.sum()
+            padded = np.concatenate(
+                (np.full(radius, float(gain[0])), np.asarray(gain, dtype=float), np.full(radius, float(gain[-1])))
+            )
+            return scipy.signal.fftconvolve(padded, kernel, mode="same")[radius:-radius]
         return scipy.ndimage.gaussian_filter1d(gain, sigma=sigma, mode="nearest")
     except (ValueError, ZeroDivisionError):
         return gain

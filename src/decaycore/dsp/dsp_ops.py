@@ -112,18 +112,25 @@ def _gaussian1d_nearest(arr: np.ndarray, sigma: float) -> np.ndarray:
 
 @numba.njit(cache=True)
 def _gd_smooth_loop(
-    gd_l: np.ndarray, log2f: np.ndarray, lim_arr: np.ndarray, sigma: float
+    gd_l: np.ndarray, log2f: np.ndarray, lim_arr: np.ndarray, curv_lim_arr: np.ndarray, sigma: float
 ) -> np.ndarray:
     for _ in range(14):
         gd_grad = _gradient1d(gd_l, log2f)
         for i in range(gd_grad.size):
             if not math.isfinite(gd_grad[i]):
                 gd_grad[i] = 0.0
+        gd_curv = _gradient1d(gd_grad, log2f)
+        for i in range(gd_curv.size):
+            if not math.isfinite(gd_curv[i]):
+                gd_curv[i] = 0.0
         max_ratio = 0.0
         for i in range(gd_grad.size):
             r = abs(gd_grad[i] / lim_arr[i])
             if r > max_ratio:
                 max_ratio = r
+            rc = abs(gd_curv[i] / curv_lim_arr[i])
+            if rc > max_ratio:
+                max_ratio = rc
         if max_ratio <= 1.001:
             break
         gd_l = _gaussian1d_nearest(gd_l, sigma)
@@ -141,6 +148,7 @@ def _limit_gd_gradient_ms_per_oct(
     f_max=250.0,
     grad_smooth_sigma=0.8,
     soft_limit=True,
+    max_curv_ms_per_oct2=None,
 ):
     f = np.asarray(freq_axis, dtype=float)
     ph = np.asarray(phase_rad, dtype=float)
@@ -166,13 +174,27 @@ def _limit_gd_gradient_ms_per_oct(
         base_lim * 0.67,
         np.where(ff < 500.0, base_lim, base_lim * 1.5),
     )
+    # Kaarevuusraja (d2GD/d(log2 f)^2) estaa teravat GD-piikit, jotka
+    # soittavat minimivaihe-IR:ssa vaikka gradientti pysyisi rajoissa.
+    # Oletus 4x gradienttiraja puuttuu peliin vain selvissa "kinkeissa".
+    if max_curv_ms_per_oct2 is None:
+        curv_lim_arr = 4.0 * lim_arr
+    else:
+        try:
+            curv = float(max_curv_ms_per_oct2)
+        except (TypeError, ValueError, OverflowError):
+            curv = 0.0
+        if np.isfinite(curv) and curv > 0.0:
+            curv_lim_arr = np.full_like(lim_arr, curv)
+        else:
+            curv_lim_arr = np.full_like(lim_arr, np.inf)
     gd_l = gd_ms.copy()
     try:
         sigma = float(grad_smooth_sigma) if float(grad_smooth_sigma) > 0.0 else 0.6
     except (TypeError, ValueError, OverflowError):
         sigma = 0.6
     sigma = float(max(0.25, sigma))
-    gd_l = _gd_smooth_loop(gd_l, log2f, lim_arr, sigma)
+    gd_l = _gd_smooth_loop(gd_l, log2f, lim_arr, curv_lim_arr, sigma)
     gd_grad = np.nan_to_num(np.gradient(gd_l, log2f), nan=0.0, posinf=0.0, neginf=0.0)
     gd_grad_l = lim_arr * np.tanh(gd_grad / lim_arr) if soft_limit else np.clip(gd_grad, -lim_arr, lim_arr)
     dlog2f = np.diff(log2f)
