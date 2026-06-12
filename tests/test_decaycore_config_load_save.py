@@ -131,7 +131,7 @@ class TestFilterTypeNormalization:
             ("min", "Minimum"),
             ("linear", "Linear"),
             ("LINEAR", "Linear"),
-            ("unknown", "Asymmetric"),  # Unknown defaults to Asymmetric
+            ("unknown", "Mixed"),  # Unknown defaults to the program default
         ],
     )
     def test_normalize_filter_type_variants(self, input_val, expected):
@@ -139,15 +139,15 @@ class TestFilterTypeNormalization:
         result = decaycore_config._normalize_filter_type(input_val)
         assert result == expected
 
-    def test_normalize_filter_type_empty_defaults_asymmetric(self):
-        """Empty filter type defaults to Asymmetric."""
+    def test_normalize_filter_type_empty_defaults_mixed(self):
+        """Empty filter type defaults to Mixed."""
         result = decaycore_config._normalize_filter_type("")
-        assert result == "Asymmetric"
+        assert result == "Mixed"
 
-    def test_normalize_filter_type_none_defaults_asymmetric(self):
-        """None filter type defaults to Asymmetric."""
+    def test_normalize_filter_type_none_defaults_mixed(self):
+        """None filter type defaults to Mixed."""
         result = decaycore_config._normalize_filter_type(None)
-        assert result == "Asymmetric"
+        assert result == "Mixed"
 
 
 class TestRoundTrip:

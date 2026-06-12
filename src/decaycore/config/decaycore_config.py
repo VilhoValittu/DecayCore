@@ -76,7 +76,7 @@ def _normalize_filter_type(value) -> str:
         return "Minimum"
     if "linear" in ft_l:
         return "Linear"
-    return "Asymmetric"
+    return "Mixed"
 
 
 # Versioned migrations: each migration is registered with a version number.
@@ -163,7 +163,7 @@ def _normalize_saved_filter_type(saved: dict, default_conf: dict) -> None:
             saved.get("filter_type", default_conf.get("filter_type"))
         )
     except _RECOVERABLE_CONFIG_EXCEPTIONS:
-        saved["filter_type"] = str(default_conf.get("filter_type", "Asymmetric"))
+        saved["filter_type"] = str(default_conf.get("filter_type", "Mixed"))
 
 
 def _load_and_merge_saved_config(default_conf: dict) -> bool:
@@ -235,7 +235,7 @@ def load_config() -> dict:
         "auto_mode_optuna_constant_liar": True,
         "auto_mode_optuna_persistent_study": True,
         "auto_mode_optuna_avoid_duplicates": True,
-        "filter_type": "Asymmetric",
+        "filter_type": "Mixed",
         "gain": 0.0,
         "hc_mode": "Harman6",
         "mag_correct": True,
@@ -436,7 +436,7 @@ def save_config(data: dict) -> None:
             )
         }
         clean_data["filter_type"] = _normalize_filter_type(
-            clean_data.get("filter_type", "Asymmetric")
+            clean_data.get("filter_type", "Mixed")
         )
         clean_data["layout"] = normalize_layout_value(clean_data.get("layout", LAYOUT_MONO))
         clean_data["lvl_mode"] = normalize_lvl_mode_value(clean_data.get("lvl_mode", LVL_MODE_AUTO))

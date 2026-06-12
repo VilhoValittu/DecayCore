@@ -8,6 +8,22 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
+## [1.1.2] - 12-6-2026
+
+### Phase correction — a major step forward in timing and focus
+
+DecayCore 1.1.2 delivers a significant upgrade to phase correction. The new behavior improves timing precision and stereo focus more confidently, while staying conservative where the measurement does not support aggressive correction. In practice, this means cleaner transients, better coherence through the critical correction range, and a more natural result without pushing phase work too far.
+
+### Mixed-phase behavior — stronger benefits, safer boundaries
+
+Mixed-phase correction now does a better job of turning real acoustic evidence into audible improvement. DecayCore is more selective about where phase correction is useful, more careful around risky regions, and better at preserving stable behavior above the frequencies where room correction should stay restrained.
+
+### Better real-world confidence
+
+This release also improves how DecayCore balances phase benefit against phase risk in real rooms. The result is a more trustworthy correction profile: stronger where timing cleanup helps, calmer where the room or measurement suggests caution.
+
+---
+
 ## [1.1.1] - 11-6-2026
 
 ### Measurement blending — smarter multi-position merging
