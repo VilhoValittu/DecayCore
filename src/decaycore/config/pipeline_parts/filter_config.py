@@ -267,6 +267,13 @@ def _filter_config_control_values(data: Dict[str, Any]) -> dict:
 def _filter_config_mixed_kwargs(FilterConfig_cls, data: Dict[str, Any]) -> dict:
     kwargs = {}
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "excess_phase_strength", float(max(0.0, min(1.0, _cfg_as_float_allow_zero(data.get("excess_phase_strength", None), 0.9)))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "phase_budget_mode", str(data.get("phase_budget_mode", "unified") or "unified").strip().lower() if str(data.get("phase_budget_mode", "unified") or "unified").strip().lower() in ("unified", "legacy") else "unified")
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "linear_excess_strength", float(max(0.0, min(1.0, _cfg_as_float_allow_zero(data.get("linear_excess_strength", None), 0.9)))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "phase_conf_gain_floor", float(np.clip(_cfg_as_float_allow_zero(data.get("phase_conf_gain_floor", None), 0.20), 0.0, 1.0)))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "phase_conf_gain_power", float(max(0.1, _cfg_as_float_allow_zero(data.get("phase_conf_gain_power", None), 1.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "phase_corr_clamp_lf_deg", float(max(0.0, _cfg_as_float_allow_zero(data.get("phase_corr_clamp_lf_deg", None), 540.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "phase_corr_clamp_hf_deg", float(max(0.0, _cfg_as_float_allow_zero(data.get("phase_corr_clamp_hf_deg", None), 90.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "max_excess_delay_cycles", float(max(0.0, _cfg_as_float_allow_zero(data.get("max_excess_delay_cycles", None), 1.0))))
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "low_freq_full_correction_hz", float(max(20.0, _cfg_as_float_allow_zero(data.get("low_freq_full_correction_hz", None), 140.0))))
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "high_freq_no_correction_hz", float(max(20.0, _cfg_as_float_allow_zero(data.get("high_freq_no_correction_hz", None), 900.0))))
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "mixed_phase_budget_lf_deg", float(max(0.0, _cfg_as_float_allow_zero(data.get("mixed_phase_budget_lf_deg", None), 40.0))))

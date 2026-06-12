@@ -16,6 +16,7 @@ import logging
 
 import numpy as np
 
+from .rank_score import official_rank_score
 from .scoring_ranking import _auto_hard_gate_reasons, get_residual_peak_db, get_residual_peak_hard_gate_db
 from .shared import _auto_safe_float
 
@@ -46,6 +47,40 @@ def _polish_metric_delta(prev: dict | None, new: dict | None) -> dict:
         if np.isfinite(_metric(new_m, "phase_risk_penalty")) and np.isfinite(_metric(prev_m, "phase_risk_penalty"))
         else float("nan"),
     }
+
+
+def _polish_rank_status(metrics: dict | None) -> str:
+    m = dict(metrics or {})
+    display_rank = float(_auto_safe_float(official_rank_score(m), float("nan")))
+    raw_rank = float(_auto_safe_float(m.get("rank_score", float("nan")), float("nan")))
+    if not np.isfinite(display_rank):
+        return "nan"
+    text = f"{display_rank:.3f}"
+    hard_gate_reasons = list(m.get("hard_gate_failures", m.get("hard_gate_reasons", [])) or [])
+    if bool(m.get("hard_gate_failed", False)) and not hard_gate_reasons:
+        hard_gate_reasons = ["hard_gate"]
+    if hard_gate_reasons and np.isfinite(raw_rank) and abs(float(raw_rank) - float(display_rank)) > 0.05:
+        text += f" (capped by {','.join(str(r) for r in hard_gate_reasons)}; raw {raw_rank:.3f})"
+    return text
+
+
+def _polish_rank_transition_status(prev: dict | None, new: dict | None) -> str:
+    prev_m = dict(prev or {})
+    new_m = dict(new or {})
+    text = f"{_polish_rank_status(prev_m)} -> {_polish_rank_status(new_m)}"
+    prev_reasons = list(prev_m.get("hard_gate_failures", prev_m.get("hard_gate_reasons", [])) or [])
+    new_reasons = list(new_m.get("hard_gate_failures", new_m.get("hard_gate_reasons", [])) or [])
+    prev_raw = float(_auto_safe_float(prev_m.get("rank_score", float("nan")), float("nan")))
+    new_raw = float(_auto_safe_float(new_m.get("rank_score", float("nan")), float("nan")))
+    if (
+        new_reasons
+        and prev_reasons == new_reasons
+        and np.isfinite(prev_raw)
+        and np.isfinite(new_raw)
+        and abs(float(new_raw) - float(prev_raw)) > 0.005
+    ):
+        text += f" (raw {prev_raw:.3f} -> {new_raw:.3f})"
+    return text
 
 
 def _winner_polish_acceptance(

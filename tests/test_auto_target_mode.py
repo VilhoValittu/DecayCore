@@ -2715,7 +2715,7 @@ def test_auto_signature_payload_exposes_policy_versions_and_metadata_identity():
     assert payload["hybrid_iir"]["min_cut_priority"] == 0.0
     assert payload["residual_peak_scorer"]["scorer_v"] >= 2
     assert payload["bass_integration_feasibility"]["policy_v"] >= 1
-    assert payload["phase_gd_guard"]["policy_v"] >= 1
+    assert payload["phase_gd_guard"]["policy_v"] >= 4
 
 
 def test_auto_signature_changes_when_measurement_metadata_changes():

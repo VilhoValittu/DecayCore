@@ -18,9 +18,8 @@ import logging
 import numpy as np
 
 from .auto_mode_profile import profiled_section
-from .rank_score import official_rank_score
 from .shared import AUTO_MODE_MAG_C_MIN_MAX_HZ, AUTO_MODE_MAG_C_MIN_MIN_HZ, _auto_mag_c_min_center, _auto_safe_float
-from .winner_polish_utils import _enrich_target_tracking_metrics, _winner_polish_acceptance
+from .winner_polish_utils import _enrich_target_tracking_metrics, _polish_rank_transition_status, _winner_polish_acceptance
 
 logger = logging.getLogger("DecayCore")
 
@@ -229,7 +228,7 @@ def _mag_c_min_emit_status(
     status_cb(
         "DecayCore automatic mode: mag_c_min winner polish improved "
         f"(mag_c_min {float(prev_mag_c_min_base):.1f} -> {float(cand_mag_c_min):.1f} Hz, "
-        f"rank {official_rank_score(prev_best):.3f} -> {official_rank_score(cur_best_metrics):.3f}, "
+        f"rank {_polish_rank_transition_status(prev_best, cur_best_metrics)}, "
         f"avg {_auto_safe_float(prev_best.get('avg_score'), 0.0):.3f} -> {_auto_safe_float(cur_best_metrics.get('avg_score'), 0.0):.3f})"
     )
 

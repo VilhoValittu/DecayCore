@@ -96,7 +96,7 @@ _AUTO_RESIDUAL_PEAK_WINNER_POLISH_POLICY_V = 2
 _AUTO_GAIN_AUTHORITY_POLICY_V = 2
 _AUTO_CONFIDENCE_MODEL_POLICY_V = 2
 _AUTO_BASS_INTEGRATION_FEASIBILITY_POLICY_V = 1
-_AUTO_PHASE_GD_GUARD_POLICY_V = 1
+_AUTO_PHASE_GD_GUARD_POLICY_V = 4
 _AUTO_MEASUREMENT_METADATA_IDENTITY_V = 1
 _AUTO_HYBRID_IIR_POLICY_V = HYBRID_IIR_POLICY_VERSION
 
@@ -378,6 +378,25 @@ def _auto_signature_payload(
             ),
             "phase_guard_prering_enable": bool(base_data.get("phase_guard_prering_enable", True)),
             "phase_guard_excess_delay_enable": bool(base_data.get("phase_guard_excess_delay_enable", True)),
+            "phase_budget_mode": str(base_data.get("phase_budget_mode", "unified") or "unified"),
+            "linear_excess_strength": float(
+                _auto_safe_float(base_data.get("linear_excess_strength", 0.9), 0.9)
+            ),
+            "phase_conf_gain_floor": float(
+                _auto_safe_float(base_data.get("phase_conf_gain_floor", 0.20), 0.20)
+            ),
+            "phase_conf_gain_power": float(
+                _auto_safe_float(base_data.get("phase_conf_gain_power", 1.0), 1.0)
+            ),
+            "phase_corr_clamp_lf_deg": float(
+                _auto_safe_float(base_data.get("phase_corr_clamp_lf_deg", 540.0), 540.0)
+            ),
+            "phase_corr_clamp_hf_deg": float(
+                _auto_safe_float(base_data.get("phase_corr_clamp_hf_deg", 90.0), 90.0)
+            ),
+            "max_excess_delay_cycles": float(
+                _auto_safe_float(base_data.get("max_excess_delay_cycles", 1.0), 1.0)
+            ),
         },
         "enable_tdc": bool(base_data.get("enable_tdc", True)),
         "bass_first_ai": bool(base_data.get("bass_first_ai", True)),
@@ -480,6 +499,13 @@ def _auto_signature_payload(
             "phase_correction_enable": bool(base_data.get("phase_correction_enable", base_data.get("enable_phase_correction", True))),
             "max_slope_db_per_oct": float(_auto_safe_float(base_data.get("max_slope_db_per_oct", float("nan")), float("nan"))),
             "reg_strength": float(_auto_safe_float(base_data.get("reg_strength", float("nan")), float("nan"))),
+            "phase_budget_mode": str(base_data.get("phase_budget_mode", "unified") or "unified"),
+            "linear_excess_strength": float(
+                _auto_safe_float(base_data.get("linear_excess_strength", 0.9), 0.9)
+            ),
+            "max_excess_delay_cycles": float(
+                _auto_safe_float(base_data.get("max_excess_delay_cycles", 1.0), 1.0)
+            ),
         },
         "bass_integration_sub_combine_mode": str(base_data.get("bass_integration_sub_combine_mode", "average") or "average"),
         "bass_integration_enabled": bool(

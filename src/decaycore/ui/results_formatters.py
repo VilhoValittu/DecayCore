@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import logging
 
+import numpy as np
+
 from ..resources.i8n.decaycore_i18n import t
 
 logger = logging.getLogger("DecayCore")
@@ -189,14 +191,25 @@ def anchor_label(st: dict, *, stereo_link_enabled: bool) -> str:
 
 def phase_clamp_label(st: dict) -> str:
     try:
-        lim = float((st or {}).get("phase_corr_clamp_deg", 0.0) or 0.0)
-        bef = float((st or {}).get("phase_corr_max_before_deg", 0.0) or 0.0)
-        clipped = bool((st or {}).get("phase_corr_clipped", False))
+        state = st or {}
+        lim = float(state.get("phase_corr_clamp_deg", 0.0) or 0.0)
+        bef = float(state.get("phase_corr_max_before_deg", 0.0) or 0.0)
+        clipped = bool(state.get("phase_corr_clipped", False))
         if lim <= 0.0:
             return "-"
+        diag = ""
+        try:
+            unwrapped = float(state.get("phase_excess_unwrapped_max_abs_deg", float("nan")))
+            retained = float(state.get("phase_extra_guard_retained_frac", float("nan")))
+            if np.isfinite(unwrapped) and np.isfinite(retained):
+                diag = f"; unwrapped excess {unwrapped:.1f} deg, guards retained {retained * 100.0:.0f}%"
+            elif np.isfinite(unwrapped):
+                diag = f"; unwrapped excess {unwrapped:.1f} deg"
+        except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
+            diag = ""
         if clipped:
-            return f"max={bef:.1f} deg -> {lim:.1f} deg"
-        return f"max={bef:.1f} deg (limit {lim:.1f} deg)"
+            return f"max={bef:.1f} deg -> {lim:.1f} deg{diag}"
+        return f"max={bef:.1f} deg (limit {lim:.1f} deg){diag}"
     except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         return "-"
 

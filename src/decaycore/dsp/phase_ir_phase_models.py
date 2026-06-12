@@ -258,6 +258,127 @@ def linear_excess_weight(freq_axis: np.ndarray, phase_lim_hz: float) -> np.ndarr
     return w
 
 
+def spike_suppression_profile(
+    freq_axis: np.ndarray,
+    excess_phase: np.ndarray,
+    phase_regions: dict,
+    *,
+    n_fft: int | None,
+    fs: float,
+) -> np.ndarray:
+    f = np.asarray(freq_axis, dtype=float)
+    spike_suppress = np.ones_like(f, dtype=float)
+    abs_excess = np.abs(np.asarray(excess_phase, dtype=float))
+    if abs_excess.size < 16 or abs_excess.size != f.size:
+        return spike_suppress
+    try:
+        n = int(n_fft) if n_fft is not None else 4096
+        target_smooth_hz = 20.0
+        sigma_bins = max(1.0, target_smooth_hz * n / float(fs))
+    except (AttributeError, TypeError, ValueError):
+        sigma_bins = 2.0
+    smooth_abs = scipy.ndimage.gaussian_filter1d(abs_excess, sigma=sigma_bins, mode="nearest")
+    spike_ratio = smooth_abs / np.maximum(abs_excess, float(np.deg2rad(2.0)))
+    spike_ratio = np.clip(spike_ratio, 0.25, 1.0)
+    regions = dict(phase_regions or {})
+    hf_region = np.asarray(regions.get("hf", np.zeros_like(f, dtype=float)), dtype=float)
+    mid_region = np.clip(
+        np.asarray(regions.get("audible", np.zeros_like(f, dtype=float)), dtype=float)
+        - np.asarray(regions.get("lf", np.zeros_like(f, dtype=float)), dtype=float),
+        0.0,
+        1.0,
+    )
+    spike_suppress = 1.0 - 0.55 * hf_region * (1.0 - spike_ratio**0.75)
+    spike_suppress *= 1.0 - 0.25 * mid_region * (1.0 - spike_ratio)
+    return np.clip(spike_suppress, 0.20, 1.0)
+
+
+def unified_correction_gain(
+    freq_axis: np.ndarray,
+    cfg,
+    st,
+    *,
+    is_mixed: bool,
+    phase_conf: np.ndarray,
+    spike_suppress: np.ndarray,
+    phase_mask: np.ndarray,
+) -> np.ndarray:
+    """
+    Single per-frequency gain governing excess-phase correction strength.
+
+    gain(f) = strength * base_w(f) * min(conf_gain(f), spike(f))
+
+    base_w is the one band fade (full below low_freq_full_correction_hz, cosine
+    fade to zero at min(high_freq_no_correction_hz, phase_limit)). Confidence
+    and spike suppression both estimate per-bin measurement trust, so the worst
+    single term bounds the correction instead of multiplying the same evidence
+    twice. Containment of the result is delegated to the excess-delay,
+    pre-ringing, GD-gradient and authority guards.
+    """
+    f = np.asarray(freq_axis, dtype=float)
+    phase_lim_hz = float(_cfg_value(cfg, "phase_limit", 1000.0) or 1000.0)
+    full_hz = float(
+        _cfg_value(cfg, "low_freq_full_correction_hz", _cfg_value(cfg, "mixed_split_freq", 300.0)) or 300.0
+    )
+    none_hz = float(_cfg_value(cfg, "high_freq_no_correction_hz", phase_lim_hz) or phase_lim_hz)
+    if phase_lim_hz > 0.0:
+        none_hz = min(none_hz, phase_lim_hz)
+    if none_hz <= (full_hz + 1.0):
+        none_hz = full_hz + 1.0
+    base_w = _mixed_excess_weight(f, full_hz, none_hz)
+    base_w = np.asarray(base_w, dtype=float) * np.asarray(phase_mask, dtype=float)
+
+    if is_mixed:
+        strength = float(np.clip(float(_cfg_value(cfg, "excess_phase_strength", 0.9) or 0.0), 0.0, 1.0))
+    else:
+        strength = float(np.clip(float(_cfg_value(cfg, "linear_excess_strength", 0.9) or 0.0), 0.0, 1.0))
+
+    conf_floor = float(np.clip(float(_cfg_value(cfg, "phase_conf_gain_floor", 0.20)), 0.0, 1.0))
+    conf_power = float(max(0.1, float(_cfg_value(cfg, "phase_conf_gain_power", 1.0))))
+    conf = np.asarray(phase_conf, dtype=float)
+    if conf.size != f.size:
+        conf = np.ones_like(f, dtype=float)
+    conf_gain = conf_floor + (1.0 - conf_floor) * np.clip(conf, 0.0, 1.0) ** conf_power
+
+    spike = np.asarray(spike_suppress, dtype=float)
+    if spike.size != f.size:
+        spike = np.ones_like(f, dtype=float)
+    risk = np.minimum(np.clip(conf_gain, 0.0, 1.0), np.clip(spike, 0.0, 1.0))
+
+    gain = strength * base_w * risk
+    try:
+        if isinstance(st, dict):
+            st["phase_corr_strength_used"] = float(strength)
+            st["mixed_phase_full_correction_hz"] = float(full_hz)
+            st["mixed_phase_no_correction_hz"] = float(none_hz)
+            if is_mixed:
+                st["mixed_phase_strength"] = float(strength)
+    except (TypeError, ValueError):
+        pass
+    return np.clip(np.asarray(gain, dtype=float), 0.0, 1.0)
+
+
+def phase_clamp_limit_deg(
+    freq_axis: np.ndarray,
+    *,
+    lf_deg: float,
+    hf_deg: float,
+    full_hz: float,
+    lim_hz: float,
+) -> np.ndarray:
+    """Per-bin sanity clamp limit, log2-interpolated from lf_deg at full_hz to hf_deg at lim_hz."""
+    f = np.asarray(freq_axis, dtype=float)
+    lo_deg = float(max(0.0, lf_deg))
+    hi_deg = float(max(0.0, hf_deg))
+    if hi_deg > lo_deg:
+        lo_deg, hi_deg = hi_deg, lo_deg
+    lo_hz = float(max(1.0, full_hz))
+    hi_hz = float(max(lo_hz * 1.0001, lim_hz))
+    x = np.log2(np.maximum(f, 1e-9) / lo_hz) / np.log2(hi_hz / lo_hz)
+    x = np.clip(x, 0.0, 1.0)
+    return lo_deg + (hi_deg - lo_deg) * x
+
+
 def smooth_linear_boundary(freq_axis: np.ndarray, extra_phase: np.ndarray, phase_lim_hz: float, cfg, st) -> np.ndarray:
     f = np.asarray(freq_axis, dtype=float)
     x = np.asarray(extra_phase, dtype=float)

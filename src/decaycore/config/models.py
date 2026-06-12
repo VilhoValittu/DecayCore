@@ -484,6 +484,13 @@ class FilterConfig:
     mixed_phase_budget_hf_deg: float = 22.5
     mixed_min_tilt_comp_enable: bool = True
     excess_phase_strength: float = 0.9
+    phase_budget_mode: str = "unified"
+    linear_excess_strength: float = 0.9
+    phase_conf_gain_floor: float = 0.20
+    phase_conf_gain_power: float = 1.0
+    phase_corr_clamp_lf_deg: float = 540.0
+    phase_corr_clamp_hf_deg: float = 90.0
+    max_excess_delay_cycles: float = 1.0
     low_freq_full_correction_hz: float = 140.0
     high_freq_no_correction_hz: float = 900.0
     phase_boundary_smooth_sigma_bins: float = 1.2

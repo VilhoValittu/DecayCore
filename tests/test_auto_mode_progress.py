@@ -277,6 +277,61 @@ def test_refine_status_uses_official_rank_score():
     assert "rank 34.810" not in messages[-1]
 
 
+def test_refine_status_explains_hard_gate_display_cap():
+    messages = []
+    search_state = _AutoModeSearchState()
+    phase_state = _AutoModePhaseState()
+    ctx = RefineEvalContext(
+        search_base_data={},
+        measurements={},
+        fs_v=44100,
+        taps_v=65536,
+        xos=[],
+        hpf=None,
+        hc_f=None,
+        hc_m=None,
+        pin_obj=None,
+        cfg=SimpleNamespace(),
+        goal="balanced",
+        filter_key="asym",
+        optimizer_backend="builtin",
+        optuna_mod=None,
+        seed=1,
+        optuna_search_sig="sig",
+        status_cb=messages.append,
+        status_prefix="DecayCore automatic mode [Harman10]",
+        winner_target_name="Harman10",
+        search_state=search_state,
+        runtime=SimpleNamespace(),
+    )
+
+    _consume_phase_result(
+        ctx,
+        phase_state=phase_state,
+        out={
+            "ok": True,
+            "metrics": {
+                "rank_score": 69.732,
+                "avg_score": 70.6,
+                "hard_gate_failed": True,
+                "hard_gate_failures": ["residual_peak_hard_gate"],
+                "mode_ripple_db": 2.5,
+                "max_net_boost_db": 0.0,
+            },
+            "preset": {"phase_limit": 236.0},
+            "result": object(),
+        },
+        idx=1,
+        n_total=10,
+        phase_label="phase 1/2",
+        plateau_after_no_improve=0,
+        use_refine_tiebreak=False,
+    )
+
+    assert messages
+    assert "rank 59.000 (capped by residual_peak_hard_gate; raw 69.732)" in messages[-1]
+
+
 def test_plateau_metric_text_prefers_official_rank_score():
     assert (
         _auto_metric_text(

@@ -17,9 +17,8 @@ import logging
 import numpy as np
 
 from .auto_mode_profile import profiled_section
-from .rank_score import official_rank_score
 from .shared import AUTO_MODE_HPF_ALLOWED_SLOPES_DB_OCT, AUTO_MODE_HPF_MAX_HZ, AUTO_MODE_HPF_MIN_HZ, _auto_safe_float
-from .winner_polish_utils import _winner_polish_acceptance
+from .winner_polish_utils import _polish_rank_status, _winner_polish_acceptance
 
 logger = logging.getLogger("DecayCore")
 
@@ -429,7 +428,7 @@ def apply_hpf_winner_polish(
                 status_cb(
                     "DecayCore automatic mode: hpf winner polish improved "
                     f"({str(candidate['label'])}, "
-                    f"rank {official_rank_score(cur_best_metrics):.3f}, "
+                    f"rank {_polish_rank_status(cur_best_metrics)}, "
                     f"avg {_auto_safe_float(cur_best_metrics.get('avg_score'), 0.0):.3f})"
                 )
 

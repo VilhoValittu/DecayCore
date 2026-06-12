@@ -125,7 +125,13 @@ def _apply_phase_clamp_mag_feedback(
     try:
         excess_approx = np.abs(np.asarray(p_rad_interp, dtype=float) - np.asarray(theo_xo, dtype=float))
         try:
-            lim_max_deg = float(getattr(cfg, "mixed_phase_budget_lf_deg", 60.0) or 60.0)
+            budget_mode = str(getattr(cfg, "phase_budget_mode", "unified") or "unified").strip().lower()
+            if budget_mode != "legacy":
+                # Predicted clamp must mirror the active sanity clamp, not the
+                # legacy mixed budget that no longer binds in unified mode.
+                lim_max_deg = float(getattr(cfg, "phase_corr_clamp_lf_deg", 540.0) or 540.0)
+            else:
+                lim_max_deg = float(getattr(cfg, "mixed_phase_budget_lf_deg", 60.0) or 60.0)
         except (AttributeError, TypeError, ValueError):
             lim_max_deg = 45.0
         lim_rad = float(np.deg2rad(lim_max_deg))

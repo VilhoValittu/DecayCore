@@ -160,9 +160,12 @@ def test_phase_model_prefers_lf_and_xo_correction_over_hf_spikes():
     r200 = float(np.abs(extra_phase[i200]) / max(np.abs(excess_u[i200]), 1e-9))
     r360 = float(np.abs(extra_phase[i360]) / max(np.abs(excess_u[i360]), 1e-9))
 
-    assert r80 > r200 * 2.0
-    assert r120 > r200 * 1.5
-    assert r360 < min(0.05, 0.01 * r80)
+    # Unified phase budget: near-full correction in the confident LF band,
+    # decreasing toward phase_limit, HF spikes still strongly suppressed.
+    assert r80 >= 0.7
+    assert r120 >= 0.5
+    assert r80 > r200
+    assert r360 < 0.05
     assert float(st["phase_confidence_lf_mean"]) > float(st["phase_confidence_hf_mean"])
     assert float(st["phase_useful_lf_score"]) > float(st["phase_risk_hf_score"])
 
@@ -238,19 +241,24 @@ def _render_final_phase(
 
 @pytest.mark.parametrize("filter_type", ["Asymmetric", "Linear Phase"])
 def test_phase_limit_preserves_xo_baseline_for_asymmetric_and_linear(filter_type: str):
+    fs = 48000
+    n_fft = 32768
+    f_ref = np.fft.rfftfreq(n_fft, d=1.0 / float(fs))
+    total_mag = np.where(f_ref < 1600.0, 1.0, 10.0 ** (-6.0 / 20.0))
     crossovers = [
         {"freq": 500.0, "order": 4, "slope": 24, "idx": 1},
         {"freq": 2800.0, "order": 4, "slope": 24, "idx": 2},
     ]
-    freq_axis, final_phase, theo_xo, _min_p = _render_final_phase(
+    freq_axis, final_phase, theo_xo, min_p = _render_final_phase(
         filter_type=filter_type,
         phase_limit=400.0,
         crossovers=crossovers,
+        total_mag=total_mag,
     )
 
     for probe_hz in (500.0, 2800.0):
         idx = int(np.argmin(np.abs(freq_axis - probe_hz)))
-        assert np.isclose(float(final_phase[idx]), float(-theo_xo[idx]), atol=1e-6)
+        assert np.isclose(float(final_phase[idx]), float(min_p[idx] - theo_xo[idx]), atol=1e-6)
 
 
 @pytest.mark.parametrize("filter_type", ["Asymmetric", "Linear Phase"])

@@ -158,7 +158,17 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):  # noqa: C901 - 
         bef = st.get("phase_corr_max_before_deg", None)
         if lim is None or bef is None:
             return f"{side}: n/a"
-        return f"{side}: max {float(bef):.1f} deg -> clamp {float(lim):.1f} deg"
+        diag = ""
+        try:
+            unwrapped = float(st.get("phase_excess_unwrapped_max_abs_deg", float("nan")))
+            retained = float(st.get("phase_extra_guard_retained_frac", float("nan")))
+            if np.isfinite(unwrapped) and np.isfinite(retained):
+                diag = f", unwrapped excess {unwrapped:.1f} deg, guards retained {retained * 100.0:.0f}%"
+            elif np.isfinite(unwrapped):
+                diag = f", unwrapped excess {unwrapped:.1f} deg"
+        except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+            diag = ""
+        return f"{side}: max {float(bef):.1f} deg -> clamp {float(lim):.1f} deg{diag}"
 
     def _gd_grad_max_value(st: dict):
         keys = (

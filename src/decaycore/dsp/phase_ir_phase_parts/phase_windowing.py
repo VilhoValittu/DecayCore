@@ -86,7 +86,9 @@ def _compute_excess_phase(raw_phase, ref_phase) -> np.ndarray:
     ref = np.asarray(ref_phase, dtype=float)
     # Keep excess phase branch-stable: if raw/ref unwrap to different 2*pi branches,
     # direct subtraction can inject large artificial zig-zag into mixed-phase correction.
-    return np.angle(np.exp(1j * (raw - ref)))
+    # Unwrap the principal delta afterwards so smooth multi-rotation excess is still
+    # available to the conservative phase guards.
+    return np.unwrap(np.angle(np.exp(1j * (raw - ref))))
 
 def _apply_mixed_excess_mask(freq_axis, excess, cfg, st) -> np.ndarray:
     return _apply_mixed_excess_mask_impl(freq_axis, excess, cfg, st)

@@ -18,10 +18,9 @@ import logging
 import numpy as np
 
 from .auto_mode_profile import profiled_section
-from .rank_score import official_rank_score
 from .scoring_ranking import _auto_hard_gate_reasons, get_residual_peak_db, get_residual_peak_hard_gate_db
 from .shared import _auto_safe_float
-from .winner_polish_utils import _polish_metric_delta, _winner_polish_acceptance
+from .winner_polish_utils import _polish_metric_delta, _polish_rank_status
 
 logger = logging.getLogger("DecayCore")
 
@@ -417,7 +416,7 @@ def _apply_residual_peak_candidate_result(
             "DecayCore automatic mode: residual-peak polish improved "
             f"(peak {_metric(prev_best, 'worst_residual_peak_raw_db', _metric(prev_best, 'worst_residual_peak_db')):.2f} -> "
             f"{_metric(cur_best_metrics, 'worst_residual_peak_raw_db', _metric(cur_best_metrics, 'worst_residual_peak_db')):.2f} dB, "
-            f"rank {official_rank_score(cur_best_metrics):.3f})"
+            f"rank {_polish_rank_status(cur_best_metrics)})"
     )
     return cur_best_preset, cur_best_metrics, True, meta
 

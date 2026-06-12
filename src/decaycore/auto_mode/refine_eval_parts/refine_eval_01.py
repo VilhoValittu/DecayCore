@@ -24,6 +24,7 @@ from ..rank_score import official_rank_score
 from ..search_v2.candidates import deduplicate_presets
 from ..search_state import _AutoModePhaseState, _AutoModeSearchState, _auto_set_search_winner
 from ..scoring_ranking import _auto_is_better_refine, _auto_rank_key
+from ..winner_polish_utils import _polish_rank_status
 from ...dsp.bass_integration import compute_bass_integration_metric_payload
 from ..shared import (
     AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO,
@@ -501,7 +502,7 @@ def _consume_phase_result_emit_status(
 ) -> None:
     if not callable(ctx.status_cb):
         return
-    rank_now = _auto_safe_float(official_rank_score(ctx.search_state.best_metrics or {}), 0.0)
+    best_rank_txt = _polish_rank_status(ctx.search_state.best_metrics or {})
     if bool(improved):
         avg_now = _auto_safe_float((ctx.search_state.best_metrics or {}).get("avg_score"), 0.0)
         mode_now = _auto_safe_float((ctx.search_state.best_metrics or {}).get("mode_ripple_db"), float("nan"))
@@ -513,7 +514,7 @@ def _consume_phase_result_emit_status(
         )
         ctx.status_cb(
             f"{ctx.status_prefix}: {phase_label} best improved trial {idx}/{n_total} "
-            f"(goal {ctx.goal}, rank {rank_now:.3f}, avg {avg_now:.3f}, "
+            f"(goal {ctx.goal}, rank {best_rank_txt}, avg {avg_now:.3f}, "
             f"mode {'n/a' if not np.isfinite(mode_now) else f'{mode_now:.3f} dB'}, "
             f"boost {'n/a' if not np.isfinite(boost_now) else f'{boost_now:.2f} dB'}, "
             f"ok {int(phase_state.ok_n)}/{int(phase_state.tried_n)}{baseline_note})"
@@ -532,7 +533,7 @@ def _consume_phase_result_emit_status(
         refine_txt = f", decision {refine_reason}, refine rank {refine_rank_txt}"
     ctx.status_cb(
         f"{ctx.status_prefix}: {phase_label} {idx}/{n_total} "
-        f"(best rank {rank_now:.3f}, candidate rank {cand_txt}, "
+        f"(best rank {best_rank_txt}, candidate rank {cand_txt}, "
         f"ok {int(phase_state.ok_n)}/{int(phase_state.tried_n)}{refine_txt})"
     )
 

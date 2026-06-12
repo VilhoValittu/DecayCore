@@ -60,6 +60,7 @@ from decaycore.auto_mode.optuna_backend_params import _auto_optuna_sanitize_enqu
 from decaycore.auto_mode.candidate_base import _derive_adaptive_freq_bounds
 from decaycore.auto_mode.materialize import AutoModeMaterializeContext, build_materialize_helpers
 from decaycore.auto_mode.rank_score import compute_rank_score_components
+from decaycore.auto_mode.winner_polish_utils import _polish_rank_status, _polish_rank_transition_status
 from decaycore.auto_mode.search.rank_combiner import _collect_rank_cached_focus_ripple
 from decaycore.auto_mode.search.metrics_common import _get_auto_scoring_range
 from decaycore.auto_mode.scoring_ranking import (
@@ -716,6 +717,29 @@ def test_compute_rank_score_components_hard_gate_failures_round_trip_in_breakdow
         "residual_peak_hard_gate",
         "bass_integration_infeasible_hard_gate",
     ]
+
+
+def test_winner_polish_rank_status_explains_hard_gate_display_cap():
+    prev_metrics = {
+        "rank_score": 69.375,
+        "avg_score": 70.2,
+        "hard_gate_failed": True,
+        "hard_gate_failures": ["residual_peak_hard_gate"],
+    }
+    new_metrics = {
+        "rank_score": 69.732,
+        "avg_score": 70.6,
+        "hard_gate_failed": True,
+        "hard_gate_failures": ["residual_peak_hard_gate"],
+    }
+
+    status = _polish_rank_status(new_metrics)
+    transition = _polish_rank_transition_status(prev_metrics, new_metrics)
+
+    assert status.startswith("59.000")
+    assert "capped by residual_peak_hard_gate" in status
+    assert "raw 69.732" in status
+    assert "raw 69.375 -> 69.732" in transition
 
 
 def test_auto_rank_key_prefers_better_target_tracking_before_avg_tie():
