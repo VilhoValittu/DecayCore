@@ -11,7 +11,7 @@
 import os
 import re
 
-DEFAULT_VERSION = "v1.1.2"
+DEFAULT_VERSION = "v1.1.2.1"
 
 
 def normalize_version(value: str | None, *, default: str = DEFAULT_VERSION) -> str:
@@ -19,7 +19,6 @@ def normalize_version(value: str | None, *, default: str = DEFAULT_VERSION) -> s
     try:
         raw = str(value or "").strip()
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -48,7 +47,10 @@ def normalize_version(value: str | None, *, default: str = DEFAULT_VERSION) -> s
 
 
 def resolve_version(*, default: str = DEFAULT_VERSION) -> str:
-    env_version = str(os.environ.get("DECAYCORE_VERSION", os.environ.get("CAMILLAFIR_VERSION", "")) or "").strip()
+    env_version = str(
+        os.environ.get("DECAYCORE_VERSION", os.environ.get("CAMILLAFIR_VERSION", ""))
+        or ""
+    ).strip()
     if env_version:
         return normalize_version(env_version, default=default)
 
@@ -57,7 +59,6 @@ def resolve_version(*, default: str = DEFAULT_VERSION) -> str:
 
         return normalize_version(build_version, default=default)
     except (
-
         AttributeError,
         TypeError,
         ValueError,

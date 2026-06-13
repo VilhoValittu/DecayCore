@@ -1866,7 +1866,7 @@ def test_auto_target_curve_selection_uses_optuna_target_study_without_recomputin
                 "decaycore_kind": "target_search",
                 "decaycore_target_name": "Harman6",
                 "decaycore_target_study_sig": str(sig_target),
-                "decaycore_target_cache_version": 2,
+                "decaycore_target_cache_version": 4,
                 "decaycore_filter_key": "asym",
             },
         )
@@ -1876,7 +1876,7 @@ def test_auto_target_curve_selection_uses_optuna_target_study_without_recomputin
             "decaycore_kind": "target_search",
             "decaycore_target_name": "Harman6",
             "decaycore_target_study_sig": str(sig_target),
-            "decaycore_target_cache_version": 2,
+            "decaycore_target_cache_version": 4,
             "decaycore_filter_key": "asym",
         },
         best_trial=SimpleNamespace(

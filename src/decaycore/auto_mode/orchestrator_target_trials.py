@@ -399,7 +399,7 @@ def _run_target_trials_optuna(*, dispatch: _TargetTrialDispatch) -> list[dict]:
             "decaycore_kind": "target_search",
             "decaycore_target_name": str(dispatch.target_name),
             "decaycore_target_study_sig": str(dispatch.target_study_sig),
-            "decaycore_target_cache_version": 3,
+            "decaycore_target_cache_version": 4,
             "decaycore_filter_key": str(dispatch.filter_key),
         },
     )

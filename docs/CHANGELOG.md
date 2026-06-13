@@ -8,6 +8,18 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
+## [1.1.2.1] - 13-6-2026
+
+### AUTO Mode cache compatibility — cleaner upgrades, fewer stale decisions
+
+DecayCore 1.1.2.1 is a focused reliability update for AUTO mode. Cache and target-search compatibility markers have been refreshed so new search behavior is not mixed with older stored results. In practice, this makes upgrades feel safer and more predictable: AUTO mode starts from the right assumptions, avoids reusing outdated target-trial data, and keeps its decisions aligned with the latest logic.
+
+### Smoother day-to-day use
+
+This is a small release, but an important one for trust. If you move to 1.1.2.1 after earlier 1.1.x builds, DecayCore is now better at knowing when old cache data should be left behind, helping searches stay consistent instead of inheriting stale optimization history.
+
+---
+
 ## [1.1.2] - 12-6-2026
 
 ### Phase correction — a major step forward in timing and focus

@@ -15,7 +15,7 @@ from __future__ import annotations
 import time
 from types import SimpleNamespace
 
-AUTO_SEARCH_CACHE_SCHEMA_VERSION = 2
+AUTO_SEARCH_CACHE_SCHEMA_VERSION = 3
 
 from ..cache_signature import _auto_cache_get_entry, _auto_cache_get_last_used_best
 from ..shared import _auto_filter_cache_key
