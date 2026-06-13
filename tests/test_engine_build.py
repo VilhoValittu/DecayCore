@@ -47,6 +47,7 @@ def test_auto_flat_enables_unsafe_raw_dsp_for_prefer_bass():
             "reg_strength": 30.0,
             "low_bass_cut_enable": True,
             "exc_prot": True,
+            "enable_residual_pass": True,
             "enable_afdw": False,
         }
     )
@@ -60,12 +61,15 @@ def test_auto_flat_enables_unsafe_raw_dsp_for_prefer_bass():
     )
 
     assert bool(cfg.unsafe_raw_dsp) is True
-    assert float(cfg.max_boost_db) >= 120.0
+    assert float(cfg.max_boost_db) == 6.0
+    assert float(cfg.max_boost_db_user) == 6.0
     assert float(cfg.max_cut_db) >= 120.0
     assert float(cfg.max_slope_db_per_oct) == 0.0
     assert float(cfg.reg_strength) == 0.0
     assert bool(cfg.low_bass_cut_enable) is False
     assert bool(cfg.exc_prot) is False
+    assert bool(cfg.acoustic_authority_limits_enable) is False
+    assert bool(cfg.enable_residual_pass) is False
     assert bool(cfg.enable_afdw) is False
 
 

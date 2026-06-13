@@ -53,6 +53,13 @@ def load_translations() -> tuple[dict, dict]:
 TRANSLATIONS, TRANSLATIONS_META = load_translations()
 
 
+def _reload_translations_in_place() -> None:
+    global TRANSLATIONS, TRANSLATIONS_META
+    translations, meta = load_translations()
+    TRANSLATIONS = translations
+    TRANSLATIONS_META = meta
+
+
 def t(key: str) -> str:
     """Funktio: t."""
     lang = locale.getlocale()[0]
@@ -60,4 +67,13 @@ def t(key: str) -> str:
 
     if key == "zoom_hint":
         return "(Vinkki: Voit zoomata hiirellä kuvaajaa)" if lang == "fi" else "(Hint: Use mouse to zoom)"
-    return TRANSLATIONS.get(lang, TRANSLATIONS.get("en", {})).get(key, key)
+    catalog = TRANSLATIONS.get(lang, TRANSLATIONS.get("en", {}))
+    translated = catalog.get(key, None)
+    if translated is not None:
+        return translated
+
+    # Hot-reload or partial module reload can update UI code before this module,
+    # so retry once from disk when a key is missing.
+    _reload_translations_in_place()
+    catalog = TRANSLATIONS.get(lang, TRANSLATIONS.get("en", {}))
+    return catalog.get(key, key)

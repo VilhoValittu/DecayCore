@@ -2702,6 +2702,7 @@ def test_auto_signature_payload_exposes_policy_versions_and_metadata_identity():
 
     assert payload["measurement_metadata_identity"] == _auto_measurement_metadata_identity(measurements)
     assert payload["signature_policy_versions"]["gain_authority_policy_v"] >= 1
+    assert payload["gain_authority_policy"]["unsafe_raw_dsp"] is False
     assert payload["gain_authority_policy"]["max_boost_db"] == 3.0
     assert payload["confidence_model"]["policy_v"] >= 2
     assert payload["confidence_model"]["conf_pull_ceil"] == 0.85
@@ -2716,6 +2717,36 @@ def test_auto_signature_payload_exposes_policy_versions_and_metadata_identity():
     assert payload["residual_peak_scorer"]["scorer_v"] >= 2
     assert payload["bass_integration_feasibility"]["policy_v"] >= 1
     assert payload["phase_gd_guard"]["policy_v"] >= 4
+
+
+def test_auto_signature_changes_when_unsafe_raw_flag_changes():
+    base = {
+        "mode": "AUTO",
+        "auto_goal": "flat",
+        "max_boost_db": 6.0,
+        "max_cut_db": 15.0,
+        "unsafe_raw_dsp": False,
+    }
+    measurements = {"measurement_path_l": "left.wav", "measurement_path_r": "right.wav"}
+
+    safe_sig = _auto_signature(
+        base_data=base,
+        measurements=measurements,
+        fs_v=44100,
+        taps_v=65536,
+        xos=[],
+        hpf=None,
+    )
+    unsafe_sig = _auto_signature(
+        base_data={**base, "unsafe_raw_dsp": True},
+        measurements=measurements,
+        fs_v=44100,
+        taps_v=65536,
+        xos=[],
+        hpf=None,
+    )
+
+    assert safe_sig != unsafe_sig
 
 
 def test_auto_signature_changes_when_measurement_metadata_changes():

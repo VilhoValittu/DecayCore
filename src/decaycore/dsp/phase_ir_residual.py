@@ -556,6 +556,9 @@ def apply_residual_pass_if_enabled(
     residual_telemetry: ResidualTelemetry | None = None
     cfg_reader = CfgReader(cfg)
 
+    if cfg_reader.bool("unsafe_raw_dsp", False):
+        return gain_db, residual_telemetry
+
     if cfg_reader.bool("enable_residual_pass", False) and cfg_reader.bool("enable_mag_correction", True):
         try:
             gain_db, residual_telemetry = _residual_process_enabled_pass(

@@ -44,6 +44,21 @@ def test_acoustic_authority_caps_disabled_leaves_caps_full():
     assert st["authority_cut_cap_reduced_bins"] == 0
 
 
+def test_acoustic_authority_caps_disabled_preserves_user_boost_cap_with_low_authority():
+    st = {
+        "authority_boost": np.zeros(128, dtype=float),
+        "authority_cut": np.zeros(128, dtype=float),
+    }
+    cfg = SimpleNamespace(acoustic_authority_limits_enable=False)
+    base_boost_cap = np.full(128, 12.0, dtype=float)
+
+    freq, _, result = _run_caps(st, cfg=cfg, boost_cap=base_boost_cap)
+
+    assert freq.shape == base_boost_cap.shape
+    assert np.allclose(result["boost_cap_db"], base_boost_cap)
+    assert int(result["boost_reduced_bins"]) == 0
+
+
 def test_acoustic_authority_caps_missing_arrays_leave_caps_full():
     st = {}
 

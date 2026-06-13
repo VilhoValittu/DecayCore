@@ -163,3 +163,33 @@ def test_residual_cannot_increase_lf_boost_near_exc_protection():
     assert np.all(out[m] <= gain_db[m] + 1e-10)
     assert telemetry is not None
     assert int(getattr(telemetry, "residual_lf_boost_blocked_bins")) >= 0
+
+
+def test_residual_pass_is_bypassed_in_unsafe_raw_mode():
+    freq_axis = np.geomspace(10.0, 220.0, 256)
+    gain_db = np.zeros_like(freq_axis, dtype=float)
+    target = np.full_like(freq_axis, 6.0, dtype=float)
+    cfg = SimpleNamespace(
+        enable_residual_pass=True,
+        enable_mag_correction=True,
+        unsafe_raw_dsp=True,
+        residual_pass_mode="general_fit",
+        residual_strength=1.0,
+        residual_smoothing_mult=1.0,
+        residual_conf_power=1.0,
+        residual_max_delta_db=6.0,
+        mag_c_min=20.0,
+        mag_c_max=180.0,
+        trans_width=20.0,
+        low_bass_cut_enable=False,
+        low_bass_cut_hz=0.0,
+        exc_prot=False,
+        exc_freq=0.0,
+        max_boost_db=12.0,
+        max_cut_db=15.0,
+    )
+
+    out, telemetry = _run_residual(cfg, gain_db, target, freq_axis)
+
+    assert np.allclose(out, gain_db, atol=1e-10, rtol=0.0)
+    assert telemetry is None

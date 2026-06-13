@@ -247,6 +247,7 @@ def _prepare_boost_caps_write_stats(
         freq_axis=freq_axis,
         mask_c=mask_c,
         boost_cap_db=boost_cap_db,
+        unsafe_raw_dsp=cfg_reader.bool("unsafe_raw_dsp", False),
     )
 
 
@@ -334,59 +335,63 @@ def _prepare_boost_caps_harmonic_risk(
     freq_axis: np.ndarray,
     mask_c: np.ndarray,
     boost_cap_db: np.ndarray,
+    unsafe_raw_dsp: bool = False,
 ) -> None:
     _hrisk_cap_enabled = False
+    _hrisk_cap_bypassed = bool(unsafe_raw_dsp)
     _hrisk_peak = 0.0
     _hrisk_peak_hz = float("nan")
     _hrisk_avg_reduction_20_200 = 0.0
     _hrisk_max_reduction_20_200 = 0.0
-    try:
-        _mctx = get_measurement_ctx()
-        if (
-            _mctx is not None
-            and _mctx.harmonic_risk_freq_hz is not None
-            and _mctx.harmonic_risk_curve is not None
-        ):
-            _hrisk_f = np.asarray(_mctx.harmonic_risk_freq_hz, dtype=float)
-            _hrisk_c = np.asarray(_mctx.harmonic_risk_curve, dtype=float)
-            if _hrisk_f.size >= 4 and _hrisk_c.size == _hrisk_f.size:
-                _risk_on_axis = np.interp(
-                    freq_axis,
-                    _hrisk_f,
-                    _hrisk_c,
-                    left=0.0,
-                    right=0.0,
-                )
-                _hrisk_band = mask_c & (freq_axis >= 20.0) & (freq_axis <= 800.0)
-                _max_local_reduction_db = 2.0
-                _cap_reduction = np.zeros_like(freq_axis, dtype=float)
-                if np.any(_hrisk_band):
-                    _cap_reduction[_hrisk_band] = (
-                        float(_max_local_reduction_db) * np.asarray(_risk_on_axis[_hrisk_band], dtype=float)
+    if not unsafe_raw_dsp:
+        try:
+            _mctx = get_measurement_ctx()
+            if (
+                _mctx is not None
+                and _mctx.harmonic_risk_freq_hz is not None
+                and _mctx.harmonic_risk_curve is not None
+            ):
+                _hrisk_f = np.asarray(_mctx.harmonic_risk_freq_hz, dtype=float)
+                _hrisk_c = np.asarray(_mctx.harmonic_risk_curve, dtype=float)
+                if _hrisk_f.size >= 4 and _hrisk_c.size == _hrisk_f.size:
+                    _risk_on_axis = np.interp(
+                        freq_axis,
+                        _hrisk_f,
+                        _hrisk_c,
+                        left=0.0,
+                        right=0.0,
                     )
-                    boost_cap_db[_hrisk_band] = np.maximum(
-                        0.0,
-                        boost_cap_db[_hrisk_band] - _cap_reduction[_hrisk_band],
-                    )
-                    _hrisk_cap_enabled = bool(np.any(_cap_reduction[_hrisk_band] > 0.01))
-                    if np.any(np.isfinite(_risk_on_axis[_hrisk_band])):
-                        _peak_idx = int(np.argmax(_risk_on_axis[_hrisk_band]))
-                        _hrisk_peak = float(np.max(_risk_on_axis[_hrisk_band]))
-                        _band_freqs = freq_axis[_hrisk_band]
-                        if _peak_idx < len(_band_freqs):
-                            _hrisk_peak_hz = float(_band_freqs[_peak_idx])
-                    _b20_200 = mask_c & (freq_axis >= 20.0) & (freq_axis <= 200.0)
-                    if np.any(_b20_200):
-                        _hrisk_avg_reduction_20_200 = float(np.mean(_cap_reduction[_b20_200]))
-                        _hrisk_max_reduction_20_200 = float(np.max(_cap_reduction[_b20_200]))
-    except (TypeError, ValueError, FloatingPointError, IndexError):
-        pass
+                    _hrisk_band = mask_c & (freq_axis >= 20.0) & (freq_axis <= 800.0)
+                    _max_local_reduction_db = 2.0
+                    _cap_reduction = np.zeros_like(freq_axis, dtype=float)
+                    if np.any(_hrisk_band):
+                        _cap_reduction[_hrisk_band] = (
+                            float(_max_local_reduction_db) * np.asarray(_risk_on_axis[_hrisk_band], dtype=float)
+                        )
+                        boost_cap_db[_hrisk_band] = np.maximum(
+                            0.0,
+                            boost_cap_db[_hrisk_band] - _cap_reduction[_hrisk_band],
+                        )
+                        _hrisk_cap_enabled = bool(np.any(_cap_reduction[_hrisk_band] > 0.01))
+                        if np.any(np.isfinite(_risk_on_axis[_hrisk_band])):
+                            _peak_idx = int(np.argmax(_risk_on_axis[_hrisk_band]))
+                            _hrisk_peak = float(np.max(_risk_on_axis[_hrisk_band]))
+                            _band_freqs = freq_axis[_hrisk_band]
+                            if _peak_idx < len(_band_freqs):
+                                _hrisk_peak_hz = float(_band_freqs[_peak_idx])
+                        _b20_200 = mask_c & (freq_axis >= 20.0) & (freq_axis <= 200.0)
+                        if np.any(_b20_200):
+                            _hrisk_avg_reduction_20_200 = float(np.mean(_cap_reduction[_b20_200]))
+                            _hrisk_max_reduction_20_200 = float(np.max(_cap_reduction[_b20_200]))
+        except (TypeError, ValueError, FloatingPointError, IndexError):
+            pass
     try:
-        if isinstance(st, dict) and _hrisk_cap_enabled:
+        if isinstance(st, dict):
             safe_put_many(
                 st,
                 {
                     "harmonic_risk_cap_enabled": bool(_hrisk_cap_enabled),
+                    "harmonic_risk_cap_bypassed_by_unsafe_raw": bool(_hrisk_cap_bypassed),
                     "harmonic_risk_peak": float(_hrisk_peak),
                     "harmonic_risk_peak_hz": float(_hrisk_peak_hz),
                     "harmonic_risk_cap_avg_reduction_20_200": float(_hrisk_avg_reduction_20_200),

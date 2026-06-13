@@ -20,6 +20,14 @@ Latest release:
 All releases:
 - [DecayCore releases](https://github.com/VilhoValittu/DecayCore/releases)
 
+## Python and dependency baseline
+
+All DecayCore versions released and documented in this repository are based on Python `3.12.3`.
+
+Current dependency baselines from the repository requirement files are:
+
+- `requirements.txt`: `numpy==2.4.6`, `scipy==1.17.1`, `nicegui==3.13.0`, `plotly==6.8.0`, `optuna==4.9.0`, `numba==0.65.1`
+
 ## Run from release package
 
 ---
@@ -94,7 +102,7 @@ sudo apt install libportaudio2
 
 ## Run directly from Python source
 
-Use this path if you want to run DecayCore from a cloned source tree instead of a packaged release. Python 3.11 or newer is recommended.
+Use this path if you want to run DecayCore from a cloned source tree instead of a packaged release. The documented baseline is Python `3.12.3`.
 
 Repository:
 - [DecayCore source repository](https://github.com/VilhoValittu/DecayCore)

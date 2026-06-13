@@ -32,6 +32,7 @@ from ..target_preview_interaction import (
     extract_vertical_shift_from_shape_relayout,
     parse_svg_path_points,
 )
+from ...common.measurement_features import build_harmonic_boost_risk_curve, build_target_decay_hint
 from ...ui_i18n import (
     LVL_ALGO_MEDIAN,
     LVL_ALGO_OPTION_LABEL_KEYS,
@@ -70,6 +71,182 @@ _TARGET_PREVIEW_DRAG_BASE_POINTS: list[tuple[float, float]] = []
 _TARGET_PREVIEW_TILT_HANDLE_POINTS: list[tuple[float, float]] = []
 _TARGET_PREVIEW_DRAG_ACTIVE = False
 _TARGET_PREVIEW_PLOT = None
+_TARGET_TAB_TRANSLATE: Callable[[str], str] | None = None
+
+
+def _decay_hint_status_color(status: str) -> str:
+    return {
+        "ok": "#2f855a",
+        "caution": "#b7791f",
+        "strong": "#c53030",
+        "unavailable": "#4a5568",
+    }.get(str(status or "").strip().lower(), "#4a5568")
+
+
+def _target_hint_translate(key: str) -> str:
+    from ...resources.i8n.decaycore_i18n import t as resource_t  # noqa: PLC0415
+
+    translator = _TARGET_TAB_TRANSLATE or resource_t
+    try:
+        translated = str(translator(key))
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        translated = key
+
+    if translated != key:
+        return translated
+    return str(resource_t(key))
+
+
+def _build_target_decay_hint_payload() -> dict[str, object]:
+    from ...common.measurement_features import normalize_rt60_bands, normalize_rt60_value  # noqa: PLC0415
+    from ...io.measurements_loader import _try_load_harmonic_sidecar, _try_load_rt60_sidecar  # noqa: PLC0415
+
+    def _cv(name, default=None):
+        return ctrl.value(name, default)
+
+    app_mode = str(_cv("mode", "BASIC") or "BASIC").upper()
+    bass_integration_enabled = bool(_cv("bass_integration_enable", False))
+
+    rt60_values: list[float | None] = []
+    rt60_bands_list: list[dict[float, float] | None] = []
+    harmonic_summaries: list[dict | None] = []
+
+    def _append_generated_source(source: object) -> None:
+        if not isinstance(source, dict):
+            return
+        rt60_values.append(normalize_rt60_value(source.get("measured_rt60")))
+        rt60_bands_list.append(normalize_rt60_bands(source.get("measured_rt60_bands")))
+        harmonic_freq = source.get("harmonic_freq_hz")
+        harmonic_mags = source.get("harmonic_magnitudes_db")
+        analysis_freq = source.get("spatial_avg_analysis_freq_hz", source.get("analysis_freq_hz"))
+        analysis_mag = source.get("spatial_avg_analysis_magnitude_db", source.get("analysis_magnitude_db"))
+        if harmonic_freq is None or not isinstance(harmonic_mags, dict) or not harmonic_mags:
+            return
+        _risk_freq, _risk_curve, risk_summary = build_harmonic_boost_risk_curve(
+            harmonic_freq,
+            harmonic_mags,
+            fundamental_freq_hz=analysis_freq,
+            fundamental_mag_db=analysis_mag,
+        )
+        harmonic_summaries.append(risk_summary)
+
+    def _append_path_sidecars(path_value: object) -> None:
+        path = str(path_value or "").strip()
+        if not path:
+            return
+        rt60_val, rt60_bands = _try_load_rt60_sidecar(path)
+        rt60_values.append(rt60_val)
+        rt60_bands_list.append(rt60_bands)
+        harmonic_freq, harmonic_mags = _try_load_harmonic_sidecar(path)
+        if harmonic_freq is None or not harmonic_mags:
+            return
+        _risk_freq, _risk_curve, risk_summary = build_harmonic_boost_risk_curve(
+            harmonic_freq,
+            harmonic_mags,
+        )
+        harmonic_summaries.append(risk_summary)
+
+    for slot in ("l", "r"):
+        _append_generated_source(_cv(f"generated_measurement_{slot}", None))
+
+    if bass_integration_enabled:
+        _append_path_sidecars(_cv("local_path_l_main", ""))
+        _append_path_sidecars(_cv("local_path_r_main", ""))
+    else:
+        _append_path_sidecars(_cv("local_path_l", ""))
+        _append_path_sidecars(_cv("local_path_r", ""))
+
+    hint = build_target_decay_hint(
+        rt60_values=rt60_values,
+        rt60_bands_list=rt60_bands_list,
+        harmonic_summaries=harmonic_summaries,
+    )
+    hint["app_mode"] = app_mode
+    return hint
+
+
+def _render_target_decay_hint() -> None:
+    from nicegui import ui  # noqa: PLC0415
+
+    hint_col = ctrl.get_container("target_decay_hint_scope")
+    if hint_col is None:
+        return
+
+    hint = _build_target_decay_hint_payload()
+    status = str(hint.get("status", "unavailable") or "unavailable")
+    reason = str(hint.get("reason", "none") or "none")
+    app_mode = str(hint.get("app_mode", "BASIC") or "BASIC").upper()
+    is_advanced = app_mode == "ADVANCED"
+
+    summary_key = {
+        "unavailable": "target_decay_hint_summary_no_data",
+        "ok": "target_decay_hint_summary_ok",
+        "caution": "target_decay_hint_summary_caution",
+        "strong": "target_decay_hint_summary_strong",
+    }.get(status, "target_decay_hint_summary_no_data")
+
+    advice_map = {
+        "no_data": "target_decay_hint_body_no_data",
+        "keep_changes_measured": "target_decay_hint_body_ok",
+        "avoid_deep_null_boost": "target_decay_hint_body_avoid_nulls",
+        "prefer_conservative_bass_boost": "target_decay_hint_body_conservative_bass",
+        "keep_correction_band_limited": "target_decay_hint_body_band_limited",
+    }
+    summary_detail_map = {
+        ("caution", "rt60"): "target_decay_hint_body_rt60_caution",
+        ("caution", "harmonic"): "target_decay_hint_body_harmonic_caution",
+        ("caution", "mixed"): "target_decay_hint_body_mixed_caution",
+        ("strong", "rt60"): "target_decay_hint_body_rt60_strong",
+        ("strong", "harmonic"): "target_decay_hint_body_harmonic_strong",
+        ("strong", "mixed"): "target_decay_hint_body_mixed_strong",
+    }
+
+    detail_keys: list[str] = []
+    summary_detail_key = summary_detail_map.get((status, reason))
+    if summary_detail_key:
+        detail_keys.append(summary_detail_key)
+    for code in hint.get("advice_codes", ()):
+        key = advice_map.get(str(code))
+        if key and key not in detail_keys:
+            detail_keys.append(key)
+    if not is_advanced and detail_keys:
+        detail_keys = detail_keys[:1]
+    elif is_advanced:
+        detail_keys = detail_keys[:2]
+
+    badge_key = {
+        "unavailable": "target_decay_hint_badge_unavailable",
+        "ok": "target_decay_hint_badge_ok",
+        "caution": "target_decay_hint_badge_caution",
+        "strong": "target_decay_hint_badge_strong",
+    }.get(status, "target_decay_hint_badge_unavailable")
+    badge_color = _decay_hint_status_color(status)
+
+    hint_col.clear()
+    with hint_col:
+        ui.label(_target_hint_translate("target_decay_hint_title")).classes("text-sm font-semibold")
+        with ui.row().classes("w-full items-center gap-2"):
+            ui.html(
+                (
+                    '<span style="display:inline-block;padding:4px 10px;'
+                    'border-radius:9999px;font-size:0.72rem;font-weight:700;'
+                    f'background:{badge_color};color:#ffffff;">{_target_hint_translate(badge_key)}</span>'
+                )
+            )
+            ui.label(_target_hint_translate(summary_key)).classes("text-xs text-gray-300")
+        for key in detail_keys:
+            ui.label(_target_hint_translate(key)).classes("text-xs text-gray-400")
 
 def _step_manual_target(delta_db: float) -> None:
     try:
@@ -117,7 +294,7 @@ def _step_manual_target_tilt(delta_db_per_oct: float) -> None:
 
 def build_target_tab(*, t: Callable, get_val: Callable) -> None:
     global _TARGET_PREVIEW_DRAG_ACTIVE, _TARGET_PREVIEW_DRAG_BASE_POINTS, _TARGET_PREVIEW_TILT_HANDLE_POINTS
-    global _TARGET_PREVIEW_PLOT
+    global _TARGET_PREVIEW_PLOT, _TARGET_TAB_TRANSLATE
 
     from nicegui import ui
     from ...application.house_curve_service import _normalize_hc_mode_key  # noqa: PLC0415
@@ -126,15 +303,19 @@ def build_target_tab(*, t: Callable, get_val: Callable) -> None:
     _TARGET_PREVIEW_DRAG_BASE_POINTS = []
     _TARGET_PREVIEW_TILT_HANDLE_POINTS = []
     _TARGET_PREVIEW_PLOT = None
+    _TARGET_TAB_TRANSLATE = t
 
     ui.markdown(f"#### {t('tab_target')}")
     ui.separator()
     ui.markdown(f"#### {t('ui_target_preview')}")
     ui.label(t("target_preview_legend_hint")).classes("text-xs text-gray-400")
+    hint_col = ui.column().classes("w-full gap-1")
+    ctrl.register_container("target_decay_hint_scope", hint_col)
 
     # Target preview container
     preview_col = ui.column().classes("w-full")
     ctrl.register_container("target_preview_scope", preview_col)
+    _render_target_decay_hint()
 
     ui.separator()
 
@@ -338,6 +519,7 @@ def refresh_target_preview() -> None:
     preview_col = ctrl.get_container("target_preview_scope")
     if preview_col is None:
         return
+    _render_target_decay_hint()
 
     fig, drag_base_points, tilt_handle_points = _build_target_preview_fig()
     _TARGET_PREVIEW_DRAG_BASE_POINTS = drag_base_points
@@ -539,8 +721,6 @@ def _build_target_preview_fig():  # noqa: C901 - target preview figure is assemb
 
         # --- build target curve ---
         target_curve = None
-        src = hc_mode_raw
-
         if hc_mode == "Upload" and isinstance(hc_file, dict) and hc_file.get("content"):
             try:
                 tf_f, tf_m = load_target_curve(hc_file["content"])
@@ -549,7 +729,6 @@ def _build_target_preview_fig():  # noqa: C901 - target preview figure is assemb
                     tf_m = np.asarray(tf_m, dtype=float)
                     if tf_f.size >= 2 and tf_m.size == tf_f.size:
                         target_curve = np.interp(freq_axis, tf_f, tf_m, left=tf_m[0], right=tf_m[-1])
-                        src = "Custom upload"
             except (
 
                 AttributeError,

@@ -6,7 +6,7 @@ DecayCore includes its own measurement workflow in release builds. The preferred
 
 DecayCore runs through a browser-based user interface. The application starts a local UI that you use in your web browser; it is not a cloud service.
 
-It focuses on physically sane, band-limited room correction instead of simply forcing a flat frequency response. DecayCore supports Linear Phase, Minimum Phase, Mixed Phase and Asymmetric FIR filters, automatic target optimization, phase-aware correction, and Temporal Decay Control for low-frequency room behavior.
+It focuses on physically sane, band-limited room correction instead of simply forcing a flat frequency response. DecayCore prioritizes controlled cuts, containment, and acoustically plausible shaping. Boost is not the primary goal, and remains a bounded, guarded exception only where the measurement supports it. DecayCore supports Linear Phase, Minimum Phase, Mixed Phase and Asymmetric FIR filters, automatic target optimization, phase-aware correction, and Temporal Decay Control for low-frequency room behavior.
 
 >DecayCore was formerly known as CamillaFIR. The project was renamed to avoid confusion with CamillaDSP while keeping full CamillaDSP compatibility.
 
@@ -29,7 +29,8 @@ REW-style measurement data may also be used in compatible workflows, but DecayCo
 - Exports convolution-ready WAV FIR filters
 - Supports CamillaDSP, Roon convolution, Equalizer APO, and other FIR-capable DSP engines
 - Supports Linear Phase, Minimum Phase, Mixed Phase and Asymmetric FIR filters
-- Uses conservative correction limits to avoid unsafe boosts and unrealistic room correction
+- Prioritizes cuts and bounded shaping over boost-heavy "flatten at any cost" correction
+- Uses conservative correction limits to avoid unsafe boosts, deep-null chasing, and unrealistic room correction
 - Includes automatic target optimization and Temporal Decay Control
 
 ## Screenshots
@@ -63,6 +64,19 @@ Download DecayCore from the official GitHub releases page:
 ## Contact
 
 Feedback: vilho.valittu@gmail.com
+
+## Python and dependency baseline
+
+All DecayCore versions released and documented in this repository are based on Python `3.12.3`.
+
+The main source environment currently documented by `requirements.txt` uses these pinned package versions:
+
+- `numpy==2.4.6`
+- `scipy==1.17.1`
+- `nicegui==3.13.0`
+- `plotly==6.8.0`
+- `optuna==4.9.0`
+- `numba==0.65.1`
 
 ## License
 

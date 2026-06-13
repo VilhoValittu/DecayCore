@@ -6,6 +6,8 @@ Core rule:
 
 > Correct what is physically plausible and perceptually useful, and avoid inverting unreliable measurement detail.
 
+In practice, that means DecayCore solves most room problems with controlled cuts and bounded shaping. Boost is secondary and only allowed conservatively where confidence is good.
+
 This page explains why that approach stays stable and audible in practice.
 
 ## 1) Time-domain first, then frequency-domain shaping
@@ -37,14 +39,14 @@ Result: corrections track robust trends instead of chasing fragile artifacts.
 
 ## 3) Explicit guardrails keep filters physically sane
 
-Most failures in room correction come from unbounded boosts and steep local corrections.
+Most failures in room correction come from unbounded boosts, deep-null chasing, and steep local corrections.
 DecayCore uses explicit limits, including:
 - `max_boost_db`, `max_cut_db`
 - `max_slope_db_per_oct` and optional split slope limits for boost vs cut
 - `low_bass_cut_hz` / excursion-oriented low-bass safety
 - `reg_strength` to avoid null-filling behavior
 
-These are not cosmetic settings. They prevent unstable inverse-filter behavior.
+These are not cosmetic settings. They prevent unstable inverse-filter behavior and keep DecayCore focused on cuts-first correction instead of boost-heavy graph flattening.
 
 ## 4) Phase reconstruction with layered safety
 

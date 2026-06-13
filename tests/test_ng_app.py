@@ -30,6 +30,11 @@ def test_target_preview_hint_translation_keys_exist_for_en_and_fi():
     for lang in ("en", "fi"):
         assert "ui_target_preview" in TRANSLATIONS[lang]
         assert "target_preview_legend_hint" in TRANSLATIONS[lang]
+        assert "target_decay_hint_title" in TRANSLATIONS[lang]
+        assert "target_decay_hint_badge_unavailable" in TRANSLATIONS[lang]
+        assert "target_decay_hint_badge_ok" in TRANSLATIONS[lang]
+        assert "target_decay_hint_badge_caution" in TRANSLATIONS[lang]
+        assert "target_decay_hint_badge_strong" in TRANSLATIONS[lang]
 
 
 def test_file_status_translation_keys_exist_for_en_and_fi():

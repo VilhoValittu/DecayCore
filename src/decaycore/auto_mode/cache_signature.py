@@ -93,7 +93,7 @@ _AUTO_DIP_FILL_RISK_SCORING_ALGO_V = 1
 _AUTO_CHANNEL_OVERFIT_SCORING_ALGO_V = 1
 _AUTO_VOICE_CLARITY_SCORING_ALGO_V = 1
 _AUTO_RESIDUAL_PEAK_WINNER_POLISH_POLICY_V = 2
-_AUTO_GAIN_AUTHORITY_POLICY_V = 2
+_AUTO_GAIN_AUTHORITY_POLICY_V = 3
 _AUTO_CONFIDENCE_MODEL_POLICY_V = 2
 _AUTO_BASS_INTEGRATION_FEASIBILITY_POLICY_V = 1
 _AUTO_PHASE_GD_GUARD_POLICY_V = 4
@@ -289,6 +289,7 @@ def _auto_signature_payload(
         },
         "gain_authority_policy": {
             "policy_v": int(_AUTO_GAIN_AUTHORITY_POLICY_V),
+            "unsafe_raw_dsp": bool(base_data.get("unsafe_raw_dsp", False)),
             "max_boost": float(_auto_safe_float(base_data.get("max_boost", float("nan")), float("nan"))),
             "max_boost_db": float(_auto_safe_float(base_data.get("max_boost_db", float("nan")), float("nan"))),
             "max_cut": float(_auto_safe_float(base_data.get("max_cut", float("nan")), float("nan"))),

@@ -14,7 +14,7 @@ from decaycore.config.models import FilterConfig
 from decaycore.dsp.correction_mag import _apply_peak_priority_error_shaping
 from decaycore.dsp.gain_policy import apply_cuts_only_guard
 from decaycore.dsp.limits import soft_clip_gain
-from decaycore.engine_build import _apply_max_boost_safety_cap
+from decaycore.engine_build import _apply_max_boost_safety_cap, _build_config_apply_unsafe_raw
 
 
 def test_advanced_auto_boost_safety_cap_allows_12_db() -> None:
@@ -25,6 +25,40 @@ def test_advanced_auto_boost_safety_cap_allows_12_db() -> None:
     assert float(cfg.max_boost_db) == pytest.approx(12.0)
     assert float(cfg.max_boost_db_user) == pytest.approx(12.0)
     assert float(cfg.max_safe_boost_db) == pytest.approx(12.0)
+
+
+def test_unsafe_raw_bypasses_safe_cap_but_preserves_user_boost_limit() -> None:
+    cfg = SimpleNamespace(
+        max_boost_db=12.0,
+        max_cut_db=15.0,
+        max_slope_db_per_oct=24.0,
+        max_slope_boost_db_per_oct=24.0,
+        max_slope_cut_db_per_oct=24.0,
+        reg_strength=30.0,
+        low_bass_cut_enable=True,
+        low_bass_cut_hz=18.0,
+        low_bass_cut_strength=1.0,
+        exc_prot=True,
+        bass_boost_cap_enable=True,
+        bass_boost_post_restore_enable=True,
+        acoustic_authority_limits_enable=True,
+        bass_smooth_adaptive=True,
+        enable_ir_pre_energy_guard=True,
+    )
+
+    _build_config_apply_unsafe_raw(
+        cfg,
+        {"unsafe_raw_dsp": True},
+        mode_u="ADVANCED",
+        auto_goal="flat",
+        max_safe_boost=4.0,
+    )
+
+    assert bool(cfg.unsafe_raw_dsp) is True
+    assert float(cfg.max_boost_db_user) == pytest.approx(12.0)
+    assert float(cfg.max_safe_boost_db) == pytest.approx(4.0)
+    assert float(cfg.max_boost_db) == pytest.approx(12.0)
+    assert bool(cfg.acoustic_authority_limits_enable) is False
 
 
 def test_basic_mode_still_clamps_max_boost_to_4_db() -> None:

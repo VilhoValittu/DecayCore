@@ -17,6 +17,10 @@ Yes. DecayCore was formerly known as CamillaFIR. The project was renamed to avoi
 
 No. DecayCore is compatible with CamillaDSP, but the generated FIR filters can also be used with other convolution-capable DSP engines that support compatible WAV impulse response filters.
 
+## Is DecayCore mainly a boost tool?
+
+No. DecayCore is built around physically plausible room correction where controlled cuts and bounded shaping do most of the work. Boost is intentionally limited and should not be used to chase deep nulls, uncertain bass behavior, or a perfectly flat-looking graph.
+
 ## Does DecayCore include measurement?
 
 Yes. DecayCore includes its own built-in measurement workflow in release builds published in the Releases section. Measurement has been verified to work on Windows. Linux has been verified to work at least on Ubuntu 22.04. macOS could not be tested due to unavailable test hardware.

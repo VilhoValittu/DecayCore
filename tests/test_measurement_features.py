@@ -1,12 +1,9 @@
 """Unit tests for measurement_features.py — RT60 and harmonic risk helpers."""
 
-import math
-from typing import Any
-
 import numpy as np
-import pytest
 
 from decaycore.common.measurement_features import (
+    build_target_decay_hint,
     normalize_rt60_value,
     normalize_rt60_bands,
     serialize_rt60_bands,
@@ -303,3 +300,38 @@ class TestBuildHarmonicBoostRiskCurve:
         freq_out, risk_out, summary = build_harmonic_boost_risk_curve(freq, h_mags)
         assert freq_out is None
         assert risk_out is None
+
+
+class TestBuildTargetDecayHint:
+    """Tests for build_target_decay_hint()."""
+
+    def test_returns_unavailable_when_metadata_is_missing(self):
+        result = build_target_decay_hint()
+        assert result["status"] == "unavailable"
+        assert result["has_data"] is False
+        assert result["advice_codes"] == ("no_data",)
+
+    def test_returns_ok_for_clean_metadata(self):
+        result = build_target_decay_hint(
+            rt60_values=[0.32],
+            rt60_bands_list=[{63.0: 0.30, 125.0: 0.34, 250.0: 0.36}],
+            harmonic_summaries=[{"valid": True, "peak_risk": 0.20, "mean_risk_20_120": 0.12}],
+        )
+        assert result["status"] == "ok"
+        assert result["has_data"] is True
+        assert result["reason"] == "none"
+
+    def test_returns_caution_at_boundary(self):
+        result = build_target_decay_hint(
+            rt60_bands_list=[{63.0: 0.50, 125.0: 0.44, 250.0: 0.40}],
+        )
+        assert result["status"] == "caution"
+        assert result["reason"] == "rt60"
+
+    def test_returns_strong_for_rt60_and_harmonic_mix(self):
+        result = build_target_decay_hint(
+            rt60_bands_list=[{63.0: 0.82, 125.0: 0.74, 250.0: 0.60}],
+            harmonic_summaries=[{"valid": True, "peak_risk": 0.80, "mean_risk_20_120": 0.55}],
+        )
+        assert result["status"] == "strong"
+        assert result["reason"] == "mixed"

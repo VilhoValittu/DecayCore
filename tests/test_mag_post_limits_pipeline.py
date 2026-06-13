@@ -3,6 +3,8 @@ from types import SimpleNamespace
 import numpy as np
 
 from decaycore.dsp.correction_types import _MagPostProcessInputs
+from decaycore.dsp.correction_types import MeasurementSideContext
+from decaycore.dsp._measurement_ctx_local import clear_measurement_ctx, set_measurement_ctx
 from decaycore.dsp.dsp_utils import cfg_float_allow_zero
 from decaycore.dsp.mag_authority_trace import (
     REASON_LOW_BASS_CUTS_ONLY,
@@ -509,6 +511,54 @@ def test_boost_limit_telemetry_records_disabled_local_cap():
     assert st["bass_boost_cap_max_extra_db_20_200"] == 0.0
     assert st.get("harmonic_risk_cap_enabled", False) is False
     assert float(np.max(out.gain_db)) <= 2.0 + 1e-6
+
+
+def test_unsafe_raw_bypasses_harmonic_risk_boost_cap_in_manual_post_limits_path():
+    st = {}
+    gain_apply = np.full(128, 10.0, dtype=float)
+    cfg = SimpleNamespace(
+        max_boost_db=10.0,
+        max_cut_db=15.0,
+        low_bass_cut_enable=False,
+        low_bass_cut_hz=0.0,
+        low_bass_cut_strength=0.0,
+        exc_prot=False,
+        exc_freq=0.0,
+        bass_boost_cap_enable=False,
+        bass_boost_post_restore_enable=False,
+        acoustic_authority_limits_enable=False,
+        unsafe_raw_dsp=True,
+        reg_strength=0.0,
+        is_wav_source=False,
+        mag_c_min=20.0,
+        mag_c_max=400.0,
+        trans_width=80.0,
+        max_slope_db_per_oct=0.0,
+        max_slope_boost_db_per_oct=0.0,
+        max_slope_cut_db_per_oct=0.0,
+        conf_pull_floor=0.05,
+        conf_pull_gamma_cut=0.55,
+        mid_refit_hz_lo=200.0,
+        mid_refit_hz_hi=2000.0,
+        do_normalize=False,
+        global_gain_db=0.0,
+    )
+    _, _, inputs = _make_inputs(gain_apply=gain_apply, cfg=cfg, st=st)
+    mctx = MeasurementSideContext(
+        harmonic_risk_freq_hz=np.asarray([20.0, 80.0, 200.0, 800.0], dtype=float),
+        harmonic_risk_curve=np.ones(4, dtype=float),
+    )
+
+    try:
+        set_measurement_ctx(mctx)
+        out = apply_post_limits_and_metrics(inputs, apply_mid_refit_pre_slope=_identity_mid_refit)
+    finally:
+        clear_measurement_ctx()
+
+    assert float(np.max(out.gain_db)) >= 9.9
+    assert st["harmonic_risk_cap_enabled"] is False
+    assert st["harmonic_risk_cap_bypassed_by_unsafe_raw"] is True
+    assert float(st["harmonic_risk_cap_max_reduction_20_200"]) == 0.0
 
 
 def test_bass_boost_restore_trace_stays_within_caps():

@@ -398,6 +398,144 @@ def build_harmonic_boost_risk_curve(
     )
 
 
+def build_target_decay_hint(
+    *,
+    rt60_values: list[float | None] | None = None,
+    rt60_bands_list: list[dict[float, float] | None] | None = None,
+    harmonic_summaries: list[dict | None] | None = None,
+) -> dict[str, object]:
+    """Build a conservative target-adjustment hint from measurement-derived data.
+
+    Returns a small inspectable dict with:
+      status: unavailable | ok | caution | strong
+      has_data: bool
+      reason: none | rt60 | harmonic | mixed
+      advice_codes: tuple[str, ...]
+      low_band_rt60_s, lowmid_rt60_s, harmonic_peak_risk, harmonic_mean_risk_20_120
+    """
+    rt60_values = list(rt60_values or [])
+    rt60_bands_list = list(rt60_bands_list or [])
+    harmonic_summaries = list(harmonic_summaries or [])
+
+    low_band_vals: list[float] = []
+    lowmid_vals: list[float] = []
+    wideband_vals: list[float] = []
+    harmonic_peak_vals: list[float] = []
+    harmonic_mean_vals: list[float] = []
+
+    for value in rt60_values:
+        norm = normalize_rt60_value(value)
+        if norm is not None:
+            wideband_vals.append(float(norm))
+
+    for bands in rt60_bands_list:
+        summary = summarize_rt60_bands(bands)
+        if summary.get("valid"):
+            lf = normalize_rt60_value(summary.get("lf_20_120_s"))
+            lowmid = normalize_rt60_value(summary.get("lowmid_120_400_s"))
+            wide = normalize_rt60_value(summary.get("wideband_s"))
+            if lf is not None:
+                low_band_vals.append(float(lf))
+            if lowmid is not None:
+                lowmid_vals.append(float(lowmid))
+            if wide is not None:
+                wideband_vals.append(float(wide))
+
+    for item in harmonic_summaries:
+        if not isinstance(item, dict) or not bool(item.get("valid")):
+            continue
+        peak = item.get("peak_risk")
+        mean_20_120 = item.get("mean_risk_20_120")
+        try:
+            peak_f = float(peak)
+        except (TypeError, ValueError):
+            peak_f = float("nan")
+        try:
+            mean_f = float(mean_20_120)
+        except (TypeError, ValueError):
+            mean_f = float("nan")
+        if math.isfinite(peak_f):
+            harmonic_peak_vals.append(float(np.clip(peak_f, 0.0, 1.0)))
+        if math.isfinite(mean_f):
+            harmonic_mean_vals.append(float(np.clip(mean_f, 0.0, 1.0)))
+
+    low_band_rt60 = max(low_band_vals) if low_band_vals else None
+    lowmid_rt60 = max(lowmid_vals) if lowmid_vals else None
+    wideband_rt60 = max(wideband_vals) if wideband_vals else None
+    harmonic_peak = max(harmonic_peak_vals) if harmonic_peak_vals else None
+    harmonic_mean = max(harmonic_mean_vals) if harmonic_mean_vals else None
+
+    has_rt60 = any(v is not None for v in (low_band_rt60, lowmid_rt60, wideband_rt60))
+    has_harmonic = any(v is not None for v in (harmonic_peak, harmonic_mean))
+    has_data = bool(has_rt60 or has_harmonic)
+
+    rt60_strong = bool(
+        (low_band_rt60 is not None and low_band_rt60 >= 0.75)
+        or (lowmid_rt60 is not None and lowmid_rt60 >= 0.65)
+        or (wideband_rt60 is not None and wideband_rt60 >= 0.60)
+    )
+    rt60_caution = bool(
+        (low_band_rt60 is not None and low_band_rt60 >= 0.50)
+        or (lowmid_rt60 is not None and lowmid_rt60 >= 0.45)
+        or (wideband_rt60 is not None and wideband_rt60 >= 0.45)
+    )
+    harmonic_strong = bool(
+        (harmonic_peak is not None and harmonic_peak >= 0.75)
+        or (harmonic_mean is not None and harmonic_mean >= 0.50)
+    )
+    harmonic_caution = bool(
+        (harmonic_peak is not None and harmonic_peak >= 0.45)
+        or (harmonic_mean is not None and harmonic_mean >= 0.28)
+    )
+
+    if not has_data:
+        status = "unavailable"
+    elif rt60_strong or harmonic_strong:
+        status = "strong"
+    elif rt60_caution or harmonic_caution:
+        status = "caution"
+    else:
+        status = "ok"
+
+    if status == "unavailable":
+        reason = "none"
+    else:
+        rt60_flag = rt60_strong or rt60_caution
+        harmonic_flag = harmonic_strong or harmonic_caution
+        if rt60_flag and harmonic_flag:
+            reason = "mixed"
+        elif rt60_flag:
+            reason = "rt60"
+        elif harmonic_flag:
+            reason = "harmonic"
+        else:
+            reason = "none"
+
+    advice_codes: tuple[str, ...]
+    if status == "unavailable":
+        advice_codes = ("no_data",)
+    elif status == "ok":
+        advice_codes = ("keep_changes_measured",)
+    elif reason == "harmonic":
+        advice_codes = ("avoid_deep_null_boost", "prefer_conservative_bass_boost")
+    elif reason == "rt60":
+        advice_codes = ("prefer_conservative_bass_boost", "keep_correction_band_limited")
+    else:
+        advice_codes = ("avoid_deep_null_boost", "keep_correction_band_limited")
+
+    return {
+        "status": status,
+        "has_data": has_data,
+        "reason": reason,
+        "advice_codes": advice_codes,
+        "low_band_rt60_s": low_band_rt60,
+        "lowmid_rt60_s": lowmid_rt60,
+        "wideband_rt60_s": wideband_rt60,
+        "harmonic_peak_risk": harmonic_peak,
+        "harmonic_mean_risk_20_120": harmonic_mean,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Aggregation helpers
 # ---------------------------------------------------------------------------
@@ -681,6 +819,7 @@ __all__ = [
     "serialize_rt60_bands",
     "summarize_rt60_bands",
     "build_harmonic_boost_risk_curve",
+    "build_target_decay_hint",
     "aggregate_rt60_bands",
     "aggregate_rt60_value",
     "aggregate_harmonic_curves",

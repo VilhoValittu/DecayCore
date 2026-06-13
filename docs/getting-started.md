@@ -5,7 +5,7 @@ description: Start using DecayCore for acoustic measurement, FIR room correction
 permalink: /getting-started/
 ---
 
-DecayCore is designed to measure your system, generate FIR room correction filters, and export convolution-ready WAV filters for CamillaDSP and other FIR-capable DSP engines.
+DecayCore is designed to measure your system, generate FIR room correction filters, and export convolution-ready WAV filters for CamillaDSP and other FIR-capable DSP engines. Its correction philosophy is cuts first, bounded shaping second, and boost only conservatively where the measurement supports it.
 
 ## Recommended workflow
 
@@ -15,6 +15,7 @@ DecayCore is designed to measure your system, generate FIR room correction filte
    - Subwoofer measurement on Windows: Ensure your playback device is configured for 5.1 or 7.1 multichannel in Windows Sound settings.
 3. Review the measured response.
 4. Choose a filter mode and target behavior.
+   - Start from conservative settings. DecayCore is not intended to flatten every dip with boost.
 5. Generate FIR correction filters.
 6. Export WAV filters.
 7. Load the filters into CamillaDSP or another convolution engine.

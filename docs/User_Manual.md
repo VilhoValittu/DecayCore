@@ -26,6 +26,8 @@ It is designed to:
 - export ready-to-use files for convolution playback systems
 - keep correction behavior safer and more repeatable through built-in guard rails
 
+Its default philosophy is simple: use cuts and bounded shaping as the main correction tools, and keep boost limited to cases where the measurement clearly supports it.
+
 DecayCore can work in several styles:
 
 - fully automatic with preset search
@@ -78,6 +80,11 @@ For most systems, start simple:
 - choose `Asymmetric` or `Mixed Phase`
 - generate filters
 - listen and re-measure before making more aggressive changes
+
+Practical rule:
+- do not treat `Max Boost` as the main tuning lever
+- let cuts and conservative band-limited correction do most of the work
+- avoid chasing deep nulls or a perfectly flat-looking low end with boost
 
 ## 4. Input Files
 
@@ -134,6 +141,7 @@ What it does:
 - picks the best candidate before final export
 - keeps the workflow guarded compared with unrestricted expert tuning
 - can use harmonic curves and IACC-aware ranking to avoid overly aggressive or overly symmetric winners
+- prefers solutions that solve more with cuts and containment than with risky boost demand
 
 **Target selection strategy**
 
@@ -158,6 +166,7 @@ What it does:
 - applies conservative defaults
 - keeps important safety clamps active
 - reduces the chance of extreme or unstable correction
+- makes it clear in day-to-day use that boost is secondary to safer attenuation-based correction
 
 Best for:
 
@@ -198,6 +207,7 @@ General guidance:
 
 - a mild house curve is often more natural than perfectly flat in-room playback
 - bass-heavy targets can sound impressive, but they increase headroom demand
+- if a target demands a lot of boost, it is usually a sign to back off rather than push harder
 - if you are unsure, start with a moderate built-in target and listen before pushing bass harder
 
 In automatic mode, DecayCore can also determine the target automatically. Three strategies are available (see section 5.1).

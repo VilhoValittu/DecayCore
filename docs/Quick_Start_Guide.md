@@ -46,9 +46,10 @@ Now, let the **FIR filter generator** process your data.
 
 1.  **Launch DecayCore:** Open the application.
 2.  **Load Measurement:** Select the L/R TXT or WAV files from the Files tab.
-3.  **Set Target Curve:** Choose a flat target or load a custom house curve.
-4.  **Safety Guards:** We recommend a safe limit of **+3 dB** for Max Boost to avoid clipping.
-    * **Low-Bass:** Enable safe bass correction policies.
+3.  **Set Target Curve:** Start with a moderate target or a mild house curve instead of chasing a perfectly flat in-room line.
+4.  **Safety Guards:** Treat **cuts as the main correction tool** and keep boost as a limited exception. We recommend a safe limit of **+3 dB** for Max Boost to avoid clipping and overcorrection.
+    * **Practical rule:** Let cuts do most of the work, and use boost only sparingly where the measurement is trustworthy.
+    * **Low-Bass:** Enable safe bass correction policies so uncertain infra-bass regions stay cuts-only when needed.
 5.  **Process:** Click generate. DecayCore produces a ZIP package containing your **convolution-ready** output files.
 
 ---
@@ -66,6 +67,6 @@ Load the resulting **WAV FIR filter** into your preferred engine:
 ---
 
 ## Why use DecayCore?
-Unlike basic EQ, this **FIR filter maker** handles **excess phase** and **temporal decay (TDC)**, providing tighter bass and more repeatable tuning.
+Unlike basic EQ, this **FIR filter maker** handles **excess phase** and **temporal decay (TDC)**, providing tighter bass and more repeatable tuning without relying on boost-heavy flattening.
 
 [← Back to Home]({{ site.baseurl }}/) | [Read the FAQ]({{ site.baseurl }}/faq/)

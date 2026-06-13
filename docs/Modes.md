@@ -8,6 +8,8 @@ DecayCore has three operating modes:
 
 The DSP engine is shared across all three. What changes is how much the program searches for you, which defaults are applied, and whether policy clamps are enforced at runtime.
 
+Across all modes, the correction philosophy stays the same: cuts are the main tool, while boost remains tightly bounded and safety-sensitive.
+
 ## How modes are applied
 
 - Startup defaults load `AUTO`.
@@ -46,6 +48,7 @@ When `auto_goal` is set to "Prefer Bass", the mode is locked to `selected`.
 - Filter type: `Mixed Phase`
 - Correction band: `18-230 Hz`
 - Max boost / cut: `+5 dB / -24 dB`
+  - Interpretation: cut headroom is intentionally much larger than boost headroom because AUTO is designed to solve more with attenuation than with gain.
 - Phase limit: `320 Hz`
 - Filter smoothing: `1/96 oct` (`filter_smooth=96`)
 - FDW cycles: `10`
@@ -82,6 +85,7 @@ Goal: predictable manual results with hard guard rails.
 - Filter type: `Linear Phase`
 - Correction band: `25-250 Hz`
 - Max boost / cut: `+3 dB / -15 dB`
+  - Interpretation: BASIC strongly favors safer cuts and keeps boost on a short leash.
 - Phase limit: `400 Hz`
 - Filter smoothing: `1/96 oct` (`filter_smooth=96`)
 - FDW cycles: `10`
@@ -130,6 +134,7 @@ Goal: manual expert workflow with fewer policy constraints.
 - Filter type: `Mixed Phase`
 - Correction band: `18-230 Hz`
 - Max boost / cut: `+5 dB / -24 dB`
+  - Interpretation: ADVANCED allows more freedom, but DecayCore still assumes cuts-first correction rather than boost-heavy flattening.
 - Phase limit: `320 Hz`
 - Filter smoothing: `1/96 oct` (`filter_smooth=96`)
 - FDW cycles: `10`

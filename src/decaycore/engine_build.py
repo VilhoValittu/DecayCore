@@ -227,7 +227,18 @@ def _build_config_apply_unsafe_raw(cfg: FilterConfig, data: dict, *, mode_u: str
         logger.exception("max_boost_db safety cap apply")
     if unsafe_raw:
         try:
-            setattr(cfg, "max_boost_db", float(max(120.0, float(getattr(cfg, "max_boost_db", 0.0) or 0.0))))
+            setattr(
+                cfg,
+                "max_boost_db",
+                float(
+                    getattr(
+                        cfg,
+                        "max_boost_db_user",
+                        getattr(cfg, "max_boost_db", 0.0),
+                    )
+                    or 0.0
+                ),
+            )
             setattr(cfg, "max_cut_db", float(max(120.0, abs(float(getattr(cfg, "max_cut_db", 0.0) or 0.0)))))
             setattr(cfg, "max_slope_db_per_oct", 0.0)
             setattr(cfg, "max_slope_boost_db_per_oct", 0.0)
@@ -239,6 +250,8 @@ def _build_config_apply_unsafe_raw(cfg: FilterConfig, data: dict, *, mode_u: str
             setattr(cfg, "exc_prot", False)
             setattr(cfg, "bass_boost_cap_enable", False)
             setattr(cfg, "bass_boost_post_restore_enable", False)
+            setattr(cfg, "acoustic_authority_limits_enable", False)
+            setattr(cfg, "enable_residual_pass", False)
             setattr(cfg, "bass_smooth_adaptive", False)
             setattr(cfg, "enable_ir_pre_energy_guard", False)
             logger.info("UNSAFE Raw DSP: guard rails disabled (FOR TEST USE ONLY)")

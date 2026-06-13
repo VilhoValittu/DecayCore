@@ -58,7 +58,11 @@ def test_refresh_target_preview_reuses_existing_plot(monkeypatch):
     )
 
     monkeypatch.setitem(sys.modules, "nicegui", types.SimpleNamespace(ui=dummy_ui))
-    monkeypatch.setattr(ng_tab_target.ctrl, "get_container", lambda name: preview_col)
+    monkeypatch.setattr(
+        ng_tab_target.ctrl,
+        "get_container",
+        lambda name: preview_col if name == "target_preview_scope" else None,
+    )
     monkeypatch.setattr(ng_tab_target, "_build_target_preview_fig", lambda: next(figures))
     monkeypatch.setattr(ng_tab_target, "_TARGET_PREVIEW_PLOT", None)
 
@@ -76,7 +80,11 @@ def test_refresh_target_preview_clears_existing_plot_when_figure_is_missing(monk
     preview_col = _DummyPreviewContainer()
     existing_plot = _DummyPlot({"data": [], "layout": {}, "config": {}})
 
-    monkeypatch.setattr(ng_tab_target.ctrl, "get_container", lambda name: preview_col)
+    monkeypatch.setattr(
+        ng_tab_target.ctrl,
+        "get_container",
+        lambda name: preview_col if name == "target_preview_scope" else None,
+    )
     monkeypatch.setattr(ng_tab_target, "_build_target_preview_fig", lambda: (None, [], []))
     monkeypatch.setattr(ng_tab_target, "_TARGET_PREVIEW_PLOT", existing_plot)
 
