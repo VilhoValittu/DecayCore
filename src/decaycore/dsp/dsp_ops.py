@@ -16,6 +16,13 @@ import numba
 import numpy as np
 import scipy.integrate
 
+# Try to import Rust DSP extension
+try:
+    from decaycore_dsp import gd_smooth_loop_rs as _gd_smooth_loop_rs
+    _DSP_RUST_AVAILABLE = True
+except ImportError:
+    _DSP_RUST_AVAILABLE = False
+
 
 def apply_confidence_weighted_target_pull(
     target_db,
@@ -111,7 +118,7 @@ def _gaussian1d_nearest(arr: np.ndarray, sigma: float) -> np.ndarray:
 
 
 @numba.njit(cache=True)
-def _gd_smooth_loop(
+def _gd_smooth_loop_numba(
     gd_l: np.ndarray, log2f: np.ndarray, lim_arr: np.ndarray, curv_lim_arr: np.ndarray, sigma: float
 ) -> np.ndarray:
     for _ in range(14):
@@ -136,6 +143,24 @@ def _gd_smooth_loop(
         gd_l = _gaussian1d_nearest(gd_l, sigma)
         sigma *= 1.25
     return gd_l
+
+
+def _gd_smooth_loop(
+    gd_l: np.ndarray, log2f: np.ndarray, lim_arr: np.ndarray, curv_lim_arr: np.ndarray, sigma: float
+) -> np.ndarray:
+    """Dispatch to Rust implementation if available, fallback to numba."""
+    if _DSP_RUST_AVAILABLE:
+        try:
+            gd_l_arr = np.asarray(gd_l, dtype=np.float64)
+            log2f_arr = np.asarray(log2f, dtype=np.float64)
+            lim_arr_arr = np.asarray(lim_arr, dtype=np.float64)
+            curv_lim_arr_arr = np.asarray(curv_lim_arr, dtype=np.float64)
+            return _gd_smooth_loop_rs(gd_l_arr, log2f_arr, lim_arr_arr, curv_lim_arr_arr, float(sigma))
+        except Exception:
+            # Fallback to numba version on any error
+            pass
+
+    return _gd_smooth_loop_numba(gd_l, log2f, lim_arr, curv_lim_arr, sigma)
 
 
 def _limit_gd_gradient_ms_per_oct(

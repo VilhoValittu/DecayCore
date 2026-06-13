@@ -16,7 +16,12 @@ import logging
 from decaycore.auto_mode.auto_mode_profile import profiled_section
 from decaycore.dsp.cache_utils import BoundedLruCache
 
-
+# Try to import Rust DSP extension
+try:
+    from decaycore_dsp import smooth_mag_core_rs as _smooth_mag_core_rs
+    _DSP_RUST_AVAILABLE = True
+except ImportError:
+    _DSP_RUST_AVAILABLE = False
 
 logger = logging.getLogger("DecayCore.dsp")
 
@@ -327,9 +332,26 @@ def _apply_smoothing_mag_only(freqs: np.ndarray, mags: np.ndarray, octave_fracti
     if not np.all(np.diff(freqs_arr) > 0):
         raise ValueError("frequency axis must be strictly monotonically increasing")
     plan = _get_smoothing_plan(freqs_arr, octave_fraction)
+    mags_arr = np.asarray(mags, dtype=np.float64)
+
+    # Try Rust implementation if available
+    if _DSP_RUST_AVAILABLE:
+        try:
+            return _smooth_mag_core_rs(
+                freqs_arr,
+                mags_arr,
+                plan["log_freqs"],
+                plan["window"],
+                plan["pad_len"],
+            )
+        except Exception:
+            # Fallback to Python/numba version on any error
+            pass
+
+    # Python/numba fallback
     return _smooth_mag_core(
         freqs_arr,
-        np.asarray(mags, dtype=np.float64),
+        mags_arr,
         plan["log_freqs"],
         plan["window"],
         plan["pad_len"],
