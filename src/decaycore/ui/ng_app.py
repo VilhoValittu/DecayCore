@@ -186,20 +186,21 @@ def register_main_page() -> None:
             _build_brand_header(version=VERSION, dark_mode=dark_mode)
 
         with ui.column().classes("w-full gap-0 cf-tabs-shell"):
-            from .ng_run_section import build_global_progress_bar  # noqa: PLC0415
+            with ui.column().classes("w-full cf-tabs-shell-inner"):
+                from .ng_run_section import build_global_progress_bar  # noqa: PLC0415
 
-            build_global_progress_bar()
-            with ui.tabs().classes("w-full") as tabs:
-                tab_files = ui.tab(t("tab_files"))
-                tab_measurement = ui.tab(t("tab_measurement")) if measurement_available else None
-                tab_basic = ui.tab(t("tab_basic"))
-                tab_target = ui.tab(t("tab_target"))
-                tab_advanced = ui.tab(t("tab_adv"))
-                tab_export = ui.tab(t("tab_window_tdc"))
-                tab_xo = ng_controls.register("tab_xo", ui.tab(t("tab_xo")))
-                tab_run = ui.tab(t("tab_run"))
+                build_global_progress_bar()
+                with ui.tabs().classes("w-full") as tabs:
+                    tab_files = ui.tab(t("tab_files"))
+                    tab_measurement = ui.tab(t("tab_measurement")) if measurement_available else None
+                    tab_basic = ui.tab(t("tab_basic"))
+                    tab_target = ui.tab(t("tab_target"))
+                    tab_advanced = ui.tab(t("tab_adv"))
+                    tab_export = ui.tab(t("tab_window_tdc"))
+                    tab_xo = ng_controls.register("tab_xo", ui.tab(t("tab_xo")))
+                    tab_run = ui.tab(t("tab_run"))
 
-        with ui.tab_panels(tabs, value=tab_files).classes("w-full"):
+        with ui.tab_panels(tabs, value=tab_files).classes("w-full cf-tab-panels-shell"):
             with ui.tab_panel(tab_files):
                 from .ng_tab_files import build_files_tab  # noqa: PLC0415
 
@@ -311,66 +312,71 @@ def _build_brand_header(*, version: str, dark_mode) -> None:
     logo_dark_b64 = _load_logo_b64("DecayCore_logo.png")
     logo_light_b64 = _load_logo_b64("DecayCore_logo_light.png")
 
-    logo_img_style = "height:80px; width:auto;"
+    logo_img_style = "display:block; width:100%; height:100%; object-fit:cover; border-radius:inherit;"
     logo_dark_src = f"data:image/png;base64,{logo_dark_b64}" if logo_dark_b64 else ""
     logo_light_src = f"data:image/png;base64,{logo_light_b64}" if logo_light_b64 else ""
 
-    with ui.row().classes("items-center gap-4 my-4 w-full justify-between"):
-        with ui.row().classes("items-center gap-4"):
-            logo_el = ui.html(
-                f'<img id="cf-brand-logo" src="{logo_dark_src}" style="{logo_img_style}" />'
-                if logo_dark_src else ""
-            )
-            with ui.column().classes("gap-0"):
-                title_el = ui.label("DecayCore").classes("text-3xl font-bold tracking-wide cf-brand-title")
-                ui.label(version).classes("text-sm text-gray-400 mt-1")
-        from .ng_run_section import build_info_panel  # noqa: PLC0415
+    with ui.column().classes("cf-brand-hero w-full"):
+        with ui.row().classes("items-start gap-6 w-full justify-between no-wrap"):
+            with ui.row().classes("items-center gap-5 min-w-0"):
+                with ui.element("div").classes("cf-brand-logo-frame shrink-0"):
+                    logo_el = ui.html(
+                        f'<img id="cf-brand-logo" src="{logo_dark_src}" style="{logo_img_style}" />'
+                        if logo_dark_src else ""
+                    )
+                with ui.column().classes("cf-brand-block gap-1 min-w-0"):
+                    ui.label("DecayCore").classes("cf-brand-title")
+                    ui.label(
+                        t("brand_subtitle")
+                    ).classes("cf-brand-subtitle")
+                    ui.label(version).classes("cf-brand-version")
+            from .ng_run_section import build_info_panel  # noqa: PLC0415
 
-        with ui.row().classes("items-center gap-2"):
-            build_info_panel()
-            _state = {"dark": True}
+            with ui.column().classes("cf-brand-actions gap-3 shrink-0"):
+                build_info_panel()
+                with ui.row().classes("justify-end gap-2"):
+                    _state = {"dark": True}
 
-            def _toggle_theme(btn=None):
-                from nicegui import ui as _ui  # noqa: PLC0415
-                if _state["dark"]:
-                    dark_mode.disable()
-                    _ui.run_javascript("document.body.classList.add('cf-light')")
-                    if logo_light_src:
-                        logo_el.set_content(
-                            f'<img id="cf-brand-logo" src="{logo_light_src}" style="{logo_img_style}" />'
-                        )
-                    _toggle_btn.props("icon=light_mode")
-                else:
-                    dark_mode.enable()
-                    _ui.run_javascript("document.body.classList.remove('cf-light')")
-                    if logo_dark_src:
-                        logo_el.set_content(
-                            f'<img id="cf-brand-logo" src="{logo_dark_src}" style="{logo_img_style}" />'
-                        )
-                    _toggle_btn.props("icon=dark_mode")
-                _state["dark"] = not _state["dark"]
+                    def _toggle_theme(btn=None):
+                        from nicegui import ui as _ui  # noqa: PLC0415
+                        if _state["dark"]:
+                            dark_mode.disable()
+                            _ui.run_javascript("document.body.classList.add('cf-light')")
+                            if logo_light_src:
+                                logo_el.set_content(
+                                    f'<img id="cf-brand-logo" src="{logo_light_src}" style="{logo_img_style}" />'
+                                )
+                            _toggle_btn.props("icon=light_mode")
+                        else:
+                            dark_mode.enable()
+                            _ui.run_javascript("document.body.classList.remove('cf-light')")
+                            if logo_dark_src:
+                                logo_el.set_content(
+                                    f'<img id="cf-brand-logo" src="{logo_dark_src}" style="{logo_img_style}" />'
+                                )
+                            _toggle_btn.props("icon=dark_mode")
+                        _state["dark"] = not _state["dark"]
 
-            _toggle_btn = (
-                ui.button(icon="dark_mode", on_click=_toggle_theme)
-                .props("flat dense round")
-                .tooltip("Vaihda teemaa")
-            )
+                    _toggle_btn = (
+                        ui.button(icon="dark_mode", on_click=_toggle_theme)
+                        .props("flat dense round")
+                        .tooltip(t("theme_toggle_tooltip"))
+                    )
 
-            async def _do_quit():
-                from nicegui import app as _nicegui_app
-                _nicegui_app.shutdown()
+                    async def _do_quit():
+                        from nicegui import app as _nicegui_app
+                        _nicegui_app.shutdown()
 
-            ui.button(icon="power_settings_new", on_click=_do_quit) \
-                .props("flat dense round color=negative") \
-                .tooltip(t("quit_btn_tooltip"))
+                    ui.button(icon="power_settings_new", on_click=_do_quit) \
+                        .props("flat dense round color=negative") \
+                        .tooltip(t("quit_btn_tooltip"))
 
-    ui.separator()
-    # About / guide (collapsed by default)
-    with ui.expansion(t("about_title")).classes("w-full"):
-        ui.markdown(t("about_body"))
-        with ui.dialog() as manual_dlg, ui.card().classes("w-full max-w-3xl max-h-[80vh] overflow-y-auto cf-modal-card"):
-            ui.markdown(manual_text).classes("w-full")
-            ui.button(t("manual_close_btn"), on_click=manual_dlg.close).props("flat")
-        ui.button(t("open_manual_btn"), on_click=manual_dlg.open).props("flat").classes("mt-2")
-
-    ui.separator()
+        # About / guide (collapsed by default)
+        with ui.expansion(t("about_title")).classes("w-full"):
+            ui.markdown(t("about_body"))
+            with ui.dialog() as manual_dlg, ui.card().classes("w-full max-w-3xl max-h-[80vh] cf-modal-card"):
+                with ui.row().classes("w-full justify-between items-center shrink-0"):
+                    ui.label("User Manual").classes("text-lg font-semibold")
+                    ui.button(icon="close", on_click=manual_dlg.close).props("flat dense round")
+                ui.markdown(manual_text).classes("w-full overflow-y-auto")
+            ui.button(t("open_manual_btn"), on_click=manual_dlg.open).props("flat").classes("mt-2")

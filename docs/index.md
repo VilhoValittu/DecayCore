@@ -61,28 +61,40 @@ hide_title: true
 
 <div class="screenshot-gallery">
   <div class="screenshot-item">
-    <img src="{{ '/pics/ui_1.png' | relative_url }}" alt="Files tab — load measurement files and set output format" loading="lazy">
-    <p class="screenshot-item__caption">1. Files — load measurement files and set output format</p>
+    <img src="{{ '/pics/ui_1.png' | relative_url }}" alt="Files tab — load measurement files, inspect metadata, and set output format" loading="lazy">
+    <p class="screenshot-item__caption">1. Files — load measurement files, inspect metadata, and set output format</p>
   </div>
   <div class="screenshot-item">
-    <img src="{{ '/pics/ui_2.png' | relative_url }}" alt="Basic tab — FIR engine, filter type, and sample rate" loading="lazy">
-    <p class="screenshot-item__caption">3. Basic — FIR engine, filter type, and sample rate</p>
+    <img src="{{ '/pics/ui_2.png' | relative_url }}" alt="Measure tab — configure capture devices and run guided room measurements" loading="lazy">
+    <p class="screenshot-item__caption">2. Measure — configure capture devices and run guided room measurements</p>
   </div>
   <div class="screenshot-item">
-    <img src="{{ '/pics/ui_3.png' | relative_url }}" alt="Target tab — correction target curve, leveling, and gain" loading="lazy">
-    <p class="screenshot-item__caption">4. Target — correction target curve, leveling, and gain</p>
+    <img src="{{ '/pics/ui_3.png' | relative_url }}" alt="Basic tab — choose operating mode, FIR engine, and sample rate" loading="lazy">
+    <p class="screenshot-item__caption">3. Basic — choose operating mode, FIR engine, and sample rate</p>
   </div>
   <div class="screenshot-item">
-    <img src="{{ '/pics/ui_4.png' | relative_url }}" alt="Advanced tab — correction shaping, bass protection, confidence-pull" loading="lazy">
-    <p class="screenshot-item__caption">5. Advanced — correction shaping, bass protection, confidence-pull</p>
+    <img src="{{ '/pics/ui_4.png' | relative_url }}" alt="Target tab — shape the target curve, leveling, and gain behavior" loading="lazy">
+    <p class="screenshot-item__caption">4. Target — shape the target curve, leveling, and gain behavior</p>
   </div>
   <div class="screenshot-item">
-    <img src="{{ '/pics/ui_5.png' | relative_url }}" alt="IR Window & Decay Control tab — IR windowing, A-FDW, Temporal Decay Control" loading="lazy">
-    <p class="screenshot-item__caption">6. IR Window & Decay Control — windowing, A-FDW, Temporal Decay Control</p>
+    <img src="{{ '/pics/ui_5.png' | relative_url }}" alt="Advanced tab — refine correction shaping, bass protection, and confidence controls" loading="lazy">
+    <p class="screenshot-item__caption">5. Advanced — refine correction shaping, bass protection, and confidence controls</p>
   </div>
   <div class="screenshot-item">
-    <img src="{{ '/pics/ui_6.png' | relative_url }}" alt="XO tab — crossover frequency and slope definition" loading="lazy">
-    <p class="screenshot-item__caption">7. XO — crossover frequency and slope definition</p>
+    <img src="{{ '/pics/ui_6.png' | relative_url }}" alt="IR Window & Decay Control tab — windowing, A-FDW, and Temporal Decay Control" loading="lazy">
+    <p class="screenshot-item__caption">6. IR Window & Decay Control — windowing, A-FDW, and Temporal Decay Control</p>
+  </div>
+  <div class="screenshot-item">
+    <img src="{{ '/pics/ui_7.png' | relative_url }}" alt="XO tab — define crossover frequency and slope for each band" loading="lazy">
+    <p class="screenshot-item__caption">7. XO — define crossover frequency and slope for each band</p>
+  </div>
+  <div class="screenshot-item">
+    <img src="{{ '/pics/ui_8.png' | relative_url }}" alt="Start / Results tab — run correction and review generated results" loading="lazy">
+    <p class="screenshot-item__caption">8. Start / Results — run correction and review generated results</p>
+  </div>
+  <div class="screenshot-item">
+    <img src="{{ '/pics/ui_9.png' | relative_url }}" alt="Final graph — generated correction analysis plot from the results view" loading="lazy">
+    <p class="screenshot-item__caption">9. Final Graph — generated correction analysis plot from the results view</p>
   </div>
 </div>
 

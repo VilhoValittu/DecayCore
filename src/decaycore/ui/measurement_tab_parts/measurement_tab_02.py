@@ -33,8 +33,9 @@ from ...measurement.devices import (
 )
 from ...measurement.io import save_measurement_bundle
 from ...measurement.models import MeasurementBundle, MeasurementRequest, MeasurementSessionAggregate
-from ...measurement.routing import measurement_role_output_channel_count
+from ...measurement.reference_signal import _sanitize_measurement_dither_level_db
 from ...measurement.sweep import (
+    DEFAULT_MEASUREMENT_DITHER_LEVEL_DB,
     DEFAULT_MEASUREMENT_SAMPLE_RATE,
     DEFAULT_OUTPUT_GAIN_DB,
     DEFAULT_POST_SILENCE_S,
@@ -46,6 +47,7 @@ from ...measurement.sweep import (
 from ...measurement.capture import run_audibility_test
 from ...measurement.workflow import run_measurement_workflow
 from .. import measurement_state, ng_controls as ctrl
+from ..ng_sections import page_shell, section_card
 from ..measurement_session_dialog import build_measurement_session_dialog
 
 _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS = (
@@ -277,6 +279,12 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
     )
     input_default = get_val("measurement_input_device", get_default_input_device_index())
     output_default = get_val("measurement_output_device", get_default_output_device_index())
+    sub_output_default = _measurement_sub_output_channel_value(
+        get_val(
+            "measurement_sub_output_channel",
+            _measurement_sub_output_channel_default(),
+        )
+    )
     default_role = _measurement_role_value(get_val("measurement_role", "left"))
     default_use_wasapi = _measurement_use_wasapi_value(get_val("measurement_use_wasapi", False))
 
@@ -297,7 +305,13 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
         if not _refresh_backend_message():
             return {}
         enabled = default_use_wasapi if use_wasapi is None else _measurement_use_wasapi_value(use_wasapi)
-        required_channels = measurement_role_output_channel_count(role_value)
+        required_channels = _measurement_required_output_channels(
+            role_value,
+            sub_output_channel=ctrl.value(
+                "measurement_sub_output_channel",
+                sub_output_default,
+            ),
+        )
         if enabled:
             output_devices = list_wasapi_output_devices(measurement_samplerate, channels=required_channels)
         else:
@@ -309,13 +323,6 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
 
     input_options = _input_device_options(use_wasapi=default_use_wasapi)
     output_options = _output_device_options_for_role(default_role, use_wasapi=default_use_wasapi)
-
-    def _safe_device_value(value, options: dict[int, str]):
-        try:
-            parsed = int(value)
-        except (TypeError, ValueError, OverflowError):
-            return None
-        return parsed if parsed in options else None
 
     def _build_request(role_override: str | None = None) -> MeasurementRequest:
         def _int(name: str, default: int) -> int:
@@ -348,6 +355,13 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
             calibration_label = Path(calibration_filename).stem
         requested_role = str(role_override or ctrl.value("measurement_role", "left") or "left").strip().lower()
         role = _measurement_role_value(requested_role)
+        resolved_output_channel = _measurement_output_channel_for_role(
+            role,
+            sub_output_channel=ctrl.value(
+                "measurement_sub_output_channel",
+                sub_output_default,
+            ),
+        )
         session_channel_key = requested_role if requested_role in ("sub1", "sub2") else role
         return MeasurementRequest(
             input_device_index=_int("measurement_input_device", -1),
@@ -362,8 +376,17 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
             pre_silence_s=DEFAULT_PRE_SILENCE_S,
             post_silence_s=DEFAULT_POST_SILENCE_S,
             input_channel=0,
-            output_channel=0,
+            output_channel=int(resolved_output_channel),
             output_gain_db=_float_config("measurement_output_gain_db", DEFAULT_OUTPUT_GAIN_DB),
+            measurement_dither_level_db=_sanitize_measurement_dither_level_db(
+                ctrl.value(
+                    "measurement_dither_level_db",
+                    get_val(
+                        "measurement_dither_level_db",
+                        DEFAULT_MEASUREMENT_DITHER_LEVEL_DB,
+                    ),
+                )
+            ),
             role=role,
             use_wasapi=_measurement_use_wasapi_value(ctrl.value("measurement_use_wasapi", False)),
             save_dir=save_dir,
@@ -590,65 +613,6 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
         on_session_error=_on_session_error,
     )
 
-    ui.markdown(f"#### {t('measurement_title')}")
-    ui.label(t("measurement_intro")).classes("text-sm text-gray-400")
-    backend_message_label["widget"] = ui.label("").classes("w-full whitespace-pre-wrap text-sm text-red-400")
-    _set_backend_message(backend_message_state["value"])
-    ui.separator()
-
-    ctrl.register("generated_measurement_l", ctrl._ValueHolder(None))
-    ctrl.register("generated_measurement_r", ctrl._ValueHolder(None))
-    ctrl.register("measurement_mic_calibration_upload", ctrl._ValueHolder(None))
-    ctrl.register(
-        "measurement_mic_calibration_label",
-        ctrl._ValueHolder(str(get_val("measurement_mic_calibration_label", "") or "")),
-    )
-    ctrl.register(
-        "measurement_samplerate",
-        ctrl._ValueHolder(int(get_val("measurement_samplerate", DEFAULT_MEASUREMENT_SAMPLE_RATE) or DEFAULT_MEASUREMENT_SAMPLE_RATE)),
-    )
-    if sys.platform == "win32":
-        with ui.row().classes("w-full"):
-            ctrl.register(
-                "measurement_use_wasapi",
-                ui.checkbox(
-                    t("measurement_use_wasapi"),
-                    value=default_use_wasapi,
-                ).classes("text-sm"),
-            )
-    else:
-        ctrl.register("measurement_use_wasapi", ctrl._ValueHolder(False))
-
-    with ui.row().classes("w-full gap-4"):
-        ctrl.register(
-            "measurement_input_device",
-            ui.select(
-                options=input_options,
-                value=_safe_device_value(input_default, input_options),
-                label=t("measurement_input_device"),
-            ).props("dense outlined").classes("flex-1"),
-        )
-        ctrl.register(
-            "measurement_output_device",
-            ui.select(
-                options=output_options,
-                value=_safe_device_value(output_default, output_options),
-                label=t("measurement_output_device"),
-            ).props("dense outlined").classes("flex-1"),
-        )
-        ctrl.register(
-            "measurement_role",
-            ui.select(
-                options={
-                    "left": t("measurement_role_left"),
-                    "right": t("measurement_role_right"),
-                    "sub": t("measurement_role_sub"),
-                },
-                value=default_role,
-                label=t("measurement_role"),
-            ).props("dense outlined").classes("flex-1"),
-        )
-
     def _refresh_input_device_options(use_wasapi: bool | None = None) -> None:
         options = _input_device_options(
             use_wasapi=_measurement_use_wasapi_value(
@@ -658,12 +622,11 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
             )
         )
         ctrl.set_options("measurement_input_device", options)
-
-        current_value = _safe_device_value(ctrl.value("measurement_input_device", None), options)
-        if current_value is None:
-            current_value = _safe_device_value(input_default, options)
-        if current_value is None and options:
-            current_value = next(iter(options))
+        current_value = _pick_measurement_device_value(
+            ctrl.value("measurement_input_device", None),
+            input_default,
+            options,
+        )
         ctrl.set_value("measurement_input_device", current_value, emit=False)
 
     def _refresh_output_device_options(role_value: str | None = None, use_wasapi: bool | None = None) -> None:
@@ -675,190 +638,318 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
         )
         options = _output_device_options_for_role(normalized_role, use_wasapi=resolved_use_wasapi)
         ctrl.set_options("measurement_output_device", options)
-
-        current_value = _safe_device_value(ctrl.value("measurement_output_device", None), options)
-        if current_value is None:
-            current_value = _safe_device_value(output_default, options)
-        if current_value is None and options:
-            current_value = next(iter(options))
+        current_value = _pick_measurement_device_value(
+            ctrl.value("measurement_output_device", None),
+            output_default,
+            options,
+        )
         ctrl.set_value("measurement_output_device", current_value, emit=False)
 
-    with ui.row().classes("w-full gap-4"):
-        async def _handle_calibration_upload(e) -> None:
-            payload = _build_upload_payload(
-                filename=e.file.name,
-                content=await e.file.read(),
-                mime_type=getattr(e.file, "content_type", ""),
-            )
-            ctrl.set_value("measurement_mic_calibration_upload", payload)
-            filename = str(payload.get("filename", "") or "").strip()
-            ctrl.set_value("measurement_mic_calibration_label", Path(filename).stem if filename else "")
+    def _refresh_sub_output_channel_ui(role_value: str | None = None) -> None:
+        visible = _measurement_sub_output_channel_visible(
+            role_value or ctrl.value("measurement_role", default_role)
+        )
+        sub_output_channel_row.set_visibility(visible)
+        ctrl.set_enabled("measurement_sub_output_channel", visible)
 
-        def _refresh_calibration_upload_status() -> None:
-            payload = ctrl.value("measurement_mic_calibration_upload", None)
-            if isinstance(payload, dict) and payload.get("content"):
-                upload_status.set_text(
-                    t("measurement_mic_calibration_selected").format(
-                        name=str(payload.get("filename", "") or t("health_not_set"))
-                    )
+    async def _handle_calibration_upload(e) -> None:
+        payload = _build_upload_payload(
+            filename=e.file.name,
+            content=await e.file.read(),
+            mime_type=getattr(e.file, "content_type", ""),
+        )
+        ctrl.set_value("measurement_mic_calibration_upload", payload)
+        filename = str(payload.get("filename", "") or "").strip()
+        ctrl.set_value("measurement_mic_calibration_label", Path(filename).stem if filename else "")
+
+    def _refresh_calibration_upload_status() -> None:
+        payload = ctrl.value("measurement_mic_calibration_upload", None)
+        if isinstance(payload, dict) and payload.get("content"):
+            upload_status.set_text(
+                t("measurement_mic_calibration_selected").format(
+                    name=str(payload.get("filename", "") or t("health_not_set"))
                 )
-                clear_calibration_btn.enable()
-                return
-            upload_status.set_text(t("measurement_calibration_none"))
-            clear_calibration_btn.disable()
-
-        def _clear_calibration_upload() -> None:
-            ctrl.set_value("measurement_mic_calibration_upload", None)
-            ctrl.set_value("measurement_mic_calibration_label", "")
-
-        with ui.column().classes("flex-1 gap-2"):
-            ui.upload(
-                label=t("measurement_mic_calibration_upload"),
-                on_upload=_handle_calibration_upload,
-                auto_upload=True,
-            ).props('accept=".txt,.cal,.csv"').classes("w-full")
-            upload_status = ui.label(t("measurement_calibration_none")).classes("text-xs text-gray-400")
-
-        clear_calibration_btn = ui.button(
-            t("file_status_clear"),
-            on_click=_clear_calibration_upload,
-        ).props('outline color="secondary"')
-
-    ctrl.get("measurement_mic_calibration_upload").on_value_change(lambda _e: _refresh_calibration_upload_status())
-    ctrl.get("measurement_role").on_value_change(lambda e: _refresh_output_device_options(e.value))
-    ctrl.get("measurement_use_wasapi").on_value_change(
-        lambda e: (
-            _refresh_input_device_options(e.value),
-            _refresh_output_device_options(ctrl.value("measurement_role", default_role), e.value),
-        )
-    )
-    _refresh_input_device_options(default_use_wasapi)
-    _refresh_output_device_options(default_role, default_use_wasapi)
-
-    ui.separator()
-    start_btn = ui.button(t("measurement_start_button"), on_click=_run_measurement_thread).props('color="positive" unelevated').classes("w-full")
-    audibility_test_btn = ui.button(
-        t("measurement_audibility_test_button"),
-        on_click=_run_audibility_test_thread,
-    ).props('outline color="secondary"').classes("w-full")
-    guided_session_btn = ui.button("Guided multi-take measurement", on_click=open_guided_session_dialog).props('outline color="secondary"').classes("w-full")
-    status_label = ui.label("").classes("text-sm text-gray-400")
-    error_label = ui.label("").classes("text-sm text-red-400")
-    summary_html = ui.html("")
-    warnings_label = ui.label("").classes("whitespace-pre-wrap text-sm")
-    with ui.row().classes("w-full gap-3"):
-        save_btn = ui.button(t("measurement_save_ir"), on_click=_save_current_bundle).props('outline color="secondary"')
-        apply_left_btn = ui.button(t("measurement_apply_left"), on_click=lambda: _apply_bundle("left")).props('outline color="secondary"')
-        apply_right_btn = ui.button(t("measurement_apply_right"), on_click=lambda: _apply_bundle("right")).props('outline color="secondary"')
-        clear_ref_btn = ui.button(t("measurement_left_ref_clear"), on_click=measurement_state.clear_timing_reference).props('outline color="secondary"')
-    session_preview_selector_row = ui.row().classes("w-full gap-3 items-center")
-    with session_preview_selector_row:
-        session_preview_channel = ui.select(
-            {},
-            value=None,
-            label=t("measurement_role"),
-        ).props("dense outlined").classes("w-56")
-    session_preview_selector_row.set_visibility(False)
-    plot_scope = ui.column().classes("w-full")
-
-    plot_ref = {"widget": None}
-    last_nonce = {"value": -1}
-
-    def _refresh_session_preview_selector() -> None:
-        bundles = dict(session_preview_state["bundles"])
-        options = _session_preview_channel_options(bundles, t)
-        visible = len(options) > 1
-        try:
-            session_preview_channel.set_options(options)
-        except _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS:
-            session_preview_channel.options = options
-            session_preview_channel.update()
-        selected_key = _session_preview_default_channel_key(
-            bundles,
-            preferred_channel_key=str(session_preview_state.get("selected_key", "") or ""),
-        )
-        session_preview_state["selected_key"] = selected_key
-        if selected_key != session_preview_channel.value:
-            try:
-                session_preview_channel.set_value(selected_key)
-            except _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS:
-                session_preview_channel.value = selected_key
-                session_preview_channel.update()
-        session_preview_selector_row.set_visibility(visible)
-
-    def _render_bundle(bundle: MeasurementBundle | None, timing_ref_latency_ms: float | None = None) -> None:
-        _refresh_session_preview_selector()
-        if bundle is None:
-            _set_html_content(summary_html, "")
-            warnings_label.set_text("")
-            plot_scope.clear()
-            plot_ref["widget"] = None
-            save_btn.disable()
-            apply_left_btn.disable()
-            apply_right_btn.disable()
-            clear_ref_btn.disable()
+            )
+            clear_calibration_btn.enable()
             return
+        upload_status.set_text(t("measurement_calibration_none"))
+        clear_calibration_btn.disable()
 
-        _set_html_content(summary_html, _measurement_summary_html(bundle, t, timing_ref_latency_ms))
-        warnings = list(bundle.health.warnings)
-        warnings_label.set_text("\n".join(warnings) if warnings else t("measurement_no_warnings"))
-        save_btn.enable()
-        apply_left_btn.enable()
-        apply_right_btn.enable()
-        if timing_ref_latency_ms is not None:
-            clear_ref_btn.enable()
+    def _clear_calibration_upload() -> None:
+        ctrl.set_value("measurement_mic_calibration_upload", None)
+        ctrl.set_value("measurement_mic_calibration_label", "")
 
-        fig = _build_preview_figure(bundle)
-        if plot_ref["widget"] is None:
-            plot_scope.clear()
-            with plot_scope:
-                plot_ref["widget"] = ui.plotly(fig).classes("w-full")
-        else:
+    with page_shell(title=t("tab_measurement"), intro=t("measurement_page_intro")):
+        with section_card(title=t("measurement_capture_section_title"), intro=t("measurement_intro")):
+            backend_message_label["widget"] = ui.label("").classes("w-full whitespace-pre-wrap text-sm text-red-400")
+            _set_backend_message(backend_message_state["value"])
+
+            ctrl.register("generated_measurement_l", ctrl._ValueHolder(None))
+            ctrl.register("generated_measurement_r", ctrl._ValueHolder(None))
+            ctrl.register("measurement_mic_calibration_upload", ctrl._ValueHolder(None))
+            ctrl.register(
+                "measurement_mic_calibration_label",
+                ctrl._ValueHolder(str(get_val("measurement_mic_calibration_label", "") or "")),
+            )
+            ctrl.register(
+                "measurement_samplerate",
+                ctrl._ValueHolder(int(get_val("measurement_samplerate", DEFAULT_MEASUREMENT_SAMPLE_RATE) or DEFAULT_MEASUREMENT_SAMPLE_RATE)),
+            )
+            ctrl.register(
+                "measurement_sub_output_channel",
+                ctrl._ValueHolder(sub_output_default),
+            )
+            ctrl.register(
+                "measurement_dither_level_db",
+                ctrl._ValueHolder(
+                    _sanitize_measurement_dither_level_db(
+                        get_val(
+                            "measurement_dither_level_db",
+                            DEFAULT_MEASUREMENT_DITHER_LEVEL_DB,
+                        )
+                    )
+                ),
+            )
+            if sys.platform == "win32":
+                with ui.row().classes("w-full"):
+                    ctrl.register(
+                        "measurement_use_wasapi",
+                        ui.checkbox(
+                            t("measurement_use_wasapi"),
+                            value=default_use_wasapi,
+                        ).classes("text-sm"),
+                    )
+            else:
+                ctrl.register("measurement_use_wasapi", ctrl._ValueHolder(False))
+
+            with ui.row().classes("w-full gap-4"):
+                ctrl.register(
+                    "measurement_input_device",
+                    ui.select(
+                        options=input_options,
+                        value=_pick_measurement_device_value(None, input_default, input_options),
+                        label=t("measurement_input_device"),
+                    ).props("dense outlined").classes("flex-1"),
+                )
+                ctrl.register(
+                    "measurement_output_device",
+                    ui.select(
+                        options=output_options,
+                        value=_pick_measurement_device_value(None, output_default, output_options),
+                        label=t("measurement_output_device"),
+                    ).props("dense outlined").classes("flex-1"),
+                )
+                ctrl.register(
+                    "measurement_role",
+                    ui.select(
+                        options={
+                            "left": t("measurement_role_left"),
+                            "right": t("measurement_role_right"),
+                            "sub": t("measurement_role_sub"),
+                        },
+                        value=default_role,
+                        label=t("measurement_role"),
+                    ).props("dense outlined").classes("flex-1"),
+                )
+                ui.button(
+                    t("measurement_refresh_devices"),
+                    on_click=lambda: (
+                        _refresh_input_device_options(),
+                        _refresh_output_device_options(),
+                    ),
+                ).props('outline color="secondary"').classes("self-end")
+
+            sub_output_channel_row = ui.row().classes("w-full gap-4")
+            with sub_output_channel_row:
+                ctrl.register(
+                    "measurement_sub_output_channel",
+                    ui.select(
+                        options={idx: str(idx + 1) for idx in range(8)},
+                        value=sub_output_default,
+                        label=t("measurement_sub_output_channel"),
+                    ).props("dense outlined").classes("flex-1"),
+                )
+                ui.label(t("measurement_sub_output_channel_hint")).classes("flex-1 text-xs text-gray-400")
+
+            with ui.row().classes("w-full gap-4"):
+                with ui.column().classes("flex-1 gap-2"):
+                    ctrl.register(
+                        "measurement_dither_level_db",
+                        ui.number(
+                            label=t("measurement_dither_level_db"),
+                            value=_sanitize_measurement_dither_level_db(
+                                get_val(
+                                    "measurement_dither_level_db",
+                                    DEFAULT_MEASUREMENT_DITHER_LEVEL_DB,
+                                )
+                            ),
+                            format="%.1f",
+                        ).props("dense outlined").classes("w-full"),
+                    )
+                    ui.label(t("measurement_dither_level_hint")).classes("text-xs text-gray-400")
+                with ui.column().classes("flex-1 gap-2"):
+                    ui.upload(
+                        label=t("measurement_mic_calibration_upload"),
+                        on_upload=_handle_calibration_upload,
+                        auto_upload=True,
+                    ).props('accept=".txt,.cal,.csv"').classes("w-full")
+                    upload_status = ui.label(t("measurement_calibration_none")).classes("text-xs text-gray-400")
+
+                clear_calibration_btn = ui.button(
+                    t("file_status_clear"),
+                    on_click=_clear_calibration_upload,
+                ).props('outline color="secondary"')
+
+        with section_card(title=t("measurement_actions_section_title"), intro=t("measurement_actions_section_intro")):
+            start_btn = ui.button(t("measurement_start_button"), on_click=_run_measurement_thread).props('color="positive" unelevated').classes("w-full")
+            audibility_test_btn = ui.button(
+                t("measurement_audibility_test_button"),
+                on_click=_run_audibility_test_thread,
+            ).props('outline color="secondary"').classes("w-full")
+            guided_session_btn = ui.button(
+                t("measurement_guided_session_button"),
+                on_click=open_guided_session_dialog,
+            ).props('outline color="secondary"').classes("w-full")
+            status_label = ui.label("").classes("text-sm text-gray-400")
+            error_label = ui.label("").classes("text-sm text-red-400")
+
+        with section_card(title=t("measurement_preview_section_title"), hero=True):
+            summary_html = ui.html("")
+            warnings_label = ui.label("").classes("whitespace-pre-wrap text-sm")
+            with ui.row().classes("w-full gap-3"):
+                save_btn = ui.button(t("measurement_save_ir"), on_click=_save_current_bundle).props('outline color="secondary"')
+                apply_left_btn = ui.button(t("measurement_apply_left"), on_click=lambda: _apply_bundle("left")).props('outline color="secondary"')
+                apply_right_btn = ui.button(t("measurement_apply_right"), on_click=lambda: _apply_bundle("right")).props('outline color="secondary"')
+                clear_ref_btn = ui.button(t("measurement_left_ref_clear"), on_click=measurement_state.clear_timing_reference).props('outline color="secondary"')
+            session_preview_selector_row = ui.row().classes("w-full gap-3 items-center")
+            with session_preview_selector_row:
+                session_preview_channel = ui.select(
+                    {},
+                    value=None,
+                    label=t("measurement_role"),
+                ).props("dense outlined").classes("w-56")
+            session_preview_selector_row.set_visibility(False)
+            plot_scope = ui.column().classes("w-full")
+
+        plot_ref = {"widget": None}
+        last_nonce = {"value": -1}
+
+        def _refresh_session_preview_selector() -> None:
+            bundles = dict(session_preview_state["bundles"])
+            options = _session_preview_channel_options(bundles, t)
+            visible = len(options) > 1
             try:
-                plot_ref["widget"].update_figure(fig)
+                session_preview_channel.set_options(options)
             except _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS:
+                session_preview_channel.options = options
+                session_preview_channel.update()
+            selected_key = _session_preview_default_channel_key(
+                bundles,
+                preferred_channel_key=str(session_preview_state.get("selected_key", "") or ""),
+            )
+            session_preview_state["selected_key"] = selected_key
+            if selected_key != session_preview_channel.value:
+                try:
+                    session_preview_channel.set_value(selected_key)
+                except _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS:
+                    session_preview_channel.value = selected_key
+                    session_preview_channel.update()
+            session_preview_selector_row.set_visibility(visible)
+
+        def _render_bundle(bundle: MeasurementBundle | None, timing_ref_latency_ms: float | None = None) -> None:
+            _refresh_session_preview_selector()
+            if bundle is None:
+                _set_html_content(summary_html, "")
+                warnings_label.set_text("")
+                plot_scope.clear()
+                plot_ref["widget"] = None
+                save_btn.disable()
+                apply_left_btn.disable()
+                apply_right_btn.disable()
+                clear_ref_btn.disable()
+                return
+
+            _set_html_content(summary_html, _measurement_summary_html(bundle, t, timing_ref_latency_ms))
+            warnings = list(bundle.health.warnings)
+            warnings_label.set_text("\n".join(warnings) if warnings else t("measurement_no_warnings"))
+            save_btn.enable()
+            apply_left_btn.enable()
+            apply_right_btn.enable()
+            if timing_ref_latency_ms is not None:
+                clear_ref_btn.enable()
+
+            fig = _build_preview_figure(bundle)
+            if plot_ref["widget"] is None:
                 plot_scope.clear()
                 with plot_scope:
                     plot_ref["widget"] = ui.plotly(fig).classes("w-full")
+            else:
+                try:
+                    plot_ref["widget"].update_figure(fig)
+                except _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS:
+                    plot_scope.clear()
+                    with plot_scope:
+                        plot_ref["widget"] = ui.plotly(fig).classes("w-full")
 
-    def _on_session_preview_channel_change(e) -> None:
-        selected_key = str(getattr(e, "value", "") or "").strip().lower()
-        session_preview_state["selected_key"] = selected_key or None
-        snap = measurement_state.get_snapshot()
-        ref_ms = snap.get("timing_ref_latency_ms", None)
-        _render_bundle(_selected_session_preview_bundle(), timing_ref_latency_ms=ref_ms)
+        def _on_session_preview_channel_change(e) -> None:
+            selected_key = str(getattr(e, "value", "") or "").strip().lower()
+            session_preview_state["selected_key"] = selected_key or None
+            snap = measurement_state.get_snapshot()
+            ref_ms = snap.get("timing_ref_latency_ms", None)
+            _render_bundle(_selected_session_preview_bundle(), timing_ref_latency_ms=ref_ms)
 
-    session_preview_channel.on_value_change(_on_session_preview_channel_change)
+        session_preview_channel.on_value_change(_on_session_preview_channel_change)
 
-    def _refresh_view() -> None:
-        snap = measurement_state.get_snapshot()
-        if bool(snap.get("busy", False)):
-            start_btn.disable()
-            audibility_test_btn.disable()
-            guided_session_btn.disable()
-        else:
-            start_btn.enable()
-            audibility_test_btn.enable()
-            guided_session_btn.enable()
-        status_label.set_text(str(snap.get("status_text", "") or ""))
-        error_text = str(snap.get("error_text", "") or "")
-        error_label.set_text(error_text)
-        error_label.set_visibility(bool(error_text))
-        ref_ms = snap.get("timing_ref_latency_ms", None)
-        if ref_ms is not None:
-            clear_ref_btn.enable()
-        else:
-            clear_ref_btn.disable()
-        if int(snap.get("nonce", -1) or -1) == int(last_nonce["value"]):
-            return
-        last_nonce["value"] = int(snap.get("nonce", -1) or -1)
-        bundle = _current_bundle()
-        _render_bundle(bundle if isinstance(bundle, MeasurementBundle) else None, timing_ref_latency_ms=ref_ms)
+        def _refresh_view() -> None:
+            snap = measurement_state.get_snapshot()
+            if bool(snap.get("busy", False)):
+                start_btn.disable()
+                audibility_test_btn.disable()
+                guided_session_btn.disable()
+            else:
+                start_btn.enable()
+                audibility_test_btn.enable()
+                guided_session_btn.enable()
+            status_label.set_text(str(snap.get("status_text", "") or ""))
+            error_text = str(snap.get("error_text", "") or "")
+            error_label.set_text(error_text)
+            error_label.set_visibility(bool(error_text))
+            ref_ms = snap.get("timing_ref_latency_ms", None)
+            if ref_ms is not None:
+                clear_ref_btn.enable()
+            else:
+                clear_ref_btn.disable()
+            if int(snap.get("nonce", -1) or -1) == int(last_nonce["value"]):
+                return
+            last_nonce["value"] = int(snap.get("nonce", -1) or -1)
+            bundle = _current_bundle()
+            _render_bundle(bundle if isinstance(bundle, MeasurementBundle) else None, timing_ref_latency_ms=ref_ms)
 
-    _refresh_calibration_upload_status()
-    _refresh_session_preview_selector()
-    _render_bundle(None)
-    ui.timer(0.4, _refresh_view)
+        ctrl.get("measurement_mic_calibration_upload").on_value_change(lambda _e: _refresh_calibration_upload_status())
+        ctrl.get("measurement_role").on_value_change(
+            lambda e: (
+                _refresh_sub_output_channel_ui(e.value),
+                _refresh_output_device_options(e.value),
+            )
+        )
+        ctrl.get("measurement_use_wasapi").on_value_change(
+            lambda e: (
+                _refresh_input_device_options(e.value),
+                _refresh_output_device_options(ctrl.value("measurement_role", default_role), e.value),
+            )
+        )
+        ctrl.get("measurement_sub_output_channel").on_value_change(
+            lambda e: _refresh_output_device_options(
+                ctrl.value("measurement_role", default_role),
+            )
+        )
+        _refresh_sub_output_channel_ui(default_role)
+        _refresh_input_device_options(default_use_wasapi)
+        _refresh_output_device_options(default_role, default_use_wasapi)
+        _refresh_calibration_upload_status()
+        _refresh_session_preview_selector()
+        _render_bundle(None)
+        ui.timer(0.4, _refresh_view)
 
 
 __all__ = ['_session_preview_channel_options', '_session_preview_default_channel_key', '_session_preview_bundle', '_format_ms', '_measurement_summary_html', 'build_measurement_tab']

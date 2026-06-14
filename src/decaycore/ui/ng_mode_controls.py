@@ -15,6 +15,7 @@ Replaces controls_mode.py + controls_ir_window.py + parts of callbacks.py.
 Each function reads the current state from ng_controls and updates
 visibility/options/values of dependent elements accordingly.
 """
+
 from __future__ import annotations
 
 import logging
@@ -41,6 +42,7 @@ _MULTI_RATE_RATES = [44100, 48000, 88200, 96000, 176400, 192000]
 # Master mode change
 # ---------------------------------------------------------------------------
 
+
 def on_mode_change(*, mode: str, t: Callable) -> None:
     """Cascade all mode-driven UI changes.
 
@@ -65,10 +67,10 @@ def on_mode_change(*, mode: str, t: Callable) -> None:
         try:
             desc_container.clear()
             from nicegui import ui  # noqa: PLC0415
+
             with desc_container:
                 ui.markdown(f"**{t('mode_desc_title')}**\n\n{t(desc_key)}")
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -113,6 +115,7 @@ def on_mode_change(*, mode: str, t: Callable) -> None:
 # Level UI
 # ---------------------------------------------------------------------------
 
+
 def update_lvl_ui(*, t: Callable) -> None:
     """Show/hide manual level controls and derived output-tilt toggle."""
     mode_u = str(ctrl.value("mode", "BASIC") or "BASIC").strip().upper()
@@ -122,7 +125,9 @@ def update_lvl_ui(*, t: Callable) -> None:
     ctrl.set_visibility("lvl_manual_scope", is_manual)
     ctrl.set_visibility("output_tilt_scope", force_output_tilt)
     if force_output_tilt:
-        ctrl.set_value("output_tilt_source", OUTPUT_TILT_SOURCE_MANUAL_TARGET_TILT, emit=False)
+        ctrl.set_value(
+            "output_tilt_source", OUTPUT_TILT_SOURCE_MANUAL_TARGET_TILT, emit=False
+        )
     ctrl.set_enabled("output_tilt_source", not force_output_tilt)
 
 
@@ -135,7 +140,6 @@ def update_lvl_range() -> None:
             ctrl.set_value("lvl_min", hi - 1.0)
             ctrl.set_value("lvl_max", lo + 1.0)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -153,6 +157,7 @@ def update_lvl_range() -> None:
 # ---------------------------------------------------------------------------
 # IR window controls
 # ---------------------------------------------------------------------------
+
 
 def update_ir_window_controls(*, t: Callable) -> None:
     """Show/hide IR window sub-controls based on mode + shape selections."""
@@ -179,6 +184,7 @@ def update_ir_tukey_ui() -> None:
 # Bass controls
 # ---------------------------------------------------------------------------
 
+
 def update_low_bass_cut_ui() -> None:
     enabled = bool(ctrl.value("low_bass_cut_enable", False))
     ctrl.set_visibility("low_bass_cut_scope", enabled)
@@ -197,6 +203,7 @@ def update_stereo_auto_policy_ui() -> None:
 # ---------------------------------------------------------------------------
 # Mixed-phase controls
 # ---------------------------------------------------------------------------
+
 
 def update_mixed_freq_ui(*, t: Callable) -> None:
     """Show mixed split only for BASIC/ADVANCED when mixed-phase is selected."""
@@ -224,6 +231,7 @@ def update_xo_ui() -> None:
 # TDC / A-FDW
 # ---------------------------------------------------------------------------
 
+
 def update_tdc_controls_ui(*, t: Callable) -> None:
     enabled = bool(ctrl.value("enable_tdc", False))
     ctrl.set_visibility("tdc_details_scope", enabled)
@@ -237,6 +245,7 @@ def update_afdw_cycles_ui(*, t: Callable) -> None:
 # ---------------------------------------------------------------------------
 # Engine metrics  (latency + resolution display)
 # ---------------------------------------------------------------------------
+
 
 def update_engine_metrics_ui(*, t: Callable) -> None:
     """Update latency / Hz-per-bin info label."""
@@ -258,7 +267,6 @@ def update_engine_metrics_ui(*, t: Callable) -> None:
         if metrics_el is not None:
             metrics_el.set_text(f"{lat_str}  |  {bin_hz:.2f} Hz/bin")
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -280,7 +288,6 @@ def update_taps_auto_info(*, t: Callable) -> None:
     try:
         base_taps = int(float(ctrl.value("taps", 65536) or 65536))
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -304,7 +311,6 @@ def update_taps_auto_info(*, t: Callable) -> None:
     try:
         from nicegui import ui  # noqa: PLC0415
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -328,7 +334,6 @@ def update_taps_auto_info(*, t: Callable) -> None:
             with container:
                 ui.markdown(markdown).classes("w-full")
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -340,10 +345,14 @@ def update_taps_auto_info(*, t: Callable) -> None:
             ModuleNotFoundError,
             NameError,
         ):
-            logger.debug("update_taps_auto_info failed for %s", scope_name, exc_info=True)
+            logger.debug(
+                "update_taps_auto_info failed for %s", scope_name, exc_info=True
+            )
 
 
-def _build_taps_auto_info_markdown(*, multi_rate: bool, base_taps: int, t: Callable) -> str:
+def _build_taps_auto_info_markdown(
+    *, multi_rate: bool, base_taps: int, t: Callable
+) -> str:
     """Build the multi-rate taps help text shown in Files and Basic tabs."""
     if not multi_rate:
         return f"_{t('auto_taps_title')}: OFF_"
@@ -355,8 +364,7 @@ def _build_taps_auto_info_markdown(*, multi_rate: bool, base_taps: int, t: Calla
     return (
         f"### {t('auto_taps_title')}\n"
         f"{t('auto_taps_body')}\n\n"
-        f"**Reference:** 44.1 kHz -> {base_taps:,} taps\n\n"
-        + "\n".join(lines)
+        f"**Reference:** 44.1 kHz -> {base_taps:,} taps\n\n" + "\n".join(lines)
     )
 
 
@@ -365,20 +373,46 @@ def _build_taps_auto_info_markdown(*, multi_rate: bool, base_taps: int, t: Calla
 # ---------------------------------------------------------------------------
 
 _AUTO_LOCKED_FIELDS = [
-    "comparison_mode", "gain", "lvl_algo", "lvl_min", "lvl_max",
-    "lvl_mode", "lvl_manual_db", "manual_target_tilt_db_per_oct",
+    "comparison_mode",
+    "gain",
+    "lvl_algo",
+    "lvl_min",
+    "lvl_max",
+    "lvl_mode",
+    "lvl_manual_db",
+    "manual_target_tilt_db_per_oct",
     "output_tilt_source",
-    "mag_correct", "mag_c_min", "mag_c_max",
-    "max_boost", "bass_first_ai", "bass_first_mode_max_hz",
-    "max_slope_db_per_oct", "max_slope_boost_db_per_oct",
-    "max_slope_cut_db_per_oct", "trans_width",
-    "phase_limit", "df_smoothing", "reg_strength",
+    "mag_correct",
+    "mag_c_min",
+    "mag_c_max",
+    "max_boost",
+    "bass_first_ai",
+    "bass_first_mode_max_hz",
+    "max_slope_db_per_oct",
+    "max_slope_boost_db_per_oct",
+    "max_slope_cut_db_per_oct",
+    "trans_width",
+    "phase_limit",
+    "df_smoothing",
+    "reg_strength",
     "stereo_link_strategy",
-    "exc_prot", "exc_freq", "hpf_enable", "low_bass_cut_enable",
-    "ir_export_window_mode", "ir_export_window_shape", "ir_export_tukey_alpha",
-    "fdw_cycles", "enable_tdc",
-    "tdc_strength", "tdc_max_reduction_db", "tdc_slope_db_per_oct",
-    "mixed_freq", "plot_smoothing_level",
+    "exc_prot",
+    "exc_freq",
+    "hpf_enable",
+    "low_bass_cut_enable",
+    "ir_export_window_mode",
+    "ir_export_window_shape",
+    "ir_export_tukey_alpha",
+    "ir_window_left",
+    "ir_window_right",
+    "fdw_cycles",
+    "enable_tdc",
+    "enable_afdw",
+    "tdc_strength",
+    "tdc_max_reduction_db",
+    "tdc_slope_db_per_oct",
+    "mixed_freq",
+    "plot_smoothing_level",
 ]
 _AUTO_ONLY_FIELDS = ["auto_goal", "auto_target_mode"]
 _HC_LOCKED_FIELDS = ["hc_mode", "hc_custom_file"]
@@ -392,6 +426,7 @@ def _update_auto_mode_fields_state(*, is_auto: bool, t: Callable) -> None:
     for name in _AUTO_ONLY_FIELDS:
         ctrl.set_enabled(name, is_auto)
     ctrl.set_visibility("auto_mode_scope", is_auto)
+    ctrl.set_visibility("auto_mode_section_scope", is_auto)
 
 
 def update_target_curve_controls_ui() -> None:
@@ -409,16 +444,17 @@ def update_target_curve_controls_ui() -> None:
 # Mode-driven IR export window default
 # ---------------------------------------------------------------------------
 
+
 def _apply_mode_ir_window_default(*, mode_u: str) -> None:
     try:
         from ..config.mode_policy import MODE_DEFAULTS  # noqa: PLC0415
+
         key = "BASIC" if mode_u in ("BASIC", "AUTO") else "ADVANCED"
         v = MODE_DEFAULTS.get(key, {}).get("ir_export_window_mode", None)
         if v:
             ctrl.set_value("ir_export_window_mode", str(v).strip())
             update_ir_window_controls(t=lambda k: k)
     except (
-
         AttributeError,
         TypeError,
         ValueError,

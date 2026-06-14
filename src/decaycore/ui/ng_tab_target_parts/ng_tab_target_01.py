@@ -20,6 +20,7 @@ from typing import Callable
 logger = logging.getLogger("DecayCore")
 
 from .. import ng_controls as ctrl
+from ..ng_sections import page_shell, section_card
 from ..target_preview_common import apply_manual_target_preview_adjustments
 from ..target_preview_interaction import (
     build_draggable_tilt_handle_shape,
@@ -108,72 +109,510 @@ def _target_hint_translate(key: str) -> str:
     return str(resource_t(key))
 
 
-def _build_target_decay_hint_payload() -> dict[str, object]:
+def _normalize_harmonic_plot_source(harmonic_freq_hz, harmonic_magnitudes_db):
+    try:
+        import numpy as np  # noqa: PLC0415
+
+        if harmonic_freq_hz is None or not isinstance(harmonic_magnitudes_db, dict):
+            return None, None
+        freq_raw = np.asarray(harmonic_freq_hz, dtype=float).reshape(-1)
+        if freq_raw.size < 4:
+            return None, None
+        freq_mask = np.isfinite(freq_raw) & (freq_raw > 0.0)
+        if int(freq_mask.sum()) < 4:
+            return None, None
+        freq = freq_raw[freq_mask]
+        mags_out: dict[int, object] = {}
+        for order_raw, arr_raw in harmonic_magnitudes_db.items():
+            try:
+                order = int(order_raw)
+                arr = np.asarray(arr_raw, dtype=float).reshape(-1)
+            except (
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
+                continue
+            if arr.size != freq_raw.size:
+                continue
+            arr = arr[freq_mask]
+            if arr.size != freq.size or not np.isfinite(arr).any():
+                continue
+            mags_out[order] = arr
+        if not mags_out:
+            return None, None
+        return freq, mags_out
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        return None, None
+
+
+def _empty_target_metadata_channel(side: str) -> dict[str, object]:
+    return {
+        "side": side,
+        "source_kind": "none",
+        "source_path": "",
+        "rt60_value": None,
+        "rt60_bands": None,
+        "harmonic_freq_hz": None,
+        "harmonic_magnitudes_db": None,
+        "harmonic_risk_freq_hz": None,
+        "harmonic_risk_curve": None,
+        "harmonic_risk_summary": None,
+    }
+
+
+def _build_target_preview_metadata_payload() -> dict[str, object]:
     from ...common.measurement_features import normalize_rt60_bands, normalize_rt60_value  # noqa: PLC0415
+    from ...io.generated_measurement_source import generated_source_matches_upload  # noqa: PLC0415
     from ...io.measurements_loader import _try_load_harmonic_sidecar, _try_load_rt60_sidecar  # noqa: PLC0415
+    from ..target_preview_cache import load_path_measurement_curve, load_upload_measurement_curve  # noqa: PLC0415
 
     def _cv(name, default=None):
         return ctrl.value(name, default)
 
+    def _curve_loader_settings() -> tuple[float, float, int]:
+        try:
+            pre_ms = float(_cv("ir_window_left", 85.0) or 85.0)
+        except (TypeError, ValueError):
+            pre_ms = 85.0
+        try:
+            post_ms = float(_cv("ir_window_right", _cv("ir_window", 500.0)) or 500.0)
+        except (TypeError, ValueError):
+            post_ms = 500.0
+        return pre_ms, post_ms, 96
+
+    def _fundamental_curve(slot: str, *, bass_integration_enabled: bool):
+        source = _cv(f"generated_measurement_{slot.lower()}", None)
+        upload_value = _cv(f"file_{slot.lower()}", None)
+        if not bass_integration_enabled and isinstance(source, dict) and generated_source_matches_upload(source, upload_value):
+            analysis_freq = source.get("spatial_avg_analysis_freq_hz", source.get("analysis_freq_hz"))
+            analysis_mag = source.get("spatial_avg_analysis_magnitude_db", source.get("analysis_magnitude_db"))
+            if analysis_freq is not None and analysis_mag is not None:
+                return analysis_freq, analysis_mag
+        pre_ms, post_ms, smoothing_level = _curve_loader_settings()
+        if not bass_integration_enabled:
+            freq, mag = load_upload_measurement_curve(
+                upload_value,
+                pre_ms=pre_ms,
+                post_ms=post_ms,
+                smoothing_level=smoothing_level,
+            )
+            if freq is not None and mag is not None:
+                return freq, mag
+        path_key = f"local_path_{slot.lower()}_main" if bass_integration_enabled else f"local_path_{slot.lower()}"
+        freq, mag = load_path_measurement_curve(
+            _cv(path_key, ""),
+            pre_ms=pre_ms,
+            post_ms=post_ms,
+            smoothing_level=smoothing_level,
+        )
+        return freq, mag
+
+    def _collect_generated(slot: str) -> dict[str, object] | None:
+        source = _cv(f"generated_measurement_{slot.lower()}", None)
+        upload_value = _cv(f"file_{slot.lower()}", None)
+        if not isinstance(source, dict) or not generated_source_matches_upload(source, upload_value):
+            return None
+        channel = _empty_target_metadata_channel(slot)
+        channel["source_kind"] = "generated"
+        channel["rt60_value"] = normalize_rt60_value(source.get("measured_rt60"))
+        channel["rt60_bands"] = normalize_rt60_bands(source.get("measured_rt60_bands"))
+        harmonic_freq, harmonic_mags = _normalize_harmonic_plot_source(
+            source.get("harmonic_freq_hz"),
+            source.get("harmonic_magnitudes_db"),
+        )
+        channel["harmonic_freq_hz"] = harmonic_freq
+        channel["harmonic_magnitudes_db"] = harmonic_mags
+        if harmonic_freq is not None and harmonic_mags:
+            analysis_freq = source.get("spatial_avg_analysis_freq_hz", source.get("analysis_freq_hz"))
+            analysis_mag = source.get("spatial_avg_analysis_magnitude_db", source.get("analysis_magnitude_db"))
+            risk_freq, risk_curve, risk_summary = build_harmonic_boost_risk_curve(
+                harmonic_freq,
+                harmonic_mags,
+                fundamental_freq_hz=analysis_freq,
+                fundamental_mag_db=analysis_mag,
+            )
+            channel["harmonic_risk_freq_hz"] = risk_freq
+            channel["harmonic_risk_curve"] = risk_curve
+            channel["harmonic_risk_summary"] = risk_summary
+        return channel
+
+    def _collect_sidecar(
+        slot: str,
+        path_value: object,
+        *,
+        fundamental_freq_hz=None,
+        fundamental_mag_db=None,
+    ) -> dict[str, object] | None:
+        path = str(path_value or "").strip()
+        if not path:
+            return None
+        channel = _empty_target_metadata_channel(slot)
+        channel["source_kind"] = "sidecar"
+        channel["source_path"] = path
+        rt60_val, rt60_bands = _try_load_rt60_sidecar(path)
+        channel["rt60_value"] = normalize_rt60_value(rt60_val)
+        channel["rt60_bands"] = normalize_rt60_bands(rt60_bands)
+        harmonic_freq_raw, harmonic_mags_raw = _try_load_harmonic_sidecar(path)
+        harmonic_freq, harmonic_mags = _normalize_harmonic_plot_source(
+            harmonic_freq_raw,
+            harmonic_mags_raw,
+        )
+        channel["harmonic_freq_hz"] = harmonic_freq
+        channel["harmonic_magnitudes_db"] = harmonic_mags
+        if harmonic_freq is not None and harmonic_mags:
+            risk_freq, risk_curve, risk_summary = build_harmonic_boost_risk_curve(
+                harmonic_freq,
+                harmonic_mags,
+                fundamental_freq_hz=fundamental_freq_hz,
+                fundamental_mag_db=fundamental_mag_db,
+            )
+            channel["harmonic_risk_freq_hz"] = risk_freq
+            channel["harmonic_risk_curve"] = risk_curve
+            channel["harmonic_risk_summary"] = risk_summary
+        return channel
+
     app_mode = str(_cv("mode", "BASIC") or "BASIC").upper()
     bass_integration_enabled = bool(_cv("bass_integration_enable", False))
 
+    channels: dict[str, dict[str, object]] = {}
     rt60_values: list[float | None] = []
     rt60_bands_list: list[dict[float, float] | None] = []
     harmonic_summaries: list[dict | None] = []
+    has_rt60 = False
+    has_harmonics = False
+    has_harmonic_risk = False
 
-    def _append_generated_source(source: object) -> None:
-        if not isinstance(source, dict):
-            return
-        rt60_values.append(normalize_rt60_value(source.get("measured_rt60")))
-        rt60_bands_list.append(normalize_rt60_bands(source.get("measured_rt60_bands")))
-        harmonic_freq = source.get("harmonic_freq_hz")
-        harmonic_mags = source.get("harmonic_magnitudes_db")
-        analysis_freq = source.get("spatial_avg_analysis_freq_hz", source.get("analysis_freq_hz"))
-        analysis_mag = source.get("spatial_avg_analysis_magnitude_db", source.get("analysis_magnitude_db"))
-        if harmonic_freq is None or not isinstance(harmonic_mags, dict) or not harmonic_mags:
-            return
-        _risk_freq, _risk_curve, risk_summary = build_harmonic_boost_risk_curve(
-            harmonic_freq,
-            harmonic_mags,
-            fundamental_freq_hz=analysis_freq,
-            fundamental_mag_db=analysis_mag,
-        )
-        harmonic_summaries.append(risk_summary)
+    for slot in ("L", "R"):
+        channel = None
+        if not bass_integration_enabled:
+            channel = _collect_generated(slot)
+        if channel is None:
+            path_key = f"local_path_{slot.lower()}_main" if bass_integration_enabled else f"local_path_{slot.lower()}"
+            fundamental_freq_hz, fundamental_mag_db = _fundamental_curve(
+                slot,
+                bass_integration_enabled=bass_integration_enabled,
+            )
+            channel = _collect_sidecar(
+                slot,
+                _cv(path_key, ""),
+                fundamental_freq_hz=fundamental_freq_hz,
+                fundamental_mag_db=fundamental_mag_db,
+            )
+        if channel is None:
+            channel = _empty_target_metadata_channel(slot)
 
-    def _append_path_sidecars(path_value: object) -> None:
-        path = str(path_value or "").strip()
-        if not path:
-            return
-        rt60_val, rt60_bands = _try_load_rt60_sidecar(path)
-        rt60_values.append(rt60_val)
-        rt60_bands_list.append(rt60_bands)
-        harmonic_freq, harmonic_mags = _try_load_harmonic_sidecar(path)
-        if harmonic_freq is None or not harmonic_mags:
-            return
-        _risk_freq, _risk_curve, risk_summary = build_harmonic_boost_risk_curve(
-            harmonic_freq,
-            harmonic_mags,
-        )
-        harmonic_summaries.append(risk_summary)
+        channels[slot] = channel
+        rt60_values.append(channel.get("rt60_value"))
+        rt60_bands_list.append(channel.get("rt60_bands"))
+        harmonic_summaries.append(channel.get("harmonic_risk_summary"))
+        if isinstance(channel.get("rt60_bands"), dict) and channel["rt60_bands"]:
+            has_rt60 = True
+        if isinstance(channel.get("harmonic_magnitudes_db"), dict) and channel["harmonic_magnitudes_db"]:
+            has_harmonics = True
+        if channel.get("harmonic_risk_freq_hz") is not None and channel.get("harmonic_risk_curve") is not None:
+            has_harmonic_risk = True
 
-    for slot in ("l", "r"):
-        _append_generated_source(_cv(f"generated_measurement_{slot}", None))
+    return {
+        "app_mode": app_mode,
+        "channels": channels,
+        "rt60_values": rt60_values,
+        "rt60_bands_list": rt60_bands_list,
+        "harmonic_summaries": harmonic_summaries,
+        "has_rt60": has_rt60,
+        "has_harmonics": has_harmonics,
+        "has_harmonic_risk": has_harmonic_risk,
+        "has_any_metadata": bool(has_rt60 or has_harmonics or has_harmonic_risk),
+    }
 
-    if bass_integration_enabled:
-        _append_path_sidecars(_cv("local_path_l_main", ""))
-        _append_path_sidecars(_cv("local_path_r_main", ""))
-    else:
-        _append_path_sidecars(_cv("local_path_l", ""))
-        _append_path_sidecars(_cv("local_path_r", ""))
 
+def _build_target_decay_hint_payload() -> dict[str, object]:
+    payload = _build_target_preview_metadata_payload()
     hint = build_target_decay_hint(
-        rt60_values=rt60_values,
-        rt60_bands_list=rt60_bands_list,
-        harmonic_summaries=harmonic_summaries,
+        rt60_values=payload.get("rt60_values"),
+        rt60_bands_list=payload.get("rt60_bands_list"),
+        harmonic_summaries=payload.get("harmonic_summaries"),
     )
-    hint["app_mode"] = app_mode
+    hint["app_mode"] = payload.get("app_mode", "BASIC")
     return hint
+
+
+def _build_target_preview_rt60_fig(metadata_payload: dict[str, object]):
+    try:
+        import plotly.graph_objects as go  # noqa: PLC0415
+
+        traces_added = 0
+        fig = go.Figure()
+        colors = {"L": "#2563eb", "R": "#ea580c"}
+        channels = metadata_payload.get("channels", {})
+        if not isinstance(channels, dict):
+            return None
+        for side in ("L", "R"):
+            channel = channels.get(side, {})
+            bands = channel.get("rt60_bands") if isinstance(channel, dict) else None
+            if not isinstance(bands, dict) or not bands:
+                continue
+            freqs = sorted(float(freq) for freq in bands.keys())
+            vals = [float(bands[freq]) for freq in freqs]
+            fig.add_trace(go.Scatter(
+                x=freqs,
+                y=vals,
+                mode="lines+markers",
+                name=f"RT60 {side}",
+                line=dict(color=colors[side], width=2.0),
+                marker=dict(size=6),
+            ))
+            traces_added += 1
+        if traces_added == 0:
+            return None
+        fig.update_xaxes(
+            type="log",
+            title_text="Hz",
+            gridcolor="rgba(15,23,42,0.10)",
+            linecolor="rgba(15,23,42,0.22)",
+            zerolinecolor="rgba(15,23,42,0.10)",
+        )
+        fig.update_yaxes(
+            title_text="s",
+            rangemode="tozero",
+            gridcolor="rgba(15,23,42,0.10)",
+            linecolor="rgba(15,23,42,0.22)",
+            zerolinecolor="rgba(15,23,42,0.10)",
+        )
+        fig.update_layout(
+            height=220,
+            margin=dict(l=40, r=20, t=20, b=35),
+            showlegend=True,
+            template="plotly_white",
+            paper_bgcolor="#ffffff",
+            plot_bgcolor="#ffffff",
+            font=dict(color="#1f2937"),
+        )
+        return fig.to_plotly_json()
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        return None
+
+
+def _build_target_preview_harmonics_fig(metadata_payload: dict[str, object]):
+    try:
+        import numpy as np  # noqa: PLC0415
+        import plotly.graph_objects as go  # noqa: PLC0415
+
+        fig = go.Figure()
+        traces_added = 0
+        colors = {
+            2: {"L": "#60a5fa", "R": "#fb923c"},
+            3: {"L": "#2563eb", "R": "#ea580c"},
+            4: {"L": "#1d4ed8", "R": "#c2410c"},
+            5: {"L": "#1e3a8a", "R": "#9a3412"},
+        }
+        channels = metadata_payload.get("channels", {})
+        if not isinstance(channels, dict):
+            return None
+        for side in ("L", "R"):
+            channel = channels.get(side, {})
+            freq = channel.get("harmonic_freq_hz") if isinstance(channel, dict) else None
+            mags = channel.get("harmonic_magnitudes_db") if isinstance(channel, dict) else None
+            if freq is None or not isinstance(mags, dict) or not mags:
+                continue
+            freq_arr = np.asarray(freq, dtype=float).reshape(-1)
+            for order, values in sorted(mags.items()):
+                val_arr = np.asarray(values, dtype=float).reshape(-1)
+                if val_arr.size != freq_arr.size:
+                    continue
+                mask = (freq_arr > 0.0) & np.isfinite(freq_arr) & np.isfinite(val_arr)
+                if int(mask.sum()) < 4:
+                    continue
+                fig.add_trace(go.Scatter(
+                    x=freq_arr[mask],
+                    y=val_arr[mask],
+                    mode="lines",
+                    name=f"H{int(order)} {side}",
+                    line=dict(color=colors.get(int(order), {}).get(side, "#6b7280"), width=1.8),
+                ))
+                traces_added += 1
+        if traces_added == 0:
+            return None
+        fig.update_xaxes(
+            type="log",
+            title_text="Hz",
+            gridcolor="rgba(15,23,42,0.10)",
+            linecolor="rgba(15,23,42,0.22)",
+            zerolinecolor="rgba(15,23,42,0.10)",
+        )
+        fig.update_yaxes(
+            title_text="dB",
+            gridcolor="rgba(15,23,42,0.10)",
+            linecolor="rgba(15,23,42,0.22)",
+            zerolinecolor="rgba(15,23,42,0.10)",
+        )
+        fig.update_layout(
+            height=240,
+            margin=dict(l=40, r=20, t=20, b=35),
+            showlegend=True,
+            template="plotly_white",
+            paper_bgcolor="#ffffff",
+            plot_bgcolor="#ffffff",
+            font=dict(color="#1f2937"),
+        )
+        return fig.to_plotly_json()
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        return None
+
+
+def _build_target_preview_harmonic_risk_fig(metadata_payload: dict[str, object]):
+    try:
+        import numpy as np  # noqa: PLC0415
+        import plotly.graph_objects as go  # noqa: PLC0415
+
+        fig = go.Figure()
+        traces_added = 0
+        colors = {"L": "#2563eb", "R": "#ea580c"}
+        max_risk = 0.0
+        channels = metadata_payload.get("channels", {})
+        if not isinstance(channels, dict):
+            return None
+        for side in ("L", "R"):
+            channel = channels.get(side, {})
+            freq = channel.get("harmonic_risk_freq_hz") if isinstance(channel, dict) else None
+            curve = channel.get("harmonic_risk_curve") if isinstance(channel, dict) else None
+            if freq is None or curve is None:
+                continue
+            freq_arr = np.asarray(freq, dtype=float).reshape(-1)
+            curve_arr = np.asarray(curve, dtype=float).reshape(-1)
+            if curve_arr.size != freq_arr.size:
+                continue
+            mask = (freq_arr > 0.0) & np.isfinite(freq_arr) & np.isfinite(curve_arr)
+            if int(mask.sum()) < 4:
+                continue
+            masked_risk = curve_arr[mask]
+            if not np.any(masked_risk > 0.0):
+                continue
+            max_risk = max(max_risk, float(np.max(masked_risk)))
+            fig.add_trace(go.Scatter(
+                x=freq_arr[mask],
+                y=masked_risk,
+                mode="lines",
+                name=f"Risk {side}",
+                line=dict(color=colors[side], width=2.0),
+            ))
+            traces_added += 1
+        if traces_added == 0:
+            return None
+        y_upper = min(1.05, max(0.03, max_risk * 1.20))
+        fig.update_xaxes(
+            type="log",
+            title_text="Hz",
+            range=[np.log10(20.0), np.log10(800.0)],
+            gridcolor="rgba(15,23,42,0.10)",
+            linecolor="rgba(15,23,42,0.22)",
+            zerolinecolor="rgba(15,23,42,0.10)",
+        )
+        fig.update_yaxes(
+            title_text="Risk",
+            range=[0.0, y_upper],
+            gridcolor="rgba(15,23,42,0.10)",
+            linecolor="rgba(15,23,42,0.22)",
+            zerolinecolor="rgba(15,23,42,0.10)",
+        )
+        fig.update_layout(
+            height=220,
+            margin=dict(l=40, r=20, t=20, b=35),
+            showlegend=True,
+            template="plotly_white",
+            paper_bgcolor="#ffffff",
+            plot_bgcolor="#ffffff",
+            font=dict(color="#1f2937"),
+        )
+        return fig.to_plotly_json()
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        return None
+
+
+def _render_target_preview_metadata() -> None:
+    from nicegui import ui  # noqa: PLC0415
+
+    metadata_col = ctrl.get_container("target_preview_metadata_scope")
+    if metadata_col is None:
+        return
+
+    metadata_payload = _build_target_preview_metadata_payload()
+    metadata_col.clear()
+    if not bool(metadata_payload.get("has_any_metadata", False)):
+        return
+
+    rt60_fig = _build_target_preview_rt60_fig(metadata_payload)
+    harmonics_fig = _build_target_preview_harmonics_fig(metadata_payload)
+    risk_fig = _build_target_preview_harmonic_risk_fig(metadata_payload)
+    if rt60_fig is None and harmonics_fig is None and risk_fig is None:
+        return
+
+    with metadata_col:
+        with ui.expansion(_target_hint_translate("target_preview_metadata_title")).classes("w-full"):
+            with ui.column().classes("w-full gap-3"):
+                if rt60_fig is not None:
+                    ui.label(_target_hint_translate("target_preview_metadata_rt60_title")).classes("text-sm font-semibold")
+                    ui.plotly(rt60_fig).classes("w-full")
+                if harmonics_fig is not None:
+                    ui.label(_target_hint_translate("target_preview_metadata_harmonics_title")).classes("text-sm font-semibold")
+                    ui.plotly(harmonics_fig).classes("w-full")
+                if risk_fig is not None:
+                    ui.label(_target_hint_translate("target_preview_metadata_risk_title")).classes("text-sm font-semibold")
+                    ui.plotly(risk_fig).classes("w-full")
+                elif bool(metadata_payload.get("has_harmonics", False)):
+                    ui.label(_target_hint_translate("target_preview_metadata_risk_title")).classes("text-sm font-semibold")
+                    ui.label(_target_hint_translate("target_preview_metadata_risk_none")).classes("text-xs text-gray-500")
 
 
 def _render_target_decay_hint() -> None:
@@ -244,9 +683,9 @@ def _render_target_decay_hint() -> None:
                     f'background:{badge_color};color:#ffffff;">{_target_hint_translate(badge_key)}</span>'
                 )
             )
-            ui.label(_target_hint_translate(summary_key)).classes("text-xs text-gray-300")
+            ui.label(_target_hint_translate(summary_key)).classes("text-xs cf-target-hint-summary")
         for key in detail_keys:
-            ui.label(_target_hint_translate(key)).classes("text-xs text-gray-400")
+            ui.label(_target_hint_translate(key)).classes("text-xs cf-target-hint-detail")
 
 def _step_manual_target(delta_db: float) -> None:
     try:
@@ -305,208 +744,193 @@ def build_target_tab(*, t: Callable, get_val: Callable) -> None:
     _TARGET_PREVIEW_PLOT = None
     _TARGET_TAB_TRANSLATE = t
 
-    ui.markdown(f"#### {t('tab_target')}")
-    ui.separator()
-    ui.markdown(f"#### {t('ui_target_preview')}")
-    ui.label(t("target_preview_legend_hint")).classes("text-xs text-gray-400")
-    hint_col = ui.column().classes("w-full gap-1")
-    ctrl.register_container("target_decay_hint_scope", hint_col)
+    with page_shell(title=t("tab_target"), intro=t("target_page_intro"), wide=True):
+        with section_card(title=t("ui_target_preview"), intro=t("target_preview_legend_hint"), hero=True):
+            hint_col = ui.column().classes("w-full gap-1")
+            ctrl.register_container("target_decay_hint_scope", hint_col)
 
-    # Target preview container
-    preview_col = ui.column().classes("w-full")
-    ctrl.register_container("target_preview_scope", preview_col)
-    _render_target_decay_hint()
+            preview_col = ui.column().classes("w-full")
+            ctrl.register_container("target_preview_scope", preview_col)
+            metadata_col = ui.column().classes("w-full")
+            ctrl.register_container("target_preview_metadata_scope", metadata_col)
+            _render_target_decay_hint()
+            _render_target_preview_metadata()
 
-    ui.separator()
+        _hc_file = ctrl._ValueHolder(get_val("hc_custom_file", None))
+        ctrl.register("hc_custom_file", _hc_file)
 
-    # House curve selector + custom upload holder
-    _hc_file = ctrl._ValueHolder(get_val("hc_custom_file", None))
-    ctrl.register("hc_custom_file", _hc_file)
-
-    hc_value = _normalize_hc_mode_key(get_val("hc_mode", "Harman6"))
-    ctrl.register(
-        "hc_mode",
-        ui.select(
-            options=_HC_OPTS,
-            value=hc_value,
-            label=t("hc_mode"),
-        ).props("dense outlined").classes("w-full"),
-    )
-
-    # Custom file upload (visible only when hc_mode=Upload)
-    with ui.column().classes("w-full") as hc_upload_col:
-        ui.label(t("hc_custom")).classes("text-sm font-medium")
-
-        async def _on_hc_upload(e) -> None:
-            _hc_file.set_value({
-                "filename": e.file.name,
-                "content": await e.file.read(),
-                "mime_type": getattr(e.file, "content_type", ""),
-            })
-            refresh_target_preview()
-
-        ui.upload(
-            label=t("hc_custom"),
-            on_upload=_on_hc_upload,
-            auto_upload=True,
-        ).props('accept=".txt"').classes("w-full")
-    ctrl.register_container("hc_custom_upload_col", hc_upload_col)
-    hc_upload_col.set_visibility(hc_value == "Upload")
-
-    ui.separator()
-    ui.markdown(f"#### 🎚 {t('ui_leveling_gain')}")
-
-    with ui.row().classes("w-full gap-4"):
-        ctrl.register(
-            "lvl_algo",
-            ui.select(
-                tr_options(t, LVL_ALGO_OPTION_LABEL_KEYS),
-                value=normalize_lvl_algo_value(get_val("lvl_algo", LVL_ALGO_MEDIAN), t),
-                label=t("lvl_algo"),
-            ).props("dense outlined").classes("flex-1"),
-        )
-        ctrl.register(
-            "gain",
-            ui.number(
-                label=t("gain"),
-                value=float(get_val("gain", 0.0) or 0.0),
-                format="%.1f",
-            ).props("dense outlined").classes("flex-1"),
-        )
-
-    with ui.row().classes("w-full gap-4"):
-        ctrl.register(
-            "lvl_min",
-            ui.number(
-                label=t("lvl_min"),
-                value=float(get_val("lvl_min", 500.0) or 500.0),
-                format="%.0f",
-            ).props("dense outlined").classes("flex-1"),
-        )
-        ctrl.register(
-            "lvl_max",
-            ui.number(
-                label=t("lvl_max"),
-                value=float(get_val("lvl_max", 2000.0) or 2000.0),
-                format="%.0f",
-            ).props("dense outlined").classes("flex-1"),
-        )
-
-    with ui.row().classes("w-full gap-4 items-start"):
-        ctrl.register(
-            "lvl_mode",
-            ui.select(
-                options=tr_options(t, LVL_MODE_OPTION_LABEL_KEYS),
-                value=normalize_lvl_mode_value(get_val("lvl_mode", LVL_MODE_AUTO), t),
-                label=t("lvl_mode"),
-            ).props("dense outlined").classes("flex-1"),
-        )
-        # Manual dB scope (shown only when lvl_mode=manual)
-        lvl_manual_col = ui.column().classes("flex-1 gap-1")
-        ctrl.register_container("lvl_manual_scope", lvl_manual_col)
-        with lvl_manual_col:
-            with ui.row().classes("w-full gap-2 items-end"):
-                ctrl.register(
-                    "lvl_manual_db",
-                    ui.number(
-                        label=t("lvl_target_db"),
-                        value=float(get_val("lvl_manual_db", 0.0) or 0.0),
-                        format="%.1f",
-                    ).props("dense outlined step=0.1").classes("flex-1"),
-                )
-                ui.button(
-                    "+",
-                    on_click=lambda: _step_manual_target(+0.1),
-                ).props('color="secondary" outline').style("min-width:34px;")
-                ui.button(
-                    "-",
-                    on_click=lambda: _step_manual_target(-0.1),
-                ).props('color="secondary" outline').style("min-width:34px;")
-            with ui.row().classes("w-full gap-2 items-end"):
-                ctrl.register(
-                    "manual_target_tilt_db_per_oct",
-                    ui.number(
-                        label=t("manual_target_tilt"),
-                        value=float(get_val("manual_target_tilt_db_per_oct", 0.0) or 0.0),
-                        format="%.1f",
-                    ).props("dense outlined step=0.1").classes("flex-1"),
-                )
-                ui.button(
-                    "+",
-                    on_click=lambda: _step_manual_target_tilt(+0.1),
-                ).props('color="secondary" outline').style("min-width:34px;")
-                ui.button(
-                    "-",
-                    on_click=lambda: _step_manual_target_tilt(-0.1),
-                ).props('color="secondary" outline').style("min-width:34px;")
-            ui.label(t("lvl_manual_help")).classes("text-xs text-gray-400")
-            ui.label(t("manual_target_tilt_help")).classes("text-xs text-gray-400")
-            ui.label(t("lvl_manual_bias_hint")).classes("text-xs text-gray-400")
-            ui.label(t("lvl_manual_drag_hint_curve")).classes("text-xs text-gray-400")
-            ui.label(t("manual_target_tilt_drag_hint")).classes("text-xs text-gray-400")
-        lvl_manual_col.set_visibility(False)
-
-    ui.separator()
-
-    # Output filter tilt source (ADVANCED + manual level only)
-    _initial_mode = str(get_val("mode", "BASIC") or "BASIC").upper()
-    _initial_lvl_mode = normalize_lvl_mode_value(get_val("lvl_mode", LVL_MODE_AUTO), t)
-    output_tilt_col = ui.column().classes("w-full gap-1")
-    ctrl.register_container("output_tilt_scope", output_tilt_col)
-    with output_tilt_col:
-        ui.label(t("output_tilt")).classes("text-sm font-semibold mt-1")
-        with ui.column().classes("w-full gap-1"):
+        hc_value = _normalize_hc_mode_key(get_val("hc_mode", "Harman6"))
+        with section_card(title=t("hc_mode")):
             ctrl.register(
-                "output_tilt_source",
-                ui.radio(
-                    tr_options(t, OUTPUT_TILT_SOURCE_OPTION_LABEL_KEYS),
-                    value=normalize_output_tilt_source_value(
-                        get_val("output_tilt_source", OUTPUT_TILT_SOURCE_OFF),
-                        t,
-                    ),
-                ).classes("w-full"),
+                "hc_mode",
+                ui.select(
+                    options=_HC_OPTS,
+                    value=hc_value,
+                    label=t("hc_mode"),
+                ).props("dense outlined").classes("w-full"),
             )
-        ui.label(t("output_tilt_help")).classes("text-xs text-gray-400")
-    output_tilt_col.set_visibility(_initial_mode == "ADVANCED" and _initial_lvl_mode == LVL_MODE_MANUAL)
 
-    ui.separator()
+            with ui.column().classes("w-full") as hc_upload_col:
+                ui.label(t("hc_custom")).classes("text-sm font-medium")
 
-    # Magnitude correction
-    ctrl.register(
-        "mag_correct",
-        ui.checkbox(t("enable_corr"), value=bool(get_val("mag_correct", True))),
-    )
+                async def _on_hc_upload(e) -> None:
+                    _hc_file.set_value({
+                        "filename": e.file.name,
+                        "content": await e.file.read(),
+                        "mime_type": getattr(e.file, "content_type", ""),
+                    })
+                    refresh_target_preview()
 
-    ui.label(t("magnitude_correction_limits")).classes("text-sm font-semibold mt-4")
+                ui.upload(
+                    label=t("hc_custom"),
+                    on_upload=_on_hc_upload,
+                    auto_upload=True,
+                ).props('accept=".txt"').classes("w-full")
+            ctrl.register_container("hc_custom_upload_col", hc_upload_col)
+            hc_upload_col.set_visibility(hc_value == "Upload")
 
-    with ui.row().classes("w-full gap-4"):
-        ctrl.register(
-            "mag_c_min",
-            ui.number(
-                label=t("min_freq"),
-                value=float(get_val("mag_c_min", 10.0) or 10.0),
-                format="%.1f",
-            ).props("dense outlined").classes("flex-1"),
-        )
-        ctrl.register(
-            "mag_c_max",
-            ui.number(
-                label=t("max_freq"),
-                value=float(get_val("mag_c_max", 200.0) or 200.0),
-                format="%.1f",
-            ).props("dense outlined").classes("flex-1"),
-        )
+        with section_card(title=t("ui_leveling_gain")):
+            with ui.row().classes("w-full gap-4"):
+                ctrl.register(
+                    "lvl_algo",
+                    ui.select(
+                        tr_options(t, LVL_ALGO_OPTION_LABEL_KEYS),
+                        value=normalize_lvl_algo_value(get_val("lvl_algo", LVL_ALGO_MEDIAN), t),
+                        label=t("lvl_algo"),
+                    ).props("dense outlined").classes("flex-1"),
+                )
+                ctrl.register(
+                    "gain",
+                    ui.number(
+                        label=t("gain"),
+                        value=float(get_val("gain", 0.0) or 0.0),
+                        format="%.1f",
+                    ).props("dense outlined").classes("flex-1"),
+                )
 
-    ui.separator()
+            with ui.row().classes("w-full gap-4"):
+                ctrl.register(
+                    "lvl_min",
+                    ui.number(
+                        label=t("lvl_min"),
+                        value=float(get_val("lvl_min", 500.0) or 500.0),
+                        format="%.0f",
+                    ).props("dense outlined").classes("flex-1"),
+                )
+                ctrl.register(
+                    "lvl_max",
+                    ui.number(
+                        label=t("lvl_max"),
+                        value=float(get_val("lvl_max", 2000.0) or 2000.0),
+                        format="%.0f",
+                    ).props("dense outlined").classes("flex-1"),
+                )
 
-    ctrl.register(
-        "max_boost",
-        ui.number(
-            label=t("max_boost"),
-            value=float(get_val("max_boost", 5.0) or 5.0),
-            format="%.1f",
-        ).props("dense outlined").classes("w-full"),
-    )
+            with ui.row().classes("w-full gap-4 items-start"):
+                ctrl.register(
+                    "lvl_mode",
+                    ui.select(
+                        options=tr_options(t, LVL_MODE_OPTION_LABEL_KEYS),
+                        value=normalize_lvl_mode_value(get_val("lvl_mode", LVL_MODE_AUTO), t),
+                        label=t("lvl_mode"),
+                    ).props("dense outlined").classes("flex-1"),
+                )
+                lvl_manual_col = ui.column().classes("flex-1 gap-1")
+                ctrl.register_container("lvl_manual_scope", lvl_manual_col)
+                with lvl_manual_col:
+                    with ui.row().classes("w-full gap-2 items-end"):
+                        ctrl.register(
+                            "lvl_manual_db",
+                            ui.number(
+                                label=t("lvl_target_db"),
+                                value=float(get_val("lvl_manual_db", 0.0) or 0.0),
+                                format="%.1f",
+                            ).props("dense outlined step=0.1").classes("flex-1"),
+                        )
+                        ui.button(
+                            "+",
+                            on_click=lambda: _step_manual_target(+0.1),
+                        ).props('color="secondary" outline').style("min-width:34px;")
+                        ui.button(
+                            "-",
+                            on_click=lambda: _step_manual_target(-0.1),
+                        ).props('color="secondary" outline').style("min-width:34px;")
+                    with ui.row().classes("w-full gap-2 items-end"):
+                        ctrl.register(
+                            "manual_target_tilt_db_per_oct",
+                            ui.number(
+                                label=t("manual_target_tilt"),
+                                value=float(get_val("manual_target_tilt_db_per_oct", 0.0) or 0.0),
+                                format="%.1f",
+                            ).props("dense outlined step=0.1").classes("flex-1"),
+                        )
+                        ui.button(
+                            "+",
+                            on_click=lambda: _step_manual_target_tilt(+0.1),
+                        ).props('color="secondary" outline').style("min-width:34px;")
+                        ui.button(
+                            "-",
+                            on_click=lambda: _step_manual_target_tilt(-0.1),
+                        ).props('color="secondary" outline').style("min-width:34px;")
+                    ui.label(t("lvl_manual_help")).classes("text-xs text-gray-400")
+                    ui.label(t("manual_target_tilt_help")).classes("text-xs text-gray-400")
+                    ui.label(t("lvl_manual_bias_hint")).classes("text-xs text-gray-400")
+                    ui.label(t("lvl_manual_drag_hint_curve")).classes("text-xs text-gray-400")
+                    ui.label(t("manual_target_tilt_drag_hint")).classes("text-xs text-gray-400")
+                lvl_manual_col.set_visibility(False)
+
+            _initial_mode = str(get_val("mode", "BASIC") or "BASIC").upper()
+            _initial_lvl_mode = normalize_lvl_mode_value(get_val("lvl_mode", LVL_MODE_AUTO), t)
+            output_tilt_col = ui.column().classes("w-full gap-1")
+            ctrl.register_container("output_tilt_scope", output_tilt_col)
+            with output_tilt_col:
+                ui.label(t("output_tilt")).classes("text-sm font-semibold mt-1")
+                with ui.column().classes("w-full gap-1"):
+                    ctrl.register(
+                        "output_tilt_source",
+                        ui.radio(
+                            tr_options(t, OUTPUT_TILT_SOURCE_OPTION_LABEL_KEYS),
+                            value=normalize_output_tilt_source_value(
+                                get_val("output_tilt_source", OUTPUT_TILT_SOURCE_OFF),
+                                t,
+                            ),
+                        ).classes("w-full"),
+                    )
+                ui.label(t("output_tilt_help")).classes("text-xs text-gray-400")
+            output_tilt_col.set_visibility(_initial_mode == "ADVANCED" and _initial_lvl_mode == LVL_MODE_MANUAL)
+
+        with section_card(title=t("magnitude_correction_limits")):
+            ctrl.register(
+                "mag_correct",
+                ui.checkbox(t("enable_corr"), value=bool(get_val("mag_correct", True))),
+            )
+
+            with ui.row().classes("w-full gap-4"):
+                ctrl.register(
+                    "mag_c_min",
+                    ui.number(
+                        label=t("min_freq"),
+                        value=float(get_val("mag_c_min", 10.0) or 10.0),
+                        format="%.1f",
+                    ).props("dense outlined").classes("flex-1"),
+                )
+                ctrl.register(
+                    "mag_c_max",
+                    ui.number(
+                        label=t("max_freq"),
+                        value=float(get_val("mag_c_max", 200.0) or 200.0),
+                        format="%.1f",
+                    ).props("dense outlined").classes("flex-1"),
+                )
+
+            ctrl.register(
+                "max_boost",
+                ui.number(
+                    label=t("max_boost"),
+                    value=float(get_val("max_boost", 5.0) or 5.0),
+                    format="%.1f",
+                ).props("dense outlined").classes("w-full"),
+            )
 
 def refresh_target_preview() -> None:
     """Regenerate the target curve preview plot (NiceGUI version).
@@ -520,6 +944,7 @@ def refresh_target_preview() -> None:
     if preview_col is None:
         return
     _render_target_decay_hint()
+    _render_target_preview_metadata()
 
     fig, drag_base_points, tilt_handle_points = _build_target_preview_fig()
     _TARGET_PREVIEW_DRAG_BASE_POINTS = drag_base_points
@@ -1115,7 +1540,23 @@ def _build_target_preview_fig():  # noqa: C901 - target preview figure is assemb
         return None, [], []
 
 
-__all__ = ['_step_manual_target', '_step_manual_target_tilt', 'build_target_tab', 'refresh_target_preview', '_mount_target_preview_plot', '_schedule_target_preview_refresh', '_on_target_preview_relayout', '_build_target_preview_fig']
+__all__ = [
+    '_normalize_harmonic_plot_source',
+    '_build_target_preview_metadata_payload',
+    '_build_target_decay_hint_payload',
+    '_build_target_preview_rt60_fig',
+    '_build_target_preview_harmonics_fig',
+    '_build_target_preview_harmonic_risk_fig',
+    '_render_target_preview_metadata',
+    '_step_manual_target',
+    '_step_manual_target_tilt',
+    'build_target_tab',
+    'refresh_target_preview',
+    '_mount_target_preview_plot',
+    '_schedule_target_preview_refresh',
+    '_on_target_preview_relayout',
+    '_build_target_preview_fig',
+]
 
 
 def _link_sibling_exports() -> None:

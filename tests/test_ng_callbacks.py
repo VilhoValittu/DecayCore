@@ -4,6 +4,7 @@ from decaycore.ui import ng_controls as ctrl
 from decaycore.ui.ng_callbacks import (
     _register_ir_window_callbacks,
     _register_bass_integration_callbacks,
+    _register_lvl_callbacks,
     _register_mode_callbacks,
     _register_target_callbacks,
     _sync_bass_integration_visibility,
@@ -30,6 +31,31 @@ class _ReactiveControl:
     def set_value(self, value):
         self.value = value
         for callback in list(self._callbacks):
+            callback(_DummyEvent(value))
+
+
+class _CommitReactiveControl:
+    def __init__(self, value):
+        self.value = value
+        self._value_callbacks = []
+        self._change_callbacks = []
+
+    def on_value_change(self, callback):
+        self._value_callbacks.append(callback)
+
+    def on(self, event, callback):
+        if event != "change":
+            raise AssertionError(f"unexpected event: {event}")
+        self._change_callbacks.append(callback)
+
+    def set_value(self, value):
+        self.value = value
+        for callback in list(self._value_callbacks):
+            callback(_DummyEvent(value))
+
+    def trigger_change(self, value):
+        self.value = value
+        for callback in list(self._change_callbacks):
             callback(_DummyEvent(value))
 
 
@@ -115,6 +141,31 @@ def test_enabling_bass_integration_forces_auto_mode(monkeypatch) -> None:
 
     assert ctrl.value("mode") == "AUTO"
     assert ctrl.value("camillafir_automatic_mode") is True
+
+
+def test_lvl_range_callbacks_wait_for_commit_before_swapping(monkeypatch) -> None:
+    ctrl.reset()
+    lvl_min = _CommitReactiveControl(500.0)
+    lvl_max = _CommitReactiveControl(2000.0)
+    ctrl.register("lvl_min", lvl_min)
+    ctrl.register("lvl_max", lvl_max)
+
+    preview_calls: list[str] = []
+    monkeypatch.setattr("decaycore.ui.ng_callbacks._update_target_preview", lambda: preview_calls.append("preview"))
+
+    _register_lvl_callbacks(t=_t)
+
+    lvl_max.set_value(2.0)
+
+    assert ctrl.value("lvl_min") == 500.0
+    assert ctrl.value("lvl_max") == 2.0
+    assert preview_calls == []
+
+    lvl_max.trigger_change(2.0)
+
+    assert ctrl.value("lvl_min") == 1.0
+    assert ctrl.value("lvl_max") == 501.0
+    assert preview_calls == ["preview"]
 
 
 def test_auto_target_mode_selected_restores_last_manual_target_from_adaptive(monkeypatch) -> None:

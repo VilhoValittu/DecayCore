@@ -11,12 +11,14 @@
 import json
 import logging
 import os
+from pathlib import Path
 
 logger = logging.getLogger("DecayCore")
 
-from ..app_paths import default_measurements_dir
+from ..app_paths import default_measurements_dir, decaycore_config_path
 from .legacy_keys import CAMILLAFIR_AUTO_MODE
 from ..common.measurement_defaults import (
+    DEFAULT_MEASUREMENT_DITHER_LEVEL_DB,
     DEFAULT_MEASUREMENT_SAMPLE_RATE,
     DEFAULT_OUTPUT_GAIN_DB,
     DEFAULT_SWEEP_END_HZ,
@@ -33,7 +35,7 @@ from ..ui_i18n import (
     normalize_output_tilt_source_value,
 )
 
-CONFIG_FILE = "config.json"
+CONFIG_FILE: Path = decaycore_config_path()
 
 _RECOVERABLE_CONFIG_EXCEPTIONS = (
     AttributeError,
@@ -168,10 +170,11 @@ def _normalize_saved_filter_type(saved: dict, default_conf: dict) -> None:
 
 def _load_and_merge_saved_config(default_conf: dict) -> bool:
     saved_mode_explicit = False
-    if not os.path.exists(CONFIG_FILE):
+    config_path = Path(CONFIG_FILE)
+    if not config_path.exists():
         return saved_mode_explicit
     try:
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             saved = json.load(f)
         if not isinstance(saved, dict):
             return saved_mode_explicit
@@ -205,7 +208,8 @@ def _resolve_runtime_mode(default_conf: dict, *, saved_mode_explicit: bool) -> s
     return mode_u
 
 
-def load_config() -> dict:
+def _make_default_config() -> dict:
+    """Return pristine default config without reading any saved file."""
     default_conf = {
         "fmt": "WAV",
         "layout": LAYOUT_MONO,
@@ -331,6 +335,7 @@ def load_config() -> dict:
         "measurement_sweep_end_hz": DEFAULT_SWEEP_END_HZ,
         "measurement_sweep_length_s": DEFAULT_SWEEP_LENGTH_S,
         "measurement_output_gain_db": DEFAULT_OUTPUT_GAIN_DB,
+        "measurement_dither_level_db": DEFAULT_MEASUREMENT_DITHER_LEVEL_DB,
         "measurement_source_path": "",
         "measurement_role": "left",
         "measurement_use_wasapi": False,
@@ -404,6 +409,11 @@ def load_config() -> dict:
         "conf_pull_bass_boost_restore": 0.70,
         "debug_stage_stats": True,
     }
+    return default_conf
+
+
+def load_config() -> dict:
+    default_conf = _make_default_config()
 
     saved_mode_explicit = _load_and_merge_saved_config(default_conf)
 
@@ -442,7 +452,9 @@ def save_config(data: dict) -> None:
         clean_data["lvl_mode"] = normalize_lvl_mode_value(clean_data.get("lvl_mode", LVL_MODE_AUTO))
         clean_data["lvl_algo"] = normalize_lvl_algo_value(clean_data.get("lvl_algo", LVL_ALGO_MEDIAN))
         clean_data["output_tilt_source"] = normalize_output_tilt_source_value(clean_data.get("output_tilt_source", "off"))
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        config_path = Path(CONFIG_FILE)
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(config_path, "w", encoding="utf-8") as f:
             json.dump(clean_data, f, indent=4)
     except (
 

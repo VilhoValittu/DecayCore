@@ -125,6 +125,7 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
     y_mag_range_db: float | None = None,
 ):
     try:
+        analysis_meta_text = None
         fft_ctx = _prediction_plot_fft_context(filt_ir=filt_ir, fs=fs, target_stats=target_stats)
         VIS_POINTS = int(fft_ctx["vis_points"])
         show_afdw = bool(fft_ctx["show_afdw"])
@@ -498,20 +499,10 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
                 ag_txt = float(target_stats.get("auto_global_gain_db", 0.0) or 0.0)
                 ah_txt = float(target_stats.get("auto_headroom_db", 0.0) or 0.0)
                 if np.isfinite(ag_txt) or np.isfinite(ah_txt):
-                    fig.add_annotation(
-                        x=0.99,
-                        y=1.0,
-                        xref="paper",
-                        yref="paper",
-                        xanchor="right",
-                        yanchor="top",
-                        text=f"Auto gain: {ag_txt:+.2f} dB | Headroom: {ah_txt:+.2f} dB | Filter delay removed: {filt_delay_ms:.2f} ms",
-                        showarrow=False,
-                        align="left",
-                        font=dict(size=12, color=_PLOT_FONT),
-                        bgcolor=_PLOT_PANEL_BG,
-                        bordercolor=_PLOT_PANEL_BORDER,
-                        borderwidth=1,
+                    analysis_meta_text = (
+                        f"Auto gain: {ag_txt:+.2f} dB"
+                        f" | Headroom: {ah_txt:+.2f} dB"
+                        f" | Filter delay removed: {filt_delay_ms:.2f} ms"
                     )
         except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
             pass
@@ -743,6 +734,14 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
                 fig.update_yaxes(range=[0.0, 1.0 / 3.0], row=5, col=1)
             fig.update_yaxes(title_text="oct", row=5, col=1)
 
+        title_text = f"{title} Analysis"
+        if analysis_meta_text:
+            title_text += (
+                "<span style='font-size:0.78em; font-weight:400;'>"
+                f"&nbsp;&nbsp;&nbsp;&nbsp;{analysis_meta_text}"
+                "</span>"
+            )
+
         fig.update_layout(
             height=fig_height,
             width=fig_width,
@@ -750,7 +749,11 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
             paper_bgcolor=_PLOT_PAPER_BG,
             plot_bgcolor=_PLOT_BG,
             font=dict(color=_PLOT_FONT, family="Inter, system-ui, sans-serif"),
-            title_text=f"{title} Analysis",
+            title=dict(
+                text=title_text,
+                x=0.01,
+                xanchor="left",
+            ),
             uirevision="keep",
             yaxis6=dict(
                 overlaying="y",

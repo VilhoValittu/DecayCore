@@ -35,13 +35,19 @@ REW-style measurement data may also be used in compatible workflows, but DecayCo
 
 ## Screenshots
 
-![Files tab — load measurement files and set output format](docs/pics/ui_1.png)
+![Files tab — load measurement files, inspect metadata, and set output format](docs/pics/ui_1.png)
 
-![Target tab — correction target curve and leveling](docs/pics/ui_3.png)
+![Measure tab — configure capture devices and run guided room measurements](docs/pics/ui_2.png)
 
-![Advanced tab — correction shaping and bass protection](docs/pics/ui_4.png)
+![Basic tab — choose operating mode, FIR engine, and sample rate](docs/pics/ui_3.png)
 
-![IR Window & Decay Control — windowing, A-FDW, Temporal Decay Control](docs/pics/ui_5.png)
+![Target tab — shape the target curve, leveling, and gain behavior](docs/pics/ui_4.png)
+
+![Advanced tab — refine correction shaping, bass protection, and confidence controls](docs/pics/ui_5.png)
+
+![Start / Results tab — run correction and review generated results](docs/pics/ui_8.png)
+
+![Final graph — generated correction analysis plot from the results view](docs/pics/ui_9.png)
 
 ## Documentation
 

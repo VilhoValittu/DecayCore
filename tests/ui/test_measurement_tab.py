@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
+from decaycore.common.measurement_defaults import DEFAULT_MEASUREMENT_DITHER_LEVEL_DB
 from decaycore.ui import measurement_tab
 
 
@@ -58,6 +59,49 @@ def test_measurement_audio_backend_message_returns_backend_reason(monkeypatch) -
     message = measurement_tab._measurement_audio_backend_message()
 
     assert message == "Audio backend loaded, but device query failed: PortAudio host API not initialized"
+
+
+def test_pick_measurement_device_value_prefers_current_then_default_then_first() -> None:
+    options = {
+        7: "Device 7",
+        9: "Device 9",
+    }
+
+    assert measurement_tab._pick_measurement_device_value(9, 7, options) == 9
+    assert measurement_tab._pick_measurement_device_value(8, 7, options) == 7
+    assert measurement_tab._pick_measurement_device_value(None, None, options) == 7
+    assert measurement_tab._pick_measurement_device_value(None, None, {}) is None
+
+
+def test_linux_sub_output_helpers_follow_selected_channel(monkeypatch) -> None:
+    monkeypatch.setattr(measurement_tab.sys, "platform", "linux")
+
+    assert measurement_tab._measurement_sub_output_channel_default() == 3
+    assert measurement_tab._measurement_sub_output_channel_value("2") == 2
+    assert measurement_tab._measurement_sub_output_channel_value(None) == 3
+    assert measurement_tab._measurement_sub_output_channel_visible("sub") is True
+    assert measurement_tab._measurement_sub_output_channel_visible("left") is False
+    assert measurement_tab._measurement_output_channel_for_role("sub", sub_output_channel=2) == 2
+    assert measurement_tab._measurement_output_channel_for_role("left", sub_output_channel=2) == 0
+    assert measurement_tab._measurement_required_output_channels("sub", sub_output_channel=2) == 3
+    assert measurement_tab._measurement_required_output_channels("sub", sub_output_channel=3) == 4
+
+
+def test_windows_sub_output_helpers_keep_existing_behavior(monkeypatch) -> None:
+    monkeypatch.setattr(measurement_tab.sys, "platform", "win32")
+
+    assert measurement_tab._measurement_sub_output_channel_visible("sub") is False
+    assert measurement_tab._measurement_output_channel_for_role("sub", sub_output_channel=2) == 0
+    assert measurement_tab._measurement_required_output_channels("sub", sub_output_channel=2) == 6
+
+
+def test_measurement_dither_level_sanitizer_uses_safe_defaults() -> None:
+    assert (
+        measurement_tab._sanitize_measurement_dither_level_db(None)
+        == DEFAULT_MEASUREMENT_DITHER_LEVEL_DB
+    )
+    assert measurement_tab._sanitize_measurement_dither_level_db(-140.0) == -120.0
+    assert measurement_tab._sanitize_measurement_dither_level_db(-40.0) == -40.0
 
 
 def test_preview_magnitude_for_plot_uses_camillafir_reference_smoothing(monkeypatch) -> None:

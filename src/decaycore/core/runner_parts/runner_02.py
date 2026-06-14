@@ -17,7 +17,6 @@ import math
 import os
 import shutil
 import subprocess
-import tempfile
 import time
 import traceback
 import zipfile
@@ -41,7 +40,7 @@ def _convert_ir_for_export(ir: np.ndarray, fmt: str) -> np.ndarray:
 
 from ...auto_mode.api import AUTO_MODE_COMPAT_VERSION
 from ...auto_mode.rank_score import attach_official_rank_score, official_rank_score
-from ...config.decaycore_config import load_config
+from ...config.decaycore_config import load_config, _make_default_config
 from ...version import VERSION
 from ...workflow.auto_flow import _run_auto_mode_search_if_needed, _run_auto_mode_seed_phases
 from ...workflow.pipeline_flow import _run_pipeline
@@ -491,13 +490,7 @@ def _resolve_headless_paths_inplace(data: dict, config_dir: Path) -> None:
 
 
 def _normalize_headless_config(config: dict, *, config_dir: Path, output_dir: Path) -> dict:
-    cwd = os.getcwd()
-    with tempfile.TemporaryDirectory(prefix="camillafir-headless-defaults-") as tmp:
-        try:
-            os.chdir(tmp)
-            data = load_config()
-        finally:
-            os.chdir(cwd)
+    data = _make_default_config()
     data.update(dict(config or {}))
     data["_headless"] = True
     data["mode"] = str(config.get("mode", data.get("mode", "auto")) or "auto").strip().upper()

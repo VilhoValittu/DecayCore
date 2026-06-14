@@ -161,6 +161,32 @@ def on_change(name: str, callback: Callable) -> None:
             logger.debug("on_change(%r) failed", name, exc_info=True)
 
 
+def on_commit(name: str, callback: Callable) -> None:
+    """Register a commit-style callback on the named element.
+
+    Prefers the native ``change`` event so typing into number/text fields does
+    not trigger writeback logic on every keystroke. Falls back to
+    ``on_value_change`` for controls that do not expose ``change`` separately.
+    """
+    el = _CONTROLS.get(name)
+    if el is None:
+        logger.debug("on_commit: element %r not registered yet", name)
+        return
+
+    def _wrapped(e: Any) -> None:
+        if name in _SUPPRESSED_CALLBACKS:
+            return
+        callback(e.value)
+
+    try:
+        el.on("change", _wrapped)
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        try:
+            el.on_value_change(_wrapped)
+        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+            logger.debug("on_commit(%r) failed", name, exc_info=True)
+
+
 # ---------------------------------------------------------------------------
 # Dynamic containers  (put_scope / use_scope equivalent)
 # ---------------------------------------------------------------------------

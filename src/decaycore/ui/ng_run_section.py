@@ -31,6 +31,7 @@ import threading
 import time
 
 from . import ui_state
+from .ng_sections import page_shell, section_card
 from ..resources.i8n.decaycore_i18n import t
 
 logger = logging.getLogger("DecayCore")
@@ -38,6 +39,7 @@ logger = logging.getLogger("DecayCore")
 _results_container_ref = None
 _progress_ref = None
 _progress_overlay_refs = []
+_progress_meta_refs = []
 _run_clock: dict = {"started_at": None, "active": False, "elapsed_s": None}
 _start_button_lock = threading.Lock()
 _pending_start_button_enable = None
@@ -114,6 +116,28 @@ def _set_progress_overlay_text_dark(enabled: bool) -> None:
             logger.debug("Failed to update progress overlay text color", exc_info=True)
 
 
+def _set_progress_meta_completed(enabled: bool) -> None:
+    add_class = "cf-progress-meta--complete" if enabled else "cf-progress-meta--running"
+    remove_class = "cf-progress-meta--running" if enabled else "cf-progress-meta--complete"
+    for meta in list(_progress_meta_refs):
+        try:
+            meta.classes(add=add_class, remove=remove_class)
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
+            logger.debug("Failed to update progress meta visual state", exc_info=True)
+
+
 def set_progress_visual_state(*, completed: bool) -> None:
     progress = get_progress_element()
     if progress is not None:
@@ -133,6 +157,7 @@ def set_progress_visual_state(*, completed: bool) -> None:
             NameError,
         ):
             logger.debug("Failed to update progress bar color", exc_info=True)
+    _set_progress_meta_completed(enabled=completed)
     _set_progress_overlay_text_dark(enabled=completed)
 
 
@@ -250,7 +275,7 @@ def build_global_progress_bar() -> None:
     Must be called inside the cf-top-shell column context (ng_app._build_header).
     Creates the progress bar, status labels, and the 500 ms polling timer.
     """
-    global _progress_ref, _progress_overlay_refs
+    global _progress_ref, _progress_overlay_refs, _progress_meta_refs
 
     from nicegui import ui
     from . import ng_bridge
@@ -258,10 +283,10 @@ def build_global_progress_bar() -> None:
     progress = ui.linear_progress(value=0.0, size="24px", show_value=False).classes("w-full")
     with progress:
         with ui.row().classes("absolute-full items-center no-wrap px-3 gap-3"):
-            progress_phase_label = ui.label("").classes("text-xs text-white font-medium truncate min-w-0 grow")
-            with ui.row().classes("items-center no-wrap gap-3 shrink-0"):
-                progress_elapsed_label = ui.label("").classes("text-xs text-white font-medium whitespace-nowrap")
-                progress_percent_label = ui.label("").classes("text-sm text-white font-medium whitespace-nowrap").bind_text_from(
+            progress_phase_label = ui.label("").classes("cf-progress-phase text-xs text-white font-medium truncate min-w-0 grow")
+            with ui.row().classes("cf-progress-meta cf-progress-meta--running items-center no-wrap gap-3 shrink-0") as progress_meta_row:
+                progress_elapsed_label = ui.label("").classes("cf-progress-meta-label text-xs text-white font-medium whitespace-nowrap")
+                progress_percent_label = ui.label("").classes("cf-progress-meta-label text-sm text-white font-medium whitespace-nowrap").bind_text_from(
                     progress,
                     "value",
                     backward=_format_progress_percent,
@@ -269,7 +294,9 @@ def build_global_progress_bar() -> None:
     progress.visible = False
     _progress_ref = progress
     _progress_overlay_refs = [progress_phase_label, progress_elapsed_label, progress_percent_label]
+    _progress_meta_refs = [progress_meta_row]
     _set_progress_overlay_text_dark(False)
+    _set_progress_meta_completed(False)
 
     ng_bridge.set_progress_element_getter(get_progress_element)
 
@@ -489,7 +516,7 @@ def build_run_section(*, on_start_click) -> None:
 
     from nicegui import ui
 
-    with ui.column().classes("w-full gap-3"):
+    with page_shell(title=t("tab_run"), intro=t("run_page_intro"), wide=True):
         start_btn = ui.button(
             t("run_start_button"),
             on_click=lambda: _handle_start(on_start_click, start_btn, _run_clock),
@@ -497,7 +524,8 @@ def build_run_section(*, on_start_click) -> None:
             'color="positive" unelevated'
         )
 
-        _results_container_ref = ui.column().classes("w-full gap-2")
+        with section_card(title=t("run_results_section_title"), hero=True):
+            _results_container_ref = ui.column().classes("w-full gap-4")
 
 
 def _clear_previous_run_output() -> None:

@@ -19,6 +19,7 @@ from typing import Callable
 from ..config.decaycore_pipeline import filter_type_supports_xo_phase_model
 from ..config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from . import ng_controls as ctrl
+from .ng_sections import page_shell, section_card
 
 _SLOPE_OPTS = [6, 12, 18, 24, 36, 48]
 
@@ -34,43 +35,42 @@ def build_xo_tab(*, t: Callable, get_val: Callable) -> None:
     )
     xo_enabled = bool(filter_type_supports_xo_phase_model(get_val("filter_type", "Mixed")))
 
-    with ui.column().classes("w-full gap-0") as xo_content:
-        ui.markdown(f"#### ✖ {t('tab_xo')}")
-        ui.label(t("tab_xo_help")).classes("text-sm text-gray-400 -mt-2 mb-2")
-        with ui.column().classes("w-full gap-1") as bass_xo_scope:
-            ui.label(t("bass_integration_xo_phase_model_info")).classes("text-xs text-gray-400")
-            ui.label(t("bass_integration_xo_avr_separate_info")).classes("text-xs text-gray-400")
-        ctrl.register_container("bass_integration_xo_info_scope", bass_xo_scope)
-        bass_xo_scope.set_visibility(bass_integration_visible)
-        with ui.column().classes("w-full gap-1") as bass_direct_scope:
-            ctrl.register(
-                "bass_integration_allpass_auto_enable",
-                ui.checkbox(
-                    t("bass_integration_allpass_auto_enable"),
-                    value=bool(get_val("bass_integration_allpass_auto_enable", False)),
-                ),
-            )
-        ctrl.register_container("bass_integration_direct_scope", bass_direct_scope)
-        bass_direct_scope.set_visibility(bass_integration_visible)
-        ui.separator()
+    with page_shell(title=t("tab_xo"), intro=t("tab_xo_help")):
+        with ui.column().classes("w-full gap-0") as xo_content:
+            with section_card(title=t("tab_xo")):
+                with ui.column().classes("w-full gap-1") as bass_xo_scope:
+                    ui.label(t("bass_integration_xo_phase_model_info")).classes("text-xs text-gray-400")
+                    ui.label(t("bass_integration_xo_avr_separate_info")).classes("text-xs text-gray-400")
+                ctrl.register_container("bass_integration_xo_info_scope", bass_xo_scope)
+                bass_xo_scope.set_visibility(bass_integration_visible)
+                with ui.column().classes("w-full gap-1") as bass_direct_scope:
+                    ctrl.register(
+                        "bass_integration_allpass_auto_enable",
+                        ui.checkbox(
+                            t("bass_integration_allpass_auto_enable"),
+                            value=bool(get_val("bass_integration_allpass_auto_enable", False)),
+                        ),
+                    )
+                ctrl.register_container("bass_integration_direct_scope", bass_direct_scope)
+                bass_direct_scope.set_visibility(bass_integration_visible)
 
-        for i in range(1, 6):
-            with ui.row().classes("w-full gap-4 items-end"):
-                ctrl.register(
-                    f"xo{i}_f",
-                    ui.number(
-                        label=f"XO {i} Hz",
-                        value=get_val(f"xo{i}_f", None),
-                        format="%.1f",
-                    ).props("dense outlined").classes("flex-1"),
-                )
-                ctrl.register(
-                    f"xo{i}_s",
-                    ui.select(
-                        _SLOPE_OPTS,
-                        value=get_val(f"xo{i}_s", 12),
-                        label="dB/oct",
-                    ).props("dense outlined").classes("w-32"),
-                )
+                for i in range(1, 6):
+                    with ui.row().classes("w-full gap-4 items-end"):
+                        ctrl.register(
+                            f"xo{i}_f",
+                            ui.number(
+                                label=f"XO {i} Hz",
+                                value=get_val(f"xo{i}_f", None),
+                                format="%.1f",
+                            ).props("dense outlined").classes("flex-1"),
+                        )
+                        ctrl.register(
+                            f"xo{i}_s",
+                            ui.select(
+                                _SLOPE_OPTS,
+                                value=get_val(f"xo{i}_s", 12),
+                                label="dB/oct",
+                            ).props("dense outlined").classes("w-32"),
+                        )
     ctrl.register_container("xo_tab_content_scope", xo_content)
     xo_content.set_visibility(xo_enabled)

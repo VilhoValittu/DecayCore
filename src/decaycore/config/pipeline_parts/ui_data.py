@@ -129,7 +129,7 @@ _UI_PIN_KEYS = [
     "measurement_input_device", "measurement_output_device",
     "measurement_input_channel", "measurement_output_channel",
     "measurement_samplerate", "measurement_sweep_start_hz", "measurement_sweep_end_hz",
-    "measurement_sweep_length_s", "measurement_output_gain_db", "measurement_source_path", "measurement_role",
+    "measurement_sweep_length_s", "measurement_output_gain_db", "measurement_dither_level_db", "measurement_source_path", "measurement_role",
     "measurement_use_wasapi",
     "measurement_mic_calibration_path", "measurement_mic_calibration_label",
     "generated_measurement_l", "generated_measurement_r",

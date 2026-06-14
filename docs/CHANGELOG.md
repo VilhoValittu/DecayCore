@@ -8,6 +8,22 @@ All notable changes to **DecayCore** are documented in this file.
 
 ---
 
+## [1.1.3] - 14-6-2026
+
+### New UI — cleaner, faster, more polished
+
+DecayCore 1.1.3 brings a clear visual refresh to the NiceGUI app. The new layout is easier to scan, sections feel more consistent, and important controls are easier to find without digging through the page. Basic, Advanced, Target, Files, Window, and XO views now feel more connected, making the whole workflow smoother from setup to export.
+
+### Better guidance and clearer everyday use
+
+This release also improves the small details that shape daily use. Target preview information is presented more clearly, the User Manual dialog is cleaner and easier to close, and responsive theme updates help the app look better across different screen sizes. Even simple actions now feel more focused.
+
+### Linux measurement — easier routing, better subwoofer handling
+
+Built-in measurement has been improved especially for Linux users. Output-channel handling for subwoofer measurements is now more robust, routing is clearer, and the measurement UI does a better job of supporting real-world device setups. The result is a simpler measurement path with less guesswork and better confidence when selecting outputs and running captures.
+
+---
+
 ## [1.1.2.1] - 13-6-2026
 
 ### AUTO Mode cache compatibility — cleaner upgrades, fewer stale decisions

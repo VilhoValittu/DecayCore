@@ -31,6 +31,7 @@ class TestLoadConfigBasics:
         required = ["fs", "mode", "filter_type", "mag_correct", "taps", "hc_mode"]
         for key in required:
             assert key in cfg
+        assert "measurement_dither_level_db" in cfg
 
     def test_load_config_key_count(self):
         """load_config has approximately 196 keys."""
@@ -157,6 +158,7 @@ class TestRoundTrip:
         """Can load config after saving it."""
         cfg1 = decaycore_config.load_config()
         cfg1["mode"] = "BASIC"
+        cfg1["measurement_dither_level_db"] = -44.0
 
         # Save
         decaycore_config.save_config(cfg1)
@@ -168,6 +170,7 @@ class TestRoundTrip:
         assert isinstance(cfg2, dict)
         assert len(cfg2) > 100
         assert "mode" in cfg2
+        assert cfg2["measurement_dither_level_db"] == -44.0
 
 
 class TestEdgeCases:

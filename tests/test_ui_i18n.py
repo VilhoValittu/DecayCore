@@ -100,3 +100,14 @@ def test_hybrid_iir_translation_keys_exist():
     for lang in ("en", "fi"):
         missing = required.difference(TRANSLATIONS[lang])
         assert not missing
+
+
+def test_measurement_translation_keys_exist_for_linux_virtual_sub_support():
+    required = {
+        "measurement_refresh_devices",
+        "measurement_sub_output_channel",
+        "measurement_sub_output_channel_hint",
+    }
+    for lang in ("en", "fi"):
+        missing = required.difference(TRANSLATIONS[lang])
+        assert not missing

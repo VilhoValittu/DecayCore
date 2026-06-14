@@ -13,42 +13,20 @@ from __future__ import annotations
 import hashlib
 import logging
 import sys
-import threading
-from pathlib import Path
-from typing import Callable
 
 logger = logging.getLogger("DecayCore")
 
 import numpy as np
 
-from ...app_paths import default_measurements_dir
-from ...measurement.adapter import bundle_to_generated_source, bundle_to_upload_payload
 from ...measurement.devices import (
     check_measurement_audio_backend,
-    get_default_input_device_index,
-    get_default_output_device_index,
     is_measurement_device_wasapi,
-    list_measurement_input_devices,
-    list_measurement_output_devices,
-    list_wasapi_input_devices,
-    list_wasapi_output_devices,
 )
-from ...measurement.io import save_measurement_bundle
-from ...measurement.models import MeasurementBundle, MeasurementRequest, MeasurementSessionAggregate
-from ...measurement.routing import measurement_role_output_channel_count
-from ...measurement.sweep import (
-    DEFAULT_MEASUREMENT_SAMPLE_RATE,
-    DEFAULT_OUTPUT_GAIN_DB,
-    DEFAULT_POST_SILENCE_S,
-    DEFAULT_PRE_SILENCE_S,
-    DEFAULT_SWEEP_END_HZ,
-    DEFAULT_SWEEP_LENGTH_S,
-    DEFAULT_SWEEP_START_HZ,
+from ...measurement.models import MeasurementBundle, MeasurementSessionAggregate
+from ...measurement.routing import (
+    DEFAULT_LINUX_SUBWOOFER_OUTPUT_CHANNEL_INDEX,
+    measurement_role_output_channel_count,
 )
-from ...measurement.capture import run_audibility_test
-from ...measurement.workflow import run_measurement_workflow
-from .. import measurement_state, ng_controls as ctrl
-from ..measurement_session_dialog import build_measurement_session_dialog
 from ..plot_common import _view_mags_for_plot
 
 
@@ -96,6 +74,70 @@ def _device_option_label(device, *, samplerate_hz: int | None = None) -> str:
 
 def _measurement_use_wasapi_value(value) -> bool:
     return bool(value) if sys.platform == "win32" else False
+
+def _measurement_sub_output_channel_default() -> int:
+    return int(DEFAULT_LINUX_SUBWOOFER_OUTPUT_CHANNEL_INDEX)
+
+def _measurement_sub_output_channel_value(value) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return _measurement_sub_output_channel_default()
+    return max(0, parsed)
+
+def _measurement_sub_output_channel_visible(role_value: str | None) -> bool:
+    if sys.platform == "win32":
+        return False
+    role = str(role_value or "").strip().lower()
+    return role == "sub"
+
+def _measurement_output_channel_for_role(
+    role_value: str | None,
+    *,
+    sub_output_channel: int | None = None,
+) -> int:
+    role = str(role_value or "").strip().lower()
+    if role != "sub" or sys.platform == "win32":
+        return 0
+    return _measurement_sub_output_channel_value(sub_output_channel)
+
+def _measurement_required_output_channels(
+    role_value: str | None,
+    *,
+    sub_output_channel: int | None = None,
+) -> int:
+    resolved_sub_channel = _measurement_output_channel_for_role(
+        role_value,
+        sub_output_channel=sub_output_channel,
+    )
+    return int(
+        measurement_role_output_channel_count(
+            role_value,
+            sub_output_channel=resolved_sub_channel,
+        )
+    )
+
+def _pick_measurement_device_value(
+    current_value,
+    saved_default,
+    options: dict[int, str],
+):
+    def _coerce(candidate):
+        try:
+            parsed = int(candidate)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        return parsed if parsed in options else None
+
+    current = _coerce(current_value)
+    if current is not None:
+        return current
+    default = _coerce(saved_default)
+    if default is not None:
+        return default
+    if options:
+        return next(iter(options))
+    return None
 
 def _filter_measurement_devices_for_wasapi(devices, *, enabled: bool):
     device_list = list(devices or [])
@@ -260,7 +302,7 @@ def _session_preview_bundles(session: MeasurementSessionAggregate) -> dict[str, 
     return bundles
 
 
-__all__ = ['_build_upload_payload', '_device_option_label', '_measurement_use_wasapi_value', '_filter_measurement_devices_for_wasapi', '_measurement_audio_backend_message', '_preview_magnitude_for_plot', '_build_preview_figure', '_session_preview_bundles']
+__all__ = ['_build_upload_payload', '_device_option_label', '_measurement_use_wasapi_value', '_measurement_sub_output_channel_default', '_measurement_sub_output_channel_value', '_measurement_sub_output_channel_visible', '_measurement_output_channel_for_role', '_measurement_required_output_channels', '_pick_measurement_device_value', '_filter_measurement_devices_for_wasapi', '_measurement_audio_backend_message', '_preview_magnitude_for_plot', '_build_preview_figure', '_session_preview_bundles']
 
 
 def _link_sibling_exports() -> None:

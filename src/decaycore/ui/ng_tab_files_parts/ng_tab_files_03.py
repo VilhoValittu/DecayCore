@@ -14,7 +14,7 @@ Replaces build_input_section() from layout_builders.py.
 """
 from __future__ import annotations
 
-import hashlib
+import asyncio
 import logging
 import os
 import re
@@ -23,9 +23,10 @@ from typing import Any, Callable
 logger = logging.getLogger("DecayCore")
 
 from .. import ng_controls as ctrl
+from ..ng_sections import page_shell, section_card
+from ...config.decaycore_config import load_config, save_config
 from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from ...app_paths import default_measurements_dir
-from ...io.measurements_loader import _try_load_harmonic_sidecar, _try_load_rt60_sidecar
 from ...ui_i18n import (
     DEVICE_AUDIO_FORMAT_OPTION_LABEL_KEYS,
     DEVICE_AUDIO_FORMAT_S32LE,
@@ -92,6 +93,29 @@ _MEASUREMENT_SLOT_UPLOAD_KEYS = {
 _SLOT_FILTER_THRESHOLD = -50.0
 _SUB_SLOT_KEYS = frozenset({"local_path_l_sub", "local_path_r_sub"})
 _SUB_FILENAME_PREFIXES = ("sub", "lfe", "sw")
+
+
+def _persist_measurement_library_dir(value: Any) -> str:
+    persisted_value = _normalize_local_path_value(value) or str(default_measurements_dir())
+    try:
+        cfg = dict(load_config() or {})
+        cfg["measurement_library_dir"] = persisted_value
+        save_config(cfg)
+    except (
+
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        logger.exception("measurement library dir persist failed")
+    return persisted_value
 
 def _score_left_slot(
     tokens: list[str],
@@ -387,6 +411,83 @@ def _suggest_measurement_library_matches(
             break
     return suggestions
 
+def _build_measurement_library_slot_options(
+    entries: list[dict[str, Any]],
+    *,
+    path_keys: list[str],
+) -> dict[str, dict[str, str]]:
+    return {path_key: _build_slot_options(entries, path_key) for path_key in path_keys}
+
+def _build_measurement_library_state(
+    entries: list[dict[str, Any]],
+    *,
+    path_keys: list[str],
+) -> dict[str, Any]:
+    entries_list = list(entries)
+    return {
+        "entries": entries_list,
+        "options": _build_measurement_library_options(entries_list),
+        "slot_options": _build_measurement_library_slot_options(entries_list, path_keys=path_keys),
+    }
+
+def _build_measurement_library_refresh_payload(
+    path_raw: Any,
+    *,
+    path_keys: list[str],
+) -> dict[str, Any]:
+    dir_value = _normalize_local_path_value(path_raw)
+    exists = False
+    if dir_value:
+        try:
+            exists = os.path.isdir(dir_value)
+        except OSError:
+            exists = False
+    entries = _scan_measurement_library(dir_value) if exists else []
+    payload = _build_measurement_library_state(entries, path_keys=path_keys)
+    payload["dir_value"] = dir_value
+    payload["exists"] = exists
+    return payload
+
+def _measurement_library_refresh_payload_for_token(
+    payload: dict[str, Any],
+    *,
+    token: int,
+    current_token: int,
+) -> dict[str, Any] | None:
+    if int(token) != int(current_token):
+        return None
+    payload_copy = dict(payload)
+    payload_copy["token"] = int(token)
+    return payload_copy
+
+def _measurement_library_status_key(
+    *,
+    dir_value: str,
+    exists: bool,
+    entry_count: int,
+    is_scanning: bool,
+) -> str:
+    if is_scanning:
+        return "measurement_library_status_scanning"
+    if not dir_value:
+        return "measurement_library_status_idle"
+    if not exists:
+        return "measurement_library_status_missing"
+    if entry_count:
+        return "measurement_library_status_found"
+    return "measurement_library_status_empty"
+
+def _suggest_measurement_library_matches_if_ready(
+    entries: list[dict[str, Any]],
+    *,
+    path_keys: list[str],
+    is_scanning: bool,
+    min_score: float = 80.0,
+) -> dict[str, str]:
+    if is_scanning:
+        return {}
+    return _suggest_measurement_library_matches(entries, path_keys=path_keys, min_score=min_score)
+
 def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - file tab coordinates upload, library, and path syncing
     from nicegui import ui
     mode_value = str(get_val("mode", "BASIC") or "BASIC").strip().upper()
@@ -399,10 +500,6 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
         bass_integration_active
         and str(get_val("bass_integration_mode", "") or "").strip() == "direct_dac"
     )
-
-    ui.markdown(f"### {t('tab_files')}")
-    ui.separator()
-    ui.label(t("input_files_help")).classes("text-sm text-gray-400 mb-1")
 
     # File uploads – store as {"filename": ..., "content": bytes} in holders
     file_holders = {
@@ -428,8 +525,17 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
     slot_configs: dict[str, list[dict[str, Any]]] = {key: [] for key in file_holders}
     path_inputs: dict[str, list[Any]] = {key: [] for key in path_holders}
     library_selects: dict[str, list[Any]] = {key: [] for key in path_holders}
-    library_state: dict[str, Any] = {"entries": [], "options": {}, "slot_options": {}}
+    library_state: dict[str, Any] = {
+        "entries": [],
+        "options": {},
+        "slot_options": {},
+        "is_scanning": False,
+        "refresh_token": 0,
+    }
     syncing_paths: set[str] = set()
+    measurement_library_input: Any | None = None
+    measurement_library_status: Any | None = None
+    measurement_library_suggest_button: Any | None = None
 
     def _refresh_target_preview() -> None:
         try:
@@ -520,6 +626,83 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
             ]
         return ["local_path_l", "local_path_r"]
 
+    def _set_enabled(control: Any, enabled: bool) -> None:
+        if control is None:
+            return
+        try:
+            if enabled:
+                control.enable()
+            else:
+                control.disable()
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
+            try:
+                if enabled:
+                    control.props(remove="disable")
+                else:
+                    control.props("disable")
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
+                logger.debug("measurement library control enable failed", exc_info=True)
+
+    def _set_measurement_library_scanning(is_scanning: bool) -> None:
+        library_state["is_scanning"] = bool(is_scanning)
+        _set_enabled(measurement_library_suggest_button, not is_scanning)
+
+    def _update_measurement_library_status(*, dir_value: str, exists: bool, entry_count: int, is_scanning: bool) -> None:
+        if measurement_library_status is None:
+            return
+        status_key = _measurement_library_status_key(
+            dir_value=dir_value,
+            exists=exists,
+            entry_count=entry_count,
+            is_scanning=is_scanning,
+        )
+        if status_key == "measurement_library_status_found":
+            measurement_library_status.set_text(t(status_key).format(count=entry_count))
+            return
+        measurement_library_status.set_text(t(status_key))
+
+    def _apply_measurement_library_state(payload: dict[str, Any]) -> None:
+        entries = list(payload.get("entries") or [])
+        options = dict(payload.get("options") or {})
+        slot_options_raw = payload.get("slot_options") or {}
+        slot_options = {
+            str(path_key): dict(slot_options_raw.get(path_key) or {})
+            for path_key in library_selects
+        }
+        library_state["entries"] = entries
+        library_state["options"] = options
+        library_state["slot_options"] = slot_options
+
+        for path_key, selects in library_selects.items():
+            slot_opts = library_state["slot_options"].get(path_key, library_state["options"])
+            for select in selects:
+                _set_options(select, slot_opts)
+            _sync_library_selects(path_key)
+
     def _sync_library_selects(path_key: str) -> None:
         guarded = False
         if path_key not in syncing_paths:
@@ -574,68 +757,114 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
         get_val("measurement_library_dir", str(default_measurements_dir()))
     ) or str(default_measurements_dir())
 
-    with ui.card().classes("w-full gap-2"):
-        ui.label(t("measurement_library_title")).classes("text-sm font-medium")
-        ui.label(t("measurement_library_help")).classes("text-xs text-gray-400")
-        with ui.row().classes("w-full items-end gap-3"):
-            measurement_library_input = ctrl.register(
-                "measurement_library_dir",
-                ui.input(
-                    label=t("measurement_library_dir"),
-                    value=default_library_dir,
-                ).classes("flex-1"),
-            )
-            use_default_library_btn = ui.button(
-                t("measurement_library_use_default"),
-                on_click=lambda: _use_default_measurement_library(),
-            ).props("outline")
-            refresh_library_btn = ui.button(
-                t("measurement_library_refresh"),
-                on_click=lambda: _refresh_measurement_library(),
-            ).props("outline")
-        with ui.row().classes("w-full items-center justify-between gap-3"):
-            measurement_library_status = ui.label("").classes("text-xs text-gray-500")
-            suggest_library_btn = ui.button(
-                t("measurement_library_suggest"),
-                on_click=lambda: _apply_measurement_library_suggestions(),
-            ).props('color="primary"')
-
-    def _refresh_measurement_library() -> None:
+    async def _refresh_measurement_library_async(token: int) -> None:
+        if measurement_library_input is None:
+            return
+        path_keys = list(library_selects)
         dir_value = _normalize_local_path_value(measurement_library_input.value)
-        library_state["entries"] = _scan_measurement_library(dir_value)
-        library_state["options"] = _build_measurement_library_options(library_state["entries"])
-        library_state["slot_options"] = {
-            path_key: _build_slot_options(library_state["entries"], path_key)
-            for path_key in library_selects
-        }
-
-        for path_key, selects in library_selects.items():
-            slot_opts = library_state["slot_options"].get(path_key, library_state["options"])
-            for select in selects:
-                _set_options(select, slot_opts)
-            _sync_library_selects(path_key)
-
-        if not dir_value:
-            measurement_library_status.set_text(t("measurement_library_status_idle"))
-            return
-        if not os.path.isdir(dir_value):
-            measurement_library_status.set_text(t("measurement_library_status_missing"))
-            return
-        if library_state["entries"]:
-            measurement_library_status.set_text(
-                t("measurement_library_status_found").format(count=len(library_state["entries"]))
+        _set_measurement_library_scanning(True)
+        _apply_measurement_library_state(_build_measurement_library_state([], path_keys=path_keys))
+        _update_measurement_library_status(
+            dir_value=dir_value,
+            exists=False,
+            entry_count=0,
+            is_scanning=True,
+        )
+        try:
+            payload = await asyncio.to_thread(
+                _build_measurement_library_refresh_payload,
+                dir_value,
+                path_keys=path_keys,
             )
+        except (
+
+            AttributeError,
+            TypeError,
+            ValueError,
+            KeyError,
+            IndexError,
+            RuntimeError,
+            OSError,
+            ImportError,
+            ModuleNotFoundError,
+            NameError,
+        ):
+            logger.exception("measurement library refresh failed")
+            if token == int(library_state["refresh_token"]):
+                _set_measurement_library_scanning(False)
+                _apply_measurement_library_state(_build_measurement_library_state([], path_keys=path_keys))
+                _update_measurement_library_status(
+                    dir_value=dir_value,
+                    exists=False,
+                    entry_count=0,
+                    is_scanning=False,
+                )
             return
-        measurement_library_status.set_text(t("measurement_library_status_empty"))
+
+        applied_payload = _measurement_library_refresh_payload_for_token(
+            payload,
+            token=token,
+            current_token=int(library_state["refresh_token"]),
+        )
+        if applied_payload is None:
+            return
+
+        _apply_measurement_library_state(applied_payload)
+        _set_measurement_library_scanning(False)
+        _update_measurement_library_status(
+            dir_value=str(applied_payload.get("dir_value", "") or ""),
+            exists=bool(applied_payload.get("exists", False)),
+            entry_count=len(list(applied_payload.get("entries") or [])),
+            is_scanning=False,
+        )
+
+    def _schedule_measurement_library_refresh(delay_s: float = 0.35, *, force: bool = False) -> None:
+        library_state["refresh_token"] = int(library_state["refresh_token"]) + 1
+        token = int(library_state["refresh_token"])
+
+        def _run() -> None:
+            if token != int(library_state["refresh_token"]):
+                return
+            try:
+                asyncio.create_task(_refresh_measurement_library_async(token))
+            except (
+
+                AttributeError,
+                TypeError,
+                ValueError,
+                KeyError,
+                IndexError,
+                RuntimeError,
+                OSError,
+                ImportError,
+                ModuleNotFoundError,
+                NameError,
+            ):
+                logger.exception("measurement library refresh task scheduling failed")
+
+        ui.timer(0.0 if force else max(float(delay_s), 0.0), _run, once=True, immediate=False)
 
     def _use_default_measurement_library() -> None:
-        _set_input_value(measurement_library_input, str(default_measurements_dir()))
-        _refresh_measurement_library()
+        _set_input_value(
+            measurement_library_input,
+            _persist_measurement_library_dir(str(default_measurements_dir())),
+        )
+        _schedule_measurement_library_refresh(0.0, force=True)
+
+    def _persist_measurement_library_dir_from_ui(value: Any) -> None:
+        if measurement_library_input is None:
+            return
+        persisted_value = _persist_measurement_library_dir(value)
+        current_value = _normalize_local_path_value(measurement_library_input.value)
+        if current_value != persisted_value:
+            _set_input_value(measurement_library_input, persisted_value)
+            _schedule_measurement_library_refresh(0.0, force=True)
 
     def _apply_measurement_library_suggestions() -> None:
-        suggestions = _suggest_measurement_library_matches(
+        suggestions = _suggest_measurement_library_matches_if_ready(
             list(library_state["entries"]),
             path_keys=_current_measurement_path_keys(),
+            is_scanning=bool(library_state["is_scanning"]),
         )
         for path_key, suggested_path in suggestions.items():
             upload_key = _MEASUREMENT_SLOT_UPLOAD_KEYS[path_key]
@@ -646,8 +875,6 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
                 value=suggested_path,
                 clear_upload=True,
             )
-
-    measurement_library_input.on_value_change(lambda _e: _refresh_measurement_library())
 
     def _render_uploaded_file_status(
         *,
@@ -714,14 +941,6 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
         file_data = holder.value if isinstance(holder.value, dict) else None
         upload_loaded = bool(file_data and file_data.get("content"))
         local_path_info = _describe_local_path(path_holder.value)
-        if upload_loaded:
-            preview_source_text = t("file_status_preview_upload")
-        elif local_path_info["entered"]:
-            preview_source_text = t("file_status_preview_path")
-        else:
-            preview_source_text = t("file_status_preview_none")
-        header_loaded = bool(upload_loaded or local_path_info["exists"])
-
         scope.clear()
         with scope:
             with ui.row().classes("w-full items-center justify-between gap-2 min-h-6"):
@@ -811,123 +1030,151 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
         _sync_library_selects(path_key)
         _render_measurement_slots(upload_key)
 
-    with ui.column().classes("w-full gap-4") as legacy_scope:
-        with ui.row().classes("w-full gap-4"):
-            _build_measurement_slot(
-                upload_key="file_l",
-                path_key="local_path_l",
-                slot_variant="legacy",
-                channel_label_key="upload_l",
-                path_label_key="path_l",
-            )
-            _build_measurement_slot(
-                upload_key="file_r",
-                path_key="local_path_r",
-                slot_variant="legacy",
-                channel_label_key="upload_r",
-                path_label_key="path_r",
-            )
-    ctrl.register_container("files_legacy_topology_scope", legacy_scope)
-    legacy_scope.set_visibility(not bass_integration_active)
+    with page_shell(title=t("tab_files"), intro=t("files_page_intro")):
+        with section_card(title=t("input_files_title"), intro=t("input_files_help")):
+            with ui.column().classes("w-full gap-3"):
+                ui.label(t("measurement_library_title")).classes("text-sm font-medium")
+                ui.label(t("measurement_library_help")).classes("text-xs text-gray-400")
+                with ui.row().classes("w-full items-end gap-3"):
+                    measurement_library_input = ctrl.register(
+                        "measurement_library_dir",
+                        ui.input(
+                            label=t("measurement_library_dir"),
+                            value=default_library_dir,
+                        ).classes("flex-1"),
+                    )
+                    ui.button(
+                        t("measurement_library_use_default"),
+                        on_click=lambda: _use_default_measurement_library(),
+                    ).props("outline")
+                    ui.button(
+                        t("measurement_library_refresh"),
+                        on_click=lambda: _schedule_measurement_library_refresh(0.0, force=True),
+                    ).props("outline")
+                with ui.row().classes("w-full items-center justify-between gap-3"):
+                    measurement_library_status = ui.label("").classes("text-xs text-gray-500")
+                    measurement_library_suggest_button = ui.button(
+                        t("measurement_library_suggest"),
+                        on_click=lambda: _apply_measurement_library_suggestions(),
+                    ).props('color="primary"')
+                measurement_library_input.on_value_change(
+                    lambda _e: _schedule_measurement_library_refresh(0.35)
+                )
+                ctrl.on_commit(
+                    "measurement_library_dir",
+                    _persist_measurement_library_dir_from_ui,
+                )
 
-    with ui.column().classes("w-full gap-4") as direct_dac_scope:
-        ui.label(t("bi_direct_sub_help")).classes("text-xs text-gray-400")
-        with ui.row().classes("w-full gap-4"):
-            _build_measurement_slot(
-                upload_key="file_l_main",
-                path_key="local_path_l_main",
-                slot_variant="direct",
-                channel_label_key="upload_l_main",
-                path_label_key="path_l_main",
-            )
-            _build_measurement_slot(
-                upload_key="file_r_main",
-                path_key="local_path_r_main",
-                slot_variant="direct",
-                channel_label_key="upload_r_main",
-                path_label_key="path_r_main",
-            )
-        with ui.row().classes("w-full gap-4"):
-            _build_measurement_slot(
-                upload_key="file_l_sub",
-                path_key="local_path_l_sub",
-                slot_variant="direct",
-                channel_label_key="upload_l_sub",
-                path_label_key="path_l_sub",
-            )
-            _build_measurement_slot(
-                upload_key="file_r_sub",
-                path_key="local_path_r_sub",
-                slot_variant="direct",
-                channel_label_key="upload_r_sub",
-                path_label_key="path_r_sub",
-            )
-    ctrl.register_container("files_direct_dac_topology_scope", direct_dac_scope)
-    direct_dac_scope.set_visibility(bool(bass_integration_active and is_direct_dac))
+            with ui.column().classes("w-full gap-4") as legacy_scope:
+                with ui.row().classes("w-full gap-4"):
+                    _build_measurement_slot(
+                        upload_key="file_l",
+                        path_key="local_path_l",
+                        slot_variant="legacy",
+                        channel_label_key="upload_l",
+                        path_label_key="path_l",
+                    )
+                    _build_measurement_slot(
+                        upload_key="file_r",
+                        path_key="local_path_r",
+                        slot_variant="legacy",
+                        channel_label_key="upload_r",
+                        path_label_key="path_r",
+                    )
+            ctrl.register_container("files_legacy_topology_scope", legacy_scope)
+            legacy_scope.set_visibility(not bass_integration_active)
 
-    _refresh_measurement_library()
+            with ui.column().classes("w-full gap-4") as direct_dac_scope:
+                ui.label(t("bi_direct_sub_help")).classes("text-xs text-gray-400")
+                with ui.row().classes("w-full gap-4"):
+                    _build_measurement_slot(
+                        upload_key="file_l_main",
+                        path_key="local_path_l_main",
+                        slot_variant="direct",
+                        channel_label_key="upload_l_main",
+                        path_label_key="path_l_main",
+                    )
+                    _build_measurement_slot(
+                        upload_key="file_r_main",
+                        path_key="local_path_r_main",
+                        slot_variant="direct",
+                        channel_label_key="upload_r_main",
+                        path_label_key="path_r_main",
+                    )
+                with ui.row().classes("w-full gap-4"):
+                    _build_measurement_slot(
+                        upload_key="file_l_sub",
+                        path_key="local_path_l_sub",
+                        slot_variant="direct",
+                        channel_label_key="upload_l_sub",
+                        path_label_key="path_l_sub",
+                    )
+                    _build_measurement_slot(
+                        upload_key="file_r_sub",
+                        path_key="local_path_r_sub",
+                        slot_variant="direct",
+                        channel_label_key="upload_r_sub",
+                        path_label_key="path_r_sub",
+                    )
+            ctrl.register_container("files_direct_dac_topology_scope", direct_dac_scope)
+            direct_dac_scope.set_visibility(bool(bass_integration_active and is_direct_dac))
 
-    ui.separator()
+            _schedule_measurement_library_refresh(0.0, force=True)
 
-    # Filter layout
-    with ui.row().classes("w-full gap-4 items-end"):
-        with ui.column().classes("gap-1"):
-            ui.label(t("layout")).classes("text-sm font-medium")
-            ctrl.register(
-                "layout",
-                ui.radio(
-                    tr_options(t, LAYOUT_OPTION_LABEL_KEYS),
-                    value=normalize_layout_value(get_val("layout", LAYOUT_MONO), t),
-                ),
-            )
+        with ui.expansion(t("files_export_compact_title")).classes("w-full"):
+            ui.label(t("files_export_section_intro")).classes("text-xs text-gray-400 mb-2")
+            with ui.card().classes("w-full gap-4"):
+                with ui.row().classes("w-full gap-4 items-end"):
+                    with ui.column().classes("gap-1"):
+                        ui.label(t("layout")).classes("text-sm font-medium")
+                        ctrl.register(
+                            "layout",
+                            ui.radio(
+                                tr_options(t, LAYOUT_OPTION_LABEL_KEYS),
+                                value=normalize_layout_value(get_val("layout", LAYOUT_MONO), t),
+                            ),
+                        )
 
-    # Filter WAV format
-    with ui.row().classes("w-full gap-4 items-end"):
-        with ui.column().classes("gap-1"):
-            ui.label(t("filter_wav_format")).classes("text-sm font-medium")
-            ctrl.register(
-                "filter_wav_format",
-                ui.radio(
-                    tr_options(t, FILTER_WAV_FORMAT_OPTION_LABEL_KEYS),
-                    value=str(get_val("filter_wav_format", FILTER_WAV_FORMAT_FLOAT32) or FILTER_WAV_FORMAT_FLOAT32),
-                ),
-            )
+                with ui.row().classes("w-full gap-4 items-end"):
+                    with ui.column().classes("gap-1"):
+                        ui.label(t("filter_wav_format")).classes("text-sm font-medium")
+                        ctrl.register(
+                            "filter_wav_format",
+                            ui.radio(
+                                tr_options(t, FILTER_WAV_FORMAT_OPTION_LABEL_KEYS),
+                                value=str(get_val("filter_wav_format", FILTER_WAV_FORMAT_FLOAT32) or FILTER_WAV_FORMAT_FLOAT32),
+                            ),
+                        )
 
-    # CamillaDSP device audio format
-    with ui.row().classes("w-full gap-4 items-end"):
-        with ui.column().classes("gap-1"):
-            ui.label(t("device_audio_format")).classes("text-sm font-medium")
-            ctrl.register(
-                "device_audio_format",
-                ui.radio(
-                    tr_options(t, DEVICE_AUDIO_FORMAT_OPTION_LABEL_KEYS),
-                    value=str(get_val("device_audio_format", DEVICE_AUDIO_FORMAT_S32LE) or DEVICE_AUDIO_FORMAT_S32LE),
-                ),
-            )
+                with ui.row().classes("w-full gap-4 items-end"):
+                    with ui.column().classes("gap-1"):
+                        ui.label(t("device_audio_format")).classes("text-sm font-medium")
+                        ctrl.register(
+                            "device_audio_format",
+                            ui.radio(
+                                tr_options(t, DEVICE_AUDIO_FORMAT_OPTION_LABEL_KEYS),
+                                value=str(get_val("device_audio_format", DEVICE_AUDIO_FORMAT_S32LE) or DEVICE_AUDIO_FORMAT_S32LE),
+                            ),
+                        )
 
-    ui.separator()
-
-    # Checkboxes
-    ctrl.register(
-        "multi_rate_opt",
-        ui.checkbox(
-            t("multi_rate"),
-            value=bool(get_val("multi_rate_opt", False)),
-        ),
-    )
-    ctrl.register(
-        "comparison_mode",
-        ui.checkbox(
-            t("comparison_mode"),
-            value=bool(get_val("comparison_mode", True)),
-        ),
-    )
-
-    # Dynamic multi-rate info container (replaces taps_auto_info_scope_files)
-    ctrl.register_container("taps_auto_info_scope_files", ui.column().classes("w-full"))
+                ctrl.register(
+                    "multi_rate_opt",
+                    ui.checkbox(
+                        t("multi_rate"),
+                        value=bool(get_val("multi_rate_opt", False)),
+                    ),
+                )
+                ctrl.register_container("taps_auto_info_scope_files", ui.column().classes("w-full"))
+                ctrl.register(
+                    "comparison_mode",
+                    ui.checkbox(
+                        t("comparison_mode"),
+                        value=bool(get_val("comparison_mode", True)),
+                    ),
+                )
 
 
-__all__ = ['_score_measurement_tokens', '_score_measurement_candidate', '_scan_measurement_library', '_build_measurement_library_options', '_entry_passes_slot_filter', '_build_slot_options', '_suggest_measurement_library_matches', 'build_files_tab']
+__all__ = ['_persist_measurement_library_dir', '_score_measurement_tokens', '_score_measurement_candidate', '_scan_measurement_library', '_build_measurement_library_options', '_entry_passes_slot_filter', '_build_slot_options', '_suggest_measurement_library_matches', '_build_measurement_library_slot_options', '_build_measurement_library_state', '_build_measurement_library_refresh_payload', '_measurement_library_refresh_payload_for_token', '_measurement_library_status_key', '_suggest_measurement_library_matches_if_ready', 'build_files_tab']
 
 
 def _link_sibling_exports() -> None:

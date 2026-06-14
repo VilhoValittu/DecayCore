@@ -291,7 +291,7 @@ def _render_summary(scope_name: str, summary: str) -> None:
 
         container.clear()
         with container:
-            ui.label(summary).classes("w-full text-sm text-gray-300").style("white-space: normal; line-height: 1.5;")
+            ui.label(summary).classes("w-full text-sm cf-adv-summary-text").style("white-space: normal; line-height: 1.5;")
     except (
 
         AttributeError,
@@ -344,5 +344,4 @@ def _fmt_rail(value: object, *, t: Callable) -> str:
 
 def _state_label(enabled: bool, *, t: Callable) -> str:
     return t("state_on") if enabled else t("state_off")
-
 

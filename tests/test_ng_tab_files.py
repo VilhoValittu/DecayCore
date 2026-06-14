@@ -3,19 +3,26 @@ import os
 
 import numpy as np
 
+from decaycore.config import decaycore_config
 from decaycore.ui.ng_tab_files import (
     _build_upload_payload,
     _build_measurement_library_options,
+    _build_measurement_library_refresh_payload,
+    _build_measurement_library_state,
     _describe_local_path,
     _file_slot_input_name,
     _file_slot_scope_name,
     _format_upload_size,
     _guess_upload_format,
+    _measurement_library_refresh_payload_for_token,
+    _measurement_library_status_key,
     _measurement_hint_tokens,
     _normalize_local_path_value,
     _normalize_layout_value,
+    _persist_measurement_library_dir,
     _scan_measurement_library,
     _suggest_measurement_library_matches,
+    _suggest_measurement_library_matches_if_ready,
 )
 
 
@@ -105,6 +112,26 @@ def test_measurement_hint_tokens_split_paths_and_names():
     assert tokens == ["session", "01", "final", "left", "final", "ir", "wav"]
 
 
+def test_persist_measurement_library_dir_updates_only_config_key(monkeypatch, tmp_path):
+    config_path = tmp_path / "config.json"
+    monkeypatch.setattr(decaycore_config, "CONFIG_FILE", str(config_path))
+    decaycore_config.save_config(
+        {
+            "mode": "AUTO",
+            "measurement_library_dir": "old",
+            "gain": 1.5,
+        }
+    )
+
+    result = _persist_measurement_library_dir(f'"{tmp_path}"')
+    persisted = decaycore_config.load_config()
+
+    assert result == str(tmp_path)
+    assert persisted["measurement_library_dir"] == str(tmp_path)
+    assert persisted["mode"] == "AUTO"
+    assert persisted["gain"] == 1.5
+
+
 def test_scan_measurement_library_lists_supported_files_recursively(tmp_path):
     newest = tmp_path / "FL0.wav"
     newest.write_bytes(b"RIFF")
@@ -124,6 +151,30 @@ def test_scan_measurement_library_lists_supported_files_recursively(tmp_path):
         "session_01/final/right_final__ir.wav [WAV]",
     ]
     assert len(options) == 2
+
+
+def test_build_measurement_library_refresh_payload_keeps_recursive_order(tmp_path):
+    newest = tmp_path / "FL0.wav"
+    newest.write_bytes(b"RIFF")
+    os.utime(newest, (300, 300))
+    nested = tmp_path / "session_01" / "final"
+    nested.mkdir(parents=True)
+    older = nested / "right_final__ir.wav"
+    older.write_bytes(b"RIFF")
+    os.utime(older, (100, 100))
+
+    payload = _build_measurement_library_refresh_payload(
+        str(tmp_path),
+        path_keys=["local_path_l", "local_path_r"],
+    )
+
+    assert payload["dir_value"] == str(tmp_path)
+    assert payload["exists"] is True
+    assert [entry["display_label"] for entry in payload["entries"]] == [
+        "FL0.wav [WAV]",
+        "session_01/final/right_final__ir.wav [WAV]",
+    ]
+    assert list(payload["slot_options"]) == ["local_path_l", "local_path_r"]
 
 
 def test_scan_measurement_library_prefers_newest_entries_first(tmp_path):
@@ -197,3 +248,54 @@ def test_suggest_measurement_library_matches_prefers_newest_tied_candidate(tmp_p
     )
 
     assert suggestions["local_path_l"].endswith(os.path.join("session_new", "pair_left.txt"))
+
+
+def test_measurement_library_refresh_payload_for_token_rejects_stale_result():
+    stale_payload = _build_measurement_library_state([], path_keys=["local_path_l"])
+    fresh_payload = _build_measurement_library_state([], path_keys=["local_path_r"])
+
+    assert _measurement_library_refresh_payload_for_token(
+        stale_payload,
+        token=1,
+        current_token=2,
+    ) is None
+
+    applied = _measurement_library_refresh_payload_for_token(
+        fresh_payload,
+        token=2,
+        current_token=2,
+    )
+
+    assert applied is not None
+    assert applied["token"] == 2
+    assert list(applied["slot_options"]) == ["local_path_r"]
+
+
+def test_suggest_measurement_library_matches_if_ready_blocks_during_scan(tmp_path):
+    (tmp_path / "pair_01_room_L.txt").write_text("20 0\n40 0\n", encoding="utf-8")
+    (tmp_path / "pair_01_room_R.txt").write_text("20 0\n40 0\n", encoding="utf-8")
+    entries = _scan_measurement_library(str(tmp_path))
+
+    assert _suggest_measurement_library_matches_if_ready(
+        entries,
+        path_keys=["local_path_l", "local_path_r"],
+        is_scanning=True,
+    ) == {}
+
+    ready = _suggest_measurement_library_matches_if_ready(
+        entries,
+        path_keys=["local_path_l", "local_path_r"],
+        is_scanning=False,
+    )
+
+    assert ready["local_path_l"].endswith("pair_01_room_L.txt")
+    assert ready["local_path_r"].endswith("pair_01_room_R.txt")
+
+
+def test_measurement_library_status_key_prefers_scanning_state():
+    assert _measurement_library_status_key(
+        dir_value="/tmp/measurements",
+        exists=True,
+        entry_count=2,
+        is_scanning=True,
+    ) == "measurement_library_status_scanning"

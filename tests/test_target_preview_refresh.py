@@ -92,3 +92,26 @@ def test_refresh_target_preview_clears_existing_plot_when_figure_is_missing(monk
 
     assert preview_col.clear_calls == 1
     assert ng_tab_target._TARGET_PREVIEW_PLOT is None
+
+
+def test_refresh_target_preview_updates_metadata_panel(monkeypatch):
+    preview_col = _DummyPreviewContainer()
+    calls = {"hint": 0, "metadata": 0}
+
+    monkeypatch.setattr(
+        ng_tab_target.ctrl,
+        "get_container",
+        lambda name: preview_col if name == "target_preview_scope" else None,
+    )
+    monkeypatch.setattr(ng_tab_target, "_render_target_decay_hint", lambda: calls.__setitem__("hint", calls["hint"] + 1))
+    monkeypatch.setattr(
+        ng_tab_target,
+        "_render_target_preview_metadata",
+        lambda: calls.__setitem__("metadata", calls["metadata"] + 1),
+    )
+    monkeypatch.setattr(ng_tab_target, "_build_target_preview_fig", lambda: (None, [], []))
+    monkeypatch.setattr(ng_tab_target, "_TARGET_PREVIEW_PLOT", None)
+
+    ng_tab_target.refresh_target_preview()
+
+    assert calls == {"hint": 1, "metadata": 1}

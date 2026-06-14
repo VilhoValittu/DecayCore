@@ -43,6 +43,23 @@ def decaycore_data_dir() -> Path:
 camillafir_data_dir = decaycore_data_dir
 
 
+def decaycore_config_path() -> Path:
+    """Return platform-correct path for config.json."""
+    home = Path.home()
+    try:
+        if os.name == "nt":
+            appdata = str(os.environ.get("APPDATA", "") or "").strip()
+            base = Path(appdata) if appdata else home / "AppData" / "Roaming"
+            return base / PROGRAM_NAME / "config.json"
+        if sys.platform == "darwin":
+            return home / "Library" / "Application Support" / PROGRAM_NAME / "config.json"
+        xdg_cfg = str(os.environ.get("XDG_CONFIG_HOME", "") or "").strip()
+        base = Path(xdg_cfg) if xdg_cfg else home / ".config"
+        return base / PROGRAM_NAME / "config.json"
+    except _RECOVERABLE_PATH_EXCEPTIONS:
+        return home / PROGRAM_NAME / "config.json"
+
+
 def default_filters_export_base_dir() -> Path:
     """
     Return default base directory for exported filters.

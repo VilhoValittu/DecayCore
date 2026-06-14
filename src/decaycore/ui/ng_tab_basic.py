@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Callable
 
 from . import ng_controls as ctrl
+from .ng_sections import page_shell, section_card
 from ..config.legacy_keys import CAMILLAFIR_AUTO_MODE
 
 _FS_OPTS = [44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000]
@@ -84,153 +85,137 @@ def build_basic_tab(*, t: Callable, get_val: Callable, max_safe_boost: float) ->
         auto_goal=auto_goal_value,
     )
 
-    ui.markdown(f"#### {t('tab_basic')}")
-    ui.separator()
-
-    # Mode row
-    with ui.row().classes("w-full gap-4 items-end"):
-        ctrl.register(
-            "mode",
-            ui.select(
-                options={
-                    "AUTO":     t("mode_auto_label"),
-                    "BASIC":    t("mode_basic_label"),
-                    "ADVANCED": t("mode_advanced_label"),
-                },
-                value=mode_value,
-                label=t("mode_label"),
-            ).props("dense outlined").classes("flex-1"),
-        )
-        ui.button(
-            t("mode_apply_defaults_btn"),
-            on_click=lambda: _apply_mode_defaults(t=t, get_val=get_val),
-        ).props('color="secondary" outline')
-
-    ui.label(t("mode_apply_defaults_help")).classes("text-xs text-gray-400 italic")
-
-    # Mode description container
-    mode_desc = ui.column().classes("w-full")
-    ctrl.register_container("mode_desc_scope", mode_desc)
-
-    ui.separator()
-
-    # AUTO-mode options
-    auto_mode_col = ui.column().classes("w-full gap-4")
-    ctrl.register_container("auto_mode_scope", auto_mode_col)
-    with auto_mode_col:
-        ctrl.register(
-            "auto_goal",
-            ui.select(
-                options={
-                    "balanced":   t("auto_goal_balanced"),
-                    "room-safe":  t("auto_goal_room_safe"),
-                    "subwoofers": t("auto_goal_subwoofers"),
-                    "low-ripple": t("auto_goal_low_ripple"),
-                    "flat":       t("auto_goal_flat"),
-                },
-                value=auto_goal_value,
-                label=t("auto_goal_label"),
-            ).props("dense outlined").classes("w-full"),
-        )
-        ctrl.register(
-            "auto_target_mode",
-            ui.select(
-                options=_auto_target_mode_options(t=t, auto_goal=auto_goal_value),
-                value=auto_target_mode_value,
-                label=t("auto_target_mode_label"),
-            ).props("dense outlined").classes("w-full"),
-        )
-        ctrl.register(
-            "bass_integration_enable",
-            ui.checkbox(
-                t("bass_integration_enable"),
-                value=bool(get_val("bass_integration_enable", False)),
-            ),
-        )
-        ui.label(t("bass_integration_auto_help")).classes("text-xs text-gray-400")
-        with ui.card().classes("w-full gap-2"):
-            ctrl.register(
-                "enable_channel_specific_auto_policy",
-                ui.checkbox(
-                    t("stereo_auto_policy_enable_label"),
-                    value=bool(get_val("enable_channel_specific_auto_policy", False)),
-                ),
-            )
-            stereo_policy_col = ui.column().classes("w-full gap-2")
-            ctrl.register_container("stereo_auto_policy_scope", stereo_policy_col)
-            with stereo_policy_col:
+    with page_shell(title=t("tab_basic"), intro=t("basic_page_intro")):
+        with section_card(title=t("mode_label"), intro=t("mode_apply_defaults_help")):
+            with ui.row().classes("w-full gap-4 items-end"):
                 ctrl.register(
-                    "channel_specific_policy_max_hz",
-                    ui.number(
-                        label=t("stereo_auto_policy_max_hz_label"),
-                        value=float(get_val("channel_specific_policy_max_hz", 220.0) or 220.0),
-                        format="%.1f",
-                    ).props("dense outlined").classes("w-full"),
+                    "mode",
+                    ui.select(
+                        options={
+                            "AUTO":     t("mode_auto_label"),
+                            "BASIC":    t("mode_basic_label"),
+                            "ADVANCED": t("mode_advanced_label"),
+                        },
+                        value=mode_value,
+                        label=t("mode_label"),
+                    ).props("dense outlined").classes("flex-1"),
                 )
-                ui.label(t("stereo_auto_policy_help")).classes("text-xs text-gray-400")
-            stereo_policy_col.set_visibility(bool(get_val("enable_channel_specific_auto_policy", False)))
-        # Bass integration controls are intentionally hidden from the Basic tab.
-    auto_mode_col.set_visibility(mode_value == "AUTO")
+                ui.button(
+                    t("mode_apply_defaults_btn"),
+                    on_click=lambda: _apply_mode_defaults(t=t, get_val=get_val),
+                ).props('color="secondary" outline')
 
-    ui.separator()
-    ui.markdown(f"#### 🧱 {t('ui_fir_engine')}")
+            mode_desc = ui.column().classes("w-full")
+            ctrl.register_container("mode_desc_scope", mode_desc)
 
-    # Sampling rate + taps
-    with ui.row().classes("w-full gap-4"):
-        ctrl.register(
-            "fs",
-            ui.select(
-                _FS_OPTS,
-                value=get_val("fs", 44100),
-                label=t("fs"),
-            ).props("dense outlined").classes("flex-1"),
-        )
-        ctrl.register(
-            "taps",
-            ui.select(
-                _TAPS_OPTS,
-                value=get_val("taps", 65536),
-                label=t("taps"),
-            ).props("dense outlined").classes("flex-1"),
-        )
+        with ui.column().classes("w-full") as auto_mode_section:
+            ctrl.register_container("auto_mode_section_scope", auto_mode_section)
+            with section_card(title=t("basic_auto_section_title"), intro=t("mode_auto_desc")):
+                auto_mode_col = ui.column().classes("w-full gap-4")
+                ctrl.register_container("auto_mode_scope", auto_mode_col)
+                with auto_mode_col:
+                    ctrl.register(
+                        "auto_goal",
+                        ui.select(
+                            options={
+                                "balanced":   t("auto_goal_balanced"),
+                                "room-safe":  t("auto_goal_room_safe"),
+                                "subwoofers": t("auto_goal_subwoofers"),
+                                "low-ripple": t("auto_goal_low_ripple"),
+                                "flat":       t("auto_goal_flat"),
+                            },
+                            value=auto_goal_value,
+                            label=t("auto_goal_label"),
+                        ).props("dense outlined").classes("w-full"),
+                    )
+                    ctrl.register(
+                        "auto_target_mode",
+                        ui.select(
+                            options=_auto_target_mode_options(t=t, auto_goal=auto_goal_value),
+                            value=auto_target_mode_value,
+                            label=t("auto_target_mode_label"),
+                        ).props("dense outlined").classes("w-full"),
+                    )
+                    ctrl.register(
+                        "bass_integration_enable",
+                        ui.checkbox(
+                            t("bass_integration_enable"),
+                            value=bool(get_val("bass_integration_enable", False)),
+                        ),
+                    )
+                    ui.label(t("bass_integration_auto_help")).classes("text-xs text-gray-400")
+                    with ui.card().classes("w-full gap-2"):
+                        ctrl.register(
+                            "enable_channel_specific_auto_policy",
+                            ui.checkbox(
+                                t("stereo_auto_policy_enable_label"),
+                                value=bool(get_val("enable_channel_specific_auto_policy", False)),
+                            ),
+                        )
+                        stereo_policy_col = ui.column().classes("w-full gap-2")
+                        ctrl.register_container("stereo_auto_policy_scope", stereo_policy_col)
+                        with stereo_policy_col:
+                            ctrl.register(
+                                "channel_specific_policy_max_hz",
+                                ui.number(
+                                    label=t("stereo_auto_policy_max_hz_label"),
+                                    value=float(get_val("channel_specific_policy_max_hz", 220.0) or 220.0),
+                                    format="%.1f",
+                                ).props("dense outlined").classes("w-full"),
+                            )
+                            ui.label(t("stereo_auto_policy_help")).classes("text-xs text-gray-400")
+                        stereo_policy_col.set_visibility(bool(get_val("enable_channel_specific_auto_policy", False)))
+            auto_mode_section.set_visibility(mode_value == "AUTO")
 
-    # Engine metrics label (latency + resolution)
-    ctrl.register("engine_metrics_label", ui.label("").classes("text-xs text-gray-400"))
+        with section_card(title=t("ui_filter_type")):
+            with ui.row().classes("w-full gap-4 items-start"):
+                ftype_opts = {
+                    "Linear": t("ft_linear"),
+                    "Minimum": t("ft_min"),
+                    "Mixed": t("ft_mixed"),
+                    "Asymmetric": t("ft_asymmetric"),
+                }
+                ctrl.register(
+                    "filter_type",
+                    ui.select(
+                        ftype_opts,
+                        value=_normalize_filter_type_value(get_val("filter_type", "Mixed")),
+                        label=t("filter_type"),
+                    ).props("dense outlined").classes("flex-1"),
+                )
+                mixed_scope = ui.column().classes("flex-1")
+                ctrl.register_container("update_mixed_freq_scope", mixed_scope)
+                with mixed_scope:
+                    ctrl.register(
+                        "mixed_freq",
+                        ui.number(
+                            label=t("mixed_split_hz_label"),
+                            value=get_val("mixed_freq", 200.0),
+                            format="%.1f",
+                        ).props("dense outlined").classes("w-full"),
+                    )
 
-    # Multi-rate info container
-    ctrl.register_container("taps_auto_info_scope_basic", ui.column().classes("w-full"))
+        with section_card(title=t("ui_fir_engine")):
+            with ui.row().classes("w-full gap-4"):
+                ctrl.register(
+                    "fs",
+                    ui.select(
+                        _FS_OPTS,
+                        value=get_val("fs", 44100),
+                        label=t("fs"),
+                    ).props("dense outlined").classes("flex-1"),
+                )
+                ctrl.register(
+                    "taps",
+                    ui.select(
+                        _TAPS_OPTS,
+                        value=get_val("taps", 65536),
+                        label=t("taps"),
+                    ).props("dense outlined").classes("flex-1"),
+                )
 
-    ui.separator()
-    ui.markdown(f"#### 🧭 {t('ui_filter_type')}")
-
-    with ui.row().classes("w-full gap-4 items-start"):
-        ftype_opts = {
-            "Linear": t("ft_linear"),
-            "Minimum": t("ft_min"),
-            "Mixed": t("ft_mixed"),
-            "Asymmetric": t("ft_asymmetric"),
-        }
-        ctrl.register(
-            "filter_type",
-            ui.select(
-                ftype_opts,
-                value=_normalize_filter_type_value(get_val("filter_type", "Mixed")),
-                label=t("filter_type"),
-            ).props("dense outlined").classes("flex-1"),
-        )
-        # Mixed-phase split frequency container (shown when filter_type=mixed)
-        mixed_scope = ui.column().classes("flex-1")
-        ctrl.register_container("update_mixed_freq_scope", mixed_scope)
-        with mixed_scope:
-            ctrl.register(
-                "mixed_freq",
-                ui.number(
-                    label=t("mixed_split_hz_label"),
-                    value=get_val("mixed_freq", 200.0),
-                    format="%.1f",
-                ).props("dense outlined").classes("w-full"),
-            )
-        # Will be hidden/shown by mode callback based on filter_type
+            ctrl.register("engine_metrics_label", ui.label("").classes("text-xs text-gray-400"))
+            ctrl.register_container("taps_auto_info_scope_basic", ui.column().classes("w-full"))
 
 
 def _apply_mode_defaults(*, t: Callable, get_val: Callable) -> None:
