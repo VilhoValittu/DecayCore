@@ -73,6 +73,11 @@ def test_direct_dac_candidate_roundtrips_to_export_settings() -> None:
         sub_lpf_hz=91.0,
         sub_lpf_order=4,
         sub_delay_ms=7.5,
+        sub_array_delay_ms=7.5,
+        sub1_delay_ms=0.0,
+        sub2_delay_ms=-0.5,
+        main_l_delay_ms=0.0,
+        main_r_delay_ms=0.0,
         sub_gain_trim_db=-2.0,
         sub_polarity_invert=True,
         source="test",
@@ -86,6 +91,12 @@ def test_direct_dac_candidate_roundtrips_to_export_settings() -> None:
     assert settings["sub_delay_ms"] == candidate.sub_delay_ms
     assert settings["sub_gain_trim_db"] == candidate.sub_gain_trim_db
     assert settings["sub_polarity_invert"] == candidate.sub_polarity_invert
+    roundtrip = direct_dac_candidate_from_data(data)
+    assert roundtrip.sub_array_delay_ms == candidate.sub_array_delay_ms
+    assert roundtrip.sub1_delay_ms == candidate.sub1_delay_ms
+    assert roundtrip.sub2_delay_ms == candidate.sub2_delay_ms
+    assert roundtrip.main_l_delay_ms == candidate.main_l_delay_ms
+    assert roundtrip.main_r_delay_ms == candidate.main_r_delay_ms
 
 
 def test_direct_dac_evaluator_uses_worst_case_channel_not_lr_average() -> None:
@@ -172,5 +183,38 @@ def test_apply_direct_dac_result_verifies_without_reoptimizing_or_overwriting() 
     assert candidate.sub_delay_ms == 7.5
     assert candidate.sub_gain_trim_db == -2.0
     assert candidate.sub_polarity_invert is True
+    assert isinstance(result["cancellation_risk"], float)
+    assert 0.0 <= result["cancellation_risk"] <= 1.0
+    assert result["feasibility_class"] in {"good", "marginal", "infeasible"}
     assert data["_bass_integration_meta"]["export_model"] == "camilladsp_yaml_compatible"
     assert data["_bass_integration_meta"]["direct_dac_candidate"]["main_hpf_hz"] == 70.0
+
+
+def test_direct_dac_candidate_prefers_current_data_over_stale_raw_candidate_alignment() -> None:
+    cfg = SimpleNamespace(
+        bass_integration_main_l_delay_ms=0.0,
+        bass_integration_main_r_delay_ms=0.0,
+        bass_integration_sub_delay_ms=0.0,
+    )
+    data = {
+        "bass_integration_mode": "direct_dac",
+        "bass_integration_sub_delay_ms": -2.5,
+        "bass_integration_sub_array_delay_ms": -2.5,
+        "bass_integration_main_l_delay_ms": 2.5,
+        "bass_integration_main_r_delay_ms": 2.5,
+        "_bass_integration_meta": {
+            "direct_dac_candidate": {
+                "sub_delay_ms": 0.0,
+                "sub_array_delay_ms": 0.0,
+                "main_l_delay_ms": 0.0,
+                "main_r_delay_ms": 0.0,
+            }
+        },
+    }
+
+    candidate = direct_dac_candidate_from_data(data, cfg)
+
+    assert candidate.sub_delay_ms == -2.5
+    assert candidate.sub_array_delay_ms == -2.5
+    assert candidate.main_l_delay_ms == 2.5
+    assert candidate.main_r_delay_ms == 2.5

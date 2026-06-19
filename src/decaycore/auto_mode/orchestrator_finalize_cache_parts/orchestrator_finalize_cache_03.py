@@ -12,40 +12,10 @@
 
 from __future__ import annotations
 
-import logging
-
-import numpy as np
-
 from ..auto_mode_profile import profiled_section
-from ..cache_signature import (
-    _auto_cache_stats_snapshot,
-    _auto_cache_put_best,
-    _auto_cache_put_last_used_best,
-    _auto_cache_put_target_for_measurements,
-    _auto_measurement_signature,
-    _auto_signature,
-)
 from ..candidate_generation import _seed_auto_mode_candidate_optuna_params
-from ..rank_score import attach_official_rank_score, official_rank_score
-from ..scoring_ranking import (
-    _auto_is_better_refine,
-    _auto_mode_ripple_for_pareto,
-    _auto_prepost_for_pareto,
-    maybe_override_hard_failed_winner,
-)
-from ..stereo_policy_refine import apply_stereo_policy_refine
-from ..shared import AUTO_MODE_CACHE_SCHEMA_VERSION, _auto_builtin_target_name, _auto_safe_float, _m
-from ..winner_polish import (
-    apply_excess_phase_strength_winner_polish,
-    apply_hpf_winner_polish,
-    apply_low_bass_cut_winner_polish,
-    apply_mag_c_min_winner_polish,
-    apply_phase_limit_winner_polish,
-    apply_residual_peak_winner_polish,
-    apply_tdc_strength_winner_polish,
-)
-
-logger = logging.getLogger("DecayCore")
+from ..rank_score import attach_official_rank_score
+from ..scoring_ranking import maybe_override_hard_failed_winner
 
 _LOW_BASS_CUT_WINNER_POLISH_STEP_HZ = 2.0
 _LOW_BASS_CUT_WINNER_POLISH_MAX_DELTA_HZ = 8.0
@@ -179,6 +149,19 @@ def _return_cached_result(
     cache_refine_rollup_tel = dict(cached_state.get("cache_refine_rollup_tel", {}) or {})
     stop_reason = str(cached_state.get("stop_reason", "max_rounds") or "max_rounds")
     seed_source = str(cached_state.get("seed_source", "exact_cache") or "exact_cache")
+    polish_meta = (
+        dict(phase_limit_cache_meta or {}),
+        dict(mag_c_min_cache_meta or {}),
+        dict(low_bass_cut_cache_meta or {}),
+        dict(hpf_cache_meta or {}),
+        dict(eps_cache_meta or {}),
+        dict(residual_peak_cache_meta or {}),
+        dict(tdc_strength_cache_meta or {}),
+    )
+    winner_polish_ran = any(
+        str(meta.get("reason", "") or "") != "cache_fast_finalize_skips_winner_polish"
+        for meta in polish_meta
+    )
     return {
         "best_result": materialized.get("best_result"),
         "best_metrics": dict(best_metrics or {}),
@@ -223,6 +206,16 @@ def _return_cached_result(
         "trials_phase1_ok": 0,
         "trials_phase2_total": int(executed_micro_trials_total),
         "trials_phase2_ok": int(executed_micro_trials_total),
+        "trials_phase3_total": int(executed_micro_trials_total),
+        "trials_phase3_ok": int(executed_micro_trials_total),
+        "phase4_finalize": True,
+        "phase4_steps": {
+            "pareto_finalize": False,
+            "winner_polish": bool(winner_polish_ran),
+            "final_validation": False,
+            "cache_save": True,
+            "cache_materialize": True,
+        },
         "optuna_phase1_telemetry": {},
         "optuna_phase2_local_telemetry": [],
         "optuna_phase3_micro_telemetry": dict(cache_refine_rollup_tel or {}),

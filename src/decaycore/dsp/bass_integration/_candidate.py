@@ -23,6 +23,11 @@ class DirectDacCandidate:
     sub_lpf_hz: float
     sub_lpf_order: int
     sub_delay_ms: float = 0.0
+    sub_array_delay_ms: float = 0.0
+    sub1_delay_ms: float = 0.0
+    sub2_delay_ms: float = 0.0
+    main_l_delay_ms: float = 0.0
+    main_r_delay_ms: float = 0.0
     sub_gain_trim_db: float = 0.0
     sub_polarity_invert: bool = False
     sub_allpass_enabled: bool = False

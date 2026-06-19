@@ -27,6 +27,11 @@ def _get_bass_integration_pkg(module_name: str):
     return sys.modules[module_name.rsplit(".", 1)[0]]
 
 
+def _get_pkg():
+    """Return the bass_integration package module for patchable attribute lookup."""
+    return _get_bass_integration_pkg(__name__)
+
+
 def _status_callback(callbacks: Any, message: str) -> None:
     if callbacks is None:
         return

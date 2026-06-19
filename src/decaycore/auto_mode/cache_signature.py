@@ -84,8 +84,10 @@ def _auto_cache_resolve_path(*, compat_version: str | None = None) -> str:
 
 
 _BASS_ALLPASS_ALGO_V = 1
-_BASS_INTEGRATION_COMBINE_ALGO_V = 1
+_BASS_INTEGRATION_COMBINE_ALGO_V = 2
+_BASS_INTEGRATION_ALGO_V = 3
 _DIRECT_DAC_SUB_TARGET_POLICY_V = 1
+_AUTO_LF_ROLLOFF_POLICY_V = 1
 _AUTO_TDC_DECAY_SCORING_ALGO_V = 2
 _AUTO_BROAD_RESIDUAL_PEAK_SCORING_ALGO_V = 2
 _AUTO_CORRECTION_SHARPNESS_SCORING_ALGO_V = 1
@@ -263,6 +265,7 @@ def _auto_signature_payload(
             "confidence_model_policy_v": int(_AUTO_CONFIDENCE_MODEL_POLICY_V),
             "residual_peak_scorer_v": int(_AUTO_BROAD_RESIDUAL_PEAK_SCORING_ALGO_V),
             "bass_integration_feasibility_policy_v": int(_AUTO_BASS_INTEGRATION_FEASIBILITY_POLICY_V),
+            "lf_rolloff_policy_v": int(_AUTO_LF_ROLLOFF_POLICY_V),
             "phase_gd_guard_policy_v": int(_AUTO_PHASE_GD_GUARD_POLICY_V),
             "measurement_metadata_identity_v": int(_AUTO_MEASUREMENT_METADATA_IDENTITY_V),
             "hybrid_iir_policy_v": int(_AUTO_HYBRID_IIR_POLICY_V),
@@ -419,6 +422,7 @@ def _auto_signature_payload(
         "_auto_mag_c_min_hz": float(_auto_safe_float(base_data.get("_auto_mag_c_min_hz", float("nan")), float("nan"))),
         "_auto_low_bass_cut_hz": float(_auto_safe_float(base_data.get("_auto_low_bass_cut_hz", float("nan")), float("nan"))),
         "_auto_exc_freq_hz": float(_auto_safe_float(base_data.get("_auto_exc_freq_hz", float("nan")), float("nan"))),
+        "_auto_lf_rolloff_policy_v": int(_AUTO_LF_ROLLOFF_POLICY_V),
         "_bass_allpass_algo_v": int(_BASS_ALLPASS_ALGO_V),
         "_bass_integration_combine_algo_v": int(_BASS_INTEGRATION_COMBINE_ALGO_V),
         "_direct_dac_sub_target_policy_v": int(_DIRECT_DAC_SUB_TARGET_POLICY_V),
@@ -516,6 +520,21 @@ def _auto_signature_payload(
         "bass_integration_sub_delay_ms": float(
             _auto_safe_float(base_data.get("bass_integration_sub_delay_ms", float("nan")), float("nan"))
         ),
+        "bass_integration_sub_array_delay_ms": float(
+            _auto_safe_float(base_data.get("bass_integration_sub_array_delay_ms", float("nan")), float("nan"))
+        ),
+        "bass_integration_sub1_delay_ms": float(
+            _auto_safe_float(base_data.get("bass_integration_sub1_delay_ms", float("nan")), float("nan"))
+        ),
+        "bass_integration_sub2_delay_ms": float(
+            _auto_safe_float(base_data.get("bass_integration_sub2_delay_ms", float("nan")), float("nan"))
+        ),
+        "bass_integration_main_l_delay_ms": float(
+            _auto_safe_float(base_data.get("bass_integration_main_l_delay_ms", float("nan")), float("nan"))
+        ),
+        "bass_integration_main_r_delay_ms": float(
+            _auto_safe_float(base_data.get("bass_integration_main_r_delay_ms", float("nan")), float("nan"))
+        ),
         "bass_integration_sub_polarity_invert": bool(base_data.get("bass_integration_sub_polarity_invert", False)),
         "bass_integration_sub_gain_trim_db": float(
             _auto_safe_float(base_data.get("bass_integration_sub_gain_trim_db", float("nan")), float("nan"))
@@ -546,6 +565,12 @@ def _auto_signature_payload(
         "direct_dac_sub_lpf_hz": float(
             _auto_safe_float(base_data.get("direct_dac_sub_lpf_hz", float("nan")), float("nan"))
         ),
+        "bass_integration_sub_topology": str(
+            dict(base_data.get("_bass_integration_meta", {}) or {}).get("sub_topology", "")
+            if isinstance(base_data.get("_bass_integration_meta", {}), dict)
+            else ""
+        ),
+        "bass_integration_algorithm_v": int(_BASS_INTEGRATION_ALGO_V),
         "bass_integration_profile": str(base_data.get("bass_integration_profile", "") or ""),
         "bass_integration_mode": "direct_dac",
         "max_boost": float(_auto_safe_float(base_data.get("max_boost", float("nan")), float("nan"))),

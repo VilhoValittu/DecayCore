@@ -176,6 +176,14 @@ def test_auto_search_v2_execution_context_preserves_mixed_filter_key():
     assert context.search_base_data["_optuna_journal_kind"] == "filter"
 
 
+def test_auto_search_v2_runtime_enables_cache_winner_polish():
+    from decaycore.auto_mode.search_v2.runtime import build_auto_mode_orchestrator_runtime
+
+    runtime = build_auto_mode_orchestrator_runtime()
+
+    assert runtime["cache_winner_polish_enabled"] is True
+
+
 def test_auto_search_v2_signature_stable_after_winner_applied():
     measurements = _measurements()
     base = _base_data()
@@ -1529,20 +1537,29 @@ def test_auto_search_v2_executor_asym_cache_finalize_none_falls_back_to_full_sea
     ]
 
 
-def test_auto_search_v2_cache_finalize_skips_repeated_winner_polish(monkeypatch):
+def test_auto_search_v2_cache_finalize_runs_winner_polish_by_default(monkeypatch):
     from decaycore.auto_mode import orchestrator_finalize
+    from decaycore.auto_mode import orchestrator_finalize_cached
 
-    def _raise_polish(**kwargs):
-        raise AssertionError("cache fast finalize should not replay winner polish")
+    calls = []
 
-    monkeypatch.setattr(orchestrator_finalize, "apply_phase_limit_winner_polish", _raise_polish)
-    monkeypatch.setattr(orchestrator_finalize, "apply_mag_c_min_winner_polish", _raise_polish)
-    monkeypatch.setattr(orchestrator_finalize, "apply_low_bass_cut_winner_polish", _raise_polish)
-    monkeypatch.setattr(orchestrator_finalize, "apply_hpf_winner_polish", _raise_polish)
-    monkeypatch.setattr(orchestrator_finalize, "apply_excess_phase_strength_winner_polish", _raise_polish)
-    monkeypatch.setattr(orchestrator_finalize, "apply_residual_peak_winner_polish", _raise_polish)
-    monkeypatch.setattr(orchestrator_finalize, "apply_tdc_strength_winner_polish", _raise_polish)
-    monkeypatch.setattr(orchestrator_finalize, "apply_stereo_policy_refine", _raise_polish)
+    def _noop_polish(**kwargs):
+        calls.append(str(kwargs.get("phase_label", "")))
+        return (
+            kwargs["best_preset"],
+            kwargs["best_metrics"],
+            False,
+            {"enabled": bool(kwargs.get("enabled", True)), "applied": False, "reason": "test_noop"},
+        )
+
+    monkeypatch.setattr(orchestrator_finalize_cached, "apply_phase_limit_winner_polish", _noop_polish)
+    monkeypatch.setattr(orchestrator_finalize_cached, "apply_mag_c_min_winner_polish", _noop_polish)
+    monkeypatch.setattr(orchestrator_finalize_cached, "apply_low_bass_cut_winner_polish", _noop_polish)
+    monkeypatch.setattr(orchestrator_finalize_cached, "apply_hpf_winner_polish", _noop_polish)
+    monkeypatch.setattr(orchestrator_finalize_cached, "apply_excess_phase_strength_winner_polish", _noop_polish)
+    monkeypatch.setattr(orchestrator_finalize_cached, "apply_residual_peak_winner_polish", _noop_polish)
+    monkeypatch.setattr(orchestrator_finalize_cached, "apply_tdc_strength_winner_polish", _noop_polish)
+    monkeypatch.setattr(orchestrator_finalize_cached, "apply_stereo_policy_refine", _noop_polish)
 
     def _materialize(preset, **kwargs):
         metrics = {
@@ -1564,7 +1581,12 @@ def test_auto_search_v2_cache_finalize_skips_repeated_winner_polish(monkeypatch)
         hc_f=None,
         hc_m=None,
         pin_obj=None,
-        cfg=SimpleNamespace(cache_enabled=False),
+        cfg=SimpleNamespace(
+            cache_enabled=False,
+            residual_peak_winner_polish_enabled=True,
+            residual_peak_winner_polish_max_variants=8,
+            residual_peak_winner_polish_min_improvement_db=0.2,
+        ),
         goal="balanced",
         rank_basis="rank_score",
         filter_key="asym",
@@ -1600,11 +1622,28 @@ def test_auto_search_v2_cache_finalize_skips_repeated_winner_polish(monkeypatch)
             "best_metrics": {"rank_score": 82.8, "avg_score": 77.2},
             "executed_micro_trials_total": 60,
         },
-        runtime=SimpleNamespace(cache_winner_polish_enabled=False),
+        runtime=SimpleNamespace(
+            cache_winner_polish_enabled=True,
+            phase_limit_winner_polish_enabled=True,
+            phase_limit_winner_polish_offsets_hz=(),
+            mag_c_min_winner_polish_enabled=True,
+            mag_c_min_winner_polish_step_hz=2.0,
+            mag_c_min_winner_polish_max_down_hz=40.0,
+            mag_c_min_winner_polish_max_up_hz=4.0,
+            hpf_winner_polish_enabled=True,
+            excess_phase_strength_winner_polish_enabled=True,
+            excess_phase_strength_winner_polish_step=0.05,
+            excess_phase_strength_winner_polish_max_delta=0.15,
+        ),
     )
 
     assert dict(result.get("best_preset", {}) or {}).get("preset_id") == "cached-asym"
-    assert result.get("phase_limit_winner_polish", {}).get("reason") == "cache_fast_finalize_skips_winner_polish"
+    assert "cache phase_limit winner polish" in calls
+    assert "cache residual_peak winner polish" in calls
+    assert "cache stereo policy refine" in calls
+    assert result.get("phase_limit_winner_polish", {}).get("reason") == "test_noop"
+    assert result.get("phase4_finalize") is True
+    assert result.get("phase4_steps", {}).get("winner_polish") is True
     assert result.get("trials_total") == 60
 
 

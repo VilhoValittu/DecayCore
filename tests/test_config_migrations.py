@@ -1,7 +1,6 @@
 """Unit tests for config migration system in decaycore_config.py."""
 
 import json
-import pytest
 
 import decaycore.config.decaycore_config as decaycore_config
 
@@ -34,6 +33,7 @@ class TestConfigMigrations:
                 "filter_type": "Asymmetric",
                 "mode": "BASIC",  # Use BASIC to avoid AUTO mode overrides
                 "mag_correct": [True],  # Was list in old format
+                "multi_rate_ultra_high_opt": [True],
                 "comparison_mode": [False],
                 "bass_integration_enable": [],  # Empty list -> False
             }),
@@ -44,6 +44,8 @@ class TestConfigMigrations:
         loaded = decaycore_config.load_config()
         assert isinstance(loaded["mag_correct"], bool)
         assert loaded["mag_correct"] is True
+        assert isinstance(loaded["multi_rate_ultra_high_opt"], bool)
+        assert loaded["multi_rate_ultra_high_opt"] is True
         assert isinstance(loaded["comparison_mode"], bool)
         assert loaded["comparison_mode"] is False
         assert isinstance(loaded["bass_integration_enable"], bool)
@@ -204,3 +206,36 @@ class TestConfigMigrations:
         assert loaded["mag_correct"] is True
         assert loaded["lvl_manual_db"] == 10.0  # 85 - 75
         assert loaded["_config_version"] == decaycore_config._CONFIG_CURRENT_VERSION
+
+    def test_load_config_normalizes_legacy_choice_indices(self, monkeypatch, tmp_path):
+        """Old configs with indexed select values should map to current choice values."""
+        cfg_path = tmp_path / "config.json"
+        cfg_path.write_text(
+            json.dumps({
+                "fs": 1,
+                "taps": 1,
+                "hpf_slope": 1,
+                "xo1_s": 2,
+                "plot_smoothing_level": 1,
+                "filter_wav_format": 1,
+                "device_audio_format": 1,
+                "ir_export_window_mode": "invalid",
+                "ir_export_window_shape": "invalid",
+                "stereo_link_strategy": "invalid",
+            }),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(decaycore_config, "CONFIG_FILE", str(cfg_path))
+
+        loaded = decaycore_config.load_config()
+
+        assert loaded["fs"] == 48000
+        assert loaded["taps"] == 1024
+        assert loaded["hpf_slope"] == 12
+        assert loaded["xo1_s"] == 18
+        assert loaded["plot_smoothing_level"] == 12
+        assert loaded["filter_wav_format"] == "S32_LE"
+        assert loaded["device_audio_format"] == "S16_LE"
+        assert loaded["ir_export_window_mode"] == "auto"
+        assert loaded["ir_export_window_shape"] == "hann"
+        assert loaded["stereo_link_strategy"] == "auto"

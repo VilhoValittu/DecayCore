@@ -22,6 +22,9 @@ from .shared import _auto_safe_float
 
 logger = logging.getLogger("DecayCore")
 
+_SEVERITY_ASYMMETRY_SCALE = 1.5
+_SEVERITY_GATE_THRESHOLD = 0.08
+
 
 def _policy_from_data(data: dict | None) -> StereoAutoPolicyConfig:
     src = dict(data or {})
@@ -470,8 +473,8 @@ def apply_stereo_policy_refine(
     asymmetry_strength = float(score_delta)
     if np.isfinite(raw_lr_mismatch):
         asymmetry_strength += 0.35 * float(raw_lr_mismatch)
-    severity = float(np.clip(asymmetry_strength / 1.5, 0.0, 1.0))
-    if severity < 0.08:
+    severity = float(np.clip(asymmetry_strength / _SEVERITY_ASYMMETRY_SCALE, 0.0, 1.0))
+    if severity < _SEVERITY_GATE_THRESHOLD:
         meta.update(
             {
                 "state": "shared_fallback",

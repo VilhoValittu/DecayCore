@@ -6,6 +6,7 @@ from decaycore.ui.ng_mode_controls import (
     _update_auto_mode_fields_state,
     update_afdw_cycles_ui,
     update_mixed_freq_ui,
+    update_multi_rate_ui,
     update_stereo_auto_policy_ui,
     update_xo_ui,
     update_lvl_ui,
@@ -48,6 +49,7 @@ def test_build_taps_auto_info_markdown_off_state():
     text = _build_taps_auto_info_markdown(
         multi_rate=False,
         base_taps=65536,
+        include_ultra_high=False,
         t=_t,
     )
 
@@ -58,6 +60,7 @@ def test_build_taps_auto_info_markdown_uses_current_base_taps():
     text = _build_taps_auto_info_markdown(
         multi_rate=True,
         base_taps=131072,
+        include_ultra_high=False,
         t=_t,
     )
 
@@ -66,6 +69,41 @@ def test_build_taps_auto_info_markdown_uses_current_base_taps():
     assert "- **44.1 kHz** -> **131,072** taps" in text
     assert "- **88.2 kHz** -> **262,144** taps" in text
     assert text.count("kHz** -> **") == 6
+
+
+def test_build_taps_auto_info_markdown_includes_ultra_high_rates_when_enabled():
+    text = _build_taps_auto_info_markdown(
+        multi_rate=True,
+        base_taps=65536,
+        include_ultra_high=True,
+        t=_t,
+    )
+
+    assert "- **352.8 kHz** -> **524,288** taps" in text
+    assert "- **384.0 kHz** -> **576,000** taps" in text
+    assert text.count("kHz** -> **") == 8
+
+
+def test_update_multi_rate_ui_hides_ultra_high_toggle_when_multi_rate_is_off():
+    ctrl.reset()
+    ctrl.register("multi_rate_opt", _DummyControl(False))
+    scope = _DummyContainer()
+    ctrl.register_container("multi_rate_ultra_high_scope", scope)
+
+    update_multi_rate_ui()
+
+    assert scope.visible is False
+
+
+def test_update_multi_rate_ui_shows_ultra_high_toggle_when_multi_rate_is_on():
+    ctrl.reset()
+    ctrl.register("multi_rate_opt", _DummyControl(True))
+    scope = _DummyContainer()
+    ctrl.register_container("multi_rate_ultra_high_scope", scope)
+
+    update_multi_rate_ui()
+
+    assert scope.visible is True
 
 
 def test_update_lvl_ui_shows_manual_target_scope_for_manual_mode():
@@ -120,7 +158,7 @@ def test_auto_mode_keeps_filter_type_enabled():
 
     assert ctrl.get("filter_type").enabled is True
     assert ctrl.get("mag_correct").enabled is False
-    assert ctrl.get("enable_afdw").enabled is True
+    assert ctrl.get("enable_afdw").enabled is False
     assert ctrl.get("auto_goal").enabled is True
 
 

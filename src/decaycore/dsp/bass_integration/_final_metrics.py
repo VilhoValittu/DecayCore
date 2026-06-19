@@ -94,6 +94,7 @@ def _direct_dac_eval_to_legacy_metrics(eval_result, *, profile: str, mode_norm: 
         "bass_dominant_channel": str(dominant),
         "bass_feasibility_class": str(s.get("feasibility_class", "infeasible" if not eval_result.feasible else "good")),
         "bass_feasibility_reason": str(s.get("feasibility_reason", "")),
+        "bass_feasibility_limiting_factor": str(s.get("feasibility_limiting_factor", "unknown")),
         "bass_direct_dac_candidate_score": float(eval_result.score),
         "bass_direct_dac_objective": float(eval_result.objective),
         "bass_direct_dac_reject_reasons": list(eval_result.reject_reasons),
@@ -108,6 +109,7 @@ def _direct_dac_eval_to_legacy_metrics(eval_result, *, profile: str, mode_norm: 
     diag["dominant_channel"] = str(dominant)
     diag["feasibility_class"] = str(metrics["bass_feasibility_class"])
     diag["feasibility_reason"] = str(metrics["bass_feasibility_reason"])
+    diag["feasibility_limiting_factor"] = str(metrics["bass_feasibility_limiting_factor"])
     metrics["diagnostics"] = diag
     metrics["gd_continuity"] = gd_cont
     metrics["snapshot"] = _final_metric_snapshot(metrics)
@@ -231,6 +233,7 @@ def _final_metric_snapshot(metrics: dict[str, Any]) -> dict[str, float | bool | 
         "dominant_channel": str(metrics.get("bass_dominant_channel", "unknown") or "unknown"),
         "feasibility_class": str(metrics.get("bass_feasibility_class", "marginal") or "marginal"),
         "feasibility_reason": str(metrics.get("bass_feasibility_reason", "") or ""),
+        "feasibility_limiting_factor": str(metrics.get("bass_feasibility_limiting_factor", "unknown") or "unknown"),
         "metric_channel_mode": str(metrics.get("bass_metric_channel_mode", "worst_case") or "worst_case"),
     }
 

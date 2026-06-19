@@ -23,12 +23,7 @@ from ._constants import (
     DIRECT_DAC_ALIGNMENT_MIN_IMPROVEMENT_SCORE,
 )
 from ._final_metrics import _final_metric_snapshot
-from ._utils import _get_bass_integration_pkg, _safe_float
-
-
-def _get_pkg():
-    """Return the bass_integration package module for patchable attribute lookup."""
-    return _get_bass_integration_pkg(__name__)
+from ._utils import _get_pkg, _safe_float
 
 
 def _feasibility_rank(value: Any) -> int:
@@ -200,17 +195,22 @@ def recommend_direct_dac_alignment(
         )
     )
     chosen_metrics = best_metrics if applied else baseline_metrics
+    selected_delay_ms = float(best_delay if applied else 0.0)
+    main_delay_ms = float(max(0.0, -selected_delay_ms))
     return {
         "applied": bool(applied),
-        "sub_delay_ms": float(best_delay if applied else 0.0),
+        "sub_delay_ms": float(selected_delay_ms),
+        "sub_array_delay_ms": float(selected_delay_ms),
+        "main_l_delay_ms": float(main_delay_ms),
+        "main_r_delay_ms": float(main_delay_ms),
         "sub_polarity_invert": bool(best_polarity if applied else False),
         "sub_gain_trim_db": float(best_gain if applied else 0.0),
         "baseline": _final_metric_snapshot(baseline_metrics),
         "optimized": _final_metric_snapshot(chosen_metrics),
         "improvement_score": float(improvement_score) if np.isfinite(improvement_score) else 0.0,
         "reason": (
-            "Applied shared mono-sub polarity/delay/gain alignment."
+            "Applied shared Direct-DAC sub-array polarity/delay/gain alignment."
             if applied
-            else "Baseline shared mono-sub alignment kept."
+            else "Baseline shared Direct-DAC sub-array alignment kept."
         ),
     }

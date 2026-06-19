@@ -59,6 +59,11 @@ def apply_direct_dac_bass_integration_result(
             "sub_lpf_hz": float(candidate.sub_lpf_hz),
             "sub_overlap_hz": float(candidate.sub_lpf_hz - candidate.main_hpf_hz),
             "sub_delay_ms": float(candidate.sub_delay_ms),
+            "sub_array_delay_ms": float(candidate.sub_array_delay_ms),
+            "sub1_delay_ms": float(candidate.sub1_delay_ms),
+            "sub2_delay_ms": float(candidate.sub2_delay_ms),
+            "main_l_delay_ms": float(candidate.main_l_delay_ms),
+            "main_r_delay_ms": float(candidate.main_r_delay_ms),
             "sub_gain_db": float(candidate.sub_gain_trim_db),
             "sub_polarity_invert": bool(candidate.sub_polarity_invert),
             "score": float(metrics.score),
@@ -68,7 +73,8 @@ def apply_direct_dac_bass_integration_result(
             "reject_reasons": list(metrics.reject_reasons),
             "worst_channel": str(metrics.dominant_channel),
             "cancellation_score": float(max(metrics.left.cancellation_risk, metrics.right.cancellation_risk)),
-            "cancellation_risk": str(metrics.summary.get("feasibility_class", "")),
+            "cancellation_risk": float(metrics.summary.get("cancellation_risk", float("nan"))),
+            "feasibility_class": str(metrics.summary.get("feasibility_class", "")),
             "magnitude_ripple_db": float(metrics.summary.get("overlap_ripple_db", float("nan"))),
         }
         data["bass_integration_alignment_auto_applied"] = True
@@ -88,6 +94,11 @@ def apply_direct_dac_bass_integration_result(
                     "recommended_crossover_hz": float(candidate.main_hpf_hz),
                     "recommended_sub_lpf_hz": float(candidate.sub_lpf_hz),
                     "direct_dac_result": dict(result_dict),
+                    "sub_array_delay_ms": float(candidate.sub_array_delay_ms),
+                    "sub1_delay_ms": float(candidate.sub1_delay_ms),
+                    "sub2_delay_ms": float(candidate.sub2_delay_ms),
+                    "main_l_delay_ms": float(candidate.main_l_delay_ms),
+                    "main_r_delay_ms": float(candidate.main_r_delay_ms),
                     **(
                         {
                             "sub_target_policy": sub_target_policy,
@@ -106,6 +117,11 @@ def apply_direct_dac_bass_integration_result(
                     "direct_dac_sub_hpf_hz": float(candidate.sub_hpf_hz),
                     "direct_dac_sub_lpf_hz": float(candidate.sub_lpf_hz),
                     "direct_dac_sub_overlap_hz": float(candidate.sub_lpf_hz - candidate.main_hpf_hz),
+                    "direct_dac_sub_array_delay_ms": float(candidate.sub_array_delay_ms),
+                    "direct_dac_sub1_delay_ms": float(candidate.sub1_delay_ms),
+                    "direct_dac_sub2_delay_ms": float(candidate.sub2_delay_ms),
+                    "direct_dac_main_l_delay_ms": float(candidate.main_l_delay_ms),
+                    "direct_dac_main_r_delay_ms": float(candidate.main_r_delay_ms),
                     "direct_dac_cancellation_score": float(result_dict["cancellation_score"]),
                     "direct_dac_magnitude_ripple_db": float(result_dict["magnitude_ripple_db"]),
                     "direct_dac_candidate_score": float(metrics.score),
@@ -116,6 +132,11 @@ def apply_direct_dac_bass_integration_result(
             bi_meta["alignment"] = {
                 "applied": True,
                 "delay_ms": float(candidate.sub_delay_ms),
+                "sub_array_delay_ms": float(candidate.sub_array_delay_ms),
+                "sub1_delay_ms": float(candidate.sub1_delay_ms),
+                "sub2_delay_ms": float(candidate.sub2_delay_ms),
+                "main_l_delay_ms": float(candidate.main_l_delay_ms),
+                "main_r_delay_ms": float(candidate.main_r_delay_ms),
                 "polarity_invert": bool(candidate.sub_polarity_invert),
                 "gain_trim_db": float(candidate.sub_gain_trim_db),
                 "reason": "Direct DAC final candidate verified with canonical evaluator.",
@@ -149,19 +170,19 @@ def apply_direct_dac_bass_integration_result(
         )
         return dict(result_dict)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
         KeyError,
         IndexError,
         RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
     ):
-        logger.debug("Direct-DAC final candidate verification failed", exc_info=True)
+        _profile = str(getattr(cfg, "bass_integration_profile", "safe") or "safe")
+        logger.warning(
+            "Direct-DAC final candidate verification failed (profile=%s) — bass integration disabled",
+            _profile,
+            exc_info=True,
+        )
         return {}
 
 

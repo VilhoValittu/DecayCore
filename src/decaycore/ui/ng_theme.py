@@ -565,7 +565,8 @@ body {
     background: rgba(242, 228, 210, 0.26);
 }
 
-body.cf-light {
+body.cf-light,
+body.body--light {
     --cf-bg: #f2ede6;
     --cf-bg-elevated: #f7f3ed;
     --cf-bg-soft: #ece4da;
@@ -592,7 +593,8 @@ body.cf-light {
     --cf-shadow-hero: 0 24px 70px rgba(76, 56, 38, 0.14);
 }
 
-body.cf-light {
+body.cf-light,
+body.body--light {
     background:
         radial-gradient(circle at top left, rgba(45, 129, 123, 0.10), transparent 28%),
         radial-gradient(circle at top right, rgba(180, 111, 50, 0.08), transparent 24%),
@@ -600,56 +602,71 @@ body.cf-light {
 }
 
 body.cf-light .cf-brand-hero,
+body.body--light .cf-brand-hero,
 body.cf-light .cf-tabs-shell-inner,
+body.body--light .cf-tabs-shell-inner,
 body.cf-light .cf-info-panel,
+body.body--light .cf-info-panel,
 body.cf-light .q-card,
-body.cf-light .cf-modal-card {
+body.body--light .q-card,
+body.cf-light .cf-modal-card,
+body.body--light .cf-modal-card {
     box-shadow: var(--cf-shadow-card) !important;
 }
 
-body.cf-light .cf-tabs-shell-inner {
+body.cf-light .cf-tabs-shell-inner,
+body.body--light .cf-tabs-shell-inner {
     background: rgba(247, 243, 237, 0.86) !important;
 }
 
-body.cf-light .q-tabs__content {
+body.cf-light .q-tabs__content,
+body.body--light .q-tabs__content {
     background: rgba(62, 42, 27, 0.07) !important;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48);
 }
 
-body.cf-light .q-tab--active {
+body.cf-light .q-tab--active,
+body.body--light .q-tab--active {
     color: #f7f3ed !important;
 }
 
-body.cf-light .cf-progress-meta {
+body.cf-light .cf-progress-meta,
+body.body--light .cf-progress-meta {
     box-shadow: 0 4px 12px rgba(76, 56, 38, 0.10);
 }
 
-body.cf-light .cf-progress-phase {
+body.cf-light .cf-progress-phase,
+body.body--light .cf-progress-phase {
     padding: 2px 10px;
     border-radius: 999px;
     background: linear-gradient(90deg, rgba(48, 38, 29, 0.34), rgba(48, 38, 29, 0.18));
 }
 
-body.cf-light .cf-progress-meta--running {
+body.cf-light .cf-progress-meta--running,
+body.body--light .cf-progress-meta--running {
     background: rgba(48, 38, 29, 0.34);
     border-color: rgba(255, 255, 255, 0.34);
 }
 
-body.cf-light .cf-progress-meta--complete {
+body.cf-light .cf-progress-meta--complete,
+body.body--light .cf-progress-meta--complete {
     background: rgba(247, 243, 237, 0.92);
     border-color: rgba(86, 61, 39, 0.16);
 }
 """
 
 
-def apply_theme():
+def apply_theme(*, dark: bool = True):
     """Inject theme CSS and enable NiceGUI dark mode.
 
     Must be called inside a @ui.page handler, before other components.
     Returns the DarkMode element so callers can toggle it later.
     """
     from nicegui import ui  # noqa: PLC0415
-    dark = ui.dark_mode()
-    dark.enable()
+    dark_mode = ui.dark_mode()
+    if dark:
+        dark_mode.enable()
+    else:
+        dark_mode.disable()
     ui.add_css(_CF_CSS)
-    return dark
+    return dark_mode

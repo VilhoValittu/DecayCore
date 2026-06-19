@@ -82,12 +82,33 @@ def _build_combined_fig(freq_hz, measured_db, predicted_db, title: str,
     mask = (f >= 10.0) & (f <= 500.0)
     f_plot = f[mask]
 
+    # Align measured and predicted to the target's dB scale.
+    # measured/predicted are in absolute FFT dB; target is in relative dB.
+    # Align from the predicted (post-FIR output) rather than the raw measured:
+    # the FIR changes the absolute level, so an offset calibrated from the raw
+    # measured would mis-place the predicted curve at bass/sub frequencies.
+    # Using the predicted at 50–200 Hz (main-dominated, FIR-corrected region)
+    # gives the correct reference for both main and sub ranges.
+    offset_db = 0.0
+    ref_for_align = predicted_db if predicted_db is not None else measured_db
+    if ref_for_align is not None and target_db is not None:
+        ref_arr = np.asarray(ref_for_align, dtype=float)
+        tgt_arr = np.asarray(target_db, dtype=float)
+        if ref_arr.size == f.size and tgt_arr.size == f.size:
+            align_mask = (
+                mask
+                & (f >= 50.0) & (f <= 200.0)
+                & np.isfinite(ref_arr) & np.isfinite(tgt_arr)
+            )
+            if np.count_nonzero(align_mask) >= 4:
+                offset_db = float(np.median(ref_arr[align_mask] - tgt_arr[align_mask]))
+
     fig = go.Figure()
     if measured_db is not None:
         m = np.asarray(measured_db, dtype=float)
         if m.size == f.size:
             fig.add_trace(go.Scatter(
-                x=f_plot, y=m[mask],
+                x=f_plot, y=(m - offset_db)[mask],
                 name="Measured (combined)",
                 line=dict(color="rgba(148,163,184,0.55)", width=1.2, dash="dot"),
             ))
@@ -95,7 +116,7 @@ def _build_combined_fig(freq_hz, measured_db, predicted_db, title: str,
         p = np.asarray(predicted_db, dtype=float)
         if p.size == f.size:
             fig.add_trace(go.Scatter(
-                x=f_plot, y=p[mask],
+                x=f_plot, y=(p - offset_db)[mask],
                 name="Predicted (combined)",
                 line=dict(color="#60a5fa", width=2.0),
             ))

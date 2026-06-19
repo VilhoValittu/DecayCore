@@ -156,7 +156,7 @@ def _auto_cache_build_global_target_entry(
         {
             "t": int(time.time()),
             "schema_version": int(AUTO_MODE_CACHE_SCHEMA_VERSION),
-            "target_cache_version": 3,
+            "target_cache_version": 4,
             "measurement_sig": str(msig),
             "measurement_identity": str(msig),
             "auto_goal": str(_auto_goal_norm(goal)),

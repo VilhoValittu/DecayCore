@@ -865,12 +865,11 @@ Bass Integration uses the **Direct DAC / CamillaDSP sub output** path: the subwo
 
 **When two subwoofers (Sub1 + Sub2) are measured, DecayCore generates one shared mono sub filter, not two separate filters.**
 
-The two sub measurements are combined into a single transfer function before alignment and FIR generation. The combination method is either:
+The current Direct DAC path first peak-aligns Sub2 relative to Sub1 and then forms one peak-aligned vector-averaged combined sub reference. FIR generation and main/sub alignment are run against that one shared combined sub branch.
 
-- **Average** — arithmetic mean of the two sub responses.
-- **Aligned sum** — cross-correlation time-alignment followed by summation.
+The resulting mono sub filter is intended to drive both subwoofers simultaneously from a single output channel (or a summed/bridged output). Reported delay, gain, polarity, and optional allpass values apply to this shared combined sub branch, not to two separate per-sub filters. If DecayCore reports a CamillaDSP main delay, that is a compensating L/R main-channel delay relative to the shared sub branch, not a per-sub setting.
 
-The resulting mono sub filter is intended to drive both subwoofers simultaneously from a single output channel (or a summed/bridged output). It does not replace per-unit DSP correction if the subwoofers are in very different positions with very different response shapes.
+This does not replace per-unit DSP correction if the subwoofers are in very different positions with very different response shapes.
 
 ### 12.3 What the feature produces
 

@@ -2,6 +2,7 @@ import numpy as np
 
 from decaycore.auto_mode.api import (
     _estimate_auto_hpf_from_response,
+    _estimate_auto_mag_c_min_hz,
     _resolve_auto_hpf_application,
 )
 
@@ -10,6 +11,65 @@ def _butter_hpf_mag_db(freqs: np.ndarray, fc_hz: float, order: int) -> np.ndarra
     f = np.asarray(freqs, dtype=float)
     with np.errstate(divide="ignore"):
         return -10.0 * np.log10(1.0 + np.power(float(fc_hz) / np.maximum(f, 1e-9), 2 * int(order)))
+
+
+def _butter_f6_hz(fc_hz: float, order: int) -> float:
+    c6 = float((10.0**0.6) - 1.0)
+    return float(fc_hz) / float(np.power(c6, 1.0 / (2.0 * int(order))))
+
+
+def test_auto_f6_estimator_recovers_butterworth_like_rolloff():
+    f = np.geomspace(10.0, 20000.0, 4096).astype(float)
+    fc_true = 36.0
+    order_true = 4
+    m = _butter_hpf_mag_db(f, fc_true, order_true)
+
+    f6 = _estimate_auto_mag_c_min_hz(f, m, f, m, default_hz=25.0)
+
+    assert abs(float(f6) - _butter_f6_hz(fc_true, order_true)) <= 5.0
+
+
+def test_auto_f6_estimator_rejects_isolated_infrabass_spike():
+    f = np.geomspace(10.0, 20000.0, 4096).astype(float)
+    fc_true = 42.0
+    order_true = 4
+    spike = 18.0 * np.exp(-0.5 * (np.log2(f / 17.0) / 0.035) ** 2.0)
+    m = _butter_hpf_mag_db(f, fc_true, order_true) + spike
+
+    f6 = _estimate_auto_mag_c_min_hz(f, m, f, m, default_hz=25.0)
+
+    assert float(f6) >= _butter_f6_hz(fc_true, order_true) - 8.0
+
+
+def test_auto_f6_estimator_stays_stable_with_local_bass_null():
+    f = np.geomspace(10.0, 20000.0, 4096).astype(float)
+    fc_true = 38.0
+    order_true = 4
+    local_null = -9.0 * np.exp(-0.5 * (np.log2(f / 34.0) / 0.045) ** 2.0)
+    m = _butter_hpf_mag_db(f, fc_true, order_true) + local_null
+
+    f6 = _estimate_auto_mag_c_min_hz(f, m, f, m, default_hz=25.0)
+
+    assert 28.0 <= float(f6) <= 48.0
+
+
+def test_auto_f6_estimator_uses_higher_channel_when_stereo_disagrees():
+    f = np.geomspace(10.0, 20000.0, 4096).astype(float)
+    left = _butter_hpf_mag_db(f, 25.0, 4)
+    right = _butter_hpf_mag_db(f, 52.0, 4)
+
+    f6 = _estimate_auto_mag_c_min_hz(f, left, f, right, default_hz=25.0)
+
+    assert float(f6) >= _butter_f6_hz(52.0, 4) - 4.0
+
+
+def test_auto_f6_estimator_keeps_full_range_response_at_minimum():
+    f = np.geomspace(10.0, 20000.0, 2048).astype(float)
+    m = np.zeros_like(f, dtype=float)
+
+    f6 = _estimate_auto_mag_c_min_hz(f, m, f, m, default_hz=25.0)
+
+    assert 10.0 <= float(f6) <= 12.0
 
 
 def test_auto_hpf_estimator_recovers_butterworth_like_rolloff():

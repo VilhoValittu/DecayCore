@@ -255,8 +255,8 @@ def evaluate_direct_dac_candidate(
     guard_hi_hz = max(guard_lo_hz + 1.0, fc * hi_ratio)
     eval_bundle = _branch_bundle(bundle, candidate, sub_combine_mode=combine_mode_norm)
 
-    l_overlap = _channel_overlap_metrics(eval_bundle.l_main, eval_bundle.l_sub, eval_bundle.l_total, lo_hz=guard_lo_hz, hi_hz=guard_hi_hz)
-    r_overlap = _channel_overlap_metrics(eval_bundle.r_main, eval_bundle.r_sub, eval_bundle.r_total, lo_hz=guard_lo_hz, hi_hz=guard_hi_hz)
+    l_overlap = _channel_overlap_metrics(eval_bundle.l_main, eval_bundle.l_sub, eval_bundle.l_total, lo_hz=guard_lo_hz, hi_hz=guard_hi_hz, fc_hz=fc, sub_lpf_hz=sub_lpf)
+    r_overlap = _channel_overlap_metrics(eval_bundle.r_main, eval_bundle.r_sub, eval_bundle.r_total, lo_hz=guard_lo_hz, hi_hz=guard_hi_hz, fc_hz=fc, sub_lpf_hz=sub_lpf)
     l_pred = _channel_predicted_sum_metrics(eval_bundle.l_total, lo_hz=guard_lo_hz, hi_hz=guard_hi_hz, fc_hz=fc)
     r_pred = _channel_predicted_sum_metrics(eval_bundle.r_total, lo_hz=guard_lo_hz, hi_hz=guard_hi_hz, fc_hz=fc)
     l_ext = _channel_overlap_extension_metrics(eval_bundle.l_main, eval_bundle.l_sub, eval_bundle.l_total, fc_hz=fc, sub_lpf_hz=sub_lpf)
@@ -302,7 +302,7 @@ def evaluate_direct_dac_candidate(
     # Classify feasibility using the worst channel's own metrics, not a synthetic cross-channel
     # max that combines ripple from one channel with GD from the other.  Both channels' reject
     # reasons are still collected above, so genuinely bad channels are not silently passed.
-    feasibility_class, feasibility_reason = _classify_bass_integration_feasibility(
+    feasibility_class, feasibility_reason, feasibility_limiting_factor = _classify_bass_integration_feasibility(
         overlap_ripple_worst=worst.overlap_ripple_db,
         sub_dominance_worst=abs(worst.sub_dominance_db),
         xo_gd_rms_worst=worst.xo_gd_rms_mismatch_ms,
@@ -354,6 +354,7 @@ def evaluate_direct_dac_candidate(
         "dominant_channel": str(dominant_channel),
         "feasibility_class": str(feasibility_class),
         "feasibility_reason": str(feasibility_reason),
+        "feasibility_limiting_factor": str(feasibility_limiting_factor),
         "export_model": "camilladsp_yaml_compatible",
         "candidate_score": float(score),
         "objective": float(-score),

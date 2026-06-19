@@ -553,6 +553,14 @@ class FilterConfig:
     sub_crossover_hz: float = 80.0
     sub_crossover_order: int = 4
     direct_dac_sub_lpf_hz: float = 80.0
+    bass_integration_sub_delay_ms: float = 0.0
+    bass_integration_sub_array_delay_ms: float = 0.0
+    bass_integration_sub1_delay_ms: float = 0.0
+    bass_integration_sub2_delay_ms: float = 0.0
+    bass_integration_main_l_delay_ms: float = 0.0
+    bass_integration_main_r_delay_ms: float = 0.0
+    bass_integration_sub_gain_trim_db: float = 0.0
+    bass_integration_sub_polarity_invert: bool = False
     sub_hpf_freq: float = 20.0
     sub_hpf_order: int = 2
     low_bass_cut_hz: float = 20.0

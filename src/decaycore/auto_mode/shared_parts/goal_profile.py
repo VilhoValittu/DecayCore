@@ -16,6 +16,7 @@ from ._constants import *
 
 logger = logging.getLogger("DecayCore")
 
+
 def _auto_goal_norm(goal: str | None) -> str:
     goal_norm = str(goal or AUTO_MODE_GOAL_DEFAULT).strip().lower()
     goal_aliases = {
@@ -24,8 +25,6 @@ def _auto_goal_norm(goal: str | None) -> str:
         "bass": AUTO_MODE_GOAL_FLAT,
         "hybrid": AUTO_MODE_GOAL_LOW_RIPPLE,
         "prefer bass": AUTO_MODE_GOAL_FLAT,
-        "prefer-bass": AUTO_MODE_GOAL_FLAT,
-        "prefer_bass": AUTO_MODE_GOAL_FLAT,
         "room_safe": AUTO_MODE_GOAL_ROOM_SAFE,
         "roomsafe": AUTO_MODE_GOAL_ROOM_SAFE,
         "low_ripple": AUTO_MODE_GOAL_LOW_RIPPLE,
@@ -44,11 +43,13 @@ def _auto_goal_norm(goal: str | None) -> str:
         goal_norm = AUTO_MODE_GOAL_DEFAULT
     return str(goal_norm)
 
+
 def _auto_bass_integration_profile_norm(profile: str | None) -> str:
     value = str(profile or "safe").strip().lower()
     if value not in ("safe", "normal", "assertive"):
         value = "safe"
     return str(value)
+
 
 def _auto_bass_integration_profile_weights(profile: str | None) -> dict[str, float]:
     profile_norm = _auto_bass_integration_profile_norm(profile)
@@ -58,6 +59,7 @@ def _auto_bass_integration_profile_weights(profile: str | None) -> dict[str, flo
         )
     )
 
+
 def _auto_goal_forced_level_window(goal: str | None) -> tuple[float, float] | None:
     if _auto_goal_norm(goal) == AUTO_MODE_GOAL_SUBWOOFERS:
         return (
@@ -66,18 +68,22 @@ def _auto_goal_forced_level_window(goal: str | None) -> tuple[float, float] | No
         )
     return None
 
+
 def _auto_builtin_target_name(hc_mode: str | None) -> str | None:
     key = str(hc_mode or "").strip().lower()
     if not key:
         return None
     return AUTO_MODE_BUILTIN_TARGET_LOOKUP.get(key)
 
+
 def _auto_goal(base_data: dict | None, default: str = AUTO_MODE_GOAL_DEFAULT) -> str:
     g = str((base_data or {}).get("auto_goal", default) or default).strip().lower()
     return str(_auto_goal_norm(g))
 
+
 def _auto_goal_basis_text(goal: str) -> str:
     return "preset_objective_score"
+
 
 def _auto_metric_text(metrics: dict | None, goal: str) -> str:
     m = dict(metrics or {})
@@ -86,11 +92,11 @@ def _auto_metric_text(metrics: dict | None, goal: str) -> str:
         rank = _auto_safe_float(m.get("rank_score"), 0.0)
     return f"rank={float(rank):.3f}"
 
+
 def _m(metrics: dict | None, key: str, default=float("nan")) -> float:
     try:
         v = float((metrics or {}).get(key, default))
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -106,14 +112,32 @@ def _m(metrics: dict | None, key: str, default=float("nan")) -> float:
     return float(v)
 
 
-__all__ = ['_auto_goal_norm', '_auto_bass_integration_profile_norm', '_auto_bass_integration_profile_weights', '_auto_goal_forced_level_window', '_auto_builtin_target_name', '_auto_goal', '_auto_goal_basis_text', '_auto_metric_text', '_m']
+__all__ = [
+    "_auto_goal_norm",
+    "_auto_bass_integration_profile_norm",
+    "_auto_bass_integration_profile_weights",
+    "_auto_goal_forced_level_window",
+    "_auto_builtin_target_name",
+    "_auto_goal",
+    "_auto_goal_basis_text",
+    "_auto_metric_text",
+    "_m",
+]
 
 
 def _link_sibling_exports() -> None:
     import importlib
+
     package = __package__
-    for module_name in ['cache_hash', 'goal_profile', 'safe_values', 'backend', 'config', 'phase_sampling']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
+    for module_name in [
+        "cache_hash",
+        "goal_profile",
+        "safe_values",
+        "backend",
+        "config",
+        "phase_sampling",
+    ]:
+        if module_name == __name__.rsplit(".", 1)[-1]:
             continue
         module = importlib.import_module(f"{package}.{module_name}")
         for symbol in getattr(module, "__all__", ()):

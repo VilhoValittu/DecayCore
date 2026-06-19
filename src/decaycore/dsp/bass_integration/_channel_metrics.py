@@ -30,6 +30,8 @@ def _channel_overlap_metrics(
     *,
     lo_hz: float,
     hi_hz: float,
+    fc_hz: float | None = None,
+    sub_lpf_hz: float | None = None,
 ) -> dict[str, float]:
     freqs = np.asarray(total.freqs_hz, dtype=float)
     mask = _band_mask(freqs, lo_hz, hi_hz)
@@ -76,7 +78,26 @@ def _channel_overlap_metrics(
     depth_weight = np.clip(depth_db / 12.0, 0.0, 1.0)
     cancellation_risk = float(np.mean(phase_opposition * depth_weight))
 
-    sub_dominance_db = float(np.median(20.0 * np.log10(sub_mag / np.maximum(main_mag, 1e-12))))
+    # Evaluate sub_dominance only in the crossover overlap zone where both components contribute.
+    # Below fc, the main is intentionally attenuated by the HPF (by design), so comparing
+    # sub vs HPF'd main there inflates apparent dominance without reflecting integration quality.
+    # Priority: [fc, sub_lpf] overlap zone → [0.90×fc, hi] near-passband → full guard band.
+    if fc_hz is not None and sub_lpf_hz is not None and float(sub_lpf_hz) > float(fc_hz) + 5.0:
+        sub_dom_lo = float(fc_hz)
+        sub_dom_hi = float(sub_lpf_hz)
+    elif fc_hz is not None and float(fc_hz) * 0.90 > lo_hz:
+        sub_dom_lo = float(fc_hz) * 0.90
+        sub_dom_hi = hi_hz
+    else:
+        sub_dom_lo = lo_hz
+        sub_dom_hi = hi_hz
+    sub_dom_mask = _band_mask(freqs, sub_dom_lo, sub_dom_hi)
+    if int(np.count_nonzero(sub_dom_mask)) >= 3:
+        sd_main = np.maximum(np.abs(main_spec[sub_dom_mask]), 1e-12)
+        sd_sub = np.maximum(np.abs(sub_spec[sub_dom_mask]), 1e-12)
+        sub_dominance_db = float(np.median(20.0 * np.log10(sd_sub / sd_main)))
+    else:
+        sub_dominance_db = float(np.median(20.0 * np.log10(sub_mag / np.maximum(main_mag, 1e-12))))
     return {
         "overlap_ratio": float(overlap_ratio),
         "overlap_ripple_db": float(ripple_db),

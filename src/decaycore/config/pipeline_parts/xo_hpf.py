@@ -262,9 +262,22 @@ def filter_type_supports_xo_phase_model(filter_type: Any) -> bool:
         return False
     return True
 
+
+_MULTI_RATE_BASE_TARGET_RATES = (44100, 48000, 88200, 96000, 176400, 192000)
+_MULTI_RATE_ULTRA_HIGH_TARGET_RATES = (352800, 384000)
+
+
+def multi_rate_target_rates(*, include_ultra_high: bool = False) -> List[int]:
+    rates = list(_MULTI_RATE_BASE_TARGET_RATES)
+    if include_ultra_high:
+        rates.extend(_MULTI_RATE_ULTRA_HIGH_TARGET_RATES)
+    return rates
+
 def choose_target_rates(data: Dict[str, Any]) -> List[int]:
     if bool(data.get("multi_rate_opt")):
-        return [44100, 48000, 88200, 96000, 176400, 192000]
+        return multi_rate_target_rates(
+            include_ultra_high=bool(data.get("multi_rate_ultra_high_opt", False))
+        )
     try:
         return [int(data.get("fs") or 44100)]
     except (TypeError, ValueError):
@@ -312,4 +325,4 @@ def detect_is_wav_source(data: Dict[str, Any]) -> bool:
     )
 
 
-__all__ = ['_apply_auto_hpf_runtime_override', 'build_xos_hpf', 'filter_type_short', 'filter_type_supports_xo_phase_model', 'choose_target_rates', 'choose_dash_fs', 'detect_is_wav_source']
+__all__ = ['_apply_auto_hpf_runtime_override', 'build_xos_hpf', 'filter_type_short', 'filter_type_supports_xo_phase_model', 'multi_rate_target_rates', 'choose_target_rates', 'choose_dash_fs', 'detect_is_wav_source']

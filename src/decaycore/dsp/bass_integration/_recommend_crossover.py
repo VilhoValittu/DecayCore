@@ -10,11 +10,15 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import numpy as np
 
+_LOG = logging.getLogger("DecayCore.dsp")
+
 from ...auto_mode.shared import _auto_bass_integration_profile_weights
+from ...dsp.lf_rolloff import estimate_lf_rolloff_f6
 from ...io.measurement_bundle import BassIntegrationBundle
 from ._constants import (
     AVR_CROSSOVER_CANDIDATES,
@@ -22,12 +26,7 @@ from ._constants import (
     MIN_DIRECT_DAC_OVERLAP_RATIO,
 )
 from ._recommend_alignment import _evaluate_metric_grid
-from ._utils import _get_bass_integration_pkg, _normalize_candidate_frequencies, _safe_float, normalize_sub_combine_mode
-
-
-def _get_pkg():
-    """Return the bass_integration package module for patchable attribute lookup."""
-    return _get_bass_integration_pkg(__name__)
+from ._utils import _get_pkg, _normalize_candidate_frequencies, _safe_float, normalize_sub_combine_mode
 
 
 def _recommend_direct_dac_int_or_default(value: object, default: int) -> int:
@@ -48,6 +47,49 @@ def _recommend_direct_dac_int_or_default(value: object, default: int) -> int:
         return int(default)
 
 
+def _direct_dac_main_rolloff_meta(bundle: BassIntegrationBundle) -> dict[str, float | str]:
+    def _estimate(transfer) -> float:
+        estimate = estimate_lf_rolloff_f6(
+            getattr(transfer, "freqs_hz", []),
+            getattr(transfer, "mag_db", []),
+            min_hz=15.0,
+            max_hz=float(AVR_CROSSOVER_CANDIDATES[-1]),
+            ref_min_hz=220.0,
+            ref_max_hz=600.0,
+            search_max_hz=220.0,
+            smooth_oct=1.0,
+            default_hz=float("nan"),
+        )
+        return float(estimate.f6_hz)
+
+    l_f6 = _estimate(bundle.l_main)
+    r_f6 = _estimate(bundle.r_main)
+    vals = [v for v in (l_f6, r_f6) if np.isfinite(v)]
+    worst = float(max(vals)) if vals else float("nan")
+    if np.isfinite(l_f6) and np.isfinite(r_f6) and abs(l_f6 - r_f6) > 20.0:
+        _LOG.warning(
+            "Bass integration: L/R main speaker F6 estimates diverge by %.1f Hz (L=%.1f Hz, R=%.1f Hz) — "
+            "measurement asymmetry may affect crossover recommendation",
+            abs(l_f6 - r_f6),
+            l_f6,
+            r_f6,
+        )
+    return {
+        "main_l_f6_hz": float(l_f6) if np.isfinite(l_f6) else float("nan"),
+        "main_r_f6_hz": float(r_f6) if np.isfinite(r_f6) else float("nan"),
+        "main_f6_worst_hz": float(worst),
+    }
+
+
+def _direct_dac_main_usability_penalty(fc: float, main_rolloff_meta: dict[str, float | str]) -> float:
+    worst_f6 = _safe_float(main_rolloff_meta.get("main_f6_worst_hz", float("nan")), float("nan"))
+    if not np.isfinite(worst_f6):
+        return 0.0
+    guard_hz = float(worst_f6) + max(2.0, 0.04 * float(worst_f6))
+    deficit_hz = max(0.0, float(guard_hz) - float(fc))
+    return float(deficit_hz / 12.0)
+
+
 def _recommend_direct_dac_eval_fc(
     *,
     bundle: BassIntegrationBundle,
@@ -62,6 +104,7 @@ def _recommend_direct_dac_eval_fc(
     sub_polarity_invert: bool,
     sub_gain_trim_db: float,
     w_main_act: float,
+    main_rolloff_meta: dict[str, float | str],
 ) -> dict[str, float | str] | None:
     if not np.isfinite(fc) or fc <= 0.0 or fc <= (sub_hpf_hz_f + 1.0):
         return None
@@ -71,6 +114,7 @@ def _recommend_direct_dac_eval_fc(
     drop_vals = [v for v in (l_drop, r_drop) if np.isfinite(v)]
     avg_drop = float(np.mean(np.asarray(drop_vals, dtype=float))) if drop_vals else float("nan")
     main_drop_norm = max(0.0, avg_drop) / 12.0 if np.isfinite(avg_drop) else float("nan")
+    main_usability_penalty = _direct_dac_main_usability_penalty(float(fc), main_rolloff_meta)
 
     best_trial: dict[str, float | str] | None = None
     for ratio in DIRECT_DAC_OVERLAP_RATIOS:
@@ -93,6 +137,8 @@ def _recommend_direct_dac_eval_fc(
         trial_score = _safe_float(metrics.get("objective", float("nan")), float("nan"))
         if np.isfinite(trial_score) and np.isfinite(main_drop_norm):
             trial_score -= w_main_act * float(main_drop_norm)
+        if np.isfinite(trial_score) and np.isfinite(main_usability_penalty):
+            trial_score -= w_main_act * float(main_usability_penalty)
         if not np.isfinite(trial_score):
             continue
         trial: dict[str, float | str] = {
@@ -132,6 +178,10 @@ def _recommend_direct_dac_eval_fc(
             "feasibility_class": str(metrics.get("bass_feasibility_class", "marginal") or "marginal"),
             "feasibility_reason": str(metrics.get("bass_feasibility_reason", "") or ""),
             "main_activity_drop_db": float(avg_drop),
+            "main_usability_penalty": float(main_usability_penalty),
+            "main_l_f6_hz": float(_safe_float(main_rolloff_meta.get("main_l_f6_hz", float("nan")), float("nan"))),
+            "main_r_f6_hz": float(_safe_float(main_rolloff_meta.get("main_r_f6_hz", float("nan")), float("nan"))),
+            "main_f6_worst_hz": float(_safe_float(main_rolloff_meta.get("main_f6_worst_hz", float("nan")), float("nan"))),
             "overlap_ratio": float(ratio),
             "sub_lpf_hz": float(sub_lpf),
             "metric_channel_mode": str(metrics.get("bass_metric_channel_mode", "worst_case") or "worst_case"),
@@ -181,6 +231,10 @@ def _recommend_direct_dac_scan_grid(
             "feasibility_class": "marginal",
             "feasibility_reason": "",
             "main_activity_drop_db": float("nan"),
+            "main_usability_penalty": float("nan"),
+            "main_l_f6_hz": float("nan"),
+            "main_r_f6_hz": float("nan"),
+            "main_f6_worst_hz": float("nan"),
             "overlap_ratio": MIN_DIRECT_DAC_OVERLAP_RATIO,
             "sub_lpf_hz": fc * MIN_DIRECT_DAC_OVERLAP_RATIO,
             "metric_channel_mode": "worst_case",
@@ -221,6 +275,7 @@ def recommend_direct_dac_crossover(
     sub_hpf_order_i = _recommend_direct_dac_int_or_default(sub_hpf_order, 2)
 
     combine_mode_norm = normalize_sub_combine_mode(sub_combine_mode)
+    main_rolloff_meta = _direct_dac_main_rolloff_meta(bundle)
 
     # If caller passes explicit candidates, use them directly (skip coarse->refine)
     explicit_candidates = _normalize_candidate_frequencies(candidates)
@@ -247,6 +302,7 @@ def recommend_direct_dac_crossover(
                 sub_polarity_invert=bool(sub_polarity_invert),
                 sub_gain_trim_db=float(sub_gain_trim_db),
                 w_main_act=w_main_act,
+                main_rolloff_meta=main_rolloff_meta,
             ),
         )
     else:
@@ -271,6 +327,7 @@ def recommend_direct_dac_crossover(
                 sub_polarity_invert=bool(sub_polarity_invert),
                 sub_gain_trim_db=float(sub_gain_trim_db),
                 w_main_act=w_main_act,
+                main_rolloff_meta=main_rolloff_meta,
             ),
         )
         best_fc_coarse = _recommend_direct_dac_best_so_far(scores, fallback_hz=bundle.avr_crossover_hz)
@@ -296,6 +353,7 @@ def recommend_direct_dac_crossover(
                 sub_polarity_invert=bool(sub_polarity_invert),
                 sub_gain_trim_db=float(sub_gain_trim_db),
                 w_main_act=w_main_act,
+                main_rolloff_meta=main_rolloff_meta,
             ),
         )
         best_fc_refine = _recommend_direct_dac_best_so_far(scores, fallback_hz=bundle.avr_crossover_hz)
@@ -321,11 +379,40 @@ def recommend_direct_dac_crossover(
                 sub_polarity_invert=bool(sub_polarity_invert),
                 sub_gain_trim_db=float(sub_gain_trim_db),
                 w_main_act=w_main_act,
+                main_rolloff_meta=main_rolloff_meta,
             ),
         )
 
     best_hz = _recommend_direct_dac_best_so_far(scores, fallback_hz=bundle.avr_crossover_hz)
     best_entry = dict(scores.get(round(best_hz, 4), scores.get(best_hz, {})) or {})
+
+    # Log top-3 candidates and warn on close calls.
+    _valid_scores = sorted(
+        ((fc, float(d["score"])) for fc, d in scores.items() if np.isfinite(_safe_float(d.get("score"), float("nan")))),
+        key=lambda x: x[1],
+        reverse=True,
+    )
+    for _rank, (_fc, _sc) in enumerate(_valid_scores[:3], start=1):
+        _e = scores[_fc]
+        _LOG.debug(
+            "Bass XO candidate #%d: %.1f Hz  score=%.4f  cancel=%.3f  ripple=%.1f dB  gd_rms=%.1f ms  feasibility=%s",
+            _rank, _fc, _sc,
+            float(_safe_float(_e.get("cancellation_risk"), float("nan"))),
+            float(_safe_float(_e.get("overlap_ripple_db"), float("nan"))),
+            float(_safe_float(_e.get("xo_gd_rms_mismatch_ms"), float("nan"))),
+            _e.get("feasibility_class", "?"),
+        )
+    if len(_valid_scores) >= 2:
+        _best_sc = _valid_scores[0][1]
+        _second_sc = _valid_scores[1][1]
+        _gap = abs(_best_sc - _second_sc)
+        _ref = max(abs(_best_sc), 1e-9)
+        if _gap / _ref < 0.05:
+            _LOG.warning(
+                "Bass XO recommendation uncertain: winner %.1f Hz (score %.4f) vs runner-up %.1f Hz (score %.4f) differ by only %.1f%%",
+                _valid_scores[0][0], _best_sc, _valid_scores[1][0], _second_sc, 100.0 * _gap / _ref,
+            )
+
     return {
         "recommended_hz": float(best_hz),
         "recommended_sub_lpf_hz": float(best_entry.get("sub_lpf_hz", best_hz)),

@@ -135,6 +135,28 @@ def _compact_auto_status_legacy_cache(after: str) -> str | None:
     return None
 
 
+def _compact_auto_status_legacy_bass_integration(after: str) -> str | None:
+    low = after.lower()
+    trial_m = re.match(
+        r"bass integration optuna search\s*\(trial\s+(\d+)/(\d+)\)",
+        after,
+        re.IGNORECASE,
+    )
+    if trial_m:
+        return f"{trial_m.group(1)}/{trial_m.group(2)} · Bass integration Optuna"
+    if low.startswith("bass integration optuna local refine"):
+        return "Bass integration · local refine"
+    if low.startswith("bass integration diagnostics refresh"):
+        return "Bass integration · diagnostics"
+    if low.startswith("bass integration prepare init"):
+        return "Bass integration · prepare"
+    if low.startswith("bass integration prepare done"):
+        return "Bass integration · ready"
+    if low.startswith("bass integration allpass scan"):
+        return "Bass integration · allpass scan"
+    return None
+
+
 def _compact_auto_status_legacy_polish(after: str) -> str | None:
     low = after.lower()
     if low.startswith("tdc_strength winner polish"):
@@ -178,6 +200,7 @@ def _compact_auto_status_legacy(after: str) -> str:
         _compact_auto_status_legacy_target,
         _compact_auto_status_legacy_progress,
         _compact_auto_status_legacy_cache,
+        _compact_auto_status_legacy_bass_integration,
         _compact_auto_status_legacy_polish,
         _compact_auto_status_legacy_misc,
     ):
@@ -562,6 +585,20 @@ def _humanize_auto_status_detail(msg: str) -> str:
     return s
 
 
+def _suppress_auto_status_detail(core: str) -> bool:
+    try:
+        s = str(core or "").strip()
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        return False
+    return bool(
+        re.match(
+            r"^DecayCore automatic mode:\s*bass integration optuna search\s*\(trial\s+\d+/\d+\)\s*$",
+            s,
+            flags=re.IGNORECASE,
+        )
+    )
+
+
 def _status_compact_with_detail(msg) -> tuple[str, str | None]:
     try:
         raw = str(msg or "").strip()
@@ -580,7 +617,8 @@ def _status_compact_with_detail(msg) -> tuple[str, str | None]:
         or bool(re.match(r"^DecayCore automatic mode \[", core))
     )
     if _is_auto_mode_text and str(core).strip() != str(compact_core).strip():
-        detail = str(core).strip()
+        if not _suppress_auto_status_detail(core):
+            detail = str(core).strip()
     return out, detail
 
 

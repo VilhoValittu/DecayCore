@@ -11,11 +11,9 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import numpy as np
-import pytest
 
 from decaycore.auto_mode.orchestrator_finalize_result import _run_p6_final_validation
 from decaycore.dsp.final_ir_validation import (
-    FinalIRValidationResult,
     final_ir_validation_to_stats,
     validate_final_fir_against_ir,
 )

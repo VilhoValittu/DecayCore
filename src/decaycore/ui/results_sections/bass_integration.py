@@ -17,10 +17,7 @@ can call it without changes to workflow code.
 """
 from __future__ import annotations
 
-import html
 import logging
-import math
-import time
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -32,43 +29,46 @@ from typing import Any
 _PLOT_RENDER_CACHE: dict = {}
 
 from ...resources.i8n.decaycore_i18n import t
-from ...auto_mode.rank_score import calibrated_auto_quality
-from .. import decaycore_plot as plots
-from .. import ui_state
+from ..bass_integration_dsp_settings import build_bass_integration_dsp_settings
 from ..results_formatters import (
-    anchor_label,
-    boost_diag,
-    fmt_ai_match,
-    fmt_ai_score,
-    fmt_freq_window,
-    fmt_tilt,
-    format_ir_window,
-    gd_grad_max_label,
-    gd_limiter_label,
-    hpf_diff_raw_label,
-    hpf_model_label,
     metric_row,
-    mixed_blend_label,
-    phase_clamp_label,
-    plot_smoothing_label,
     safe_float,
-    shared_window_label,
-    stereo_link_mode_label,
-    xo_fc_gd_label,
 )
 
-from ...dsp.lr_difference_metrics import compute_lr_difference_metrics
-
 logger = logging.getLogger("DecayCore")
+
+
+def _format_main_sub_gd_assessment(main_gd_ms: float, sub_gd_ms: float) -> str:
+    if any(value != value or abs(value) == float("inf") for value in (main_gd_ms, sub_gd_ms)):
+        return "n/a"
+
+    delta_ms = abs(float(main_gd_ms) - float(sub_gd_ms))
+    if delta_ms < 1.5:
+        key = "results_value_bass_xo_main_sub_gd_assessment_good"
+        color = "#22c55e"
+    elif delta_ms < 5.0:
+        key = "results_value_bass_xo_main_sub_gd_assessment_average"
+        color = "#f59e0b"
+    elif delta_ms > 8.0:
+        key = "results_value_bass_xo_main_sub_gd_assessment_reposition"
+        color = "#ef4444"
+    else:
+        key = "results_value_bass_xo_main_sub_gd_assessment_elevated"
+        color = "#ef4444"
+    message = t(key).format(delta=f"{delta_ms:.3f}")
+    return f"<span style='color:{color};font-weight:600;'>{message}</span>"
+
 
 def _render_bass_integration(*, data: dict) -> None:
     if not bool((data or {}).get("bass_integration_enable", False)):
         return
 
+    dsp_settings = build_bass_integration_dsp_settings(data)
     bi_meta = dict((data or {}).get("_bass_integration_meta", {}) or {})
     auto_meta = dict((data or {}).get("_auto_mode_meta", {}) or {})
     best_metrics = dict(auto_meta.get("best_metrics", {}) or {})
     diag = dict(bi_meta.get("diagnostics", {}) or {})
+    gd_cont = dict(diag.get("gd_continuity", {}) or {})
     sub_st = dict(bi_meta.get("sub_filter_stats", {}) or {})
     allpass_meta = dict(bi_meta.get("recommended_allpass", {}) or {})
     alignment_meta = dict(bi_meta.get("alignment", {}) or {})
@@ -77,58 +77,92 @@ def _render_bass_integration(*, data: dict) -> None:
     allpass_auto_enabled = bool(data.get("bass_integration_allpass_auto_enable", False))
     allpass_on = bool(allpass_meta.get("enabled", False))
     combine_mode = str(
-        bi_meta.get("sub_combine_mode", data.get("bass_integration_sub_combine_mode", "average")) or "average"
+        diag.get(
+            "sub_combine_mode",
+            bi_meta.get("sub_combine_mode", data.get("bass_integration_sub_combine_mode", "average")),
+        )
+        or "average"
+    ).strip().lower()
+    is_dual_sub_prealigned = bool(diag.get("dual_sub_preprocessing_applied", False)) or combine_mode == "dual_sub_peak_aligned_average"
+    metric_channel_mode = str(
+        diag.get(
+            "metric_channel_mode",
+            bi_meta.get("metric_channel_mode", best_metrics.get("bass_metric_channel_mode", "worst_case")),
+        )
+        or "worst_case"
     )
-    metric_channel_mode = str(best_metrics.get("bass_metric_channel_mode", "worst_case") or "worst_case")
 
-    cancellation_risk = safe_float(
-        best_metrics.get("bass_cancellation_risk", diag.get("cancellation_risk", float("nan"))),
-        float("nan"),
+    def _first_finite(*values: Any) -> float:
+        for value in values:
+            parsed = safe_float(value, float("nan"))
+            if parsed == parsed and abs(parsed) != float("inf"):
+                return float(parsed)
+        return float("nan")
+
+    cancellation_risk = _first_finite(
+        diag.get("cancellation_risk", float("nan")),
+        best_metrics.get("bass_cancellation_risk", float("nan")),
     )
-    overlap_ripple = safe_float(
-        best_metrics.get("bass_overlap_ripple", diag.get("overlap_ripple_db", float("nan"))),
-        float("nan"),
+    overlap_ripple = _first_finite(
+        diag.get("overlap_ripple_db", float("nan")),
+        best_metrics.get("bass_overlap_ripple", float("nan")),
     )
-    sub_dominance = safe_float(
-        best_metrics.get("bass_sub_dominance", diag.get("sub_dominance_db", float("nan"))),
-        float("nan"),
+    sub_dominance = _first_finite(
+        diag.get("sub_dominance_db", float("nan")),
+        best_metrics.get("bass_sub_dominance", float("nan")),
     )
-    overlap_ripple_delta = safe_float(
-        best_metrics.get("bass_overlap_ripple_delta_db", diag.get("overlap_ripple_delta_db", float("nan"))),
-        float("nan"),
+    overlap_ripple_delta = _first_finite(
+        diag.get("overlap_ripple_delta_db", float("nan")),
+        best_metrics.get("bass_overlap_ripple_delta_db", float("nan")),
     )
-    sub_dominance_delta = safe_float(
-        best_metrics.get("bass_sub_dominance_delta_db", diag.get("sub_dominance_delta_db", float("nan"))),
-        float("nan"),
+    sub_dominance_delta = _first_finite(
+        diag.get("sub_dominance_delta_db", float("nan")),
+        best_metrics.get("bass_sub_dominance_delta_db", float("nan")),
     )
-    null_severity = safe_float(
-        best_metrics.get("bass_null_severity", diag.get("null_severity", float("nan"))),
-        float("nan"),
+    null_severity = _first_finite(
+        diag.get("null_severity", float("nan")),
+        best_metrics.get("bass_null_severity", float("nan")),
     )
-    xo_gd_mismatch = safe_float(
-        best_metrics.get("bass_xo_gd_rms_mismatch_ms", best_metrics.get("bass_xo_gd_mismatch_ms", float("nan"))),
-        float("nan"),
+    xo_gd_mismatch = _first_finite(
+        diag.get("xo_gd_rms_mismatch_ms", float("nan")),
+        gd_cont.get("gd_rms_mismatch_ms_worst", float("nan")),
+        best_metrics.get("bass_xo_gd_rms_mismatch_ms", float("nan")),
+        best_metrics.get("bass_xo_gd_mismatch_ms", float("nan")),
     )
-    xo_gd_delta = safe_float(
-        best_metrics.get("bass_xo_gd_mismatch_delta_ms", diag.get("gd_mismatch_delta_ms", float("nan"))),
-        float("nan"),
+    xo_gd_delta = _first_finite(
+        diag.get("xo_gd_mismatch_delta_ms", float("nan")),
+        best_metrics.get("bass_xo_gd_mismatch_delta_ms", float("nan")),
     )
-    xo_gd_max = safe_float(
-        best_metrics.get("bass_xo_gd_max_mismatch_ms", diag.get("gd_max_mismatch_ms_worst", float("nan"))),
-        float("nan"),
+    xo_gd_max = _first_finite(
+        diag.get("xo_gd_max_mismatch_ms", float("nan")),
+        gd_cont.get("gd_max_mismatch_ms_worst", float("nan")),
+        best_metrics.get("bass_xo_gd_max_mismatch_ms", float("nan")),
     )
-    xo_main_gd = safe_float(best_metrics.get("bass_xo_main_gd_ms", float("nan")), float("nan"))
-    xo_sub_gd = safe_float(best_metrics.get("bass_xo_sub_gd_ms", float("nan")), float("nan"))
+    xo_main_gd = _first_finite(
+        diag.get("xo_main_gd_ms", float("nan")),
+        (
+            safe_float(gd_cont.get("l_main_gd_ms", float("nan")), float("nan"))
+            + safe_float(gd_cont.get("r_main_gd_ms", float("nan")), float("nan"))
+        )
+        / 2.0,
+        best_metrics.get("bass_xo_main_gd_ms", float("nan")),
+    )
+    xo_sub_gd = _first_finite(
+        diag.get("xo_sub_gd_ms", float("nan")),
+        gd_cont.get("sub_gd_ms", float("nan")),
+        best_metrics.get("bass_xo_sub_gd_ms", float("nan")),
+    )
+    main_sub_gd_assessment = _format_main_sub_gd_assessment(xo_main_gd, xo_sub_gd)
     sub_level_delta_20_120 = safe_float(diag.get("sub_combined_level_delta_db_20_120", float("nan")), float("nan"))
     sub_level_delta_30_90 = safe_float(diag.get("sub_combined_level_delta_db_30_90", float("nan")), float("nan"))
     dominant_channel = str(
-        best_metrics.get("bass_dominant_channel", diag.get("dominant_channel", "unknown")) or "unknown"
+        diag.get("dominant_channel", best_metrics.get("bass_dominant_channel", "unknown")) or "unknown"
     ).strip().lower()
     feasibility_class = str(
-        best_metrics.get("bass_feasibility_class", diag.get("feasibility_class", "unknown")) or "unknown"
+        diag.get("feasibility_class", best_metrics.get("bass_feasibility_class", "unknown")) or "unknown"
     ).strip().lower()
     feasibility_reason = str(
-        best_metrics.get("bass_feasibility_reason", diag.get("feasibility_reason", "")) or ""
+        diag.get("feasibility_reason", best_metrics.get("bass_feasibility_reason", "")) or ""
     ).strip()
 
     def _fmt(v: float, unit: str = "") -> str:
@@ -179,18 +213,51 @@ def _render_bass_integration(*, data: dict) -> None:
     baseline_cancel = safe_float(allpass_baseline.get("cancellation_risk", float("nan")), float("nan"))
     baseline_ripple = safe_float(allpass_baseline.get("overlap_ripple_db", float("nan")), float("nan"))
     baseline_gd = safe_float(allpass_baseline.get("xo_gd_mismatch_ms", float("nan")), float("nan"))
-    optimized_cancel = safe_float(
-        best_metrics.get("bass_cancellation_risk", allpass_optimized.get("cancellation_risk", cancellation_risk)),
+    optimized_cancel = _first_finite(
+        diag.get("cancellation_risk", float("nan")),
+        best_metrics.get("bass_cancellation_risk", float("nan")),
+        allpass_optimized.get("cancellation_risk", cancellation_risk),
+    )
+    optimized_ripple = _first_finite(
+        diag.get("overlap_ripple_db", float("nan")),
+        best_metrics.get("bass_overlap_ripple", float("nan")),
+        allpass_optimized.get("overlap_ripple_db", overlap_ripple),
+    )
+    optimized_gd = _first_finite(
+        diag.get("xo_gd_rms_mismatch_ms", float("nan")),
+        gd_cont.get("gd_rms_mismatch_ms_worst", float("nan")),
+        best_metrics.get("bass_xo_gd_rms_mismatch_ms", float("nan")),
+        best_metrics.get("bass_xo_gd_mismatch_ms", float("nan")),
+        allpass_optimized.get("xo_gd_mismatch_ms", xo_gd_mismatch),
+    )
+    sub_delay_value = safe_float(
+        alignment_meta.get("delay_ms", data.get("bass_integration_sub_delay_ms", float("nan"))),
         float("nan"),
     )
-    optimized_ripple = safe_float(
-        best_metrics.get("bass_overlap_ripple", allpass_optimized.get("overlap_ripple_db", overlap_ripple)),
+    sub_array_delay_value = safe_float(
+        alignment_meta.get(
+            "sub_array_delay_ms",
+            data.get("bass_integration_sub_array_delay_ms", alignment_meta.get("delay_ms", float("nan"))),
+        ),
         float("nan"),
     )
-    optimized_gd = safe_float(
-        best_metrics.get("bass_xo_gd_mismatch_ms", allpass_optimized.get("xo_gd_mismatch_ms", xo_gd_mismatch)),
+    main_l_delay_value = safe_float(
+        alignment_meta.get("main_l_delay_ms", data.get("bass_integration_main_l_delay_ms", float("nan"))),
         float("nan"),
     )
+    main_r_delay_value = safe_float(
+        alignment_meta.get("main_r_delay_ms", data.get("bass_integration_main_r_delay_ms", float("nan"))),
+        float("nan"),
+    )
+    main_delay_label = f"L {_fmt(main_l_delay_value, ' ms')}, R {_fmt(main_r_delay_value, ' ms')}"
+    shared_branch_label = t("results_value_bass_shared_sub_branch") if is_dual_sub_prealigned else None
+
+    if dsp_settings:
+        _section(
+            t("results_section_bass_dsp_settings"),
+            [metric_row(t(setting.label_key), setting.value, setting.value) for setting in dsp_settings],
+            summary_lines=[t("bass_integration_dsp_settings_note")],
+        )
 
     _section(
         t("results_section_bass_integration"),
@@ -302,13 +369,32 @@ def _render_bass_integration(*, data: dict) -> None:
                 _translate_channel(dominant_channel),
                 _translate_channel(dominant_channel),
             ),
+            *(
+                [
+                    metric_row(
+                        t("results_metric_bass_shared_sub_branch"),
+                        shared_branch_label or "n/a",
+                        shared_branch_label or "n/a",
+                    )
+                ]
+                if is_dual_sub_prealigned
+                else []
+            ),
             metric_row(
-                t("results_metric_bass_sub_level_delta_20_120"),
+                t(
+                    "results_metric_bass_dual_sub_alignment_delta_20_120"
+                    if is_dual_sub_prealigned
+                    else "results_metric_bass_sub_level_delta_20_120"
+                ),
                 _fmt(sub_level_delta_20_120, " dB"),
                 _fmt(sub_level_delta_20_120, " dB"),
             ),
             metric_row(
-                t("results_metric_bass_sub_level_delta_30_90"),
+                t(
+                    "results_metric_bass_dual_sub_alignment_delta_30_90"
+                    if is_dual_sub_prealigned
+                    else "results_metric_bass_sub_level_delta_30_90"
+                ),
                 _fmt(sub_level_delta_30_90, " dB"),
                 _fmt(sub_level_delta_30_90, " dB"),
             ),
@@ -318,12 +404,25 @@ def _render_bass_integration(*, data: dict) -> None:
                 t("state_on") if bool(alignment_meta.get("applied", False)) else t("state_off"),
             ),
             metric_row(
-                t("results_metric_bass_alignment_delay"),
-                _fmt(safe_float(alignment_meta.get("delay_ms", data.get("bass_integration_sub_delay_ms", float("nan"))), float("nan")), " ms"),
-                _fmt(safe_float(alignment_meta.get("delay_ms", data.get("bass_integration_sub_delay_ms", float("nan"))), float("nan")), " ms"),
+                t(
+                    "results_metric_bass_shared_sub_array_delay"
+                    if is_dual_sub_prealigned
+                    else "results_metric_bass_alignment_delay"
+                ),
+                _fmt(sub_array_delay_value if is_dual_sub_prealigned else sub_delay_value, " ms"),
+                _fmt(sub_array_delay_value if is_dual_sub_prealigned else sub_delay_value, " ms"),
             ),
             metric_row(
-                t("results_metric_bass_alignment_polarity"),
+                t("results_metric_bass_main_delay"),
+                main_delay_label,
+                main_delay_label,
+            ),
+            metric_row(
+                t(
+                    "results_metric_bass_shared_sub_polarity"
+                    if is_dual_sub_prealigned
+                    else "results_metric_bass_alignment_polarity"
+                ),
                 t("ir_align_value_inverted")
                 if bool(alignment_meta.get("polarity_invert", data.get("bass_integration_sub_polarity_invert", False)))
                 else t("ir_align_value_ok"),
@@ -332,22 +431,34 @@ def _render_bass_integration(*, data: dict) -> None:
                 else t("ir_align_value_ok"),
             ),
             metric_row(
-                t("results_metric_bass_alignment_gain"),
+                t(
+                    "results_metric_bass_shared_sub_gain"
+                    if is_dual_sub_prealigned
+                    else "results_metric_bass_alignment_gain"
+                ),
                 _fmt(safe_float(alignment_meta.get("gain_trim_db", data.get("bass_integration_sub_gain_trim_db", float("nan"))), float("nan")), " dB"),
                 _fmt(safe_float(alignment_meta.get("gain_trim_db", data.get("bass_integration_sub_gain_trim_db", float("nan"))), float("nan")), " dB"),
             ),
             metric_row(
-                t("results_metric_bass_allpass"),
+                t("results_metric_bass_shared_sub_allpass" if is_dual_sub_prealigned else "results_metric_bass_allpass"),
                 t("state_on") if allpass_on else t("state_off"),
                 t("state_on") if allpass_on else t("state_off"),
             ),
             metric_row(
-                t("results_metric_bass_allpass_freq"),
+                t(
+                    "results_metric_bass_shared_sub_allpass_freq"
+                    if is_dual_sub_prealigned
+                    else "results_metric_bass_allpass_freq"
+                ),
                 f"{float(allpass_meta.get('freq_hz', 0.0) or 0.0):.1f} Hz" if allpass_on else "n/a",
                 f"{float(allpass_meta.get('freq_hz', 0.0) or 0.0):.1f} Hz" if allpass_on else "n/a",
             ),
             metric_row(
-                t("results_metric_bass_allpass_q"),
+                t(
+                    "results_metric_bass_shared_sub_allpass_q"
+                    if is_dual_sub_prealigned
+                    else "results_metric_bass_allpass_q"
+                ),
                 f"{float(allpass_meta.get('q', 0.707) or 0.707):.3f}" if allpass_on else "n/a",
                 f"{float(allpass_meta.get('q', 0.707) or 0.707):.3f}" if allpass_on else "n/a",
             ),
@@ -410,6 +521,11 @@ def _render_bass_integration(*, data: dict) -> None:
                 t("results_metric_bass_xo_sub_gd"),
                 _fmt(xo_sub_gd, " ms"),
                 _fmt(xo_sub_gd, " ms"),
+            ),
+            metric_row(
+                t("results_metric_bass_xo_main_sub_gd_assessment"),
+                main_sub_gd_assessment,
+                main_sub_gd_assessment,
             ),
             *(
                 [

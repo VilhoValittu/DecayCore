@@ -265,6 +265,54 @@ def test_build_export_zip_direct_dac_yaml_includes_sub_pipeline_and_allpass():
         assert "names: [mastergain, sub_hpf, sub_lpf, sub_allpass, ir_sub]" in yaml_text
 
 
+def test_build_export_zip_summary_includes_bass_dsp_settings_section():
+    result = _make_result(with_sub=True)
+    data = _base_data("Mono")
+    data.update(
+        {
+            "bass_integration_enable": True,
+            "_bass_integration_meta": {
+                "avr_crossover_hz": 54.1,
+                "direct_dac_sub_lpf_hz": 86.6,
+                "alignment": {
+                    "delay_ms": 11.989,
+                    "main_l_delay_ms": 0.0,
+                    "main_r_delay_ms": 0.0,
+                    "polarity_invert": True,
+                    "gain_trim_db": -8.785,
+                },
+                "recommended_allpass": {
+                    "enabled": False,
+                },
+                "inputs": {},
+            },
+        }
+    )
+
+    zip_buffer, _, _ = build_export_zip(
+        data=data,
+        results=[result],
+        ft_short="Asymmetric",
+        file_ts="1200_290326",
+        irw_tag="auto",
+        write_dashboards=False,
+    )
+
+    with zipfile.ZipFile(zip_buffer) as zf:
+        summary_name = next(name for name in zf.namelist() if name.startswith("Summary_") and name.endswith(".txt"))
+        summary_text = zf.read(summary_name).decode("utf-8")
+        assert "=== DSP SETTINGS TO ENTER IN YOUR DSP ===" in summary_text
+        assert "=== BASS INTEGRATION DIAGNOSTICS ===" in summary_text
+        assert "Use these exact crossover, delay, polarity, gain, and allpass values in your DSP." not in summary_text
+        assert "Main HPF: 54.1 Hz / 12 dB/oct" in summary_text
+        assert "Sub LPF: 86.6 Hz / 12 dB/oct" in summary_text
+        assert "Sub delay: 11.989 ms" in summary_text
+        assert "Main delay L/R: L 0.000 ms, R 0.000 ms" in summary_text
+        assert "Sub polarity: INVERTED" in summary_text
+        assert "Sub gain trim: -8.785 dB" in summary_text
+        assert "Bass allpass: OFF" in summary_text
+
+
 def test_build_export_zip_direct_dac_yaml_uses_linkwitz_riley_for_24db_crossovers():
     result = _make_result(with_sub=True)
     data = _base_data("Mono")
@@ -428,3 +476,19 @@ def test_build_export_zip_multi_rate_direct_dac_yaml_uses_sub_pipeline_tokenized
         assert "channels: 3" in yaml_text
         assert "filename: ../coeffs/Sub_Asymmetric_$samplerate$Hz_1200_290326_auto.wav" in yaml_text
         assert "names: [mastergain, sub_hpf, sub_lpf, ir_sub]" in yaml_text
+
+
+def test_choose_target_rates_adds_ultra_high_only_when_requested():
+    from decaycore.config.decaycore_pipeline import choose_target_rates
+
+    assert choose_target_rates({"multi_rate_opt": True}) == [44100, 48000, 88200, 96000, 176400, 192000]
+    assert choose_target_rates({"multi_rate_opt": True, "multi_rate_ultra_high_opt": True}) == [
+        44100,
+        48000,
+        88200,
+        96000,
+        176400,
+        192000,
+        352800,
+        384000,
+    ]

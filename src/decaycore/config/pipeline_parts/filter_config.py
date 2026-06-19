@@ -346,6 +346,27 @@ def _filter_config_bass_integration_kwargs(FilterConfig_cls, data: Dict[str, Any
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_integration_profile", str(data.get("bass_integration_profile", "safe") or "safe"))
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_integration_sub_combine_mode", str(normalize_sub_combine_mode(data.get("bass_integration_sub_combine_mode", "average"))))
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "avr_crossover_hz", float(_cfg_as_float_allow_zero(data.get("avr_crossover_hz", None), 80.0)))
+    for _key in (
+        "bass_integration_sub_delay_ms",
+        "bass_integration_sub_array_delay_ms",
+        "bass_integration_sub1_delay_ms",
+        "bass_integration_sub2_delay_ms",
+        "bass_integration_main_l_delay_ms",
+        "bass_integration_main_r_delay_ms",
+        "bass_integration_sub_gain_trim_db",
+    ):
+        _filter_config_set_if_hasattr(
+            kwargs,
+            FilterConfig_cls,
+            _key,
+            float(_cfg_as_float_allow_zero(data.get(_key, None), 0.0)),
+        )
+    _filter_config_set_if_hasattr(
+        kwargs,
+        FilterConfig_cls,
+        "bass_integration_sub_polarity_invert",
+        bool(data.get("bass_integration_sub_polarity_invert", False)),
+    )
     if hasattr(FilterConfig_cls, "direct_dac_sub_lpf_hz"):
         _main_xo_hz = float(_cfg_as_float_allow_zero(data.get("sub_crossover_hz", None), _cfg_as_float_allow_zero(data.get("avr_crossover_hz", None), 80.0)))
         _direct_sub_lpf_hz = float(_cfg_as_float_allow_zero(data.get("direct_dac_sub_lpf_hz", None), _main_xo_hz))

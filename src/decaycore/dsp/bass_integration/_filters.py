@@ -15,12 +15,7 @@ import scipy.signal
 
 from ...io.measurement_bundle import BassIntegrationBundle, TransferData
 from ..bass_cache import _BUTTER_RESPONSE_CACHE, _get_filtered_branch_cache
-from ._utils import _build_transfer_like, _get_bass_integration_pkg, _interp_complex_response, _safe_float
-
-
-def _get_pkg():
-    """Return the bass_integration package module for patchable attribute lookup."""
-    return _get_bass_integration_pkg(__name__)
+from ._utils import _build_transfer_like, _get_pkg, _interp_complex_response, _safe_float
 
 
 def _butterworth_complex_response(

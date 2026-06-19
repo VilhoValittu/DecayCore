@@ -5,7 +5,6 @@ Compares gd_smooth_loop_rs against Python reference.
 
 import numpy as np
 import pytest
-import math
 
 
 def get_decaycore_dsp():

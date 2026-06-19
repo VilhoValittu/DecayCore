@@ -15,6 +15,7 @@ import logging
 import numpy as np
 
 from ..dsp import decaycore_dsp as dsp
+from ..dsp.lf_rolloff import estimate_lf_rolloff_f6
 from . import shared
 
 logger = logging.getLogger("DecayCore")
@@ -229,7 +230,7 @@ def _auto_hpf_prepare_channel(
 
     ref_mask = (ff >= ref_min) & (ff <= ref_max)
     if int(np.count_nonzero(ref_mask)) < 8:
-        ref_mask = (ff >= 80.0) & (ff <= 320.0)
+        ref_mask = (ff >= 200.0) & (ff <= 500.0)
     if int(np.count_nonzero(ref_mask)) < 8:
         return None
     ref_slice = np.asarray(mm_use[ref_mask], dtype=float)
@@ -466,8 +467,19 @@ def _auto_hpf_estimate_quality(
 
 
 def _auto_mag_c_min_channel_f6(ff: np.ndarray, mm: np.ndarray, *, default_hz: float) -> float | None:
-    prepared = _auto_mag_c_min_prepare_channel(ff, mm, default_hz=default_hz)
-    return _auto_mag_c_min_crossing(prepared)
+    estimate = estimate_lf_rolloff_f6(
+        ff,
+        mm,
+        min_hz=float(shared.AUTO_MODE_MAG_C_MIN_MIN_HZ),
+        max_hz=float(shared.AUTO_MODE_MAG_C_MIN_MAX_HZ),
+        ref_min_hz=float(shared.AUTO_MODE_MAG_C_MIN_REF_MIN_HZ),
+        ref_max_hz=float(shared.AUTO_MODE_MAG_C_MIN_REF_MAX_HZ),
+        search_max_hz=float(shared.AUTO_MODE_MAG_C_MIN_SEARCH_MAX_HZ),
+        smooth_oct=float(shared.AUTO_MODE_MAG_C_MIN_SMOOTH_OCT),
+        default_hz=float(default_hz),
+    )
+    f6 = float(estimate.f6_hz)
+    return f6 if np.isfinite(f6) else None
 
 
 def _auto_hpf_fit_one_channel(

@@ -37,7 +37,7 @@ class TestLoadConfigBasics:
         """load_config has approximately 196 keys."""
         cfg = decaycore_config.load_config()
         # Allow some variance in key count
-        assert 180 <= len(cfg) <= 215
+        assert 180 <= len(cfg) <= 220
 
     def test_load_config_mode_is_string(self):
         """mode is a string."""
@@ -114,6 +114,36 @@ class TestSaveConfigBasics:
             # Some exceptions are expected (file write issues), but not all
             assert "invalid" not in str(e).lower()
 
+    def test_save_config_normalizes_legacy_choice_indices(self, monkeypatch, tmp_path):
+        """Persisted select values should be rewritten to canonical options."""
+        cfg_path = tmp_path / "config.json"
+        monkeypatch.setattr(decaycore_config, "CONFIG_FILE", str(cfg_path))
+
+        decaycore_config.save_config({
+            "fs": 1,
+            "taps": 1,
+            "hpf_slope": 1,
+            "xo1_s": 2,
+            "plot_smoothing_level": 1,
+            "filter_wav_format": 1,
+            "device_audio_format": 1,
+            "ir_export_window_mode": "invalid",
+            "ir_export_window_shape": "invalid",
+            "stereo_link_strategy": "invalid",
+        })
+
+        saved = cfg_path.read_text(encoding="utf-8")
+        assert '"fs": 48000' in saved
+        assert '"taps": 1024' in saved
+        assert '"hpf_slope": 12' in saved
+        assert '"xo1_s": 18' in saved
+        assert '"plot_smoothing_level": 12' in saved
+        assert '"filter_wav_format": "S32_LE"' in saved
+        assert '"device_audio_format": "S16_LE"' in saved
+        assert '"ir_export_window_mode": "auto"' in saved
+        assert '"ir_export_window_shape": "hann"' in saved
+        assert '"stereo_link_strategy": "auto"' in saved
+
 
 class TestFilterTypeNormalization:
     """Tests for filter type normalization."""
@@ -171,6 +201,31 @@ class TestRoundTrip:
         assert len(cfg2) > 100
         assert "mode" in cfg2
         assert cfg2["measurement_dither_level_db"] == -44.0
+
+    def test_roundtrip_preserves_ui_theme_preference(self, monkeypatch, tmp_path):
+        """Theme preference should persist across save/load."""
+        cfg_path = tmp_path / "config.json"
+        monkeypatch.setattr(decaycore_config, "CONFIG_FILE", str(cfg_path))
+
+        cfg1 = decaycore_config.load_config()
+        assert cfg1["ui_theme_dark"] is True
+
+        cfg1["ui_theme_dark"] = False
+        decaycore_config.save_config(cfg1)
+
+        cfg2 = decaycore_config.load_config()
+        assert cfg2["ui_theme_dark"] is False
+
+    def test_save_config_preserves_theme_when_new_data_omits_it(self, monkeypatch, tmp_path):
+        """Later saves without theme key should keep the previously chosen theme."""
+        cfg_path = tmp_path / "config.json"
+        monkeypatch.setattr(decaycore_config, "CONFIG_FILE", str(cfg_path))
+
+        decaycore_config.save_config({"mode": "BASIC", "ui_theme_dark": False})
+        decaycore_config.save_config({"mode": "ADVANCED"})
+
+        cfg = decaycore_config.load_config()
+        assert cfg["ui_theme_dark"] is False
 
 
 class TestEdgeCases:

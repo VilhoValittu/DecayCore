@@ -270,6 +270,11 @@ def _hpf_finalize_state(
         default=seed_slope_db_oct,
         allowed_slopes=allowed_slopes,
     )
+    if final_override:
+        cur_best_preset = dict(cur_best_preset)
+        cur_best_preset["hpf_enable"] = bool(final_enabled)
+        cur_best_preset["hpf_freq"] = float(final_freq_hz)
+        cur_best_preset["hpf_slope"] = int(final_slope_db_oct)
     meta["applied"] = bool(improved)
     meta["final_enabled"] = bool(final_enabled)
     meta["final_freq_hz"] = float(final_freq_hz)

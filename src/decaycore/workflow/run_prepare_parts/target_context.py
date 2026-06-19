@@ -67,9 +67,14 @@ def _safe_log_info(active_logger: logging.Logger | None, msg: str, *args) -> Non
 
 
 def _build_bi_alignment_recommendation(bi_unified: dict) -> dict:
+    sub_delay_ms = _safe_float(bi_unified.get("sub_delay_ms", 0.0), 0.0)
+    main_delay_default = max(0.0, -float(sub_delay_ms))
     return {
         "applied": bool(bi_unified.get("applied", False)),
-        "sub_delay_ms": _safe_float(bi_unified.get("sub_delay_ms", 0.0), 0.0),
+        "sub_delay_ms": float(sub_delay_ms),
+        "sub_array_delay_ms": _safe_float(bi_unified.get("sub_array_delay_ms", sub_delay_ms), sub_delay_ms),
+        "main_l_delay_ms": _safe_float(bi_unified.get("main_l_delay_ms", main_delay_default), main_delay_default),
+        "main_r_delay_ms": _safe_float(bi_unified.get("main_r_delay_ms", main_delay_default), main_delay_default),
         "sub_polarity_invert": bool(bi_unified.get("sub_polarity_invert", False)),
         "sub_gain_trim_db": _safe_float(bi_unified.get("sub_gain_trim_db", 0.0), 0.0),
         "reason": str(bi_unified.get("reason", "") or ""),
@@ -232,6 +237,20 @@ def _build_bass_integration_metadata_unified(
     alignment = {
         "applied": bool(data.get("bass_integration_alignment_auto_applied", False)),
         "delay_ms": _safe_float_from_dict(data, "bass_integration_sub_delay_ms", 0.0),
+        "sub_array_delay_ms": _safe_float(
+            data.get("bass_integration_sub_array_delay_ms", bundle_diagnostics.get("sub_array_delay_ms", 0.0)),
+            0.0,
+        ),
+        "sub1_delay_ms": _safe_float(
+            data.get("bass_integration_sub1_delay_ms", bundle_diagnostics.get("sub1_delay_ms", 0.0)),
+            0.0,
+        ),
+        "sub2_delay_ms": _safe_float(
+            data.get("bass_integration_sub2_delay_ms", bundle_diagnostics.get("sub2_delay_ms", 0.0)),
+            0.0,
+        ),
+        "main_l_delay_ms": _safe_float_from_dict(data, "bass_integration_main_l_delay_ms", 0.0),
+        "main_r_delay_ms": _safe_float_from_dict(data, "bass_integration_main_r_delay_ms", 0.0),
         "polarity_invert": bool(data.get("bass_integration_sub_polarity_invert", False)),
         "gain_trim_db": _safe_float_from_dict(data, "bass_integration_sub_gain_trim_db", 0.0),
         "reason": str(data.get("bass_integration_alignment_reason", "") or ""),
@@ -303,6 +322,11 @@ def _build_bass_integration_metadata_unified(
         "bass_integration_profile": meta_dict["profile"],
         "direct_dac_sub_lpf_hz": meta_dict["direct_dac_sub_lpf_hz"],
         "bass_integration_sub_delay_ms": alignment["delay_ms"],
+        "bass_integration_sub_array_delay_ms": alignment["sub_array_delay_ms"],
+        "bass_integration_sub1_delay_ms": alignment["sub1_delay_ms"],
+        "bass_integration_sub2_delay_ms": alignment["sub2_delay_ms"],
+        "bass_integration_main_l_delay_ms": alignment["main_l_delay_ms"],
+        "bass_integration_main_r_delay_ms": alignment["main_r_delay_ms"],
         "bass_integration_sub_polarity_invert": alignment["polarity_invert"],
         "bass_integration_sub_gain_trim_db": alignment["gain_trim_db"],
         "bass_integration_alignment_auto_applied": alignment["applied"],
@@ -434,6 +458,7 @@ def _prepare_target_curve_bass_integration_context(
     if _auto_active:
         _status(callbacks, "DecayCore automatic mode: bass integration prepare init")
     _bi_prepare_t0 = time.perf_counter()
+    requested_allpass_auto_enable = bool(data.get("bass_integration_allpass_auto_enable", False))
 
     data["bass_integration_sub_combine_mode"] = str(
         data.get("bass_integration_sub_combine_mode", "average") or "average"
@@ -443,38 +468,55 @@ def _prepare_target_curve_bass_integration_context(
     data["bass_integration_sub_gain_trim_db"] = float(data.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0)
     data["bass_integration_alignment_auto_applied"] = False
     data["bass_integration_alignment_reason"] = ""
-    data["bass_integration_allpass_auto_enable"] = False
+    data["bass_integration_allpass_auto_enable"] = bool(requested_allpass_auto_enable)
     data["bass_integration_allpass_auto_applied"] = False
     data["bass_integration_allpass_freq_hz"] = 0.0
     data["bass_integration_allpass_q"] = 0.707
     data["bass_integration_allpass_reason"] = "Direct DAC rewrite uses polarity/delay/gain only."
-    _bi_unified = {
-        "applied": False,
-        "sub_delay_ms": 0.0,
-        "sub_polarity_invert": False,
-        "sub_gain_trim_db": 0.0,
-        "recommended_hz": _safe_float_from_dict(data, "avr_crossover_hz", 80.0, positive=True),
-        "recommended_sub_lpf_hz": _safe_float(
-            data.get(
-                "direct_dac_sub_lpf_hz",
+    _bi_unified = dict(_compute_direct_dac_prepare_recommendation(bundle, data, callbacks=callbacks) or {})
+    if not _bi_unified:
+        _bi_unified = {
+            "applied": False,
+            "sub_delay_ms": 0.0,
+            "sub_array_delay_ms": 0.0,
+            "main_l_delay_ms": 0.0,
+            "main_r_delay_ms": 0.0,
+            "sub_polarity_invert": False,
+            "sub_gain_trim_db": 0.0,
+            "recommended_hz": _safe_float_from_dict(data, "avr_crossover_hz", 80.0, positive=True),
+            "recommended_sub_lpf_hz": _safe_float(
+                data.get(
+                    "direct_dac_sub_lpf_hz",
+                    _safe_float_from_dict(data, "avr_crossover_hz", 80.0, positive=True),
+                ),
                 _safe_float_from_dict(data, "avr_crossover_hz", 80.0, positive=True),
+                positive=True,
             ),
-            _safe_float_from_dict(data, "avr_crossover_hz", 80.0, positive=True),
-            positive=True,
-        ),
-        "baseline": {},
-        "optimized": {},
-        "improvement_score": 0.0,
-        "reason": "Direct DAC optimization runs after FIR prediction.",
-        "allpass_enabled": False,
-        "allpass_freq_hz": 0.0,
-        "allpass_q": 0.707,
-        "allpass_reason": "Direct DAC rewrite uses polarity/delay/gain only.",
-    }
+            "baseline": {},
+            "optimized": {},
+            "improvement_score": 0.0,
+            "reason": "Direct DAC optimization runs after FIR prediction.",
+            "allpass_enabled": False,
+            "allpass_freq_hz": 0.0,
+            "allpass_q": 0.707,
+            "allpass_reason": "Direct DAC rewrite uses polarity/delay/gain only.",
+        }
     bi_alignment_recommendation = _build_bi_alignment_recommendation(_bi_unified)
     data["bass_integration_alignment_auto_applied"] = bool(bi_alignment_recommendation["applied"])
     data["bass_integration_sub_delay_ms"] = _safe_float(
         bi_alignment_recommendation["sub_delay_ms"],
+        0.0,
+    )
+    data["bass_integration_sub_array_delay_ms"] = _safe_float(
+        bi_alignment_recommendation["sub_array_delay_ms"],
+        0.0,
+    )
+    data["bass_integration_main_l_delay_ms"] = _safe_float(
+        bi_alignment_recommendation["main_l_delay_ms"],
+        0.0,
+    )
+    data["bass_integration_main_r_delay_ms"] = _safe_float(
+        bi_alignment_recommendation["main_r_delay_ms"],
         0.0,
     )
     data["bass_integration_sub_polarity_invert"] = bool(bi_alignment_recommendation["sub_polarity_invert"])

@@ -429,6 +429,54 @@ def test_apply_null_guard_target_respects_guard_max_hz_and_leaves_treble_unchang
     assert np.allclose(out[high], target[high], atol=1e-9, rtol=1e-9)
 
 
+def test_apply_null_guard_target_does_not_treat_lf_rolloff_as_local_null():
+    freq_axis = np.geomspace(10.0, 20000.0, 4096, dtype=float)
+    target = np.interp(
+        freq_axis,
+        [10.0, 20.0, 40.0, 100.0, 1000.0, 20000.0],
+        [10.0, 10.0, 9.0, 4.8, 0.0, -6.0],
+    )
+    measured = target.copy()
+    low = freq_axis < 22.0
+    measured[low] -= 72.0 * np.log2(22.0 / np.maximum(freq_axis[low], 1e-9))
+
+    out = apply_null_guard_target(
+        freq_axis,
+        target,
+        measured,
+        mag_c_min=10.0,
+        mag_c_max=200.0,
+        guard_max_hz=200.0,
+        enable=True,
+        depth_db=12.0,
+        max_blend=0.85,
+        max_total_relax_db=12.0,
+        smooth_oct=0.18,
+    )
+
+    low_band = (freq_axis >= 10.0) & (freq_axis <= 31.5)
+    np.testing.assert_allclose(out[low_band], target[low_band], atol=1e-9)
+
+    local_null_measured = target - 36.0 * np.exp(
+        -0.5 * (np.log2(freq_axis / 60.0) / 0.06) ** 2
+    )
+    local_null_out = apply_null_guard_target(
+        freq_axis,
+        target,
+        local_null_measured,
+        mag_c_min=10.0,
+        mag_c_max=200.0,
+        guard_max_hz=200.0,
+        enable=True,
+        depth_db=12.0,
+        max_blend=0.85,
+        max_total_relax_db=12.0,
+        smooth_oct=0.18,
+    )
+
+    assert float(np.interp(60.0, freq_axis, local_null_out - target)) < -3.0
+
+
 def test_prepare_correction_baseline_skips_second_leveling_pass_after_uniform_target_shift(monkeypatch):
     freq_axis = np.linspace(20.0, 20000.0, 2048, dtype=float)
     measured = np.zeros_like(freq_axis)

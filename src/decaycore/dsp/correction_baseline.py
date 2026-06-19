@@ -15,7 +15,6 @@ import threading
 from typing import Any, Callable
 
 import numpy as np
-import scipy.signal
 
 from decaycore.auto_mode.auto_mode_profile import profiled_section
 from decaycore.common.measurement_features import estimate_schroeder_hz, median_rt60_mid_band
@@ -57,6 +56,18 @@ def _clear_rt60_cache() -> None:
     """Tyhjentää RT60-välimuistin. Vain testeille."""
     with _RT60_CACHE_LOCK:
         _RT60_CACHE.clear()
+
+
+def _smooth_with_edge_padding(values: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+    arr = np.asarray(values, dtype=float).reshape(-1)
+    k = np.asarray(kernel, dtype=float).reshape(-1)
+    if arr.size == 0 or k.size == 0:
+        return arr.copy()
+    half = int(k.size // 2)
+    if half <= 0:
+        return arr.copy()
+    padded = np.pad(arr, (half, half), mode="edge")
+    return np.convolve(padded, k, mode="valid")
 
 
 def apply_null_guard_target(
@@ -125,7 +136,7 @@ def apply_null_guard_target(
     x = np.arange(-half, half + 1, dtype=float)
     k = np.exp(-0.5 * (x / sigma_bins) ** 2)
     k /= np.sum(k)
-    env_band = scipy.signal.fftconvolve(env[band], k, mode="same")
+    env_band = _smooth_with_edge_padding(env[band], k)
     env[band] = env_band
 
     # dip depth relative to envelope
@@ -141,11 +152,23 @@ def apply_null_guard_target(
 
     # weight grows from 0 at depth=d0 to 1 at ~2*d0
     w = np.clip((dip - d0) / max(d0, 1e-6), 0.0, 1.0)
+    recovery_mask = _null_guard_local_recovery_mask(
+        f[band],
+        m[band],
+        depth_db=d0,
+        side_oct=max(0.35, float(smooth_oct) * 2.5),
+    )
+    w_band_base = w[band]
+    if recovery_mask.shape == w_band_base.shape:
+        w_band_base = w_band_base * recovery_mask.astype(float)
+        w_new = np.zeros_like(w)
+        w_new[band] = w_band_base
+        w = w_new
     # sharpen slightly so only true nulls get high weight
     w = w**1.4
 
     # smooth the mask too (prevents zipper artifacts)
-    w_band = scipy.signal.fftconvolve(w[band], k, mode="same")
+    w_band = _smooth_with_edge_padding(w[band], k)
     w2 = np.zeros_like(w)
     w2[band] = np.clip(w_band, 0.0, 1.0)
 
@@ -170,6 +193,55 @@ def apply_null_guard_target(
     t_new = np.maximum(t_new, t0 - cap)
 
     return t_new
+
+
+def _null_guard_local_recovery_mask(
+    freqs_hz: np.ndarray,
+    measured_mags: np.ndarray,
+    *,
+    depth_db: float,
+    side_oct: float = 0.45,
+) -> np.ndarray:
+    """Return bins that look like local dips instead of one-sided LF rolloff."""
+    f = np.asarray(freqs_hz, dtype=float).reshape(-1)
+    m = np.asarray(measured_mags, dtype=float).reshape(-1)
+    if f.size != m.size or f.size < 8:
+        return np.zeros_like(f, dtype=bool)
+    valid = np.isfinite(f) & np.isfinite(m) & (f > 0.0)
+    if int(np.count_nonzero(valid)) < 8:
+        return np.zeros_like(f, dtype=bool)
+
+    lf = np.log2(np.clip(f, 1e-9, None))
+    try:
+        side = float(side_oct)
+    except (TypeError, ValueError, OverflowError):
+        side = 0.45
+    if not np.isfinite(side) or side <= 0.0:
+        side = 0.45
+    side = float(np.clip(side, 0.25, 0.75))
+    min_recovery_db = float(max(3.0, 0.35 * float(depth_db)))
+
+    out = np.zeros_like(f, dtype=bool)
+    # Pipeline use caps null-guard to the low-frequency guard band, so this
+    # per-bin range check stays small while keeping the edge logic explicit.
+    for i in range(f.size):
+        if not bool(valid[i]):
+            continue
+        lo = int(np.searchsorted(lf, lf[i] - side, side="left"))
+        hi = int(np.searchsorted(lf, lf[i] + side, side="right"))
+        if lo >= i or hi <= i + 1:
+            continue
+        left = m[lo:i]
+        right = m[i + 1:hi]
+        left = left[np.isfinite(left)]
+        right = right[np.isfinite(right)]
+        if left.size == 0 or right.size == 0:
+            continue
+        recovery_db = min(float(np.max(left) - m[i]), float(np.max(right) - m[i]))
+        out[i] = bool(np.isfinite(recovery_db) and recovery_db >= min_recovery_db)
+    return out
+
+
 def _resample_or_interpolate_to_axis(
     meas_freq: np.ndarray,
     meas_values: np.ndarray,

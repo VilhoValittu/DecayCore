@@ -231,6 +231,14 @@ class TestStatusCompactWithDetail:
         # Should parse and compact
         assert len(compact) > 0
 
+    def test_bass_integration_optuna_progress_stays_on_single_status_line(self):
+        """Bass-integration Optuna trial progress should not create detail rows."""
+        msg = "DecayCore automatic mode: bass integration optuna search (trial 12/512)"
+        compact, detail = ui_state._status_compact_with_detail(msg)
+        assert compact.startswith("12/512")
+        assert "bass integration" in compact.lower()
+        assert detail is None
+
 
 class TestCompactAutoStatusCore:
     """Tests for _compact_auto_status_core function."""
@@ -390,6 +398,20 @@ class TestUpdateStatus:
         base = ui_state.get_status_base_message()
         # Should be empty or default
         assert isinstance(base, str)
+
+    def test_update_status_bass_integration_progress_does_not_fill_detail_history(
+        self, mock_renderer
+    ):
+        """Bass-integration trial updates stay in the live status row only."""
+        ui_state.reset_auto_status_details()
+        for idx in range(1, 4):
+            ui_state.update_status(
+                "DecayCore automatic mode: bass integration optuna search "
+                f"(trial {idx}/512)"
+            )
+        snap = ui_state.get_status_snapshot()
+        assert snap["status_last_text"].startswith("3/512")
+        assert snap["auto_status_details"] == []
 
 
 class TestUpdateAutoSelectedBar:

@@ -110,7 +110,7 @@ def build_basic_tab(*, t: Callable, get_val: Callable, max_safe_boost: float) ->
 
         with ui.column().classes("w-full") as auto_mode_section:
             ctrl.register_container("auto_mode_section_scope", auto_mode_section)
-            with section_card(title=t("basic_auto_section_title"), intro=t("mode_auto_desc")):
+            with section_card(title=t("basic_auto_section_title"), intro=t("basic_auto_section_intro")):
                 auto_mode_col = ui.column().classes("w-full gap-4")
                 ctrl.register_container("auto_mode_scope", auto_mode_col)
                 with auto_mode_col:

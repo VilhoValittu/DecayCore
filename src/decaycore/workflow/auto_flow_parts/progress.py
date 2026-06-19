@@ -17,42 +17,9 @@ import typing
 import numpy as np
 
 from ...auto_mode.api import (
-    AUTO_MODE_GOAL_FLAT,
-    AUTO_MODE_COMPAT_VERSION,
-    AUTO_MODE_EXC_FROM_F6_ADD_HZ,
-    AUTO_MODE_EXC_MAX_HZ,
-    AUTO_MODE_EXC_MIN_HZ,
-    AUTO_MODE_LOCAL_REFINE_ENABLED,
     AUTO_MODE_LOCAL_REFINE_TOP_K,
-    AUTO_MODE_LOCAL_REFINE_TRIALS_PER_TOP,
-    AUTO_MODE_LOW_BASS_FROM_F6_ADD_HZ,
-    AUTO_MODE_LOW_BASS_MAX_HZ,
-    AUTO_MODE_LOW_BASS_MIN_HZ,
-    AUTO_MODE_PHASE3_MICRO_TRIALS,
-    AUTO_MODE_REFINE_TRIALS,
-    AUTO_MODE_TARGET_TOP_N,
-    AUTO_MODE_TARGET_TRIALS_PER_CURVE,
-    AUTO_MODE_TRIALS,
-    _auto_goal_norm,
-    _auto_optimizer_backend,
     _auto_safe_float,
-    _auto_select_builtin_target_curve,
-    _auto_select_target_curve_with_trials,
-    _estimate_auto_hpf_from_response,
-    _estimate_auto_mag_c_min_hz,
-    _resolve_auto_hpf_application,
-    _run_auto_mode_search,
 )
-from ...auto_mode.rank_score import attach_official_rank_score, official_rank_score
-from ...auto_mode.shared import _auto_goal_forced_level_window
-from ...application.run_contracts import apply_auto_mode_result
-from ...config.decaycore_pipeline import (
-    build_xos_hpf,
-    choose_target_rates,
-    detect_is_wav_source,
-    filter_type_short,
-)
-from ...ui.decaycore_utils import scale_taps_with_fs
 from ..bridge_types import ProcessRunCallbacks
 
 if typing.TYPE_CHECKING:

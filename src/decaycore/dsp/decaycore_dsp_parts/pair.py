@@ -45,6 +45,10 @@ from ..filter_pipeline import (
 )
 from ..filter_result import _assemble_generate_filter_result
 
+_GUARD_OFFSET_DIFF_DB = 1.5
+_GUARD_TILT_DIFF_DB_PER_OCT = 0.7
+_GUARD_TILT_ABS_MAX_DB_PER_OCT = 2.0
+
 def _channel_hpf_replacement(cfg: FilterConfig, channel: str) -> dict:
     xo_hz = getattr(cfg, f"avr_crossover_hz_{channel}", None)
     if xo_hz is None:
@@ -180,6 +184,9 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
     l_st1 = _run_generate_filter_stereo_link_presolve_stats(f_l, m_l, p_l, cfg_l)
     r_st1 = _run_generate_filter_stereo_link_presolve_stats(f_r, m_r, p_r, cfg_r)
 
+    lvl_min = float(getattr(cfg, "lvl_min", 200.0) or 200.0)
+    lvl_max = float(getattr(cfg, "lvl_max", 3000.0) or 3000.0)
+
     def _as_stat_float(st: dict | None, key: str, default=np.nan) -> float:
         try:
             if isinstance(st, dict):
@@ -277,9 +284,6 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
             return None
         return min(candidates, key=_anchor_key)
 
-    lvl_min = float(getattr(cfg, "lvl_min", 200.0) or 200.0)
-    lvl_max = float(getattr(cfg, "lvl_max", 3000.0) or 3000.0)
-
     mode = str(getattr(cfg, "lvl_mode", "Auto") or "Auto")
     if "Manual" in mode:
         win_l = [lvl_min, lvl_max]
@@ -343,9 +347,9 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
     tilt_abs_max = max(abs(float(tilt_l)) if np.isfinite(tilt_l) else 0.0, abs(float(tilt_r)) if np.isfinite(tilt_r) else 0.0)
 
     guard_triggered = bool(
-        (off_diff > 1.5)
-        or (tilt_diff > 0.7)
-        or (tilt_abs_max > 1.2)
+        (off_diff > _GUARD_OFFSET_DIFF_DB)
+        or (tilt_diff > _GUARD_TILT_DIFF_DB_PER_OCT)
+        or (tilt_abs_max > _GUARD_TILT_ABS_MAX_DB_PER_OCT)
     )
     strategy_resolved = "hybrid" if (strategy_req == "auto" and guard_triggered) else ("shared" if strategy_req == "auto" else strategy_req)
 

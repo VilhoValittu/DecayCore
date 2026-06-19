@@ -78,6 +78,7 @@ def build_auto_mode_orchestrator_runtime() -> dict:
         "excess_phase_strength_winner_polish_max_delta": auto_api.AUTO_MODE_EXCESS_PHASE_STRENGTH_WINNER_POLISH_MAX_DELTA,
         "phase_limit_winner_polish_enabled": auto_api.AUTO_MODE_PHASE_LIMIT_WINNER_POLISH_ENABLED,
         "phase_limit_winner_polish_offsets_hz": auto_api.AUTO_MODE_PHASE_LIMIT_WINNER_POLISH_OFFSETS_HZ,
+        "cache_winner_polish_enabled": True,
         "run_pipeline": auto_api.run_pipeline,
         "suggest_auto_mode_candidate_optuna": auto_api._suggest_auto_mode_candidate_optuna,
         "summarize_run": auto_api.summarize_run,

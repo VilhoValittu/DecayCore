@@ -179,11 +179,12 @@ If your system includes one or two subwoofers, you can use the Bass Integration 
 Key facts:
 
 - Requires separate subwoofer measurement WAV files (from the built-in measurement tool or compatible external captures).
-- Built-in subwoofer measurement requires Windows — see the Official Manual section 11.4.
+- Built-in subwoofer measurement requires Windows for 100% compatilibly — see the Official Manual section 11.4.
 - Uses the **Direct DAC / CamillaDSP sub output** path: the subwoofer is driven directly from a separate amplifier channel or CamillaDSP pipeline output.
-- **When two subwoofers are measured, DecayCore generates one shared mono sub filter** for both. The two sub responses are combined before FIR generation; separate per-unit filters are not produced.
+- **When two subwoofers are entered , DecayCore generates one shared mono sub filter** for both. The current Direct DAC path peak-aligns Sub2 to Sub1, builds one combined sub reference, and does not produce separate per-unit filters.
+- In dual-sub mode, the reported sub delay, polarity, gain trim, and optional allpass values apply to that shared combined sub branch.
 - The export ZIP will contain a dedicated Sub FIR WAV file and updated crossover settings alongside the L/R filters.
-- Always re-measure after applying the exported crossover and sub delay settings to verify the integration in your actual room.
+- Always re-measure after applying the exported crossover and shared sub delay settings to verify the integration in your actual room.
 
 Full details: `docs/Official_Manual.md` section 12.
 

@@ -26,7 +26,7 @@ import logging
 import sys
 from pathlib import Path
 
-from ..config.decaycore_config import load_config
+from ..config.decaycore_config import load_config, save_config
 from ..features import has_measurement_module
 from ..resources.i8n.decaycore_i18n import t
 from . import ui_state
@@ -176,14 +176,14 @@ def register_main_page() -> None:
     def _page() -> None:
         ui.add_head_html('<link rel="icon" type="image/x-icon" href="/favicon.ico">')
         ng_controls.reset()
-        dark_mode = apply_theme()
-
         d = load_config()
+        theme_dark = bool(d.get("ui_theme_dark", True))
+        dark_mode = apply_theme(dark=theme_dark)
         get_val = lambda k, def_v: d.get(k, def_v)
         measurement_available = has_measurement_module()
 
         with ui.column().classes("w-full gap-0 cf-brand-shell"):
-            _build_brand_header(version=VERSION, dark_mode=dark_mode)
+            _build_brand_header(version=VERSION, dark_mode=dark_mode, initial_theme_dark=theme_dark)
 
         with ui.column().classes("w-full gap-0 cf-tabs-shell"):
             with ui.column().classes("w-full cf-tabs-shell-inner"):
@@ -284,7 +284,13 @@ def _on_start_click() -> None:
 # Header rendering
 # ---------------------------------------------------------------------------
 
-def _build_brand_header(*, version: str, dark_mode) -> None:
+def _persist_theme_preference(*, dark: bool) -> None:
+    cfg = dict(load_config() or {})
+    cfg["ui_theme_dark"] = bool(dark)
+    save_config(cfg)
+
+
+def _build_brand_header(*, version: str, dark_mode, initial_theme_dark: bool) -> None:
     from nicegui import ui
 
     ui.add_head_html(_external_link_head_html())
@@ -320,9 +326,10 @@ def _build_brand_header(*, version: str, dark_mode) -> None:
         with ui.row().classes("items-start gap-6 w-full justify-between no-wrap"):
             with ui.row().classes("items-center gap-5 min-w-0"):
                 with ui.element("div").classes("cf-brand-logo-frame shrink-0"):
+                    initial_logo_src = logo_dark_src if initial_theme_dark or not logo_light_src else logo_light_src
                     logo_el = ui.html(
-                        f'<img id="cf-brand-logo" src="{logo_dark_src}" style="{logo_img_style}" />'
-                        if logo_dark_src else ""
+                        f'<img id="cf-brand-logo" src="{initial_logo_src}" style="{logo_img_style}" />'
+                        if initial_logo_src else ""
                     )
                 with ui.column().classes("cf-brand-block gap-1 min-w-0"):
                     ui.label("DecayCore").classes("cf-brand-title")
@@ -335,7 +342,7 @@ def _build_brand_header(*, version: str, dark_mode) -> None:
             with ui.column().classes("cf-brand-actions gap-3 shrink-0"):
                 build_info_panel()
                 with ui.row().classes("justify-end gap-2"):
-                    _state = {"dark": True}
+                    _state = {"dark": bool(initial_theme_dark)}
 
                     def _toggle_theme(btn=None):
                         from nicegui import ui as _ui  # noqa: PLC0415
@@ -347,6 +354,7 @@ def _build_brand_header(*, version: str, dark_mode) -> None:
                                     f'<img id="cf-brand-logo" src="{logo_light_src}" style="{logo_img_style}" />'
                                 )
                             _toggle_btn.props("icon=light_mode")
+                            _persist_theme_preference(dark=False)
                         else:
                             dark_mode.enable()
                             _ui.run_javascript("document.body.classList.remove('cf-light')")
@@ -355,10 +363,11 @@ def _build_brand_header(*, version: str, dark_mode) -> None:
                                     f'<img id="cf-brand-logo" src="{logo_dark_src}" style="{logo_img_style}" />'
                                 )
                             _toggle_btn.props("icon=dark_mode")
+                            _persist_theme_preference(dark=True)
                         _state["dark"] = not _state["dark"]
 
                     _toggle_btn = (
-                        ui.button(icon="dark_mode", on_click=_toggle_theme)
+                        ui.button(icon="dark_mode" if initial_theme_dark else "light_mode", on_click=_toggle_theme)
                         .props("flat dense round")
                         .tooltip(t("theme_toggle_tooltip"))
                     )

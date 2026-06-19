@@ -80,7 +80,7 @@ def _classify_bass_integration_feasibility(
     sub_combine_mode: str,
     sub_level_delta_db_20_120: Any,
     fc_hz: float = 80.0,
-) -> tuple[str, str]:
+) -> tuple[str, str, str]:
     values = {
         "overlap_ripple_db": _safe_float(overlap_ripple_worst, float("nan")),
         "sub_dominance_db": _safe_float(sub_dominance_worst, float("nan")),
@@ -110,12 +110,25 @@ def _classify_bass_integration_feasibility(
         return bool(checked)
 
     if _meets("good"):
-        return "good", "Shared mono-sub integration meets balance and crossover guard targets."
+        return "good", "Shared mono-sub integration meets balance and crossover guard targets.", "none"
 
     feasibility_class = "marginal" if _meets("marginal") else "infeasible"
     ref_limits = dict(
         BASS_INTEGRATION_FEASIBILITY_THRESHOLDS["good" if feasibility_class == "marginal" else "marginal"]
     )
+
+    # Identify the single metric furthest over its limit (normalised ratio).
+    _good_limits = dict(BASS_INTEGRATION_FEASIBILITY_THRESHOLDS["good"])
+    limiting_factor = "unknown"
+    _max_ratio = -1.0
+    for _key, _limit in _good_limits.items():
+        _value = values.get(_key, float("nan"))
+        _effective = float(_limit) * _gd_scale if _key == "xo_gd_rms_mismatch_ms" else float(_limit)
+        if np.isfinite(_value) and _effective > 0.0:
+            _ratio = float(_value) / _effective
+            if _ratio > _max_ratio:
+                _max_ratio = _ratio
+                limiting_factor = str(_key)
     label = {
         "left": "Left channel remains limiting",
         "right": "Right channel remains limiting",
@@ -150,7 +163,7 @@ def _classify_bass_integration_feasibility(
         reasons.append(
             "usable but asymmetric" if feasibility_class == "marginal" else "no balanced shared mono-sub solution found"
         )
-    return feasibility_class, ". ".join(str(part).strip() for part in reasons if str(part).strip()) + "."
+    return feasibility_class, ". ".join(str(part).strip() for part in reasons if str(part).strip()) + ".", limiting_factor
 
 
 def _gd_ms_from_transfer(transfer: TransferData) -> np.ndarray:

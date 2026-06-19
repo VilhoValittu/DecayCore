@@ -234,10 +234,8 @@ def _load_local_house_curve(data: dict, *, parse_measurements_from_path=None):
 
 def _load_preset_house_curve(*, mode_key: str):
     preset_key = mode_key
-    hc_source = "Preset"
     if preset_key == "Upload":
         preset_key = "Flat"
-        hc_source = "Upload (no file)"
     if preset_key in ("Custom", "Upload"):
         hc_f, hc_m = get_house_curve_by_name("Flat")
         return hc_f, hc_m, "Upload (no file)"

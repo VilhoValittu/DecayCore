@@ -12,47 +12,14 @@ from __future__ import annotations
 
 import logging
 import math
-import time
 import typing
-from datetime import datetime
 
-import numpy as np
 
 from ...config.legacy_keys import is_auto_mode
-from ...application.health_service import compute_health
-from ...application.house_curve_service import load_house_curve
-from ...application.run_request import RunRequest
-from ...application.run_contracts import (
-    PreparedRunInput,
-    ResolvedRunConfig,
-    copy_resolved_data,
-    copy_source_ui_data,
-)
-from ...common.result_postprocess import _irwin_tag
-from ...config.decaycore_config import save_config
-from ...config.decaycore_pipeline import (
-    build_xos_hpf,
-    choose_dash_fs,
-    choose_target_rates,
-    detect_is_wav_source,
-    filter_type_short,
-    log_df_smoothing_toggle,
-)
-from ...io.generated_measurement_source import generated_source_matches_upload, parse_generated_source
-from ...io.measurements_loader import (
-    _try_load_harmonic_sidecar,
-    _try_load_rt60_sidecar,
-    load_bass_integration_measurements,
-    load_measurements_lr,
-    load_raw_irs_lr,
-    load_raw_ir_sub,
-)
-from ...io.measurements_txt import parse_measurements_from_path
-from ...resources.i8n.decaycore_i18n import t
-from ..bridge_types import ProcessRunCallbacks
+from ...dsp.bass_integration._utils import _safe_float
 
 if typing.TYPE_CHECKING:
-    from ..process_run_flow import ProcessRunSupport
+    pass
 
 logger = logging.getLogger("DecayCore")
 
@@ -130,7 +97,7 @@ def _compute_direct_dac_prepare_recommendation(bundle: object, data: dict, callb
     profile = str(data.get("bass_integration_profile", "safe") or "safe")
     xo_order, sub_hpf_hz, sub_hpf_order = _direct_dac_filter_params(data)
     sub_combine_mode = str(data.get("bass_integration_sub_combine_mode", "average") or "average")
-    allpass_auto_enable = bool(data.get("bass_integration_allpass_auto_enable", False))
+    allpass_auto_enable = True
 
     use_optuna = False
     if backend_key == "optuna":
@@ -230,8 +197,50 @@ def _compute_selected_bass_integration_diagnostics(bundle: object, data: dict) -
             or {}
         )
         out = dict(metrics.get("diagnostics", {}) or {})
+        gd_cont = dict(out.get("gd_continuity", {}) or {})
         out.update(
             {
+                "metric_channel_mode": str(metrics.get("bass_metric_channel_mode", out.get("metric_channel_mode", "worst_case")) or "worst_case"),
+                "xo_gd_rms_mismatch_ms": float(
+                    _safe_float(
+                        metrics.get(
+                            "bass_xo_gd_rms_mismatch_ms",
+                            _safe_float(gd_cont.get("gd_rms_mismatch_ms_worst", float("nan")), float("nan")),
+                        ),
+                        float("nan"),
+                    )
+                ),
+                "xo_gd_max_mismatch_ms": float(
+                    _safe_float(
+                        metrics.get(
+                            "bass_xo_gd_max_mismatch_ms",
+                            _safe_float(gd_cont.get("gd_max_mismatch_ms_worst", float("nan")), float("nan")),
+                        ),
+                        float("nan"),
+                    )
+                ),
+                "xo_main_gd_ms": float(
+                    _safe_float(
+                        metrics.get(
+                            "bass_xo_main_gd_ms",
+                            (
+                                _safe_float(gd_cont.get("l_main_gd_ms", float("nan")), float("nan"))
+                                + _safe_float(gd_cont.get("r_main_gd_ms", float("nan")), float("nan"))
+                            )
+                            / 2.0,
+                        ),
+                        float("nan"),
+                    )
+                ),
+                "xo_sub_gd_ms": float(
+                    _safe_float(
+                        metrics.get("bass_xo_sub_gd_ms", gd_cont.get("sub_gd_ms", float("nan"))),
+                        float("nan"),
+                    )
+                ),
+                "xo_gd_mismatch_delta_ms": float(
+                    _safe_float(metrics.get("bass_xo_gd_mismatch_delta_ms", out.get("xo_gd_mismatch_delta_ms", float("nan"))), float("nan"))
+                ),
                 "direct_dac_main_hpf_order": int(xo_order),
                 "direct_dac_sub_lpf_order": int(xo_order),
                 "direct_dac_sub_hpf_hz": float(sub_hpf_hz),

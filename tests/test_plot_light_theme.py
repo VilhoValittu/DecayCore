@@ -325,10 +325,5 @@ def test_prediction_plot_keeps_magnitude_legend_focused_on_core_curves():
     assert legend_names[:4] == ["Measured", "Target", "Predicted (exported)", "Confidence"]
     assert len(legend_names) == 5
     assert legend_names[-1].startswith("Error (M")
-    summary_annotation = next(
-        annotation
-        for annotation in fig_dict["layout"]["annotations"]
-        if annotation["text"].startswith("Auto gain:")
-    )
-    assert float(summary_annotation["y"]) == 1.0
+    assert "Auto gain:" in fig_dict["layout"]["title"]["text"]
     assert fig_dict["layout"]["margin"]["b"] >= 90

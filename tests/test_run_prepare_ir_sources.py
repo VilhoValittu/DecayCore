@@ -12,6 +12,7 @@ from decaycore.workflow.run_prepare import (
 )
 from decaycore.workflow.run_prepare_parts.target_context import (
     _build_bass_integration_metadata_unified,
+    _prepare_target_curve_bass_integration_context,
     _safe_float_from_dict,
 )
 
@@ -267,6 +268,68 @@ def test_prepare_target_curve_context_keeps_bass_integration_metadata_consistent
     assert meta["recommended_allpass"]["enabled"] == measurements["bass_integration_allpass_auto_applied"] is True
     assert meta["recommended_allpass"]["freq_hz"] == measurements["bass_integration_allpass_freq_hz"] == 77.5
     assert meta["recommended_allpass"]["q"] == measurements["bass_integration_allpass_q"] == 0.9
+
+
+def test_prepare_target_curve_bass_integration_context_applies_prepare_recommendation(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "decaycore.workflow.run_prepare_parts.target_context._compute_direct_dac_prepare_recommendation",
+        lambda bundle, data, callbacks=None: {
+            "applied": True,
+            "sub_delay_ms": -2.5,
+            "sub_array_delay_ms": -2.5,
+            "main_l_delay_ms": 2.5,
+            "main_r_delay_ms": 2.5,
+            "sub_polarity_invert": False,
+            "sub_gain_trim_db": -1.25,
+            "recommended_hz": 80.0,
+            "recommended_sub_lpf_hz": 100.0,
+            "baseline": {"overlap_ripple_db": 4.5},
+            "optimized": {"overlap_ripple_db": 2.0},
+            "improvement_score": 0.75,
+            "reason": "Applied shared Direct-DAC sub-array polarity/delay/gain alignment.",
+            "allpass_enabled": True,
+            "allpass_freq_hz": 77.5,
+            "allpass_q": 0.9,
+            "allpass_reason": "Allpass test",
+        },
+    )
+    monkeypatch.setattr(
+        "decaycore.workflow.run_prepare_parts.target_context._refresh_target_curve_bass_integration_diagnostics",
+        lambda **kwargs: {"selected_only": 2.5},
+    )
+
+    data = {
+        "mode": "AUTO",
+        "bass_integration_enable": True,
+        "bass_integration_profile": "safe",
+        "bass_integration_sub_combine_mode": "average",
+        "bass_integration_allpass_auto_enable": True,
+        "avr_crossover_hz": 80.0,
+        "sub_crossover_hz": 80.0,
+        "direct_dac_sub_lpf_hz": 100.0,
+        "sub_crossover_slope": 24,
+        "sub_hpf_slope": 12,
+        "sub_hpf_freq": 20.0,
+    }
+    ctx = {"bass_integration_bundle": SimpleNamespace(diagnostics={})}
+
+    result = _prepare_target_curve_bass_integration_context(
+        ctx=ctx,
+        data=data,
+        callbacks=_callbacks(),
+    )
+
+    assert result["bi_alignment_recommendation"]["applied"] is True
+    assert data["bass_integration_sub_delay_ms"] == -2.5
+    assert data["bass_integration_sub_array_delay_ms"] == -2.5
+    assert data["bass_integration_main_l_delay_ms"] == 2.5
+    assert data["bass_integration_main_r_delay_ms"] == 2.5
+    assert data["bass_integration_sub_gain_trim_db"] == -1.25
+    assert data["bass_integration_alignment_auto_applied"] is True
+    assert data["bass_integration_allpass_auto_enable"] is True
+    assert data["bass_integration_allpass_auto_applied"] is True
+    assert data["bass_integration_allpass_freq_hz"] == 77.5
+    assert data["bass_integration_allpass_q"] == 0.9
 
 
 def test_prepare_ui_reads_lr_raw_ir_from_regular_slots(monkeypatch) -> None:

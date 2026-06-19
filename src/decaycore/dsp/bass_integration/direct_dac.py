@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+import scipy.signal
 
 from ._filters import _butterworth_complex_response
 
@@ -92,22 +93,14 @@ def _group_delay_ms(freqs: np.ndarray, response: np.ndarray) -> np.ndarray:
     if freqs.size < 3 or response.size != freqs.size:
         return np.full(freqs.shape, np.nan, dtype=float)
     phase = np.unwrap(np.angle(response))
-    omega = 2.0 * np.pi * freqs
+    n = phase.size
+    if n >= 7:
+        wlen = min(11, n if n % 2 == 1 else n - 1)
+        phase = scipy.signal.savgol_filter(phase, window_length=wlen, polyorder=2)
+    omega = 2.0 * np.pi * np.maximum(freqs, 1e-9)
     try:
         gd_s = -np.gradient(phase, omega)
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
+    except (TypeError, ValueError, RuntimeError):
         return np.full(freqs.shape, np.nan, dtype=float)
     return np.asarray(gd_s * 1000.0, dtype=float)
 

@@ -10,7 +10,6 @@
 
 import json
 import logging
-import os
 from pathlib import Path
 
 logger = logging.getLogger("DecayCore")
@@ -87,6 +86,16 @@ def _normalize_filter_type(value) -> str:
 
 _CONFIG_CURRENT_VERSION = 1  # Increment this when adding a new migration
 
+_FS_OPTIONS = (44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000)
+_TAPS_OPTIONS = (512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576)
+_SLOPE_OPTIONS = (6, 12, 18, 24, 36, 48)
+_PLOT_SMOOTHING_LEVEL_OPTIONS = ("Psychoacoustic", 12, 24, 48, 96)
+_FILTER_WAV_FORMAT_OPTIONS = ("FLOAT32", "S32_LE", "S16_LE")
+_DEVICE_AUDIO_FORMAT_OPTIONS = ("S32_LE", "S16_LE")
+_IR_EXPORT_WINDOW_MODE_OPTIONS = ("auto", "rew_asym")
+_IR_EXPORT_WINDOW_SHAPE_OPTIONS = ("hann", "tukey")
+_STEREO_LINK_STRATEGY_OPTIONS = ("off", "auto", "hybrid", "shared")
+
 
 def _migration_v1_coerce_legacy_boolean_lists(saved: dict) -> None:
     """Migration 1: Convert list-valued booleans to bool type.
@@ -98,6 +107,7 @@ def _migration_v1_coerce_legacy_boolean_lists(saved: dict) -> None:
         "normalize_opt",
         "align_opt",
         "multi_rate_opt",
+        "multi_rate_ultra_high_opt",
         "stereo_link",
         "exc_prot",
         "hpf_enable",
@@ -134,6 +144,107 @@ def _migration_v1_lvl_manual_db_shift(saved: dict) -> None:
                 saved["lvl_manual_db"] = float(value - 75.0)
     except _RECOVERABLE_CONFIG_EXCEPTIONS:
         pass
+
+
+def _parse_legacy_choice_index(value) -> int | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, int):
+        return int(value)
+    if isinstance(value, float):
+        if not float(value).is_integer():
+            return None
+        return int(value)
+    try:
+        text = str(value).strip()
+    except _RECOVERABLE_CONFIG_EXCEPTIONS:
+        return None
+    if not text:
+        return None
+    if text[0] in "+-":
+        digits = text[1:]
+    else:
+        digits = text
+    if not digits.isdigit():
+        return None
+    try:
+        return int(text)
+    except _RECOVERABLE_CONFIG_EXCEPTIONS:
+        return None
+
+
+def _normalize_choice_value(value, *, options: tuple, default):
+    if value in options:
+        return value
+
+    try:
+        raw = str(value).strip()
+    except _RECOVERABLE_CONFIG_EXCEPTIONS:
+        raw = ""
+    if raw:
+        for option in options:
+            if raw.casefold() == str(option).strip().casefold():
+                return option
+
+    index = _parse_legacy_choice_index(value)
+    if index is not None and 0 <= index < len(options):
+        return options[index]
+
+    return default
+
+
+def _normalize_saved_choice_fields(saved: dict, default_conf: dict) -> None:
+    saved["fs"] = _normalize_choice_value(
+        saved.get("fs", default_conf.get("fs")),
+        options=_FS_OPTIONS,
+        default=int(default_conf.get("fs", 44100)),
+    )
+    saved["taps"] = _normalize_choice_value(
+        saved.get("taps", default_conf.get("taps")),
+        options=_TAPS_OPTIONS,
+        default=int(default_conf.get("taps", 65536)),
+    )
+    saved["hpf_slope"] = _normalize_choice_value(
+        saved.get("hpf_slope", default_conf.get("hpf_slope")),
+        options=_SLOPE_OPTIONS,
+        default=int(default_conf.get("hpf_slope", 24)),
+    )
+    for key in ("xo1_s", "xo2_s", "xo3_s", "xo4_s", "xo5_s"):
+        saved[key] = _normalize_choice_value(
+            saved.get(key, default_conf.get(key)),
+            options=_SLOPE_OPTIONS,
+            default=int(default_conf.get(key, 12)),
+        )
+    saved["plot_smoothing_level"] = _normalize_choice_value(
+        saved.get("plot_smoothing_level", default_conf.get("plot_smoothing_level")),
+        options=_PLOT_SMOOTHING_LEVEL_OPTIONS,
+        default=default_conf.get("plot_smoothing_level", "Psychoacoustic"),
+    )
+    saved["filter_wav_format"] = _normalize_choice_value(
+        saved.get("filter_wav_format", default_conf.get("filter_wav_format")),
+        options=_FILTER_WAV_FORMAT_OPTIONS,
+        default=str(default_conf.get("filter_wav_format", "FLOAT32")),
+    )
+    saved["device_audio_format"] = _normalize_choice_value(
+        saved.get("device_audio_format", default_conf.get("device_audio_format")),
+        options=_DEVICE_AUDIO_FORMAT_OPTIONS,
+        default=str(default_conf.get("device_audio_format", "S32_LE")),
+    )
+    saved["ir_export_window_mode"] = _normalize_choice_value(
+        saved.get("ir_export_window_mode", default_conf.get("ir_export_window_mode")),
+        options=_IR_EXPORT_WINDOW_MODE_OPTIONS,
+        default=str(default_conf.get("ir_export_window_mode", "auto")),
+    )
+    saved["ir_export_window_shape"] = _normalize_choice_value(
+        saved.get("ir_export_window_shape", default_conf.get("ir_export_window_shape")),
+        options=_IR_EXPORT_WINDOW_SHAPE_OPTIONS,
+        default=str(default_conf.get("ir_export_window_shape", "hann")),
+    )
+    saved["stereo_link_strategy"] = _normalize_choice_value(
+        saved.get("stereo_link_strategy", default_conf.get("stereo_link_strategy")),
+        options=_STEREO_LINK_STRATEGY_OPTIONS,
+        default=str(default_conf.get("stereo_link_strategy", "auto")),
+    )
 
 
 def _apply_config_migrations(saved: dict) -> None:
@@ -181,6 +292,7 @@ def _load_and_merge_saved_config(default_conf: dict) -> bool:
 
         _apply_config_migrations(saved)
         _normalize_saved_filter_type(saved, default_conf)
+        _normalize_saved_choice_fields(saved, default_conf)
 
         saved_mode_explicit = saved.get("mode", None) not in (None, "")
         saved["layout"] = normalize_layout_value(saved.get("layout", default_conf.get("layout")))
@@ -190,6 +302,20 @@ def _load_and_merge_saved_config(default_conf: dict) -> bool:
     except _RECOVERABLE_CONFIG_EXCEPTIONS:
         logger.exception("config load and merge")
     return saved_mode_explicit
+
+
+def _load_saved_config_dict() -> dict:
+    config_path = Path(CONFIG_FILE)
+    if not config_path.exists():
+        return {}
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            saved = json.load(f)
+        if isinstance(saved, dict):
+            return saved
+    except _RECOVERABLE_CONFIG_EXCEPTIONS:
+        logger.exception("config raw load")
+    return {}
 
 
 def _resolve_runtime_mode(default_conf: dict, *, saved_mode_explicit: bool) -> str:
@@ -226,6 +352,11 @@ def _make_default_config() -> dict:
         "avr_crossover_hz": 80.0,
         "direct_dac_sub_lpf_hz": 80.0,
         "bass_integration_sub_delay_ms": 0.0,
+        "bass_integration_sub_array_delay_ms": 0.0,
+        "bass_integration_sub1_delay_ms": 0.0,
+        "bass_integration_sub2_delay_ms": 0.0,
+        "bass_integration_main_l_delay_ms": 0.0,
+        "bass_integration_main_r_delay_ms": 0.0,
         "bass_integration_sub_polarity_invert": False,
         "bass_integration_sub_gain_trim_db": 0.0,
         "bass_integration_alignment_auto_applied": False,
@@ -314,6 +445,7 @@ def _make_default_config() -> dict:
         "normalize_opt": False,
         "align_opt": True,
         "multi_rate_opt": False,
+        "multi_rate_ultra_high_opt": False,
         "reg_strength": 30.0,
         "stereo_link": True,
         "stereo_link_strategy": "auto",
@@ -398,6 +530,7 @@ def _make_default_config() -> dict:
         "max_slope_cut_db_per_oct": 0.0,
         "df_smoothing": False,
         "comparison_mode": True,
+        "ui_theme_dark": True,
         "tdc_max_reduction_db": 9.0,
         "tdc_slope_db_per_oct": 6.0,
         "bass_first_ai": True,
@@ -445,9 +578,13 @@ def save_config(data: dict) -> None:
                 and v is not None
             )
         }
+        saved_existing = _load_saved_config_dict()
+        if "ui_theme_dark" not in clean_data and "ui_theme_dark" in saved_existing:
+            clean_data["ui_theme_dark"] = bool(saved_existing["ui_theme_dark"])
         clean_data["filter_type"] = _normalize_filter_type(
             clean_data.get("filter_type", "Mixed")
         )
+        _normalize_saved_choice_fields(clean_data, _make_default_config())
         clean_data["layout"] = normalize_layout_value(clean_data.get("layout", LAYOUT_MONO))
         clean_data["lvl_mode"] = normalize_lvl_mode_value(clean_data.get("lvl_mode", LVL_MODE_AUTO))
         clean_data["lvl_algo"] = normalize_lvl_algo_value(clean_data.get("lvl_algo", LVL_ALGO_MEDIAN))

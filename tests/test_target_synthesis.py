@@ -145,7 +145,6 @@ def test_hf_noise_floor_brightening_does_not_accumulate_to_20khz():
     out_m = np.asarray(out_m, dtype=float)
     neutral_m = np.asarray(neutral_m, dtype=float)
 
-    idx_8k = int(np.argmin(np.abs(out_f - 8000.0)))
     idx_16k = int(np.argmin(np.abs(out_f - 16000.0)))
     idx_20k = int(np.argmin(np.abs(out_f - 20000.0)))
 

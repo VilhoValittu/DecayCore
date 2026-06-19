@@ -214,6 +214,7 @@ def test_collect_ui_data_auto_mode_preserves_allowed_inputs_but_forces_managed_s
         "fs": 96000,
         "taps": 131072,
         "multi_rate_opt": [True],
+        "multi_rate_ultra_high_opt": [True],
         "gain": 9.5,
         "phase_limit": 999.0,
         "enable_tdc": [],
@@ -239,6 +240,7 @@ def test_collect_ui_data_auto_mode_preserves_allowed_inputs_but_forces_managed_s
     assert int(data.get("fs")) == 96000
     assert int(data.get("taps")) == 131072
     assert bool(data.get("multi_rate_opt")) is True
+    assert bool(data.get("multi_rate_ultra_high_opt")) is True
     assert float(data.get("phase_limit")) == 407.2
     assert bool(data.get("enable_tdc")) is True
     assert bool(data.get("enable_afdw")) is False
@@ -2702,6 +2704,7 @@ def test_auto_signature_payload_exposes_policy_versions_and_metadata_identity():
 
     assert payload["measurement_metadata_identity"] == _auto_measurement_metadata_identity(measurements)
     assert payload["signature_policy_versions"]["gain_authority_policy_v"] >= 1
+    assert payload["signature_policy_versions"]["lf_rolloff_policy_v"] >= 1
     assert payload["gain_authority_policy"]["unsafe_raw_dsp"] is False
     assert payload["gain_authority_policy"]["max_boost_db"] == 3.0
     assert payload["confidence_model"]["policy_v"] >= 2
@@ -2717,6 +2720,8 @@ def test_auto_signature_payload_exposes_policy_versions_and_metadata_identity():
     assert payload["residual_peak_scorer"]["scorer_v"] >= 2
     assert payload["bass_integration_feasibility"]["policy_v"] >= 1
     assert payload["phase_gd_guard"]["policy_v"] >= 4
+    assert payload["_auto_lf_rolloff_policy_v"] >= 1
+    assert payload["bass_integration_algorithm_v"] >= 3
 
 
 def test_auto_signature_changes_when_unsafe_raw_flag_changes():

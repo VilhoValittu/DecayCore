@@ -24,7 +24,6 @@ from ..plot_common import (
     _prepare_curve_for_target_plot,
     _view_mags_for_plot,
     calculate_clean_gd,
-    logger,
     remove_ir_peak_delay,
     smooth_complex,
 )
@@ -130,7 +129,6 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
         VIS_POINTS = int(fft_ctx["vis_points"])
         show_afdw = bool(fft_ctx["show_afdw"])
         fig_height, fig_width = int(fft_ctx["fig_height"]), int(fft_ctx["fig_width"])
-        n_fft = int(fft_ctx["n_fft"])
         f_lin = fft_ctx["f_lin"]
         h_filt = fft_ctx["h_filt"]
         h_filt_display = fft_ctx["h_filt_display"]
@@ -174,8 +172,6 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
                 f_min_hz=f_win_min,
                 f_max_hz=f_win_max,
             )
-            t_stats = _maybe_shift_to_abs(target_curve, avg_t) if target_curve is not None else None
-
             m_interp = np.interp(f_lin, f_stats, m_stats)
 
             m_lin_clean = _view_mags_for_plot(

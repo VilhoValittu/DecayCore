@@ -291,15 +291,20 @@ def _register_stereo_callbacks(*, t: Callable) -> None:
 
 
 def _register_metric_callbacks(*, t: Callable) -> None:
-    """fs, taps, multi_rate_opt -> latency/resolution display."""
+    """fs, taps, multi-rate toggles -> latency/resolution display."""
 
     def _refresh(v: Any) -> None:
-        from .ng_mode_controls import update_engine_metrics_ui, update_taps_auto_info
+        from .ng_mode_controls import (
+            update_engine_metrics_ui,
+            update_multi_rate_ui,
+            update_taps_auto_info,
+        )
 
         update_engine_metrics_ui(t=t)
+        update_multi_rate_ui()
         update_taps_auto_info(t=t)
 
-    for field in ("fs", "taps", "multi_rate_opt", "filter_type"):
+    for field in ("fs", "taps", "multi_rate_opt", "multi_rate_ultra_high_opt", "filter_type"):
         ctrl.on_change(field, _refresh)
 
 
@@ -314,6 +319,7 @@ def _initial_state_sync(*, t: Callable, get_val: Callable) -> None:
             update_lvl_ui,
             update_low_bass_cut_ui,
             update_mixed_freq_ui,
+            update_multi_rate_ui,
             update_stereo_auto_policy_ui,
             update_tdc_controls_ui,
             update_taps_auto_info,
@@ -335,6 +341,7 @@ def _initial_state_sync(*, t: Callable, get_val: Callable) -> None:
         update_lvl_ui(t=t)
         update_ir_window_controls(t=t)
         update_mixed_freq_ui(t=t)
+        update_multi_rate_ui()
         update_low_bass_cut_ui()
         update_bass_first_ui()
         update_stereo_auto_policy_ui()

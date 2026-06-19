@@ -27,17 +27,12 @@ from ._constants import (
 )
 from ._final_metrics import _final_metric_snapshot
 from ._utils import (
-    _get_bass_integration_pkg,
+    _get_pkg,
     _normalize_candidate_frequencies,
     _normalize_candidate_q_values,
     _safe_float,
     normalize_sub_combine_mode,
 )
-
-
-def _get_pkg():
-    """Return the bass_integration package module for patchable attribute lookup."""
-    return _get_bass_integration_pkg(__name__)
 
 
 def _allpass_result(

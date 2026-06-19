@@ -1124,6 +1124,7 @@ def _append_dsp_effective_auto_tail_summary(summary_content: str, data, auto_met
 
 def _append_dsp_effective_params(summary_content, data, fs_v):
     try:
+        summary_content = _append_dsp_effective_base_summary(summary_content, data, fs_v)
         summary_content = _append_dsp_effective_auto_mode_summary(summary_content, data)
     except (
 

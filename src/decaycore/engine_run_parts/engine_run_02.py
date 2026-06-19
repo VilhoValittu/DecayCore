@@ -19,11 +19,8 @@ import numpy as np
 from ..auto_mode.auto_mode_profile import profiled_section
 from ..common.comparison_stats import _make_comparison_stats
 from ..common.measurement_features import (
-    build_harmonic_boost_risk_curve,
     estimate_schroeder_hz,
     median_rt60_mid_band,
-    normalize_rt60_bands,
-    normalize_rt60_value,
 )
 from ..common.result_postprocess import (
     _ensure_scoring_keys,
@@ -42,7 +39,6 @@ from ..dsp.bass_integration import (
     build_bundle_combined_sub_transfer,
     direct_dac_candidate_from_data,
 )
-from ..dsp.correction_types import MeasurementSideContext
 from ..dsp.hybrid_iir import peaking_eq_response as _peaking_eq_response
 from ..engine_build import _as_float
 from ..engine_summary import summarize_run
@@ -807,7 +803,7 @@ def run_pipeline(  # noqa: C901 - pipeline orchestration is intentionally centra
         "bass_integration_delay_ms": _as_float(direct_dac_result_dict.get("sub_delay_ms"), 0.0),
         "bass_integration_gain_db": _as_float(direct_dac_result_dict.get("sub_gain_db"), 0.0),
         "bass_integration_polarity": "invert" if bool(direct_dac_result_dict.get("sub_polarity_invert", False)) else "normal",
-        "bass_integration_cancellation_risk": str(direct_dac_result_dict.get("cancellation_risk", "") or ""),
+        "bass_integration_cancellation_risk": _as_float(direct_dac_result_dict.get("cancellation_risk"), 0.0),
         **({f"bass_integration_{k}": v for k, v in sub_target_meta.items()} if sub_target_meta else {}),
     }
 

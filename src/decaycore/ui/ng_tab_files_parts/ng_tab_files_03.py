@@ -1164,6 +1164,14 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
                         value=bool(get_val("multi_rate_opt", False)),
                     ),
                 )
+                with ctrl.register_container("multi_rate_ultra_high_scope", ui.column().classes("w-full pl-6")):
+                    ctrl.register(
+                        "multi_rate_ultra_high_opt",
+                        ui.checkbox(
+                            t("multi_rate_ultra_high"),
+                            value=bool(get_val("multi_rate_ultra_high_opt", False)),
+                        ),
+                    )
                 ctrl.register_container("taps_auto_info_scope_files", ui.column().classes("w-full"))
                 ctrl.register(
                     "comparison_mode",

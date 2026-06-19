@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 import logging
-import re
 import typing
 
 import numpy as np
@@ -22,17 +21,11 @@ from ...auto_mode.api import (
     AUTO_MODE_EXC_FROM_F6_ADD_HZ,
     AUTO_MODE_EXC_MAX_HZ,
     AUTO_MODE_EXC_MIN_HZ,
-    AUTO_MODE_LOCAL_REFINE_ENABLED,
-    AUTO_MODE_LOCAL_REFINE_TOP_K,
-    AUTO_MODE_LOCAL_REFINE_TRIALS_PER_TOP,
     AUTO_MODE_LOW_BASS_FROM_F6_ADD_HZ,
     AUTO_MODE_LOW_BASS_MAX_HZ,
     AUTO_MODE_LOW_BASS_MIN_HZ,
-    AUTO_MODE_PHASE3_MICRO_TRIALS,
-    AUTO_MODE_REFINE_TRIALS,
     AUTO_MODE_TARGET_TOP_N,
     AUTO_MODE_TARGET_TRIALS_PER_CURVE,
-    AUTO_MODE_TRIALS,
     _auto_goal_norm,
     _auto_cache_get_entry,
     _auto_cache_get_target_for_measurements,
@@ -46,17 +39,13 @@ from ...auto_mode.api import (
     _estimate_auto_hpf_from_response,
     _estimate_auto_mag_c_min_hz,
     _resolve_auto_hpf_application,
-    _run_auto_mode_search,
 )
-from ...auto_mode.rank_score import attach_official_rank_score, official_rank_score
 from ...auto_mode.shared import _auto_goal_forced_level_window
-from ...application.run_contracts import apply_auto_mode_result
 from ...config.legacy_keys import is_auto_mode
 from ...config.decaycore_pipeline import (
     build_xos_hpf,
     choose_target_rates,
     detect_is_wav_source,
-    filter_type_short,
 )
 from ...ui.decaycore_utils import scale_taps_with_fs
 from ..bridge_types import ProcessRunCallbacks
@@ -868,13 +857,16 @@ def _seed_phases_run_auto_mode_preview(
         bass_integration_active=bass_integration_active,
     )
     try:
+        seed_f_l, seed_m_l, seed_f_r, seed_m_r = _seed_phases_extract_direct_dac_pre_measurements(
+            ctx, f_l, m_l, f_r, m_r,
+        )
         _seed_phases_apply_preview_seed_heuristics(
             data,
             auto_status=auto_status,
-            f_l=f_l,
-            m_l=m_l,
-            f_r=f_r,
-            m_r=m_r,
+            f_l=seed_f_l,
+            m_l=seed_m_l,
+            f_r=seed_f_r,
+            m_r=seed_m_r,
         )
         (
             hpf_f_l,

@@ -19,12 +19,7 @@ from ._final_metrics import _final_metric_snapshot
 from ._recommend_alignment import recommend_direct_dac_alignment
 from ._recommend_allpass import recommend_direct_dac_allpass
 from ._recommend_crossover import recommend_direct_dac_crossover
-from ._utils import _LOG, _get_bass_integration_pkg, _safe_float, _status_callback, normalize_sub_combine_mode
-
-
-def _get_pkg():
-    """Return the bass_integration package module for patchable attribute lookup."""
-    return _get_bass_integration_pkg(__name__)
+from ._utils import _LOG, _get_pkg, _safe_float, _status_callback, normalize_sub_combine_mode
 
 
 def _direct_dac_prepare_allpass_postpass(
@@ -116,11 +111,22 @@ def _direct_dac_prepare_result(
     candidate_score: float | None = None,
     reject_reasons: list[str] | None = None,
     worst_channel: str | None = None,
+    sub_array_delay_ms: float | None = None,
+    main_l_delay_ms: float | None = None,
+    main_r_delay_ms: float | None = None,
 ) -> dict[str, Any]:
+    selected_sub_delay = float(sub_delay_ms if applied else 0.0)
+    selected_sub_array_delay = float(selected_sub_delay if sub_array_delay_ms is None else sub_array_delay_ms)
+    main_delay_default = float(max(0.0, -selected_sub_delay))
+    selected_main_l_delay = float(main_delay_default if main_l_delay_ms is None else main_l_delay_ms)
+    selected_main_r_delay = float(main_delay_default if main_r_delay_ms is None else main_r_delay_ms)
     result = {
         "applied": bool(applied),
         "backend": str(backend),
-        "sub_delay_ms": float(sub_delay_ms if applied else 0.0),
+        "sub_delay_ms": float(selected_sub_delay),
+        "sub_array_delay_ms": float(selected_sub_array_delay if applied else 0.0),
+        "main_l_delay_ms": float(selected_main_l_delay if applied else 0.0),
+        "main_r_delay_ms": float(selected_main_r_delay if applied else 0.0),
         "sub_polarity_invert": bool(sub_polarity_invert if applied else False),
         "sub_gain_trim_db": float(sub_gain_trim_db if applied else 0.0),
         "recommended_hz": float(recommended_hz),
@@ -203,6 +209,9 @@ def _recommend_direct_dac_prepare_builtin_core(
     ):
         _LOG.debug("Direct-DAC builtin alignment recommendation failed; keeping baseline alignment", exc_info=True)
     best_delay = float(align_result.get("sub_delay_ms", 0.0) or 0.0)
+    best_sub_array_delay = float(align_result.get("sub_array_delay_ms", best_delay) or 0.0)
+    best_main_l_delay = float(align_result.get("main_l_delay_ms", max(0.0, -best_delay)) or 0.0)
+    best_main_r_delay = float(align_result.get("main_r_delay_ms", max(0.0, -best_delay)) or 0.0)
     best_polarity = bool(align_result.get("sub_polarity_invert", False))
     best_gain = float(align_result.get("sub_gain_trim_db", 0.0) or 0.0)
     applied = bool(align_result.get("applied", False))
@@ -284,6 +293,9 @@ def _recommend_direct_dac_prepare_builtin_core(
         applied=applied,
         backend="builtin",
         sub_delay_ms=best_delay,
+        sub_array_delay_ms=best_sub_array_delay,
+        main_l_delay_ms=best_main_l_delay,
+        main_r_delay_ms=best_main_r_delay,
         sub_polarity_invert=best_polarity,
         sub_gain_trim_db=best_gain,
         recommended_hz=best_fc,

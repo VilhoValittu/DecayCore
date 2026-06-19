@@ -20,16 +20,11 @@ from ._constants import COMBINED_SUB_ALIGNMENT_MAX_LAG_MS
 from ._utils import (
     _band_mask,
     _build_transfer_like,
-    _get_bass_integration_pkg,
+    _get_pkg,
     _interp_complex_response,
     _sum_component_specs,
     normalize_sub_combine_mode,
 )
-
-
-def _get_pkg():
-    """Return the bass_integration package module for patchable attribute lookup."""
-    return _get_bass_integration_pkg(__name__)
 
 
 def _transfer_is_effectively_silent(transfer: TransferData | None) -> bool:
@@ -93,9 +88,122 @@ def _band_level_delta_db(
     mask = _band_mask(freqs, lo_hz, hi_hz)
     if int(np.count_nonzero(mask)) < 3:
         return float("nan")
-    combined_db = 20.0 * np.log10(np.maximum(np.abs(np.asarray(combined_spec, dtype=np.complex128)[mask]), 1e-12))
-    average_db = 20.0 * np.log10(np.maximum(np.abs(np.asarray(average_spec, dtype=np.complex128)[mask]), 1e-12))
-    return float(np.median(combined_db - average_db))
+    combined_mag = np.abs(np.asarray(combined_spec, dtype=np.complex128)[mask])
+    average_mag = np.abs(np.asarray(average_spec, dtype=np.complex128)[mask])
+    finite = (
+        np.isfinite(combined_mag)
+        & np.isfinite(average_mag)
+    )
+    if int(np.count_nonzero(finite)) < 3:
+        return float("nan")
+    combined_mag = combined_mag[finite]
+    average_mag = average_mag[finite]
+    # Use band-average power instead of the median of per-bin dB deltas.
+    # Median-of-deltas can collapse to ~0 dB even when alignment removes a large
+    # cancellation notch and materially raises the average in-band level.
+    combined_power = float(np.mean(np.square(np.maximum(combined_mag, 1e-12))))
+    average_power = float(np.mean(np.square(np.maximum(average_mag, 1e-12))))
+    return float(10.0 * np.log10(max(combined_power, 1e-24) / max(average_power, 1e-24)))
+
+
+def _preserve_precombined_dual_sub_diagnostics(
+    bundle: BassIntegrationBundle,
+    diagnostics: dict[str, Any],
+) -> dict[str, Any]:
+    """Keep dual-sub preprocessing deltas when the bundle already contains one virtual sub.
+
+    After dual-sub peak alignment, the bundle intentionally collapses to one combined
+    acoustic sub reference. Recombining that single virtual sub later would always
+    report 0 dB delta, so preserve the original dual-sub alignment deltas instead.
+    """
+    bundle_diag = dict(getattr(bundle, "diagnostics", {}) or {})
+    if not bool(bundle_diag.get("dual_sub_preprocessing_applied", False)):
+        return diagnostics
+    if len(_bundle_sub_slot_names(bundle)) != 1:
+        return diagnostics
+
+    out = dict(diagnostics or {})
+    for key in (
+        "sub_combined_level_delta_db_20_120",
+        "sub_combined_level_delta_db_30_90",
+        "predicted_sub_array_gain_db_30_100",
+    ):
+        try:
+            value = float(bundle_diag.get(key, float("nan")))
+        except (
+            TypeError,
+            ValueError,
+            KeyError,
+            AttributeError,
+        ):
+            continue
+        if np.isfinite(value):
+            out[key] = float(value)
+    return out
+
+
+def _phase_rms_deg(
+    freqs_hz: np.ndarray,
+    spec_a: np.ndarray,
+    spec_b: np.ndarray,
+    *,
+    lo_hz: float = 30.0,
+    hi_hz: float = 100.0,
+) -> float:
+    freqs = np.asarray(freqs_hz, dtype=float)
+    mask = _band_mask(freqs, lo_hz, hi_hz)
+    if int(np.count_nonzero(mask)) < 3:
+        return float("nan")
+    a = np.asarray(spec_a, dtype=np.complex128)[mask]
+    b = np.asarray(spec_b, dtype=np.complex128)[mask]
+    finite = np.isfinite(a.real) & np.isfinite(a.imag) & np.isfinite(b.real) & np.isfinite(b.imag)
+    if int(np.count_nonzero(finite)) < 3:
+        return float("nan")
+    delta = np.angle(a[finite] * np.conj(b[finite]))
+    return float(np.rad2deg(np.sqrt(np.mean(np.square(delta)))))
+
+
+def _phase_aligned_sub_delay_ms(
+    ref_spec: np.ndarray,
+    moving_spec: np.ndarray,
+    freqs_hz: np.ndarray,
+    *,
+    max_delay_ms: float = COMBINED_SUB_ALIGNMENT_MAX_LAG_MS,
+    lo_hz: float = 30.0,
+    hi_hz: float = 100.0,
+) -> tuple[float, float]:
+    freqs = np.asarray(freqs_hz, dtype=float)
+    mask = _band_mask(freqs, lo_hz, hi_hz)
+    if int(np.count_nonzero(mask)) < 3:
+        return 0.0, float("nan")
+    ref = np.asarray(ref_spec, dtype=np.complex128)[mask]
+    moving = np.asarray(moving_spec, dtype=np.complex128)[mask]
+    freq_band = freqs[mask]
+    finite = np.isfinite(ref.real) & np.isfinite(ref.imag) & np.isfinite(moving.real) & np.isfinite(moving.imag)
+    if int(np.count_nonzero(finite)) < 3:
+        return 0.0, float("nan")
+    ref = ref[finite]
+    moving = moving[finite]
+    freq_band = freq_band[finite]
+
+    def _best_for_grid(delay_grid_ms: np.ndarray) -> tuple[float, float]:
+        phase = np.exp(-1j * 2.0 * np.pi * freq_band[None, :] * (delay_grid_ms[:, None] / 1000.0))
+        aligned = moving[None, :] * phase
+        delta = np.angle(ref[None, :] * np.conj(aligned))
+        rms = np.rad2deg(np.sqrt(np.mean(np.square(delta), axis=1)))
+        finite_rms = np.isfinite(rms)
+        if not bool(np.any(finite_rms)):
+            return 0.0, float("nan")
+        best_idx = int(np.argmin(np.where(finite_rms, rms, np.inf)))
+        return float(delay_grid_ms[best_idx]), float(rms[best_idx])
+
+    max_delay = float(max(0.0, max_delay_ms))
+    coarse = np.arange(-max_delay, max_delay + 0.5, 1.0, dtype=float)
+    best_delay, _best_rms = _best_for_grid(coarse)
+    refine_lo = max(-max_delay, best_delay - 1.0)
+    refine_hi = min(max_delay, best_delay + 1.0)
+    refine = np.arange(refine_lo, refine_hi + 0.05, 0.1, dtype=float)
+    return _best_for_grid(refine)
 
 
 def build_combined_sub_transfer(
@@ -117,11 +225,16 @@ def build_combined_sub_transfer(
             {
                 "sub_combine_mode": str(mode_norm),
                 "sub_slot_count": 0,
+                "sub_topology": "no_sub",
                 "whether_alignment_applied": False,
                 "alignment_offset_ms": 0.0,
                 "alignment_confidence": 0.0,
+                "sub_array_delay_ms": 0.0,
+                "sub1_delay_ms": 0.0,
+                "sub2_delay_ms": 0.0,
                 "sub_combined_level_delta_db_20_120": 0.0,
                 "sub_combined_level_delta_db_30_90": 0.0,
+                "predicted_sub_array_gain_db_30_100": 0.0,
             },
         )
 
@@ -178,9 +291,18 @@ def build_combined_sub_transfer(
     diagnostics = {
         "sub_combine_mode": str(mode_norm),
         "sub_slot_count": int(len(active_subs)),
+        "sub_topology": "single_sub_bus" if len(active_subs) == 1 else f"dual_sub_{mode_norm}",
         "whether_alignment_applied": bool(alignment_applied),
         "alignment_offset_ms": float(alignment_offset_ms),
         "alignment_confidence": float(alignment_confidence),
+        "sub_array_delay_ms": 0.0,
+        "sub1_delay_ms": 0.0,
+        "sub2_delay_ms": float(alignment_offset_ms if alignment_applied else 0.0),
+        "sub_array_phase_rms_deg_30_100": (
+            _phase_rms_deg(freqs, specs[0], specs[1], lo_hz=30.0, hi_hz=100.0)
+            if len(specs) > 1
+            else 0.0
+        ),
         "sub_combined_level_delta_db_20_120": _band_level_delta_db(
             freqs,
             combined_spec,
@@ -194,6 +316,13 @@ def build_combined_sub_transfer(
             avg_spec,
             lo_hz=30.0,
             hi_hz=90.0,
+        ),
+        "predicted_sub_array_gain_db_30_100": _band_level_delta_db(
+            freqs,
+            combined_spec,
+            avg_spec,
+            lo_hz=30.0,
+            hi_hz=100.0,
         ),
     }
     return _build_transfer_like(template, combined_spec, label=label), diagnostics
@@ -224,13 +353,27 @@ def prepare_dual_sub_peak_aligned_average(
     peak1 = int(sub1_peak_samples)
     peak2 = int(sub2_peak_samples)
     delay_samples = int(peak1 - peak2)
-    delay_s = float(delay_samples) / float(fs)
+    peak_delay_ms = float(delay_samples) / float(fs) * 1000.0
+    phase_delay_ms, phase_rms = _phase_aligned_sub_delay_ms(
+        spec1,
+        spec2,
+        freqs,
+        max_delay_ms=COMBINED_SUB_ALIGNMENT_MAX_LAG_MS,
+        lo_hz=30.0,
+        hi_hz=100.0,
+    )
+    delay_ms = (
+        float(phase_delay_ms)
+        if np.isfinite(phase_rms)
+        else float(peak_delay_ms)
+    )
+    delay_s = float(delay_ms) / 1000.0
     spec2_aligned = spec2 * np.exp(-1j * 2.0 * np.pi * freqs * float(delay_s))
     combined_spec = np.asarray((spec1 + spec2_aligned) / 2.0, dtype=np.complex128)
+    raw_average_spec = np.asarray((spec1 + spec2) / 2.0, dtype=np.complex128)
 
     peak1_ms = float(peak1) / float(fs) * 1000.0
     peak2_ms = float(peak2) / float(fs) * 1000.0
-    delay_ms = float(delay_samples) / float(fs) * 1000.0
     # Alignment is reliable when the inferred delay is small relative to the XO period.
     # > 10 ms direct-peak offset is suspicious in a typical room setup: the peak may be
     # a reflection rather than the direct sound, which would misalign the integration.
@@ -244,12 +387,42 @@ def prepare_dual_sub_peak_aligned_average(
         "dual_sub_sub1_peak_ms": float(peak1_ms),
         "dual_sub_sub2_peak_ms": float(peak2_ms),
         "dual_sub_relative_delay_samples": int(delay_samples),
+        "dual_sub_peak_relative_delay_ms": float(peak_delay_ms),
         "dual_sub_relative_delay_ms": float(delay_ms),
+        "dual_sub_phase_refined": bool(np.isfinite(phase_rms)),
+        "dual_sub_phase_refined_rms_deg_30_100": float(phase_rms),
+        "dual_sub_sub1_delay_ms": 0.0,
+        "dual_sub_sub2_delay_ms": float(delay_ms),
+        "sub1_delay_ms": 0.0,
+        "sub2_delay_ms": float(delay_ms),
+        "sub_array_delay_ms": 0.0,
         "dual_sub_alignment_reliable": bool(alignment_reliable),
         "dual_sub_combined_method": "peak_aligned_complex_vector_average",
         "dual_sub_effective_sub_slot_count": 1,
         "dual_sub_per_sub_optimization": False,
         "dual_sub_topology_label": "dual-sub vector-average reference",
+        "sub_array_phase_rms_deg_30_100": _phase_rms_deg(freqs, spec1, spec2_aligned, lo_hz=30.0, hi_hz=100.0),
+        "sub_combined_level_delta_db_20_120": _band_level_delta_db(
+            freqs,
+            combined_spec,
+            raw_average_spec,
+            lo_hz=20.0,
+            hi_hz=120.0,
+        ),
+        "sub_combined_level_delta_db_30_90": _band_level_delta_db(
+            freqs,
+            combined_spec,
+            raw_average_spec,
+            lo_hz=30.0,
+            hi_hz=90.0,
+        ),
+        "predicted_sub_array_gain_db_30_100": _band_level_delta_db(
+            freqs,
+            combined_spec,
+            raw_average_spec,
+            lo_hz=30.0,
+            hi_hz=100.0,
+        ),
     }
     return _build_transfer_like(sub1, combined_spec, label=label), diagnostics
 
@@ -280,6 +453,7 @@ def build_bundle_combined_sub_transfer(
         min_confidence=float(min_confidence),
         label=label or ("R combined sub" if ch == "r" else "L combined sub"),
     )
+    diagnostics = _preserve_precombined_dual_sub_diagnostics(bundle, diagnostics)
     result = (combined, diagnostics)
     if len(_csub_cache) >= 64:
         _csub_cache.clear()

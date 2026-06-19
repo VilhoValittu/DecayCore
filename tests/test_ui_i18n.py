@@ -111,3 +111,19 @@ def test_measurement_translation_keys_exist_for_linux_virtual_sub_support():
     for lang in ("en", "fi"):
         missing = required.difference(TRANSLATIONS[lang])
         assert not missing
+
+
+def test_bass_integration_dsp_settings_translation_keys_exist():
+    required = {
+        "results_section_bass_dsp_settings",
+        "bass_integration_dsp_settings_note",
+        "results_metric_bass_dsp_main_delay",
+        "results_metric_bass_xo_main_sub_gd_assessment",
+        "results_value_bass_xo_main_sub_gd_assessment_good",
+        "results_value_bass_xo_main_sub_gd_assessment_average",
+        "results_value_bass_xo_main_sub_gd_assessment_elevated",
+        "results_value_bass_xo_main_sub_gd_assessment_reposition",
+    }
+    for lang in ("en", "fi"):
+        missing = required.difference(TRANSLATIONS[lang])
+        assert not missing

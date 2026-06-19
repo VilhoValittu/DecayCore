@@ -105,7 +105,7 @@ def _finalize_cached_result(
     best_metrics = dict(cached_state.get("best_metrics", {}) or {})
     improved_count_total = int(cached_state.get("improved_count_total", 0) or 0)
     winner_phase_label = _cache_refine_winner_phase_label(seed_source)
-    if not bool(getattr(runtime, "cache_winner_polish_enabled", False)):
+    if not bool(getattr(runtime, "cache_winner_polish_enabled", True)):
         skipped_polish_meta = {
             "enabled": False,
             "applicable": False,

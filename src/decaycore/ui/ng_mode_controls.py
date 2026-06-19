@@ -23,7 +23,10 @@ from typing import Callable
 
 from . import ng_controls as ctrl
 from .decaycore_utils import scale_taps_with_fs
-from ..config.decaycore_pipeline import filter_type_supports_xo_phase_model
+from ..config.decaycore_pipeline import (
+    filter_type_supports_xo_phase_model,
+    multi_rate_target_rates,
+)
 from ..ui_i18n import (
     LVL_MODE_AUTO,
     LVL_MODE_MANUAL,
@@ -34,8 +37,6 @@ from ..ui_i18n import (
 )
 
 logger = logging.getLogger("DecayCore")
-
-_MULTI_RATE_RATES = [44100, 48000, 88200, 96000, 176400, 192000]
 
 
 # ---------------------------------------------------------------------------
@@ -284,6 +285,7 @@ def update_engine_metrics_ui(*, t: Callable) -> None:
 def update_taps_auto_info(*, t: Callable) -> None:
     """Render multi-rate taps info into both NiceGUI scope containers."""
     multi_rate = bool(ctrl.value("multi_rate_opt", False))
+    include_ultra_high = bool(ctrl.value("multi_rate_ultra_high_opt", False))
 
     try:
         base_taps = int(float(ctrl.value("taps", 65536) or 65536))
@@ -305,6 +307,7 @@ def update_taps_auto_info(*, t: Callable) -> None:
     markdown = _build_taps_auto_info_markdown(
         multi_rate=multi_rate,
         base_taps=base_taps,
+        include_ultra_high=include_ultra_high,
         t=t,
     )
 
@@ -351,20 +354,29 @@ def update_taps_auto_info(*, t: Callable) -> None:
 
 
 def _build_taps_auto_info_markdown(
-    *, multi_rate: bool, base_taps: int, t: Callable
+    *, multi_rate: bool, base_taps: int, include_ultra_high: bool, t: Callable
 ) -> str:
     """Build the multi-rate taps help text shown in Files and Basic tabs."""
     if not multi_rate:
         return f"_{t('auto_taps_title')}: OFF_"
 
+    rates = multi_rate_target_rates(include_ultra_high=include_ultra_high)
     lines = [
         f"- **{rate / 1000:.1f} kHz** -> **{scale_taps_with_fs(rate, base_taps=base_taps):,}** taps"
-        for rate in _MULTI_RATE_RATES
+        for rate in rates
     ]
     return (
         f"### {t('auto_taps_title')}\n"
         f"{t('auto_taps_body')}\n\n"
         f"**Reference:** 44.1 kHz -> {base_taps:,} taps\n\n" + "\n".join(lines)
+    )
+
+
+def update_multi_rate_ui() -> None:
+    """Show the ultra-high-rate toggle only when multi-rate export is enabled."""
+    ctrl.set_visibility(
+        "multi_rate_ultra_high_scope",
+        bool(ctrl.value("multi_rate_opt", False)),
     )
 
 

@@ -106,7 +106,10 @@ _AUTO_MODE_DEFAULT_CFG_TO_UI = {
 _UI_PIN_KEYS = [
     "mode", "auto_goal", "auto_target_mode", "auto_mode_workers", "fs", "taps", "filter_type", "mixed_freq", "gain", "hc_mode",
     "bass_integration_enable", "bass_integration_mode", "bass_integration_profile", "bass_integration_sub_combine_mode", "avr_crossover_hz",
-    "bass_integration_sub_delay_ms", "bass_integration_sub_polarity_invert", "bass_integration_sub_gain_trim_db",
+    "bass_integration_sub_delay_ms", "bass_integration_sub_array_delay_ms",
+    "bass_integration_sub1_delay_ms", "bass_integration_sub2_delay_ms",
+    "bass_integration_main_l_delay_ms", "bass_integration_main_r_delay_ms",
+    "bass_integration_sub_polarity_invert", "bass_integration_sub_gain_trim_db",
     "bass_integration_alignment_auto_applied", "bass_integration_alignment_reason",
     "bass_integration_allpass_auto_enable", "bass_integration_allpass_freq_hz", "bass_integration_allpass_q", "bass_integration_allpass_auto_applied",
     "sub_crossover_hz", "sub_crossover_slope", "sub_crossover_manual_override", "direct_dac_sub_lpf_hz", "sub_hpf_freq", "sub_hpf_slope",
@@ -122,7 +125,7 @@ _UI_PIN_KEYS = [
     "ir_anchor_mode", "min_causal_ms", "auto_asym_left_ratio", "auto_asym_left_max_ms",
     "lvl_mode", "reg_strength", "normalize_opt", "align_opt",
     "stereo_link", "stereo_link_strategy", "exc_prot", "exc_freq", "low_bass_cut_hz", "low_bass_cut_enable", "hpf_enable", "hpf_freq",
-    "hpf_slope", "multi_rate_opt", "ir_window", "ir_window_left", "ir_window_right", "ir_export_window_mode", "ir_window_mode",
+    "hpf_slope", "multi_rate_opt", "multi_rate_ultra_high_opt", "ir_window", "ir_window_left", "ir_window_right", "ir_export_window_mode", "ir_window_mode",
     "ir_export_window_shape", "ir_export_tukey_alpha",
     "measurement_library_dir",
     "local_path_l", "local_path_r",
@@ -165,7 +168,7 @@ _UI_PIN_KEYS = [
 ]
 
 _LIST_BOOL_KEYS = [
-    "mag_correct", "normalize_opt", "align_opt", "multi_rate_opt",
+    "mag_correct", "normalize_opt", "align_opt", "multi_rate_opt", "multi_rate_ultra_high_opt",
     "stereo_link", "exc_prot", "hpf_enable", "df_smoothing",
     "comparison_mode", "bass_first_ai", "phase_safe_2058",
     "enable_tdc", "enable_afdw", "low_bass_cut_enable", "auto_optimize_low_bass_cut", "enable_ir_pre_energy_guard",
@@ -374,6 +377,26 @@ def _normalize_bass_integration_alignment_fields(data: Dict[str, Any], is_auto_m
         data.get("bass_integration_sub_combine_mode", "average")
     )
     data["bass_integration_sub_delay_ms"] = _safe_float(data.get("bass_integration_sub_delay_ms", 0.0) or 0.0, 0.0)
+    data["bass_integration_sub_array_delay_ms"] = _safe_float(
+        data.get("bass_integration_sub_array_delay_ms", 0.0) or 0.0,
+        0.0,
+    )
+    data["bass_integration_sub1_delay_ms"] = _safe_float(
+        data.get("bass_integration_sub1_delay_ms", 0.0) or 0.0,
+        0.0,
+    )
+    data["bass_integration_sub2_delay_ms"] = _safe_float(
+        data.get("bass_integration_sub2_delay_ms", 0.0) or 0.0,
+        0.0,
+    )
+    data["bass_integration_main_l_delay_ms"] = _safe_float(
+        data.get("bass_integration_main_l_delay_ms", 0.0) or 0.0,
+        0.0,
+    )
+    data["bass_integration_main_r_delay_ms"] = _safe_float(
+        data.get("bass_integration_main_r_delay_ms", 0.0) or 0.0,
+        0.0,
+    )
     data["bass_integration_sub_polarity_invert"] = bool(data.get("bass_integration_sub_polarity_invert", False))
     data["bass_integration_sub_gain_trim_db"] = _safe_float(data.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0, 0.0)
     data["bass_integration_alignment_auto_applied"] = bool(data.get("bass_integration_alignment_auto_applied", False))

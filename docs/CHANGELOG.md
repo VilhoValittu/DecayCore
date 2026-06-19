@@ -6,6 +6,24 @@ All notable changes to **DecayCore** are documented in this file.
 
 ## DecayCore
 
+## [1.1.4]
+
+### Bass Integration v2 — phase done right
+
+The headline of this release is a rebuilt bass integration engine. Instead of chasing the flattest possible magnitude response, v2 optimizes for the best possible phase behavior through the crossover region — the part that actually determines how tight, fast, and connected the low end feels. The result is bass that locks in with the mains, with cleaner transients and a more cohesive transition between subwoofer and main speakers.
+
+### Higher-resolution exports
+
+Multi-rate export now reaches even further, adding 352.8 kHz and 384 kHz to the available export sample rates. High-resolution and DSD-adjacent workflows are now fully covered, so you can match the exact rate your playback chain expects without resampling.
+
+### More accurate, more reliable filtering
+
+Several improvements sharpen the core DSP. The −6 dB calculation is now more robust, giving more dependable crossover and bandwidth measurements. Stereo policy and filter generation have been reworked with new guard thresholds and smoothing functions, producing cleaner, more stable filters and fewer edge-case surprises across a wider range of measurements.
+
+### Better AUTO results out of the box
+
+Cache winner polish is now enabled by default. AUTO mode automatically refines its best candidate, so you get a more finished result without changing any settings — better default quality with zero extra effort.
+
 ---
 
 ## [1.1.3] - 14-6-2026

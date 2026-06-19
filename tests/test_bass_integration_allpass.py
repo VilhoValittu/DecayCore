@@ -347,6 +347,76 @@ def test_direct_dac_prepare_allpass_failure_keeps_stable_result_shape(monkeypatc
     assert "Direct-DAC allpass post-pass failed" in caplog.text
 
 
+def test_direct_dac_optuna_vectorized_seed_path_skips_legacy_seed_scans(monkeypatch) -> None:
+    pytest.importorskip("optuna")
+    from decaycore.dsp.bass_integration import _recommend_prepare_optuna as prepare_optuna
+    from decaycore.dsp.bass_integration.direct_dac import DirectDacBassIntegrationResult
+
+    bundle = _bundle()
+    seen = {"fast_seed_calls": 0}
+
+    def _fake_metrics(_bundle, _fc_hz, _profile, **_kwargs):
+        return {
+            "objective": 0.5,
+            "bass_cancellation_risk": 0.1,
+            "bass_overlap_ripple": 2.0,
+            "bass_sub_dominance": 1.0,
+            "bass_null_severity": 0.0,
+            "bass_xo_gd_rms_mismatch_ms": 1.0,
+            "bass_direct_dac_candidate_score": 0.0,
+            "bass_direct_dac_reject_reasons": [],
+            "bass_direct_dac_worst_channel": "balanced",
+        }
+
+    def _fake_fast_seed(*_args, **_kwargs):
+        seen["fast_seed_calls"] += 1
+        return DirectDacBassIntegrationResult(
+            enabled=True,
+            main_hpf_hz=95.0,
+            sub_hpf_hz=20.0,
+            sub_lpf_hz=118.75,
+            sub_overlap_hz=23.75,
+            sub_delay_ms=3.0,
+            sub_gain_db=-1.5,
+            sub_polarity_invert=False,
+            phase_error_deg=0.0,
+            gd_mismatch_ms=0.0,
+            cancellation_risk="low",
+            cancellation_score=0.0,
+            magnitude_ripple_db=0.0,
+            score=0.0,
+            rejected=False,
+            reject_reason="",
+        )
+
+    def _raise_legacy(*_args, **_kwargs):
+        raise AssertionError("legacy seed scan should not run")
+
+    monkeypatch.setattr(bass_integration, "compute_final_bass_integration_metrics", _fake_metrics)
+    monkeypatch.setattr(bass_integration, "_main_guard_band_drop_db", lambda _main, _fc_hz: 0.0)
+    monkeypatch.setattr(prepare_optuna, "run_direct_dac_bass_integration", _fake_fast_seed)
+    monkeypatch.setattr(prepare_optuna, "recommend_direct_dac_alignment", _raise_legacy)
+    monkeypatch.setattr(prepare_optuna, "recommend_direct_dac_crossover", _raise_legacy)
+
+    result = recommend_direct_dac_prepare_optuna(
+        bundle,
+        profile="safe",
+        main_hpf_order=4,
+        sub_lpf_order=4,
+        sub_hpf_hz=20.0,
+        sub_hpf_order=2,
+        trials=1,
+        startup_trials=1,
+        local_trials=1,
+    )
+
+    assert seen["fast_seed_calls"] == 2
+    assert result["backend"] == "optuna"
+    assert "applied" in result
+    assert "recommended_hz" in result
+    assert "candidate_score" in result
+
+
 def test_direct_dac_optuna_seed_failure_logs_and_preserves_result_shape(monkeypatch, caplog) -> None:
     pytest.importorskip("optuna")
     from decaycore.dsp.bass_integration import _recommend_prepare_optuna as prepare_optuna
@@ -371,6 +441,7 @@ def test_direct_dac_optuna_seed_failure_logs_and_preserves_result_shape(monkeypa
 
     monkeypatch.setattr(bass_integration, "compute_final_bass_integration_metrics", _fake_metrics)
     monkeypatch.setattr(bass_integration, "_main_guard_band_drop_db", lambda _main, _fc_hz: 0.0)
+    monkeypatch.setattr(prepare_optuna, "_direct_dac_fast_seed_candidates", _raise_alignment)
     monkeypatch.setattr(prepare_optuna, "recommend_direct_dac_alignment", _raise_alignment)
     monkeypatch.setattr(
         prepare_optuna,
@@ -396,6 +467,7 @@ def test_direct_dac_optuna_seed_failure_logs_and_preserves_result_shape(monkeypa
     assert "recommended_hz" in result
     assert "candidate_score" in result
     assert result["reject_reasons"] == []
+    assert "Direct-DAC Optuna vectorized seed build failed" in caplog.text
     assert "Direct-DAC Optuna alignment seed failed" in caplog.text
 
 
