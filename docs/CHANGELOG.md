@@ -6,7 +6,7 @@ All notable changes to **DecayCore** are documented in this file.
 
 ## DecayCore
 
-## [1.1.4]
+## [1.1.4] - 19-6-2026
 
 ### Bass Integration v2 — phase done right
 
@@ -23,6 +23,24 @@ Several improvements sharpen the core DSP. The −6 dB calculation is now more r
 ### Better AUTO results out of the box
 
 Cache winner polish is now enabled by default. AUTO mode automatically refines its best candidate, so you get a more finished result without changing any settings — better default quality with zero extra effort.
+
+---
+
+### Bass Integration v2 — vaiheenkorjaus pääosassa
+
+Tämän julkaisun terävintä kärkeä on uudelleenrakennettu Bass Integration-moottori. Sen sijaan, että v2 tavoittelisi mahdollisimman tasaista vastetta, se optimoi parhaan mahdollisen vaihekäyttäytymisen jakotaajuusalueella — juuri sen osan, joka ratkaisee, miten tiukalta, nopealta ja yhtenäiseltä matalat taajuudet tuntuvat. Lopputuloksena basso lukittuu pääkaiuttimiin, transientit ovat puhtaampia ja siirtymä subwooferin ja pääkaiuttimien välillä on puhtaampi.
+
+### Korkeamman resoluution vientiformaatit
+
+Monitaajuusvienti yltää nyt entistä korkeammille taajuuksille : valittaviin näytteenottotaajuuksiin on lisätty 352,8 kHz ja 384 kHz. Tapsien määrä on kova. Korkearesoluutioiset ja DSD formaatit ovat nyt täysin edustettuina, joten dsp:si voi valita juuri sen taajuuden valmiista paketista, jota toistoketjusi odottaa, ilman tarvetta uudelleen näytteistämiselle.
+
+### Tarkempi ja luotettavampi suodatus
+
+Useat parannukset terävöittävät DSP-moottoria. −6 dB:n laskenta on nyt vakaampi, mikä antaa luotettavammat tulokset jakotaajuuksien laskentaan. Stereo-policy ja suodattimien generointi on uudistettu uusilla suojakynnyksillä ja pehmennysfunktioilla, mikä tuottaa puhtaampia ja vakaampia suodattimia sekä vakaamman lopputuloksen erillaisilla mittausdatoilla.
+
+### Parempia AUTO-tuloksia suoraan oletuksena
+
+Välimuistin voittajan viimeistely on nyt oletuksena käytössä. AUTO-tila hienosäätää automaattisesti parhaan ehdokkaansa, joten saat viimeistellymmän tuloksen muuttamatta mitään asetuksia — parempi oletuslaatu ilman ylimääräistä vaivaa. Toimii myös toisella ajolla, kun cache-ajo on käytössä.
 
 ---
 
