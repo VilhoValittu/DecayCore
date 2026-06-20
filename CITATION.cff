@@ -4,5 +4,5 @@ message: "If you use DecayCore in research or publications, please cite it."
 authors:
   - family-names: Valittu
     given-names: Vilho
-version: 1.1.4
+version: 1.1.5
 url: "https://github.com/VilhoValittu/DecayCore"

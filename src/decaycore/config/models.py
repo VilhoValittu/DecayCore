@@ -450,7 +450,7 @@ class FilterConfig:
     hybrid_iir_max_q: float = 12.0
     hybrid_iir_max_cut_db: float = 6.0
     hybrid_iir_min_confidence: float = 0.30
-    hybrid_iir_min_gd_excess_ms: float = 15.0
+    hybrid_iir_min_gd_excess_ms: float = 10.0
     hybrid_iir_min_cut_priority: float = 0.0
 
     comparison_mode: bool = True

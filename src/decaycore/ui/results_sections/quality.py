@@ -404,6 +404,19 @@ def _fmt_biquad(b: dict | None) -> str:
     return f"{freq:.1f} Hz, Q {q:.2f}, {gain:+.2f} dB (conf {conf:.2f})"
 
 
+def _fmt_external_iir_hpf(st: dict) -> str:
+    if not bool(st.get("external_iir_hpf_enabled", False)):
+        return "-"
+    try:
+        freq_hz = float(st.get("external_iir_hpf_freq_hz", 0.0) or 0.0)
+        slope = int(st.get("external_iir_hpf_slope_db_oct", 0) or 0)
+    except (TypeError, ValueError, OverflowError):
+        return "-"
+    if not (math.isfinite(freq_hz) and freq_hz > 0.0 and slope > 0):
+        return "-"
+    return f"{freq_hz:.1f} Hz, {slope:d} dB/oct, CamillaDSP IIR"
+
+
 def _rejected_reasons(st: dict) -> str:
     rejected = [d for d in (st.get("hybrid_iir_rejected") or []) if isinstance(d, dict)]
     reasons = sorted({str(d.get("reason", "unknown")) for d in rejected[:6]})
@@ -414,7 +427,9 @@ def _render_hybrid_iir_cuts(*, l_st_f: dict, r_st_f: dict) -> None:
     """Render collapsible Hybrid FIR-IIR modal cuts section."""
     l_enabled = bool(l_st_f.get("hybrid_iir_enabled", False))
     r_enabled = bool(r_st_f.get("hybrid_iir_enabled", False))
-    if not l_enabled and not r_enabled:
+    l_hpf_enabled = bool(l_st_f.get("external_iir_hpf_enabled", False))
+    r_hpf_enabled = bool(r_st_f.get("external_iir_hpf_enabled", False))
+    if not l_enabled and not r_enabled and not l_hpf_enabled and not r_hpf_enabled:
         return
 
     l_biquads = [dict(b) for b in (l_st_f.get("hybrid_iir_biquads") or []) if isinstance(b, dict)]
@@ -427,6 +442,7 @@ def _render_hybrid_iir_cuts(*, l_st_f: dict, r_st_f: dict) -> None:
     r_gd_src = str(r_st_f.get("hybrid_iir_gd_source", "stats") or "stats")
 
     rows: list[dict] = [
+        metric_row(t("results_metric_external_iir_hpf"), _fmt_external_iir_hpf(l_st_f), _fmt_external_iir_hpf(r_st_f)),
         metric_row(t("results_metric_hybrid_iir_active_cuts"), str(l_count), str(r_count)),
         metric_row(t("results_metric_hybrid_iir_detected_events"), str(l_events), str(r_events)),
     ]
@@ -456,7 +472,7 @@ def _render_hybrid_iir_cuts(*, l_st_f: dict, r_st_f: dict) -> None:
 
 
 __all__ = ['_render_ir_alignment', '_render_dsp_quality', '_render_lr_difference',
-           '_render_hybrid_iir_cuts', '_fmt_biquad', '_rejected_reasons']
+           '_render_hybrid_iir_cuts', '_fmt_biquad', '_fmt_external_iir_hpf', '_rejected_reasons']
 
 
 def _link_sibling_exports() -> None:

@@ -18,7 +18,7 @@ import scipy.optimize
 
 from .modal_analysis import RoomModeEvent
 
-HYBRID_IIR_POLICY_VERSION = 3
+HYBRID_IIR_POLICY_VERSION = 5
 
 
 @dataclass(frozen=True)
@@ -32,7 +32,7 @@ class HybridIIRPolicy:
     max_q: float = 12.0
     max_cut_db: float = 6.0
     min_confidence: float = 0.30
-    min_gd_excess_ms: float = 15.0
+    min_gd_excess_ms: float = 10.0
     min_cut_priority: float = 0.0
     max_voice_clarity_risk: float = 0.45
 
@@ -48,7 +48,7 @@ class HybridIIRPolicy:
             max_q=_safe_float(getattr(cfg, "hybrid_iir_max_q", 12.0), 12.0),
             max_cut_db=_safe_float(getattr(cfg, "hybrid_iir_max_cut_db", 6.0), 6.0),
             min_confidence=_safe_float(getattr(cfg, "hybrid_iir_min_confidence", 0.30), 0.30),
-            min_gd_excess_ms=_safe_float(getattr(cfg, "hybrid_iir_min_gd_excess_ms", 15.0), 15.0),
+            min_gd_excess_ms=_safe_float(getattr(cfg, "hybrid_iir_min_gd_excess_ms", 10.0), 10.0),
             min_cut_priority=_safe_float(getattr(cfg, "hybrid_iir_min_cut_priority", 0.0), 0.0),
         ).normalized()
 

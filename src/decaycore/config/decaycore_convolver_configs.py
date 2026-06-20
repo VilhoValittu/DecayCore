@@ -277,7 +277,7 @@ def _resolve_raspberry_yaml_context(
     sub_lpf = _coerce_optional_float(sub_lpf_hz)
     sub_polarity_invert = bool(sub_polarity_invert)
 
-    use_main_hpf = bool(include_sub and _is_positive_finite(main_hpf))
+    use_main_hpf = bool(_is_positive_finite(main_hpf))
     use_sub_hpf = bool(include_sub and _is_positive_finite(sub_hpf))
     use_sub_lpf = bool(include_sub and _is_positive_finite(sub_lpf))
     use_sub_allpass = bool(include_sub and _is_positive_finite(ap_freq_hz) and _is_positive_finite(ap_q))

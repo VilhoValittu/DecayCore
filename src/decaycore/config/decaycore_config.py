@@ -428,7 +428,7 @@ def _make_default_config() -> dict:
         "hybrid_iir_max_q": 12.0,
         "hybrid_iir_max_cut_db": 6.0,
         "hybrid_iir_min_confidence": 0.30,
-        "hybrid_iir_min_gd_excess_ms": 15.0,
+        "hybrid_iir_min_gd_excess_ms": 10.0,
         "auto_voice_band_hi_hz": 180.0,
         "fdw_cycles": 10.0,
         "mag_c_min": 10.0,

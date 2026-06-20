@@ -12,6 +12,7 @@ from decaycore.dsp.filter_pipeline import _run_generate_filter_pre_correction
 from decaycore.dsp import correction_baseline
 from decaycore.dsp.correction_baseline import apply_null_guard_target
 from decaycore.dsp.dsp_ops import apply_hpf_to_mags
+from decaycore.dsp.dsp_phase_ir import _apply_hpf_magnitude_to_gain
 from decaycore.dsp.dsp_preprocess import clear_preprocess_cache, run_preprocess
 from decaycore.dsp.tdc import apply_smart_tdc
 from decaycore.auto_mode.scoring_metrics import _auto_score_result
@@ -104,7 +105,7 @@ def test_hpf_blocks_positive_net_boost_below_cutoff():
     phase = np.zeros_like(freq)
     cfg = FilterConfig(
         fs=44100,
-        num_taps=8192,
+        num_taps=65536,
         filter_type_str="Minimum Phase",
         mag_c_min=10.0,
         mag_c_max=200.0,
@@ -126,6 +127,42 @@ def test_hpf_blocks_positive_net_boost_below_cutoff():
     mask = (freq_axis >= 10.0) & (freq_axis <= 40.0)
     assert np.any(mask)
     assert float(np.max(filt[mask] - hpf[mask])) <= 1e-9
+
+
+def test_low_tap_hpf_is_routed_outside_fir_gain():
+    freq_axis = np.asarray([10.0, 20.0, 40.0, 80.0], dtype=float)
+    gain_db = np.asarray([1.0, 0.5, 0.0, -0.5], dtype=float)
+    logger = SimpleNamespace(info=lambda *_args, **_kwargs: None)
+    hpf_settings = {"enabled": True, "freq": 40.0, "order": 2}
+
+    low_tap_cfg = FilterConfig(fs=44100, num_taps=4096, hpf_settings=hpf_settings)
+    low_tap_out = _apply_hpf_magnitude_to_gain(
+        cfg=low_tap_cfg,
+        freq_axis=freq_axis,
+        gain_db=gain_db,
+        apply_hpf_to_mags=apply_hpf_to_mags,
+        logger=logger,
+    )
+    np.testing.assert_allclose(low_tap_out, gain_db)
+    _imp, st = generate_filter(
+        np.linspace(10.0, 2000.0, 512, dtype=float),
+        np.zeros(512, dtype=float),
+        np.zeros(512, dtype=float),
+        low_tap_cfg,
+    )
+    assert st["external_iir_hpf_enabled"] is True
+    assert st["external_iir_hpf_freq_hz"] == pytest.approx(40.0)
+    assert st["external_iir_hpf_slope_db_oct"] == 12
+
+    high_tap_cfg = FilterConfig(fs=44100, num_taps=65536, hpf_settings=hpf_settings)
+    high_tap_out = _apply_hpf_magnitude_to_gain(
+        cfg=high_tap_cfg,
+        freq_axis=freq_axis,
+        gain_db=gain_db,
+        apply_hpf_to_mags=apply_hpf_to_mags,
+        logger=logger,
+    )
+    assert not np.allclose(high_tap_out, gain_db)
 
 
 def test_pre_correction_reraises_optuna_trial_pruned(monkeypatch, caplog):

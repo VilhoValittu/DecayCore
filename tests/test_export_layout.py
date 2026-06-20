@@ -129,6 +129,48 @@ def test_build_export_zip_writes_hybrid_iir_before_conv():
         assert "type: Peaking" in yaml_text
         assert "names: [mastergain, l_hybrid_iir_1, ir_left]" in yaml_text
         assert "names: [mastergain, r_hybrid_iir_1, ir_right]" in yaml_text
+        iir_name = "IIR_Asymmetric_48000Hz_auto.txt"
+        assert iir_name in zf.namelist()
+        iir_text = zf.read(iir_name).decode("utf-8")
+        assert "Hybrid FIR-IIR modal cuts" in iir_text
+        assert "l_hybrid_iir_1: Peaking, freq=41.500 Hz" in iir_text
+        assert "r_hybrid_iir_1: Peaking, freq=83.000 Hz" in iir_text
+
+
+def test_build_export_zip_writes_low_tap_main_hpf_as_iir():
+    result = _make_result()
+    data = _base_data("Mono")
+    data.update(
+        {
+            "hpf_enable": True,
+            "hpf_freq": 32.0,
+            "hpf_slope": 24,
+        }
+    )
+    zip_buffer, _, _ = build_export_zip(
+        data=data,
+        results=[result],
+        ft_short="Asymmetric",
+        file_ts="1200_290326",
+        irw_tag="auto",
+        write_dashboards=False,
+    )
+
+    with zipfile.ZipFile(zip_buffer) as zf:
+        yaml_name = next(name for name in zf.namelist() if name.endswith(".yml"))
+        yaml_text = zf.read(yaml_name).decode("utf-8")
+        assert "channels: 2" in yaml_text
+        assert "main_hpf:" in yaml_text
+        assert "freq: 32.000" in yaml_text
+        assert "type: LinkwitzRileyHighpass" in yaml_text
+        assert "names: [mastergain, main_hpf, ir_left]" in yaml_text
+        assert "names: [mastergain, main_hpf, ir_right]" in yaml_text
+        iir_name = "IIR_Asymmetric_48000Hz_auto.txt"
+        assert iir_name in zf.namelist()
+        iir_text = zf.read(iir_name).decode("utf-8")
+        assert "main_hpf: BiquadCombo LinkwitzRileyHighpass" in iir_text
+        assert "freq=32.000 Hz" in iir_text
+        assert "slope=24 dB/oct" in iir_text
 
 
 def test_build_export_zip_writes_single_stereo_wav_when_requested():

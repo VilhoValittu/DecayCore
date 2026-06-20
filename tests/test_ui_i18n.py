@@ -96,6 +96,7 @@ def test_hybrid_iir_translation_keys_exist():
         "adv_summary_boost_gamma",
         "adv_summary_bass_boost_floor",
         "adv_summary_bass_restore",
+        "results_metric_external_iir_hpf",
     }
     for lang in ("en", "fi"):
         missing = required.difference(TRANSLATIONS[lang])

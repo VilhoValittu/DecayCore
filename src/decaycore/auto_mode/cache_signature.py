@@ -72,6 +72,7 @@ from .shared import (
     logger,
 )
 from ..dsp.hybrid_iir import HYBRID_IIR_POLICY_VERSION
+from ..dsp.hpf_policy import HPF_IIR_TAP_THRESHOLD, hpf_settings_should_use_iir
 
 def _auto_cache_resolve_path(*, compat_version: str | None = None) -> str:
     if compat_version is None:
@@ -101,6 +102,7 @@ _AUTO_BASS_INTEGRATION_FEASIBILITY_POLICY_V = 1
 _AUTO_PHASE_GD_GUARD_POLICY_V = 4
 _AUTO_MEASUREMENT_METADATA_IDENTITY_V = 1
 _AUTO_HYBRID_IIR_POLICY_V = HYBRID_IIR_POLICY_VERSION
+_AUTO_HPF_IIR_ROUTING_POLICY_V = 1
 
 
 def _auto_signature(
@@ -269,6 +271,12 @@ def _auto_signature_payload(
             "phase_gd_guard_policy_v": int(_AUTO_PHASE_GD_GUARD_POLICY_V),
             "measurement_metadata_identity_v": int(_AUTO_MEASUREMENT_METADATA_IDENTITY_V),
             "hybrid_iir_policy_v": int(_AUTO_HYBRID_IIR_POLICY_V),
+            "hpf_iir_routing_policy_v": int(_AUTO_HPF_IIR_ROUTING_POLICY_V),
+        },
+        "hpf_iir_routing": {
+            "policy_v": int(_AUTO_HPF_IIR_ROUTING_POLICY_V),
+            "tap_threshold": int(HPF_IIR_TAP_THRESHOLD),
+            "enabled_for_this_run": bool(hpf_settings_should_use_iir(hpf, taps_v)),
         },
         "hybrid_iir": {
             "policy_v": int(_AUTO_HYBRID_IIR_POLICY_V),
@@ -284,7 +292,7 @@ def _auto_signature_payload(
             "max_cut_db": float(_auto_safe_float(base_data.get("hybrid_iir_max_cut_db", 6.0), 6.0)),
             "min_confidence": float(_auto_safe_float(base_data.get("hybrid_iir_min_confidence", 0.30), 0.30)),
             "min_gd_excess_ms": float(
-                _auto_safe_float(base_data.get("hybrid_iir_min_gd_excess_ms", 15.0), 15.0)
+                _auto_safe_float(base_data.get("hybrid_iir_min_gd_excess_ms", 10.0), 10.0)
             ),
             "min_cut_priority": float(
                 _auto_safe_float(base_data.get("hybrid_iir_min_cut_priority", 0.0), 0.0)

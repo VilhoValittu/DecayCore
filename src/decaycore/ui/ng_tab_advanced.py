@@ -447,7 +447,7 @@ def build_advanced_tab(
                             ui.number(
                                 label=t("hybrid_iir_min_gd_excess_ms"),
                                 value=float(
-                                    get_val("hybrid_iir_min_gd_excess_ms", 15.0) or 15.0
+                                    get_val("hybrid_iir_min_gd_excess_ms", 10.0) or 10.0
                                 ),
                                 format="%.1f",
                             )

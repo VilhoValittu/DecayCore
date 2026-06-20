@@ -581,7 +581,7 @@ def build_filter_config(
         hybrid_iir_max_q=float(max(0.2, _cfg_as_float_allow_zero(data.get("hybrid_iir_max_q", None), 12.0))),
         hybrid_iir_max_cut_db=float(max(0.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_max_cut_db", None), 6.0))),
         hybrid_iir_min_confidence=float(max(0.0, min(1.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_min_confidence", None), 0.30)))),
-        hybrid_iir_min_gd_excess_ms=float(max(0.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_min_gd_excess_ms", None), 15.0))),
+        hybrid_iir_min_gd_excess_ms=float(max(0.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_min_gd_excess_ms", None), 10.0))),
         hybrid_iir_min_cut_priority=float(max(0.0, min(1.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_min_cut_priority", None), 0.0)))),
         **({"stereo_auto_policy": stereo_auto_policy} if "stereo_auto_policy" in dataclass_fields else {}),
         **bass_smooth_kwargs,

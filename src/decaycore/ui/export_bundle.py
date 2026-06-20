@@ -187,7 +187,11 @@ def build_export_zip(
                 getattr(getattr(result, "sub_ir", None), "size", 0) > 0
                 for result in list(results or [])
             )
-            yaml_settings = _direct_dac_yaml_export_settings(data, include_sub=include_sub)
+            yaml_settings = _direct_dac_yaml_export_settings(
+                data,
+                include_sub=include_sub,
+                result_taps=int(getattr(results[0], "taps", 0) or 0) if results else None,
+            )
             yaml_content = generate_raspberry_yaml(
                 int(data.get("fs") or 44100),
                 ft_short,

@@ -77,6 +77,16 @@ def _hybrid_signature_payload(**overrides):
     )
 
 
+def test_hybrid_iir_default_min_gd_excess_is_10ms():
+    cfg = FilterConfig()
+    policy = HybridIIRPolicy.from_config(cfg)
+    payload = _hybrid_signature_payload(hybrid_iir_enabled=True)
+
+    assert cfg.hybrid_iir_min_gd_excess_ms == pytest.approx(10.0)
+    assert policy.min_gd_excess_ms == pytest.approx(10.0)
+    assert payload["hybrid_iir"]["min_gd_excess_ms"] == pytest.approx(10.0)
+
+
 def test_hybrid_iir_selects_safe_room_mode_and_uses_safe_cut():
     freq = np.linspace(20.0, 200.0, 512)
     result = design_hybrid_iir(
@@ -257,8 +267,92 @@ def test_hybrid_iir_uses_phase_derived_gd_when_stats_gd_missing(monkeypatch):
         st={},
     )
 
-    assert seen["gd_size"] == freq.size
+    assert seen["gd_size"] == stats["hybrid_iir_modal_analysis_bin_count"]
+    assert seen["gd_size"] > freq.size
+    assert stats["hybrid_iir_modal_analysis_taps"] == 262144
+    assert stats["hybrid_iir_modal_analysis_axis_source"] == "fixed_262144"
     assert stats["hybrid_iir_gd_source"] == "phase"
+
+
+def test_hybrid_iir_modal_search_uses_fixed_dense_grid_for_low_taps():
+    fs = 48000
+    native_freq = np.fft.rfftfreq(4096, d=1.0 / fs)
+    native_freq = native_freq[(native_freq >= 20.0) & (native_freq <= 200.0)]
+    source_freq = np.geomspace(20.0, 200.0, 4096)
+    source_peak = _bump(source_freq, 52.0, 8.0, 0.035)
+    native_peak = np.interp(native_freq, source_freq, source_peak)
+    cfg = FilterConfig(
+        fs=fs,
+        num_taps=4096,
+        hybrid_iir_enabled=True,
+        hybrid_iir_min_peak_db=4.0,
+        hybrid_iir_min_gd_excess_ms=0.0,
+        hybrid_iir_min_confidence=0.5,
+    )
+
+    adjusted, stats = filter_pipeline._apply_hybrid_iir_preconditioning(
+        cfg=cfg,
+        freq_axis=native_freq,
+        gain_db=np.zeros_like(native_freq),
+        m_anal=native_peak,
+        calc_offset_db=0.0,
+        target_mags=np.zeros_like(native_freq),
+        conf_mask=np.full_like(native_freq, 0.9),
+        f_in=source_freq,
+        m_smooth_std=source_peak,
+        st={},
+    )
+
+    assert stats["hybrid_iir_modal_analysis_taps"] == 262144
+    assert stats["hybrid_iir_modal_analysis_axis_source"] == "fixed_262144"
+    assert stats["hybrid_iir_modal_analysis_bin_count"] > native_freq.size
+    assert stats["hybrid_iir_modal_event_count"] >= 1
+    assert stats["hybrid_iir_filter_count"] >= 1
+    assert stats["hybrid_iir_biquads"][0]["freq"] == pytest.approx(52.0, rel=0.08)
+    assert len(stats["hybrid_iir_mag_db"]) == native_freq.size
+    assert adjusted.shape == native_freq.shape
+
+
+def test_hybrid_iir_dense_phase_gd_allows_default_threshold_for_low_taps():
+    fs = 48000
+    native_freq = np.fft.rfftfreq(4096, d=1.0 / fs)
+    native_freq = native_freq[(native_freq >= 20.0) & (native_freq <= 200.0)]
+    source_freq = np.geomspace(20.0, 200.0, 4096)
+    source_peak = _bump(source_freq, 52.0, 8.0, 0.035)
+    gd_excess_ms = 38.0 * np.exp(-0.5 * (np.log2(source_freq / 52.0) / 0.04) ** 2)
+    phase_rad = -np.cumsum(gd_excess_ms / 1000.0 * np.gradient(2.0 * np.pi * source_freq))
+    native_peak = np.interp(native_freq, source_freq, source_peak)
+    cfg = FilterConfig(
+        fs=fs,
+        num_taps=4096,
+        hybrid_iir_enabled=True,
+        hybrid_iir_min_peak_db=4.0,
+        hybrid_iir_min_gd_excess_ms=12.0,
+        hybrid_iir_min_confidence=0.5,
+    )
+
+    adjusted, stats = filter_pipeline._apply_hybrid_iir_preconditioning(
+        cfg=cfg,
+        freq_axis=native_freq,
+        gain_db=np.zeros_like(native_freq),
+        m_anal=native_peak,
+        calc_offset_db=0.0,
+        target_mags=np.zeros_like(native_freq),
+        conf_mask=np.full_like(native_freq, 0.9),
+        f_in=source_freq,
+        m_smooth_std=source_peak,
+        p_smooth=np.rad2deg(phase_rad),
+        st={},
+    )
+
+    assert stats["hybrid_iir_gd_source"] == "preprocessed_phase"
+    assert stats["hybrid_iir_modal_gd_source"] == "preprocessed_phase"
+    assert stats["hybrid_iir_min_gd_excess_ms_effective"] == pytest.approx(12.0)
+    assert stats["hybrid_iir_filter_count"] >= 1
+    assert stats["hybrid_iir_biquads"][0]["freq"] == pytest.approx(52.0, rel=0.08)
+    assert stats["hybrid_iir_biquads"][0]["gain"] < 0.0
+    assert len(stats["hybrid_iir_mag_db"]) == native_freq.size
+    assert adjusted.shape == native_freq.shape
 
 
 def test_hybrid_iir_real_detector_selects_synthetic_modal_peak():

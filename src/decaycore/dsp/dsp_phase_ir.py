@@ -13,6 +13,7 @@ from __future__ import annotations
 import numpy as np
 
 from .dsp_telemetry import apply_residual_telemetry
+from .hpf_policy import HPF_IIR_TAP_THRESHOLD, filter_config_should_use_iir_hpf
 from .phase_ir_autogain import compute_auto_gain_and_headroom
 from .phase_ir_build import build_phase_and_ir
 from .phase_ir_contracts import (
@@ -70,6 +71,18 @@ def _apply_hpf_magnitude_to_gain(*, cfg, freq_axis: np.ndarray, gain_db: np.ndar
     hpf_order = int(hs.get("order", 0) or 0)
     if not (hpf_f > 0 and hpf_order > 0):
         return gain_db
+    if filter_config_should_use_iir_hpf(cfg):
+        try:
+            logger.info(
+                "HPF routed to external IIR: "
+                f"fc={hpf_f:.1f} Hz, "
+                f"order={hpf_order} "
+                f"({hpf_order * 6:.0f} dB/oct), "
+                f"taps={int(getattr(cfg, 'num_taps', 0) or 0)} < {int(HPF_IIR_TAP_THRESHOLD)}"
+            )
+        except (AttributeError, TypeError, ValueError):
+            pass
+        return np.asarray(gain_db, dtype=float)
     hpf_db = apply_hpf_to_mags(freq_axis, np.zeros_like(freq_axis), hpf_f, hpf_order)
     out = np.asarray(gain_db, dtype=float) + np.asarray(hpf_db, dtype=float)
     hpf_guard_mask = np.isfinite(freq_axis) & (freq_axis <= float(hpf_f)) & (out > hpf_db)

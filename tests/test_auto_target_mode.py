@@ -2705,6 +2705,9 @@ def test_auto_signature_payload_exposes_policy_versions_and_metadata_identity():
     assert payload["measurement_metadata_identity"] == _auto_measurement_metadata_identity(measurements)
     assert payload["signature_policy_versions"]["gain_authority_policy_v"] >= 1
     assert payload["signature_policy_versions"]["lf_rolloff_policy_v"] >= 1
+    assert payload["signature_policy_versions"]["hpf_iir_routing_policy_v"] >= 1
+    assert payload["hpf_iir_routing"]["tap_threshold"] == 65536
+    assert payload["hpf_iir_routing"]["enabled_for_this_run"] is False
     assert payload["gain_authority_policy"]["unsafe_raw_dsp"] is False
     assert payload["gain_authority_policy"]["max_boost_db"] == 3.0
     assert payload["confidence_model"]["policy_v"] >= 2
@@ -2713,9 +2716,10 @@ def test_auto_signature_payload_exposes_policy_versions_and_metadata_identity():
     assert payload["confidence_model"]["conf_pull_gamma_boost"] == 1.35
     assert payload["confidence_model"]["conf_pull_bass_boost_floor_min"] == 0.55
     assert payload["confidence_model"]["conf_pull_bass_boost_restore"] == 0.70
-    assert payload["hybrid_iir"]["policy_v"] >= 3
+    assert payload["hybrid_iir"]["policy_v"] >= 5
     assert payload["hybrid_iir"]["max_freq_hz"] == 200.0
     assert payload["hybrid_iir"]["min_confidence"] == 0.30
+    assert payload["hybrid_iir"]["min_gd_excess_ms"] == 10.0
     assert payload["hybrid_iir"]["min_cut_priority"] == 0.0
     assert payload["residual_peak_scorer"]["scorer_v"] >= 2
     assert payload["bass_integration_feasibility"]["policy_v"] >= 1

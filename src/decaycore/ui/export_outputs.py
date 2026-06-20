@@ -25,9 +25,11 @@ from .export_summary_text import (
 )
 from ..app_paths import program_version_token
 from ..common.result_postprocess import _irwin_tag
+from ..config.decaycore_pipeline import build_xos_hpf
 from ..config.decaycore_convolver_configs import generate_hlc_config, generate_raspberry_yaml
 from ..config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from ..config.results import FilterResult
+from ..dsp.hpf_policy import hpf_settings_should_use_iir
 from ..auto_mode.rank_score import attach_official_rank_score, official_rank_score
 from ..ui_i18n import layout_legacy_name
 
@@ -278,17 +280,47 @@ def _apply_direct_dac_sub_allpass_settings(settings: dict[str, Any], data: dict 
         settings["sub_allpass_q"] = float(q)
 
 
-def _direct_dac_yaml_export_settings(data: dict | None, *, include_sub: bool) -> dict[str, Any]:
-    settings = _direct_dac_default_settings()
-    if not bool(include_sub):
-        return settings
+def _effective_main_hpf_iir_export_settings(data: dict | None, *, result_taps: int | None = None) -> tuple[float, int] | None:
+    try:
+        _xos, hpf = build_xos_hpf(dict(data or {}))
+    except _RECOVERABLE_JSON_SAFE_EXCEPTIONS:
+        return None
+    taps = result_taps
+    if taps is None:
+        try:
+            taps = int((data or {}).get("taps", 0) or 0)
+        except _RECOVERABLE_JSON_SAFE_EXCEPTIONS:
+            taps = 0
+    if not hpf_settings_should_use_iir(hpf, taps):
+        return None
+    try:
+        freq_hz = float((hpf or {}).get("freq", 0.0) or 0.0)
+        order = int((hpf or {}).get("order", 0) or 0)
+    except _RECOVERABLE_JSON_SAFE_EXCEPTIONS:
+        return None
+    if not (math.isfinite(freq_hz) and freq_hz > 0.0 and order > 0):
+        return None
+    return float(freq_hz), int(order)
 
-    settings["include_sub"] = True
-    settings["sub_delay_ms"] = float(_safe_export_float(data, "bass_integration_sub_delay_ms", 0.0))
-    settings["sub_polarity_invert"] = bool((data or {}).get("bass_integration_sub_polarity_invert", False))
-    settings["sub_gain_trim_db"] = float(_safe_export_float(data, "bass_integration_sub_gain_trim_db", 0.0))
-    _apply_direct_dac_sub_xo_settings(settings, data)
-    _apply_direct_dac_sub_allpass_settings(settings, data)
+
+def _direct_dac_yaml_export_settings(
+    data: dict | None,
+    *,
+    include_sub: bool,
+    result_taps: int | None = None,
+) -> dict[str, Any]:
+    settings = _direct_dac_default_settings()
+    if bool(include_sub):
+        settings["include_sub"] = True
+        settings["sub_delay_ms"] = float(_safe_export_float(data, "bass_integration_sub_delay_ms", 0.0))
+        settings["sub_polarity_invert"] = bool((data or {}).get("bass_integration_sub_polarity_invert", False))
+        settings["sub_gain_trim_db"] = float(_safe_export_float(data, "bass_integration_sub_gain_trim_db", 0.0))
+        _apply_direct_dac_sub_xo_settings(settings, data)
+        _apply_direct_dac_sub_allpass_settings(settings, data)
+    main_iir_hpf = _effective_main_hpf_iir_export_settings(data, result_taps=result_taps)
+    if main_iir_hpf is not None and settings.get("main_hpf_hz") is None:
+        settings["main_hpf_hz"] = float(main_iir_hpf[0])
+        settings["main_hpf_order"] = int(main_iir_hpf[1])
     return settings
 
 
@@ -299,6 +331,116 @@ def _hybrid_iir_biquads_from_result(result: Any, side: str) -> list[dict]:
     except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
         st = {}
     return [dict(item) for item in list(st.get("hybrid_iir_biquads", []) or []) if isinstance(item, dict)]
+
+
+def _camilladsp_hpf_type_label(order: int) -> str:
+    return "Biquad Highpass" if int(order) <= 2 else "BiquadCombo LinkwitzRileyHighpass"
+
+
+def _camilladsp_lpf_type_label(order: int) -> str:
+    return "Biquad Lowpass" if int(order) <= 2 else "BiquadCombo LinkwitzRileyLowpass"
+
+
+def _iir_report_biquad_lines(name_prefix: str, biquads: list[dict]) -> list[str]:
+    lines: list[str] = []
+    for idx, biquad in enumerate(biquads, start=1):
+        try:
+            freq = float(biquad.get("freq", 0.0) or 0.0)
+            q = float(biquad.get("q", 0.0) or 0.0)
+            gain = float(biquad.get("gain", 0.0) or 0.0)
+            confidence = float(biquad.get("confidence", 0.0) or 0.0)
+            safe_cut = float(biquad.get("safe_cut_db", 0.0) or 0.0)
+        except _RECOVERABLE_JSON_SAFE_EXCEPTIONS:
+            continue
+        lines.append(
+            f"{name_prefix}_hybrid_iir_{idx}: Peaking, "
+            f"freq={freq:.3f} Hz, q={q:.6f}, gain={gain:.3f} dB, "
+            f"confidence={confidence:.3f}, safe_cut={safe_cut:.3f} dB"
+        )
+    return lines
+
+
+def _build_iir_report_text(
+    *,
+    data: dict | None,
+    result: FilterResult | None,
+    yaml_settings: dict[str, Any],
+    fs_v: int,
+    ft_short: str,
+    irw_tag: str,
+) -> str | None:
+    left_iir = _hybrid_iir_biquads_from_result(result, "left")
+    right_iir = _hybrid_iir_biquads_from_result(result, "right")
+    lines: list[str] = [
+        "DecayCore IIR filters",
+        f"Filter: {ft_short}",
+        f"Sample rate: {int(fs_v)} Hz",
+        f"IR window tag: {irw_tag}",
+        "",
+        "CamillaDSP filter order: mastergain -> external IIR -> FIR convolver",
+        "",
+    ]
+    has_iir = False
+    main_hpf = yaml_settings.get("main_hpf_hz")
+    main_order = int(yaml_settings.get("main_hpf_order", 2) or 2)
+    try:
+        main_hpf_f = float(main_hpf)
+    except _RECOVERABLE_JSON_SAFE_EXCEPTIONS:
+        main_hpf_f = 0.0
+    if math.isfinite(main_hpf_f) and main_hpf_f > 0.0:
+        has_iir = True
+        lines.append(
+            f"main_hpf: {_camilladsp_hpf_type_label(main_order)}, "
+            f"freq={main_hpf_f:.3f} Hz, order={main_order:d}, slope={main_order * 6:d} dB/oct"
+        )
+    if bool(yaml_settings.get("include_sub", False)):
+        sub_hpf = yaml_settings.get("sub_hpf_hz")
+        sub_lpf = yaml_settings.get("sub_lpf_hz")
+        sub_hpf_order = int(yaml_settings.get("sub_hpf_order", 2) or 2)
+        sub_lpf_order = int(yaml_settings.get("sub_lpf_order", 2) or 2)
+        try:
+            sub_hpf_f = float(sub_hpf)
+        except _RECOVERABLE_JSON_SAFE_EXCEPTIONS:
+            sub_hpf_f = 0.0
+        try:
+            sub_lpf_f = float(sub_lpf)
+        except _RECOVERABLE_JSON_SAFE_EXCEPTIONS:
+            sub_lpf_f = 0.0
+        if math.isfinite(sub_hpf_f) and sub_hpf_f > 0.0:
+            has_iir = True
+            lines.append(
+                f"sub_hpf: {_camilladsp_hpf_type_label(sub_hpf_order)}, "
+                f"freq={sub_hpf_f:.3f} Hz, order={sub_hpf_order:d}, slope={sub_hpf_order * 6:d} dB/oct"
+            )
+        if math.isfinite(sub_lpf_f) and sub_lpf_f > 0.0:
+            has_iir = True
+            lines.append(
+                f"sub_lpf: {_camilladsp_lpf_type_label(sub_lpf_order)}, "
+                f"freq={sub_lpf_f:.3f} Hz, order={sub_lpf_order:d}, slope={sub_lpf_order * 6:d} dB/oct"
+            )
+    if left_iir or right_iir:
+        if lines[-1] != "":
+            lines.append("")
+        lines.append("Hybrid FIR-IIR modal cuts")
+        left_lines = _iir_report_biquad_lines("l", left_iir)
+        right_lines = _iir_report_biquad_lines("r", right_iir)
+        lines.extend(left_lines or ["l_hybrid_iir: none"])
+        lines.extend(right_lines or ["r_hybrid_iir: none"])
+        has_iir = True
+    if not has_iir:
+        return None
+    try:
+        taps = int(getattr(result, "taps", 0) or (data or {}).get("taps", 0) or 0)
+    except _RECOVERABLE_JSON_SAFE_EXCEPTIONS:
+        taps = 0
+    if taps > 0:
+        lines.append("")
+        lines.append(f"FIR taps: {taps:d}")
+    return "\n".join(lines).strip() + "\n"
+
+
+def _iir_report_name(*, ft_short: str, fs_v: int, irw_tag: str) -> str:
+    return f"IIR_{ft_short}_{int(fs_v)}Hz_{irw_tag}.txt"
 
 
 def _build_summary_text(
@@ -438,12 +580,24 @@ def _write_fs_outputs(
     )
     zf.writestr(f"Config_{ft_short}_{fs_v}Hz_{irw_tag}.cfg", hlc_cfg)
 
+    sub_ir = getattr(result, "sub_ir", None) if result is not None else None
+    yaml_settings = _direct_dac_yaml_export_settings(
+        data,
+        include_sub=bool(sub_ir is not None and getattr(sub_ir, "size", 0) > 0),
+        result_taps=int(getattr(result, "taps", 0) or 0) if result is not None else None,
+    )
+    iir_report = _build_iir_report_text(
+        data=data,
+        result=result,
+        yaml_settings=yaml_settings,
+        fs_v=int(fs_v),
+        ft_short=ft_short,
+        irw_tag=irw_tag,
+    )
+    if iir_report:
+        zf.writestr(_iir_report_name(ft_short=ft_short, fs_v=int(fs_v), irw_tag=irw_tag), iir_report)
+
     if not bool(data.get("multi_rate_opt", False)):
-        sub_ir = getattr(result, "sub_ir", None) if result is not None else None
-        yaml_settings = _direct_dac_yaml_export_settings(
-            data,
-            include_sub=bool(sub_ir is not None and getattr(sub_ir, "size", 0) > 0),
-        )
         yaml_content = generate_raspberry_yaml(
             fs_v,
             ft_short,

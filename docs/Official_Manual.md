@@ -464,7 +464,7 @@ When hybrid IIR produces biquads, they are included in the exported CamillaDSP Y
 | `max_q` | `12.0` | Maximum allowed biquad Q |
 | `max_cut_db` | `6.0 dB` | Maximum cut depth per biquad |
 | `min_confidence` | `0.65` | Minimum confidence required at the mode frequency |
-| `min_gd_excess_ms` | `15.0 ms` | Minimum group delay excess required |
+| `min_gd_excess_ms` | `10.0 ms` | Minimum group delay excess required |
 | `min_cut_priority` | `0.0` | Minimum cut priority score to place a filter |
 | `max_voice_clarity_risk` | `0.45` | Limits cuts that could reduce voice clarity |
 

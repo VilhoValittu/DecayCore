@@ -30,12 +30,16 @@ from .dsp_ops import (
 from .dsp_phase_ir import run_phase_ir_stage
 from .dsp_preprocess import run_preprocess
 from .dsp_utils import cfg_float_allow_zero as _cfg_float_allow_zero
-from .hybrid_iir import HybridIIRPolicy, design_hybrid_iir
+from .hpf_policy import HPF_IIR_TAP_THRESHOLD, filter_config_should_use_iir_hpf
+from .hybrid_iir import HybridIIRPolicy, design_hybrid_iir, peaking_eq_response
 from .modal_analysis import detect_room_modes
+from .phase import remove_time_of_flight
 from .phase_ir_autogain import compute_auto_gain_and_headroom
 from .phase_ir_residual import apply_residual_pass_if_enabled
 
 logger = logging.getLogger("DecayCore.dsp")
+
+HYBRID_IIR_MODAL_ANALYSIS_TAPS = 262144
 
 
 def _array_from_stats(st: dict, *keys: str) -> np.ndarray:
@@ -49,6 +53,109 @@ def _array_from_stats(st: dict, *keys: str) -> np.ndarray:
     return np.asarray([], dtype=float)
 
 
+def _external_iir_hpf_stats(cfg: FilterConfig) -> dict:
+    hs = getattr(cfg, "hpf_settings", None)
+    if not filter_config_should_use_iir_hpf(cfg) or not isinstance(hs, dict):
+        return {}
+    try:
+        freq_hz = float(hs.get("freq", 0.0) or 0.0)
+        order = int(hs.get("order", 0) or 0)
+        taps = int(getattr(cfg, "num_taps", 0) or 0)
+    except (TypeError, ValueError, OverflowError):
+        return {}
+    if not (np.isfinite(freq_hz) and freq_hz > 0.0 and order > 0 and taps > 0):
+        return {}
+    return {
+        "external_iir_hpf_enabled": True,
+        "external_iir_hpf_freq_hz": float(freq_hz),
+        "external_iir_hpf_order": int(order),
+        "external_iir_hpf_slope_db_oct": int(order * 6),
+        "external_iir_hpf_tap_threshold": int(HPF_IIR_TAP_THRESHOLD),
+        "external_iir_hpf_num_taps": int(taps),
+        "external_iir_hpf_target": "camilladsp_main_hpf",
+    }
+
+
+def _interp_to_axis(src_freq: np.ndarray, src_values: np.ndarray, dst_freq: np.ndarray) -> np.ndarray:
+    try:
+        src_f = np.asarray(src_freq, dtype=float).reshape(-1)
+        src_v = np.asarray(src_values, dtype=float).reshape(-1)
+        dst_f = np.asarray(dst_freq, dtype=float).reshape(-1)
+    except (TypeError, ValueError):
+        return np.zeros_like(np.asarray(dst_freq, dtype=float), dtype=float)
+    if src_f.size < 2 or src_v.size != src_f.size or dst_f.size == 0:
+        return np.zeros_like(dst_f, dtype=float)
+    valid = np.isfinite(src_f) & np.isfinite(src_v)
+    if int(np.count_nonzero(valid)) < 2:
+        return np.zeros_like(dst_f, dtype=float)
+    src_f = src_f[valid]
+    src_v = src_v[valid]
+    order = np.argsort(src_f, kind="mergesort")
+    src_f = src_f[order]
+    src_v = src_v[order]
+    uniq = np.concatenate(([True], np.diff(src_f) > 0.0))
+    src_f = src_f[uniq]
+    src_v = src_v[uniq]
+    if src_f.size < 2:
+        return np.zeros_like(dst_f, dtype=float)
+    return np.interp(dst_f, src_f, src_v, left=float(src_v[0]), right=float(src_v[-1]))
+
+
+def _hybrid_iir_modal_analysis_axis(cfg: FilterConfig, policy: HybridIIRPolicy, native_freq: np.ndarray) -> tuple[np.ndarray, str]:
+    try:
+        fs = float(getattr(cfg, "fs", 0) or 0)
+    except (TypeError, ValueError):
+        fs = 0.0
+    if np.isfinite(fs) and fs > 0.0:
+        dense = np.fft.rfftfreq(int(HYBRID_IIR_MODAL_ANALYSIS_TAPS), d=1.0 / fs)
+        band = (
+            np.isfinite(dense)
+            & (dense >= float(policy.min_freq_hz))
+            & (dense <= float(policy.max_freq_hz))
+            & (dense > 0.0)
+        )
+        dense = np.asarray(dense[band], dtype=float)
+        if dense.size >= 8:
+            return dense, "fixed_262144"
+    return np.asarray(native_freq, dtype=float).reshape(-1), "native_fallback"
+
+
+def _hybrid_iir_native_result(result, native_freq: np.ndarray, fs: float):
+    freq = np.asarray(native_freq, dtype=float).reshape(-1)
+    response = np.ones(freq.size, dtype=complex)
+    for biquad in result.biquads:
+        response *= peaking_eq_response(freq, float(fs), biquad.freq_hz, biquad.q, biquad.gain_db)
+    mag_db = 20.0 * np.log10(np.maximum(np.abs(response), 1e-12))
+    phase_rad = np.unwrap(np.angle(response)) if response.size else np.asarray([], dtype=float)
+    return replace(
+        result,
+        response=response,
+        mag_db=np.nan_to_num(mag_db, nan=0.0, posinf=0.0, neginf=0.0),
+        phase_rad=np.nan_to_num(phase_rad, nan=0.0, posinf=0.0, neginf=0.0),
+    )
+
+
+def _hybrid_iir_dense_gd_from_phase(
+    *,
+    modal_freq: np.ndarray,
+    phase_source_freq: np.ndarray | None,
+    phase_source_deg: np.ndarray | None,
+) -> np.ndarray:
+    try:
+        src_f = np.asarray(phase_source_freq, dtype=float).reshape(-1)
+        src_phase = np.asarray(phase_source_deg, dtype=float).reshape(-1)
+    except (TypeError, ValueError):
+        return np.asarray([], dtype=float)
+    if src_f.size < 8 or src_phase.size != src_f.size:
+        return np.asarray([], dtype=float)
+    phase_rad = np.deg2rad(_interp_to_axis(src_f, src_phase, modal_freq))
+    try:
+        phase_rad, _delay_slope = remove_time_of_flight(np.asarray(modal_freq, dtype=float), phase_rad)
+    except (TypeError, ValueError, FloatingPointError):
+        pass
+    return _group_delay_excess_from_phase(modal_freq, phase_rad)
+
+
 def _apply_hybrid_iir_preconditioning(
     *,
     cfg: FilterConfig,
@@ -59,6 +166,9 @@ def _apply_hybrid_iir_preconditioning(
     target_mags: np.ndarray,
     conf_mask: np.ndarray,
     phase_rad: np.ndarray | None = None,
+    f_in: np.ndarray | None = None,
+    m_smooth_std: np.ndarray | None = None,
+    p_smooth: np.ndarray | None = None,
     st: dict,
 ) -> tuple[np.ndarray, dict]:
     policy = HybridIIRPolicy.from_config(cfg)
@@ -72,29 +182,55 @@ def _apply_hybrid_iir_preconditioning(
     if gd.size != np.asarray(freq_axis).size:
         gd = _group_delay_excess_from_phase(freq_axis, phase_rad)
         gd_source = "phase"
-    has_gd = bool(gd.size == np.asarray(freq_axis).size)
-    if not has_gd:
-        policy = replace(policy, min_gd_excess_ms=0.0)
-        gd_source = "unavailable"
+    has_native_gd = bool(gd.size == np.asarray(freq_axis).size)
     try:
+        native_freq = np.asarray(freq_axis, dtype=float)
+        modal_freq, modal_axis_source = _hybrid_iir_modal_analysis_axis(cfg, policy, native_freq)
+        modal_measured_src_f = np.asarray(f_in, dtype=float).reshape(-1) if f_in is not None else np.asarray([], dtype=float)
+        modal_measured_src_m = (
+            np.asarray(m_smooth_std, dtype=float).reshape(-1) if m_smooth_std is not None else np.asarray([], dtype=float)
+        )
+        if modal_measured_src_f.size >= 2 and modal_measured_src_m.size == modal_measured_src_f.size:
+            measured_dense = _interp_to_axis(modal_measured_src_f, modal_measured_src_m, modal_freq) - float(calc_offset_db)
+            measured_source = "preprocessed_measurement"
+        else:
+            measured_dense = _interp_to_axis(native_freq, np.asarray(m_anal, dtype=float), modal_freq) - float(calc_offset_db)
+            measured_source = "native_analysis"
+        target_dense = _interp_to_axis(native_freq, np.asarray(target_mags, dtype=float), modal_freq)
+        conf_dense = np.clip(_interp_to_axis(native_freq, np.asarray(conf_mask, dtype=float), modal_freq), 0.0, 1.0)
+        gd_dense_phase = _hybrid_iir_dense_gd_from_phase(
+            modal_freq=modal_freq,
+            phase_source_freq=f_in,
+            phase_source_deg=p_smooth,
+        )
+        if gd_dense_phase.size == modal_freq.size:
+            gd_dense = gd_dense_phase
+            gd_source = "preprocessed_phase"
+        elif has_native_gd:
+            gd_dense = _interp_to_axis(native_freq, gd, modal_freq)
+        else:
+            policy = replace(policy, min_gd_excess_ms=0.0)
+            gd_source = "unavailable"
+            gd_dense = None
         modal = detect_room_modes(
-            freq_axis,
-            np.asarray(m_anal, dtype=float) - float(calc_offset_db),
-            target_mag_db=target_mags,
+            modal_freq,
+            measured_dense,
+            target_mag_db=target_dense,
             corrected_mag_db=None,
-            group_delay_ms=gd if has_gd else None,
-            confidence_mask=conf_mask,
+            group_delay_ms=gd_dense,
+            confidence_mask=conf_dense,
             lo_hz=float(policy.min_freq_hz),
             hi_hz=float(policy.max_freq_hz),
             min_peak_db=float(policy.min_peak_db),
         )
         result = design_hybrid_iir(
             modal.events,
-            np.asarray(freq_axis, dtype=float),
+            modal_freq,
             int(getattr(cfg, "fs", 0) or 0),
             policy,
-            measured_mag_db=np.asarray(m_anal, dtype=float) - float(calc_offset_db),
+            measured_mag_db=measured_dense,
         )
+        result = _hybrid_iir_native_result(result, native_freq, float(getattr(cfg, "fs", 0) or 0))
     except (
 
         AttributeError,
@@ -119,6 +255,11 @@ def _apply_hybrid_iir_preconditioning(
     stats["hybrid_iir_modal_event_count"] = int(getattr(modal, "mode_count", 0) or 0)
     stats["hybrid_iir_gd_source"] = str(gd_source)
     stats["hybrid_iir_min_gd_excess_ms_effective"] = float(policy.min_gd_excess_ms)
+    stats["hybrid_iir_modal_analysis_taps"] = int(HYBRID_IIR_MODAL_ANALYSIS_TAPS)
+    stats["hybrid_iir_modal_analysis_axis_source"] = str(modal_axis_source)
+    stats["hybrid_iir_modal_analysis_bin_count"] = int(np.asarray(modal_freq).size)
+    stats["hybrid_iir_modal_measured_source"] = str(measured_source)
+    stats["hybrid_iir_modal_gd_source"] = str(gd_source)
     if result.biquads and result.mag_db.size == np.asarray(gain_db).size:
         iir_mag = np.asarray(result.mag_db, dtype=float)
         adjusted_gain = np.asarray(gain_db, dtype=float) - iir_mag
@@ -255,6 +396,9 @@ def _run_generate_filter_pre_correction(
         "st": st,
         "reflections": reflections,
         "target_mags": corr.target_mags,
+        "f_in": f_in,
+        "m_smooth_std": prep.m_smooth_std,
+        "p_smooth": prep.p_smooth,
         "m_anal": m_anal,
         "conf_mask": conf_mask,
         "cmp": corr.cmp,
@@ -325,7 +469,7 @@ def _run_generate_filter_stereo_link_presolve(
         freq_axis = np.asarray(state["freq_axis"], dtype=float)
         gain_db = np.asarray(state["gain_db"], dtype=float).copy()
         hs = getattr(cfg, "hpf_settings", None)
-        if isinstance(hs, dict) and hs.get("enabled"):
+        if isinstance(hs, dict) and hs.get("enabled") and not filter_config_should_use_iir_hpf(cfg):
             hpf_f = float(hs.get("freq", 0.0) or 0.0)
             hpf_order = int(hs.get("order", 0) or 0)
             if hpf_f > 0 and hpf_order > 0:
@@ -405,6 +549,8 @@ def _run_generate_filter_pipeline(
     calc_offset_db = state["calc_offset_db"]
     target_mags = state["target_mags"]
     st = state["st"]
+    if isinstance(st, dict):
+        st.update(_external_iir_hpf_stats(cfg))
     mask_c = state["mask_c"]
     base_sigma = state["base_sigma"]
     _filter_smooth = state["filter_smooth"]
@@ -423,6 +569,9 @@ def _run_generate_filter_pipeline(
         target_mags=np.asarray(target_mags, dtype=float),
         conf_mask=np.asarray(conf_mask, dtype=float),
         phase_rad=np.asarray(p_rad_interp, dtype=float),
+        f_in=np.asarray(state["f_in"], dtype=float),
+        m_smooth_std=np.asarray(state["m_smooth_std"], dtype=float),
+        p_smooth=np.asarray(state["p_smooth"], dtype=float),
         st=st,
     )
     if isinstance(st, dict) and hybrid_iir_stats:
