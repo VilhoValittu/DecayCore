@@ -6,6 +6,18 @@ All notable changes to **DecayCore** are documented in this file.
 
 ## DecayCore
 
+## [1.1.6] - 21-6-2026
+
+### Rust replaces Numba
+Rust replaces Numba from version 1.1.6 onward. This results in significantly smaller packaged builds of the application. No other functional changes.
+
+---
+
+### Rust korvasi Numban
+Rust korvasi Numban versiosta 1.1.6 eteenpäin. Tällä saatiin aikaan huomattavasti pienemmät paketoidut versiot ohjelmasta. Ei muita toiminnallisia muutoksia.
+
+---
+
 ## [1.1.5] - 20-6-2026
 
 ### Hybrid FIR-IIR modal cuts
