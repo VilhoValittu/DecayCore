@@ -11,12 +11,13 @@
 // DecayCore DSP extension — Rust/PyO3 0.22
 // Selective Rust hotpath acceleration: smoothing, phase/IR stage
 
-mod utils;
-mod smoothing;
+#![allow(clippy::useless_conversion)]
+
 mod gd_limit;
-mod slope_limit;
-mod rms;
 mod log_box;
+mod rms;
+mod slope_limit;
+mod smoothing;
 
 use pyo3::prelude::*;
 use pyo3::types::PyModule;

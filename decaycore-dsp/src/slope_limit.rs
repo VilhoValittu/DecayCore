@@ -11,6 +11,7 @@
 // Slope-per-octave limiters — mirrors dsp/limits.py::_slope_passes + _slope_passes_asym
 
 use numpy::{PyArray1, PyReadonlyArray1};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 // ---------------------------------------------------------------------------
@@ -117,6 +118,13 @@ pub fn slope_passes_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let x = x.as_slice()?;
     let mut gv = g.as_slice()?.to_vec();
+    if gv.len() != x.len() {
+        return Err(PyValueError::new_err(format!(
+            "g and x must have the same length, got {} and {}",
+            gv.len(),
+            x.len()
+        )));
+    }
     slope_passes(&mut gv, x, max_db_per_oct);
     Ok(PyArray1::from_vec_bound(py, gv))
 }
@@ -138,6 +146,13 @@ pub fn slope_passes_asym_rs<'py>(
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
     let x = x.as_slice()?;
     let mut gv = g.as_slice()?.to_vec();
+    if gv.len() != x.len() {
+        return Err(PyValueError::new_err(format!(
+            "g and x must have the same length, got {} and {}",
+            gv.len(),
+            x.len()
+        )));
+    }
     slope_passes_asym_forward(&mut gv, x, boost, cut);
     slope_passes_asym_backward(&mut gv, x, boost, cut);
     Ok(PyArray1::from_vec_bound(py, gv))

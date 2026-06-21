@@ -11,6 +11,7 @@
 // GD gradient limiter — mirrors dsp_ops.py::_gd_smooth_loop + helpers
 
 use numpy::{PyArray1, PyReadonlyArray1};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::f64;
 
@@ -50,9 +51,9 @@ fn gaussian1d_nearest(arr: &[f64], sigma: f64) -> Vec<f64> {
 
     // Build Gaussian kernel
     let mut k = vec![0.0; ksize];
-    for i in 0..ksize {
+    for (i, ki) in k.iter_mut().enumerate() {
         let x = (i as f64) - (radius as f64);
-        k[i] = (-x * x / s2).exp();
+        *ki = (-x * x / s2).exp();
     }
 
     // Normalize kernel
@@ -65,14 +66,14 @@ fn gaussian1d_nearest(arr: &[f64], sigma: f64) -> Vec<f64> {
 
     // Convolve with boundary reflection
     let mut out = vec![0.0; n];
-    for i in 0..n {
+    for (i, out_i) in out.iter_mut().enumerate() {
         let mut acc = 0.0;
-        for j in 0..ksize {
+        for (j, &kj) in k.iter().enumerate() {
             let offset = (j as i32) - (radius as i32);
             let idx = ((i as i32) + offset).max(0).min((n - 1) as i32) as usize;
-            acc += arr[idx] * k[j];
+            acc += arr[idx] * kj;
         }
-        out[i] = acc;
+        *out_i = acc;
     }
 
     out
@@ -107,7 +108,17 @@ pub fn gd_smooth_loop_rs<'py>(
     let lim_arr = lim_arr.as_slice()?;
     let curv_lim_arr = curv_lim_arr.as_slice()?;
 
-    if gd_l.is_empty() || log2f.is_empty() || lim_arr.is_empty() || curv_lim_arr.is_empty() {
+    if log2f.len() != gd_l.len() || lim_arr.len() != gd_l.len() || curv_lim_arr.len() != gd_l.len()
+    {
+        return Err(PyValueError::new_err(format!(
+            "gd_l, log2f, lim_arr and curv_lim_arr must have the same length, got {}, {}, {}, {}",
+            gd_l.len(),
+            log2f.len(),
+            lim_arr.len(),
+            curv_lim_arr.len()
+        )));
+    }
+    if gd_l.is_empty() {
         return Ok(PyArray1::from_vec_bound(py, gd_l.to_vec()));
     }
 
@@ -138,18 +149,14 @@ pub fn gd_smooth_loop_rs<'py>(
         // Find max violation ratio
         let mut max_ratio = 0.0;
         for i in 0..gd_grad.len() {
-            if lim_arr[i] > 0.0 {
-                let r = (gd_grad[i] / lim_arr[i]).abs();
-                if r > max_ratio {
-                    max_ratio = r;
-                }
+            let r = (gd_grad[i] / lim_arr[i]).abs();
+            if r > max_ratio {
+                max_ratio = r;
             }
 
-            if curv_lim_arr[i] > 0.0 {
-                let rc = (gd_curv[i] / curv_lim_arr[i]).abs();
-                if rc > max_ratio {
-                    max_ratio = rc;
-                }
+            let rc = (gd_curv[i] / curv_lim_arr[i]).abs();
+            if rc > max_ratio {
+                max_ratio = rc;
             }
         }
 

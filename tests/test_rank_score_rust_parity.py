@@ -1,4 +1,5 @@
 import importlib
+import importlib.metadata
 
 import pytest
 
@@ -140,3 +141,11 @@ def test_rank_score_dispatch_uses_installed_rust_extension():
 
     assert dispatched["rank_score"] == pytest.approx(direct_rust["rank_score"], abs=1e-9)
     assert dispatched["rank_score_raw"] == pytest.approx(direct_rust["rank_score_raw"], abs=1e-9)
+
+
+@pytest.mark.requires_rust
+def test_rank_score_extension_version_metadata_matches_distribution():
+    rust_scoring = pytest.importorskip("decaycore_scoring")
+
+    assert rust_scoring.__version__ == "0.2.0"
+    assert importlib.metadata.version("decaycore-scoring") == rust_scoring.__version__

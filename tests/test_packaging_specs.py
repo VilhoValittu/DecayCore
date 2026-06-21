@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -10,6 +11,16 @@ SPEC_NAMES = (
     "DecayCore_linux.spec",
     "DecayCore_macos.spec",
 )
+
+
+def _load_spec_common():
+    import importlib.util
+
+    spec_common_path = REPO_ROOT / "decaycore_spec_common.py"
+    module_spec = importlib.util.spec_from_file_location("decaycore_spec_common", spec_common_path)
+    spec_common = importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(spec_common)
+    return spec_common
 
 
 def _execute_spec(spec_name: str):
@@ -55,6 +66,39 @@ def _execute_spec(spec_name: str):
     exec(spec_path.read_text(encoding="utf-8"), namespace)
 
     return namespace, captured
+
+
+def test_all_repository_pyinstaller_specs_are_known_shared_specs():
+    actual = tuple(sorted(path.name for path in REPO_ROOT.glob("*.spec")))
+    assert actual == tuple(sorted(SPEC_NAMES))
+
+
+def test_all_pyinstaller_specs_import_shared_spec_config():
+    for spec_name in SPEC_NAMES:
+        spec_text = (REPO_ROOT / spec_name).read_text(encoding="utf-8")
+        assert "import decaycore_spec_common as spec_common" in spec_text
+        assert "spec_common.build_datas(" in spec_text
+        assert "spec_common.build_hiddenimports(" in spec_text
+        assert "spec_common.build_excludes()" in spec_text
+
+
+def test_all_pyinstaller_build_commands_use_shared_specs():
+    files_to_check = (
+        REPO_ROOT / "linux_package.sh",
+        REPO_ROOT / "windows_package.ps1",
+        REPO_ROOT / ".github" / "workflows" / "release-build.yml",
+    )
+    known_specs = set(SPEC_NAMES)
+    build_command_pattern = re.compile(
+        r"(?:python -m PyInstaller|\"\$PYTHON\" -m PyInstaller|pyinstaller --clean)\b[^\n]*"
+    )
+    for path in files_to_check:
+        text = path.read_text(encoding="utf-8")
+        for match in build_command_pattern.finditer(text):
+            command = match.group(0)
+            referenced_specs = set(re.findall(r"\bDecayCore_[A-Za-z0-9_]+\.spec\b", command))
+            assert referenced_specs, f"{path.name} has PyInstaller command without a spec: {command}"
+            assert referenced_specs <= known_specs, f"{path.name} uses unknown spec in: {command}"
 
 
 @pytest.mark.parametrize(
@@ -143,6 +187,92 @@ def test_packaging_specs_exclude_pywebio(spec_name: str):
     assert all(not item.startswith("pywebio") for item in hiddenimports)
 
 
+# Optional heavy subpackages that no platform build should bundle. Keeping this
+# parity check stops the Windows/macOS specs from drifting back to pulling in
+# pyarrow and unused Plotly/NiceGUI helpers (the drift this shared config fixed).
+_REQUIRED_OPTIONAL_EXCLUDES = (
+    "pyarrow",
+    "plotly.express",
+    "plotly.data",
+    "plotly.figure_factory",
+    "scipy.cluster",
+    "uvloop",
+    "watchfiles",
+    "nicegui.elements.aggrid",
+    "nicegui.elements.codemirror",
+    "webview",
+)
+
+
+@pytest.mark.parametrize("spec_name", SPEC_NAMES)
+def test_packaging_specs_share_optional_excludes(spec_name: str):
+    _, captured = _execute_spec(spec_name)
+    excludes = captured["analysis"]["kwargs"]["excludes"]
+
+    for name in _REQUIRED_OPTIONAL_EXCLUDES:
+        assert name in excludes, f"{spec_name} is missing exclude {name!r}"
+    assert "nicegui.native" not in excludes, f"{spec_name} must keep NiceGUI native fallback package"
+
+
+def test_all_specs_use_identical_excludes():
+    exclude_sets = {
+        spec_name: set(_execute_spec(spec_name)[1]["analysis"]["kwargs"]["excludes"])
+        for spec_name in SPEC_NAMES
+    }
+    reference = exclude_sets["DecayCore_linux.spec"]
+    for spec_name, excludes in exclude_sets.items():
+        assert excludes == reference, f"{spec_name} excludes diverge from linux spec"
+
+
+def test_report_prune_paths_match_optional_excludes():
+    spec_common = _load_spec_common()
+    prune_paths = spec_common.report_prune_paths()
+
+    # No duplicates, and no path nested under another already in the list.
+    assert len(prune_paths) == len(set(prune_paths))
+    for path in prune_paths:
+        assert not any(path != other and path.startswith(other + "/") for other in prune_paths)
+
+    # Every optional exclude is covered by exactly one reported parent path.
+    for name in spec_common._OPTIONAL_EXCLUDES:
+        as_path = name.replace(".", "/")
+        assert any(as_path == p or as_path.startswith(p + "/") for p in prune_paths)
+
+    for path in spec_common.NICEGUI_DATA_EXCLUDE_PREFIXES:
+        assert any(path == p or path.startswith(p + "/") for p in prune_paths)
+
+
+def test_nicegui_data_filter_drops_unused_element_assets_but_keeps_plotly():
+    spec_common = _load_spec_common()
+    datas = [
+        ("/venv/site-packages/nicegui/elements/aggrid/dist/index.js", "nicegui/elements/aggrid"),
+        ("/venv/site-packages/nicegui/elements/codemirror/dist/index.js", "nicegui/elements/codemirror"),
+        ("/venv/site-packages/nicegui/elements/plotly/dist/index.js", "nicegui/elements/plotly"),
+        ("/venv/site-packages/nicegui/static/quasar.umd.js", "nicegui/static"),
+    ]
+
+    assert spec_common.filter_nicegui_datas(datas) == [
+        ("/venv/site-packages/nicegui/elements/plotly/dist/index.js", "nicegui/elements/plotly"),
+        ("/venv/site-packages/nicegui/static/quasar.umd.js", "nicegui/static"),
+    ]
+
+
+def test_package_scripts_derive_prune_report_from_shared_config():
+    script_text = (REPO_ROOT / "linux_package.sh").read_text(encoding="utf-8")
+    workflow_text = (REPO_ROOT / ".github" / "workflows" / "release-build.yml").read_text(
+        encoding="utf-8"
+    )
+
+    # The size report must derive its prune list from the shared module rather
+    # than carrying a hand-maintained copy that can drift from the spec excludes.
+    assert "report_prune_paths()" in script_text
+    assert "for rel in \\" not in script_text
+    assert '(cd dist && 7z a -t7z -mx=9 -mmt=on -m0=lzma2 "../out/DecayCore_${VERSION}_linux.7z" "$PACK_NAME")' in script_text
+    assert "| head -n 20" not in script_text
+    assert "report_prune_paths()" in workflow_text
+    assert "for rel in \\" not in workflow_text
+
+
 def test_plotly_hook_does_not_force_pandas_or_duplicate_plotly_js():
     hook_text = (REPO_ROOT / "pyinstaller_hooks" / "hook-plotly.py").read_text(encoding="utf-8")
 
@@ -155,6 +285,8 @@ def test_nicegui_hook_filters_source_maps():
 
     assert 'collect_data_files("nicegui")' in hook_text
     assert 'endswith(".map")' in hook_text
+    assert "filter_nicegui_datas" in hook_text
+    assert '"webview"' in hook_text
 
 
 def test_release_workflow_verifies_manual_in_macos_app_bundle_layout():

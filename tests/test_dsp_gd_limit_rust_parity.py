@@ -93,6 +93,31 @@ class TestGdSmoothLoopRsParity:
         assert result_rs.shape == (0,)
         assert result_py.shape == (0,)
 
+    def test_gd_smooth_loop_rs_rejects_mismatched_lengths(self, dsp):
+        gd_l = np.array([0.0, 1.0, 2.0], dtype=np.float64)
+        log2f = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+        lim_arr = np.array([1.0], dtype=np.float64)
+        curv_lim_arr = np.array([1.0, 1.0, 1.0], dtype=np.float64)
+
+        with pytest.raises(ValueError, match="same length"):
+            dsp.gd_smooth_loop_rs(gd_l, log2f, lim_arr, curv_lim_arr, 0.8)
+
+        with pytest.raises(ValueError, match="same length"):
+            dsp.gd_smooth_loop_rs(gd_l, log2f, np.array([], dtype=np.float64), curv_lim_arr, 0.8)
+
+    def test_gd_smooth_loop_rs_zero_limit_parity(self, dsp, python_gd_smooth_loop):
+        """Zero limits must mirror Python's violation handling."""
+        gd_l = np.array([0.0, 10.0, 0.0], dtype=np.float64)
+        log2f = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+        lim_arr = np.zeros(3, dtype=np.float64)
+        curv_lim_arr = np.ones(3, dtype=np.float64)
+
+        with np.errstate(divide="ignore", invalid="ignore"):
+            result_py = python_gd_smooth_loop(gd_l.copy(), log2f, lim_arr, curv_lim_arr, 0.8)
+        result_rs = dsp.gd_smooth_loop_rs(gd_l.copy(), log2f, lim_arr, curv_lim_arr, 0.8)
+
+        np.testing.assert_allclose(result_rs, result_py, rtol=1e-9, atol=1e-9)
+
     def test_gd_smooth_loop_rs_violation(self, dsp, python_gd_smooth_loop):
         """Test with gradient violating the limit."""
         n = 100

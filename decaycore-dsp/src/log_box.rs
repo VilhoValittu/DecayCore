@@ -11,6 +11,7 @@
 // Log-space box smoothing — mirrors modal_preparation.py::_smooth_log_box_kernel
 
 use numpy::{PyArray1, PyReadonlyArray1};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 // ---------------------------------------------------------------------------
@@ -32,6 +33,13 @@ pub fn smooth_log_box_kernel_rs<'py>(
     let x = x.as_slice()?;
     let y_raw = y_raw.as_slice()?;
     let n = x.len();
+    if y_raw.len() != n {
+        return Err(PyValueError::new_err(format!(
+            "x and y_raw must have the same length, got {} and {}",
+            n,
+            y_raw.len()
+        )));
+    }
 
     // Prefix sums of finite values and their weights.
     let mut sum_y = vec![0.0; n + 1];

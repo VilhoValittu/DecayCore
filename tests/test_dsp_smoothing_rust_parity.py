@@ -95,6 +95,15 @@ class TestSmoothmMagCoreRsParity:
         result = dsp.smooth_mag_core_rs(freqs, mags, log_freqs, window, pad_len)
         assert result.shape == (0,)
 
+    def test_smooth_mag_core_rs_rejects_mismatched_freqs_and_mags(self, dsp):
+        freqs = np.array([20.0, 40.0], dtype=np.float64)
+        mags = np.array([1.0], dtype=np.float64)
+        log_freqs = np.array([20.0, 40.0], dtype=np.float64)
+        window = np.array([1.0], dtype=np.float64)
+
+        with pytest.raises(ValueError, match="freqs and mags"):
+            dsp.smooth_mag_core_rs(freqs, mags, log_freqs, window, 0)
+
     def test_smooth_mag_core_rs_very_narrow_window(self, dsp):
         """Test with single-element window (minimal smoothing)."""
         freqs = np.array([20, 100, 500, 2000, 10000], dtype=np.float64)

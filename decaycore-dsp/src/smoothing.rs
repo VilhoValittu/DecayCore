@@ -11,8 +11,8 @@
 // Smoothing core — mirrors smoothing.py::_smooth_mag_core
 
 use numpy::{PyArray1, PyReadonlyArray1};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use crate::utils::safe_f64;
 
 // ---------------------------------------------------------------------------
 // smooth_mag_core_rs: Core log-grid smoothing kernel
@@ -42,6 +42,14 @@ pub fn smooth_mag_core_rs<'py>(
     let log_freqs = log_freqs.as_slice()?;
     let window = window.as_slice()?;
 
+    if freqs.len() != mags.len() {
+        return Err(PyValueError::new_err(format!(
+            "freqs and mags must have the same length, got {} and {}",
+            freqs.len(),
+            mags.len()
+        )));
+    }
+
     if freqs.is_empty() || mags.is_empty() || log_freqs.is_empty() || window.is_empty() {
         return Ok(PyArray1::from_vec_bound(py, mags.to_vec()));
     }
@@ -59,29 +67,23 @@ pub fn smooth_mag_core_rs<'py>(
     let mut padded = vec![0.0; p];
 
     // Left edge padding
-    for i in 0..pad_len {
-        padded[i] = log_mags[0];
-    }
+    padded[..pad_len].fill(log_mags[0]);
     // Center data
-    for i in 0..n {
-        padded[pad_len + i] = log_mags[i];
-    }
+    padded[pad_len..pad_len + n].copy_from_slice(&log_mags);
     // Right edge padding
-    for i in 0..pad_len {
-        padded[pad_len + n + i] = log_mags[n - 1];
-    }
+    padded[pad_len + n..].fill(log_mags[n - 1]);
 
     // Step 3: Convolve padded with window (same-mode style)
     // output[ii] = sum_k padded[half_w + pad_len + ii - k] * window[k]
     let half_w = (w.saturating_sub(1)) / 2;
     let mut sm = vec![0.0; n];
-    for ii in 0..n {
+    for (ii, sm_i) in sm.iter_mut().enumerate() {
         let mut acc = 0.0;
         let base = half_w + pad_len + ii;
-        for k in 0..w {
-            acc += padded.get(base.saturating_sub(k)).copied().unwrap_or(0.0) * window[k];
+        for (k, &wk) in window.iter().enumerate() {
+            acc += padded.get(base.saturating_sub(k)).copied().unwrap_or(0.0) * wk;
         }
-        sm[ii] = acc;
+        *sm_i = acc;
     }
 
     // Step 4: Interpolate smoothed values back to original frequency grid

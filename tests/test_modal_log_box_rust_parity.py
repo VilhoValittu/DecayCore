@@ -64,6 +64,13 @@ class TestSmoothLogBoxKernelRsParity:
         result_py = py_kernel(x, y, 0.2)
         np.testing.assert_allclose(result_rs, result_py, rtol=1e-9, atol=1e-9)
 
+    def test_rejects_mismatched_lengths(self, dsp):
+        x = np.array([0.0, 1.0], dtype=np.float64)
+        y = np.array([1.0], dtype=np.float64)
+
+        with pytest.raises(ValueError, match="same length"):
+            dsp.smooth_log_box_kernel_rs(x, y, 0.1)
+
     def test_nonuniform_axis(self, dsp, py_kernel):
         # Irregularly spaced (still sorted) log axis to exercise the binary search.
         rng = np.random.default_rng(3)

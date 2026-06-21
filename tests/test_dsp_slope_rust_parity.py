@@ -66,6 +66,16 @@ class TestSlopePassesRsParity:
         result_py = py_slope_passes(g.copy(), x, 3.0)
         np.testing.assert_allclose(result_rs, result_py, rtol=1e-9, atol=1e-9)
 
+    def test_slope_passes_rejects_mismatched_lengths(self, dsp):
+        g = np.array([0.0], dtype=np.float64)
+        x = np.array([0.0, 1.0], dtype=np.float64)
+
+        with pytest.raises(ValueError, match="same length"):
+            dsp.slope_passes_rs(g, x, 6.0)
+
+        with pytest.raises(ValueError, match="same length"):
+            dsp.slope_passes_asym_rs(g, x, 6.0, 12.0)
+
     @pytest.mark.parametrize("boost,cut", [(6.0, 12.0), (3.0, 0.0), (0.0, 8.0), (4.0, 4.0)])
     def test_slope_passes_asym_parity(self, dsp, py_slope_passes_asym, boost, cut):
         rng = np.random.default_rng(123)
