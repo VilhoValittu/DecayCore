@@ -21,7 +21,7 @@ pytestmark = pytest.mark.requires_rust
 
 
 class TestGdSmoothLoopRsParity:
-    """Verify Rust gd_smooth_loop_rs matches Python _gd_smooth_loop_numba."""
+    """Verify Rust gd_smooth_loop_rs matches Python _gd_smooth_loop_py."""
 
     @pytest.fixture
     def dsp(self):
@@ -33,9 +33,9 @@ class TestGdSmoothLoopRsParity:
 
     @pytest.fixture
     def python_gd_smooth_loop(self):
-        """Import Python numba reference implementation."""
-        from src.decaycore.dsp.dsp_ops import _gd_smooth_loop_numba
-        return _gd_smooth_loop_numba
+        """Import pure-Python reference implementation."""
+        from src.decaycore.dsp.dsp_ops import _gd_smooth_loop_py
+        return _gd_smooth_loop_py
 
     def _make_log_freq_axis(self, f_min, f_max, n):
         """Create log-spaced frequency axis."""

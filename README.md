@@ -82,7 +82,12 @@ The main source environment currently documented by `requirements.txt` uses thes
 - `nicegui==3.13.0`
 - `plotly==6.8.0`
 - `optuna==4.9.0`
-- `numba==0.65.1`
+
+> `numba` was removed in v1.1.6. The DSP and scoring hot paths it used are now
+> provided by two optional Rust extensions (`decaycore-dsp`, `decaycore-scoring`),
+> prebuilt in the packaged releases. When running from source they are optional
+> (a pure-Python fallback exists) but strongly recommended; building them needs a
+> Rust toolchain. See the [Installation guide](https://vilhovalittu.github.io/DecayCore/installation/) for steps.
 
 ## License
 

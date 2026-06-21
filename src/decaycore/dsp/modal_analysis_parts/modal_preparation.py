@@ -13,8 +13,14 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-import numba
 import numpy as np
+
+# Try to import Rust DSP extension
+try:
+    from decaycore_dsp import smooth_log_box_kernel_rs as _smooth_log_box_kernel_rs
+    _DSP_RUST_AVAILABLE = True
+except ImportError:
+    _DSP_RUST_AVAILABLE = False
 
 
 
@@ -116,7 +122,6 @@ def _as_float_array(value) -> np.ndarray:
     ):
         return np.asarray([], dtype=float)
 
-@numba.njit(cache=True)
 def _smooth_log_box_kernel(x: np.ndarray, y_raw: np.ndarray, half: float) -> np.ndarray:
     n = x.size
     sum_y = np.empty(n + 1)
@@ -167,6 +172,12 @@ def _smooth_log_box(freq_hz: np.ndarray, values: np.ndarray, width_oct: float) -
     x = np.ascontiguousarray(log_f[order], dtype=float)
     y_raw = np.ascontiguousarray(v[order], dtype=float)
     out = np.empty_like(v, dtype=float)
+    if _DSP_RUST_AVAILABLE:
+        try:
+            out[order] = _smooth_log_box_kernel_rs(x, y_raw, float(half))
+            return out
+        except Exception:
+            pass
     out[order] = _smooth_log_box_kernel(x, y_raw, half)
     return out
 

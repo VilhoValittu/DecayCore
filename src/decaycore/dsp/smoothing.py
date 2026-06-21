@@ -10,7 +10,6 @@
 
 import hashlib
 import numpy as np
-import numba
 import logging
 
 from decaycore.auto_mode.auto_mode_profile import profiled_section
@@ -287,7 +286,6 @@ def _log_afdw_bw_once(f: np.ndarray, t: np.ndarray) -> None:
 # Internal smoothing helpers
 # ---------------------------------------------------------------------------
 
-@numba.njit(cache=True)
 def _smooth_mag_core(
     freqs: np.ndarray,
     mags: np.ndarray,
@@ -296,7 +294,7 @@ def _smooth_mag_core(
     pad_len: int,
 ) -> np.ndarray:
     # Fused interp → edge-pad → convolve ('same') → interp back.
-    # Eliminates intermediate allocations and is compiled to native code.
+    # Pure-Python fallback for the Rust smooth_mag_core_rs hot path.
     log_mags = np.interp(log_freqs, freqs, mags)
     n = log_mags.size
     w = window.size
@@ -324,6 +322,35 @@ def _smooth_mag_core(
     return np.interp(freqs, log_freqs, sm)
 
 
+def _smooth_mag_core_dispatch(freqs_arr: np.ndarray, vals_arr: np.ndarray, plan) -> np.ndarray:
+    """Dispatch the core smoothing kernel to Rust if available, else pure Python.
+
+    `freqs_arr`/`vals_arr` must already be contiguous float64; `plan` is the
+    smoothing plan from `_get_smoothing_plan`.
+    """
+    if _DSP_RUST_AVAILABLE:
+        try:
+            return _smooth_mag_core_rs(
+                freqs_arr,
+                vals_arr,
+                plan["log_freqs"],
+                plan["window"],
+                plan["pad_len"],
+            )
+        except Exception:
+            # Fallback to pure-Python version on any error
+            pass
+
+    # Pure-Python fallback
+    return _smooth_mag_core(
+        freqs_arr,
+        vals_arr,
+        plan["log_freqs"],
+        plan["window"],
+        plan["pad_len"],
+    )
+
+
 def _apply_smoothing_mag_only(freqs: np.ndarray, mags: np.ndarray, octave_fraction: float) -> np.ndarray:
     """Magnitude-only smoothing path; no phase work."""
     if octave_fraction <= 0:
@@ -333,29 +360,7 @@ def _apply_smoothing_mag_only(freqs: np.ndarray, mags: np.ndarray, octave_fracti
         raise ValueError("frequency axis must be strictly monotonically increasing")
     plan = _get_smoothing_plan(freqs_arr, octave_fraction)
     mags_arr = np.asarray(mags, dtype=np.float64)
-
-    # Try Rust implementation if available
-    if _DSP_RUST_AVAILABLE:
-        try:
-            return _smooth_mag_core_rs(
-                freqs_arr,
-                mags_arr,
-                plan["log_freqs"],
-                plan["window"],
-                plan["pad_len"],
-            )
-        except Exception:
-            # Fallback to Python/numba version on any error
-            pass
-
-    # Python/numba fallback
-    return _smooth_mag_core(
-        freqs_arr,
-        mags_arr,
-        plan["log_freqs"],
-        plan["window"],
-        plan["pad_len"],
-    )
+    return _smooth_mag_core_dispatch(freqs_arr, mags_arr, plan)
 
 
 def apply_smoothing_std(freqs, mags, phases, octave_fraction=1.0):
@@ -368,18 +373,6 @@ def apply_smoothing_std(freqs, mags, phases, octave_fraction=1.0):
         raise ValueError("frequency axis must be strictly monotonically increasing")
     phase_unwrap = np.unwrap(np.deg2rad(phases))
     plan = _get_smoothing_plan(freqs, float(octave_fraction))
-    sm_mags = _smooth_mag_core(
-        freqs,
-        mags,
-        plan["log_freqs"],
-        plan["window"],
-        plan["pad_len"],
-    )
-    sm_phases = _smooth_mag_core(
-        freqs,
-        phase_unwrap,
-        plan["log_freqs"],
-        plan["window"],
-        plan["pad_len"],
-    )
+    sm_mags = _smooth_mag_core_dispatch(freqs, mags, plan)
+    sm_phases = _smooth_mag_core_dispatch(freqs, phase_unwrap, plan)
     return sm_mags, np.rad2deg(sm_phases)

@@ -124,18 +124,16 @@ def _meas_fixed_cache_key(
     raw_phases,
     n_fft: int,
     fs: float,
-    presolve_mode: bool,
-    cfg,
 ) -> tuple | None:
+    # Keys only the presolve_mode-independent core (FFT axis, smoothing,
+    # confidence, reflections). The presolve_mode/comparison/plot-dependent
+    # extras (m_plot_db, cmp) are layered on top per call, so they are not
+    # part of this key — this lets the presolve pass and the real pipeline
+    # pass share the heavy core for the same measurement arrays.
     try:
         n = len(freqs)
         if n < 2:
             return None
-        # Include comparison mode params so the cached cmp block matches.
-        comparison_mode = bool(getattr(cfg, "comparison_mode", False))
-        ref_fs = int(getattr(cfg, "comparison_ref_fs", 44100) or 44100) if comparison_mode else 0
-        ref_taps = int(getattr(cfg, "comparison_ref_taps", 65536) or 65536) if comparison_mode else 0
-        plot_smooth = str(getattr(cfg, "plot_smoothing_level", "") or "")
         return (
             id(freqs),
             id(meas_mags),
@@ -145,11 +143,6 @@ def _meas_fixed_cache_key(
             n,
             round(float(freqs[0]), 4),
             round(float(freqs[-1]), 4),
-            bool(presolve_mode),
-            comparison_mode,
-            ref_fs,
-            ref_taps,
-            plot_smooth,
         )
     except (TypeError, ValueError, IndexError, OverflowError):
         return None
@@ -256,28 +249,28 @@ def _run_preprocess_cached_result(
     return cache_key, clone_preprocess_result(cached)
 
 
-def _meas_fixed_unpack(entry: dict) -> dict:
+def _meas_fixed_unpack(core: dict, extras: dict) -> dict:
     return {
-        "f_in": entry["f_in"],
-        "m_in": entry["m_in"],
-        "p_in": entry["p_in"],
-        "freq_axis": entry["freq_axis"],
-        "m_smooth_std": entry["m_smooth_std"],
-        "p_smooth": entry["p_smooth"],
-        "m_interp": entry["m_interp"],
-        "p_rad_raw": entry["p_rad_raw"],
-        "p_rad_interp": entry["p_rad_interp"],
-        "delay_slope": entry["delay_slope"],
-        "m_plot_db": entry["m_plot_db"],
-        "complex_meas": entry["complex_meas"],
-        "m_anal": np.copy(entry["m_anal_base"]),
-        "p_anal_rad": entry["p_anal_rad"],
-        "complex_anal": entry["complex_anal"],
-        "conf_mask": entry["conf_mask"],
-        "reflections": entry["reflections"],
-        "cmp": entry["cmp"],
-        "analysis_mode": entry["analysis_mode"],
-        "is_psy": entry["is_psy"],
+        "f_in": core["f_in"],
+        "m_in": core["m_in"],
+        "p_in": core["p_in"],
+        "freq_axis": core["freq_axis"],
+        "m_smooth_std": core["m_smooth_std"],
+        "p_smooth": core["p_smooth"],
+        "m_interp": core["m_interp"],
+        "p_rad_raw": core["p_rad_raw"],
+        "p_rad_interp": core["p_rad_interp"],
+        "delay_slope": core["delay_slope"],
+        "m_plot_db": extras["m_plot_db"],
+        "complex_meas": core["complex_meas"],
+        "m_anal": np.copy(core["m_anal_base"]),
+        "p_anal_rad": core["p_anal_rad"],
+        "complex_anal": core["complex_anal"],
+        "conf_mask": core["conf_mask"],
+        "reflections": core["reflections"],
+        "cmp": extras["cmp"],
+        "analysis_mode": extras["analysis_mode"],
+        "is_psy": extras["is_psy"],
     }
 
 
@@ -361,26 +354,26 @@ def _comparison_payload_valid(cmp: dict | None) -> bool:
     return all(len(cmp[k]) == n for k in keys)
 
 
-def _store_meas_fixed_entry(cache_key: tuple | None, payload: dict) -> None:
+def _store_meas_fixed_entry(cache_key: tuple | None, core: dict) -> None:
     _MEAS_FIXED_STATS["misses"] = _MEAS_FIXED_STATS.get("misses", 0) + 1
     if cache_key is None:
         return
-    _MEAS_FIXED_CACHE.put(cache_key, payload)
+    _MEAS_FIXED_CACHE.put(cache_key, core)
 
 
-def _compute_meas_fixed_payload(
+def _compute_meas_fixed_core(
     freqs,
     meas_mags,
     raw_phases,
     cfg,
     *,
     n_fft: int,
-    presolve_mode: bool,
-    stereo_link_ctx,
 ) -> dict:
+    # presolve_mode-independent heavy core: rFFT axis, magnitude/phase
+    # smoothing, interpolation, confidence/reflections. Shared between the
+    # stereo presolve pass and the real pipeline pass via _MEAS_FIXED_CACHE.
     f_in, m_in, p_in = _prepare_preprocess_inputs(freqs, meas_mags, raw_phases)
     freq_axis = np.fft.rfftfreq(n_fft, d=1.0 / float(cfg.fs))
-    is_psy = (not bool(presolve_mode)) and ("psy" in str(cfg.plot_smoothing_level).lower())
     m_smooth_std = analysis_smoothing_lf_to_hf(
         f_in, m_in, low_bw=1 / 3.0, high_bw=1 / 1.0, f_lo=230.0, f_hi=400.0
     )
@@ -389,26 +382,12 @@ def _compute_meas_fixed_payload(
     m_interp = np.interp(freq_axis, f_in, m_in)
     p_rad_raw = np.deg2rad(np.interp(freq_axis, f_in, p_in))
     p_rad_interp, delay_slope = remove_time_of_flight(freq_axis, p_rad_raw)
-    m_plot_db = None
-    if is_psy:
-        try:
-            m_plot_db = psychoacoustic_smoothing(freq_axis, m_interp)
-        except (TypeError, ValueError, FloatingPointError):
-            m_plot_db = None
     complex_meas = 10 ** (m_interp / 20.0) * np.exp(1j * p_rad_interp)
     m_anal = np.interp(freq_axis, f_in, m_smooth_std)
     p_anal_rad = np.deg2rad(np.interp(freq_axis, f_in, p_smooth))
     p_anal_rad, _ = remove_time_of_flight(freq_axis, p_anal_rad)
     complex_anal = 10 ** (m_anal / 20.0) * np.exp(1j * p_anal_rad)
     conf_mask, reflections, _ = analyze_acoustic_confidence(freq_axis, complex_anal, cfg.fs)
-    cmp, analysis_mode = _compute_comparison_payload(
-        cfg=cfg,
-        presolve_mode=bool(presolve_mode),
-        stereo_link_ctx=stereo_link_ctx,
-        freq_axis=freq_axis,
-        m_anal=m_anal,
-        p_anal_rad=p_anal_rad,
-    )
     return {
         "f_in": f_in,
         "m_in": m_in,
@@ -420,13 +399,42 @@ def _compute_meas_fixed_payload(
         "p_rad_raw": p_rad_raw,
         "p_rad_interp": p_rad_interp,
         "delay_slope": float(delay_slope),
-        "m_plot_db": m_plot_db,
         "complex_meas": complex_meas,
         "m_anal_base": m_anal,
         "p_anal_rad": p_anal_rad,
         "complex_anal": complex_anal,
         "conf_mask": conf_mask,
         "reflections": reflections,
+    }
+
+
+def _compute_meas_fixed_extras(
+    core: dict,
+    cfg,
+    *,
+    presolve_mode: bool,
+    stereo_link_ctx,
+) -> dict:
+    # presolve_mode-dependent extras layered on top of the shared core:
+    # the psychoacoustic plot curve and the comparison payload. Cheap no-ops
+    # in the common path (presolve, or non-comparison non-psy configs).
+    is_psy = (not bool(presolve_mode)) and ("psy" in str(cfg.plot_smoothing_level).lower())
+    m_plot_db = None
+    if is_psy:
+        try:
+            m_plot_db = psychoacoustic_smoothing(core["freq_axis"], core["m_interp"])
+        except (TypeError, ValueError, FloatingPointError):
+            m_plot_db = None
+    cmp, analysis_mode = _compute_comparison_payload(
+        cfg=cfg,
+        presolve_mode=bool(presolve_mode),
+        stereo_link_ctx=stereo_link_ctx,
+        freq_axis=core["freq_axis"],
+        m_anal=core["m_anal_base"],
+        p_anal_rad=core["p_anal_rad"],
+    )
+    return {
+        "m_plot_db": m_plot_db,
         "cmp": cmp,
         "analysis_mode": analysis_mode,
         "is_psy": is_psy,
@@ -443,22 +451,20 @@ def _run_preprocess_meas_fixed(
     presolve_mode: bool,
     stereo_link_ctx,
 ) -> dict:
-    mfk = _meas_fixed_cache_key(freqs, meas_mags, raw_phases, n_fft, float(cfg.fs), bool(presolve_mode), cfg)
-    cached = _MEAS_FIXED_CACHE.get(mfk) if mfk is not None else None
-    if cached is not None:
+    mfk = _meas_fixed_cache_key(freqs, meas_mags, raw_phases, n_fft, float(cfg.fs))
+    core = _MEAS_FIXED_CACHE.get(mfk) if mfk is not None else None
+    if core is not None:
         _MEAS_FIXED_STATS["hits"] = _MEAS_FIXED_STATS.get("hits", 0) + 1
-        return _meas_fixed_unpack(cached)
-    payload = _compute_meas_fixed_payload(
-        freqs,
-        meas_mags,
-        raw_phases,
+    else:
+        core = _compute_meas_fixed_core(freqs, meas_mags, raw_phases, cfg, n_fft=n_fft)
+        _store_meas_fixed_entry(mfk, core)
+    extras = _compute_meas_fixed_extras(
+        core,
         cfg,
-        n_fft=n_fft,
         presolve_mode=bool(presolve_mode),
         stereo_link_ctx=stereo_link_ctx,
     )
-    _store_meas_fixed_entry(mfk, payload)
-    return _meas_fixed_unpack(payload)
+    return _meas_fixed_unpack(core, extras)
 
 
 def _run_preprocess_apply_afdw(cfg, meas_data: dict) -> None:

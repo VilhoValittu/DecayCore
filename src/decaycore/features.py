@@ -21,4 +21,36 @@ def has_measurement_module() -> bool:
         return False
 
 
-__all__ = ["has_measurement_module"]
+# Native Rust acceleration modules. When these are missing the program still
+# runs using the pure-Python fallbacks, but noticeably slower.
+RUST_EXTENSION_MODULES = ("decaycore_scoring", "decaycore_dsp")
+
+# User-facing installation guide for the native extensions.
+RUST_INSTALL_URL = "https://vilhovalittu.github.io/DecayCore/installation/"
+
+
+def missing_rust_modules() -> list[str]:
+    """Return the names of native Rust extension modules that are not installed."""
+    missing: list[str] = []
+    for name in RUST_EXTENSION_MODULES:
+        try:
+            found = importlib.util.find_spec(name) is not None
+        except (ImportError, AttributeError, ValueError):
+            found = False
+        if not found:
+            missing.append(name)
+    return missing
+
+
+def has_rust_acceleration() -> bool:
+    """Return True only when every native Rust extension module is available."""
+    return not missing_rust_modules()
+
+
+__all__ = [
+    "has_measurement_module",
+    "has_rust_acceleration",
+    "missing_rust_modules",
+    "RUST_EXTENSION_MODULES",
+    "RUST_INSTALL_URL",
+]

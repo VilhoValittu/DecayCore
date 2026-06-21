@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 
 from ..config.decaycore_config import load_config, save_config
-from ..features import has_measurement_module
+from ..features import RUST_INSTALL_URL, has_measurement_module, missing_rust_modules
 from ..resources.i8n.decaycore_i18n import t
 from . import ui_state
 from .ng_theme import apply_theme
@@ -184,6 +184,7 @@ def register_main_page() -> None:
 
         with ui.column().classes("w-full gap-0 cf-brand-shell"):
             _build_brand_header(version=VERSION, dark_mode=dark_mode, initial_theme_dark=theme_dark)
+            _build_rust_warning_banner()
 
         with ui.column().classes("w-full gap-0 cf-tabs-shell"):
             with ui.column().classes("w-full cf-tabs-shell-inner"):
@@ -288,6 +289,32 @@ def _persist_theme_preference(*, dark: bool) -> None:
     cfg = dict(load_config() or {})
     cfg["ui_theme_dark"] = bool(dark)
     save_config(cfg)
+
+
+def _build_rust_warning_banner() -> None:
+    """Show a prominent warning when the native Rust extensions are missing.
+
+    DecayCore still runs on the pure-Python fallbacks, but noticeably slower, so
+    we point the user at the installation guide.
+    """
+    from nicegui import ui
+
+    missing = missing_rust_modules()
+    if not missing:
+        return
+
+    logger.warning("Native Rust acceleration not installed (missing: %s)", ", ".join(missing))
+
+    with ui.row().classes("w-full items-center gap-2 cf-rust-warning").style(
+        "background:#7a1f1f; color:#fff; padding:10px 16px; border-radius:8px; margin:8px 0;"
+    ):
+        ui.icon("warning").classes("text-xl")
+        with ui.column().classes("gap-0 min-w-0"):
+            ui.label(t("rust_warning_title")).classes("font-semibold")
+            ui.label(t("rust_warning_body")).classes("text-sm")
+        ui.link(t("rust_warning_link"), RUST_INSTALL_URL, new_tab=True).classes(
+            "underline font-semibold"
+        ).style("color:#fff;")
 
 
 def _build_brand_header(*, version: str, dark_mode, initial_theme_dark: bool) -> None:

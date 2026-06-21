@@ -9,10 +9,16 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 import numpy as np
-import numba
+
+# Try to import Rust DSP extension
+try:
+    from decaycore_dsp import slope_passes_rs as _slope_passes_rs
+    from decaycore_dsp import slope_passes_asym_rs as _slope_passes_asym_rs
+    _DSP_RUST_AVAILABLE = True
+except ImportError:
+    _DSP_RUST_AVAILABLE = False
 
 
-@numba.njit(cache=True)
 def _slope_passes(g, x, max_db_per_oct):
     n = x.size
     for k in range(1, n):
@@ -38,14 +44,12 @@ def _slope_passes(g, x, max_db_per_oct):
     return g
 
 
-@numba.njit(cache=True)
 def _slope_passes_asym(g, x, boost, cut):
     _slope_passes_asym_forward(g, x, boost, cut)
     _slope_passes_asym_backward(g, x, boost, cut)
     return g
 
 
-@numba.njit(cache=True)
 def _slope_passes_asym_forward(g, x, boost, cut):
     n = x.size
     for k in range(1, n):
@@ -62,7 +66,6 @@ def _slope_passes_asym_forward(g, x, boost, cut):
             g[k] = g[k - 1] - lim
 
 
-@numba.njit(cache=True)
 def _slope_passes_asym_backward(g, x, boost, cut):
     n = x.size
     for k in range(n - 2, -1, -1):
@@ -77,6 +80,30 @@ def _slope_passes_asym_backward(g, x, boost, cut):
             g[k] = g[k + 1] + lim
         elif dg < -lim:
             g[k] = g[k + 1] - lim
+
+
+def _apply_slope_passes(g, x, max_db_per_oct):
+    """Dispatch to Rust slope limiter if available, fallback to pure Python."""
+    if _DSP_RUST_AVAILABLE:
+        try:
+            g_arr = np.asarray(g, dtype=np.float64)
+            x_arr = np.asarray(x, dtype=np.float64)
+            return _slope_passes_rs(g_arr, x_arr, float(max_db_per_oct))
+        except Exception:
+            pass
+    return _slope_passes(g, x, max_db_per_oct)
+
+
+def _apply_slope_passes_asym(g, x, boost, cut):
+    """Dispatch to Rust asym slope limiter if available, fallback to pure Python."""
+    if _DSP_RUST_AVAILABLE:
+        try:
+            g_arr = np.asarray(g, dtype=np.float64)
+            x_arr = np.asarray(x, dtype=np.float64)
+            return _slope_passes_asym_rs(g_arr, x_arr, float(boost), float(cut))
+        except Exception:
+            pass
+    return _slope_passes_asym(g, x, boost, cut)
 
 
 def soft_clip_gain(gain_db, max_boost_db, max_cut_db):
@@ -141,8 +168,7 @@ def limit_slope_per_octave(freq_axis, gain_db, max_db_per_oct=12.0):
     ii = idx
     x = np.log2(f[ii])
     g_sub = g[ii].copy()
-    _slope_passes(g_sub, x, max_db_per_oct)
-    g[ii] = g_sub
+    g[ii] = _apply_slope_passes(g_sub, x, max_db_per_oct)
     return g
 
 
@@ -167,8 +193,7 @@ def limit_slope_per_octave_asym(freq_axis, gain_db, max_db_per_oct_boost, max_db
 
     lf = np.log2(f[idx])
     g_sub = g[idx].copy()
-    _slope_passes_asym(g_sub, lf, b, c)
-    g[idx] = g_sub
+    g[idx] = _apply_slope_passes_asym(g_sub, lf, b, c)
     return g
 
 

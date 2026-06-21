@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import math
 
-import numba
 import numpy as np
 import scipy.integrate
 
@@ -73,7 +72,6 @@ def apply_confidence_weighted_target_pull(
         return out, {"w_eff": w_eff, "pull_mask": None, "pull_strength": None}
 
 
-@numba.njit(cache=True)
 def _gradient1d(arr: np.ndarray, spacing: np.ndarray) -> np.ndarray:
     n = arr.size
     out = np.empty(n)
@@ -88,7 +86,6 @@ def _gradient1d(arr: np.ndarray, spacing: np.ndarray) -> np.ndarray:
     return out
 
 
-@numba.njit(cache=True)
 def _gaussian1d_nearest(arr: np.ndarray, sigma: float) -> np.ndarray:
     radius = max(1, int(4.0 * sigma + 0.5))
     n = arr.size
@@ -117,8 +114,7 @@ def _gaussian1d_nearest(arr: np.ndarray, sigma: float) -> np.ndarray:
     return out
 
 
-@numba.njit(cache=True)
-def _gd_smooth_loop_numba(
+def _gd_smooth_loop_py(
     gd_l: np.ndarray, log2f: np.ndarray, lim_arr: np.ndarray, curv_lim_arr: np.ndarray, sigma: float
 ) -> np.ndarray:
     for _ in range(14):
@@ -148,7 +144,7 @@ def _gd_smooth_loop_numba(
 def _gd_smooth_loop(
     gd_l: np.ndarray, log2f: np.ndarray, lim_arr: np.ndarray, curv_lim_arr: np.ndarray, sigma: float
 ) -> np.ndarray:
-    """Dispatch to Rust implementation if available, fallback to numba."""
+    """Dispatch to Rust implementation if available, fallback to pure Python."""
     if _DSP_RUST_AVAILABLE:
         try:
             gd_l_arr = np.asarray(gd_l, dtype=np.float64)
@@ -157,10 +153,10 @@ def _gd_smooth_loop(
             curv_lim_arr_arr = np.asarray(curv_lim_arr, dtype=np.float64)
             return _gd_smooth_loop_rs(gd_l_arr, log2f_arr, lim_arr_arr, curv_lim_arr_arr, float(sigma))
         except Exception:
-            # Fallback to numba version on any error
+            # Fallback to pure-Python version on any error
             pass
 
-    return _gd_smooth_loop_numba(gd_l, log2f, lim_arr, curv_lim_arr, sigma)
+    return _gd_smooth_loop_py(gd_l, log2f, lim_arr, curv_lim_arr, sigma)
 
 
 def _limit_gd_gradient_ms_per_oct(

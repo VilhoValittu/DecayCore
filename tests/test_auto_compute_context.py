@@ -363,7 +363,10 @@ def test_meas_fixed_cache_clear_works():
     assert len(_MEAS_FIXED_CACHE) == 0
 
 
-def test_meas_fixed_cache_presolve_mode_separate_entry():
+def test_meas_fixed_cache_presolve_mode_shares_core_entry():
+    # The presolve pass and the real pipeline pass share the heavy meas_fixed
+    # core (presolve_mode only gates the m_plot_db/cmp extras layered on top),
+    # so both modes resolve to a single cache entry for the same arrays.
     clear_meas_fixed_cache()
     clear_preprocess_cache()
     f, m, p = _make_measurement_arrays()
@@ -372,4 +375,4 @@ def test_meas_fixed_cache_presolve_mode_separate_entry():
     run_preprocess(f, m, p, cfg, presolve_mode=False)
     run_preprocess(f, m, p, cfg, presolve_mode=True)
 
-    assert len(_MEAS_FIXED_CACHE) == 2
+    assert len(_MEAS_FIXED_CACHE) == 1

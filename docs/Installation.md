@@ -26,7 +26,9 @@ All DecayCore versions released and documented in this repository are based on P
 
 Current dependency baselines from the repository requirement files are:
 
-- `requirements.txt`: `numpy==2.4.6`, `scipy==1.17.1`, `nicegui==3.13.0`, `plotly==6.8.0`, `optuna==4.9.0`, `numba==0.65.1`
+- `requirements.txt`: `numpy==2.4.6`, `scipy==1.17.1`, `nicegui==3.13.0`, `plotly==6.8.0`, `optuna==4.9.0`
+
+From v1.1.6 onwards `numba` is no longer used. The hot DSP and scoring paths it previously accelerated are now provided by two optional Rust extensions (`decaycore-dsp` and `decaycore-scoring`). They are bundled and prebuilt in the packaged releases. If you run from source, see [Optional Rust acceleration extensions](#optional-rust-acceleration-extensions) below — DecayCore still runs without them using a pure-Python fallback, but they are strongly recommended for acceptable performance.
 
 ## Run from release package
 
@@ -130,6 +132,58 @@ git pull
 
 ---
 
+### Optional Rust acceleration extensions
+
+DecayCore ships two optional Rust extensions that accelerate the DSP and scoring
+paths that previously relied on `numba`:
+
+- `decaycore-dsp` (Rust DSP extension)
+- `decaycore-scoring` (Rust scoring extension)
+
+These are **prebuilt and bundled in the packaged releases**, so release users do
+not need them. When you run from source they are **not** installed by
+`requirements.txt`. DecayCore will still start and produce correct results
+without them through a pure-Python fallback, but the fallback is significantly
+slower. Building the extensions is strongly recommended for source runs.
+
+Building them requires a Rust toolchain. Install it once with
+[rustup](https://rustup.rs/):
+
+- Linux / macOS:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+- Windows: download and run `rustup-init.exe` from https://rustup.rs/.
+
+Restart your shell (or run `. "$HOME/.cargo/env"` on Linux/macOS) so `cargo` is
+on `PATH`, then verify:
+
+```bash
+cargo --version
+```
+
+With your DecayCore virtual environment activated (see the per-platform steps
+below), build and install both extensions from the source tree. `pip` reads the
+`maturin` build backend declared by each crate and compiles them automatically:
+
+```bash
+python -m pip install ./decaycore-scoring
+python -m pip install ./decaycore-dsp
+```
+
+On Windows, run the same two commands from PowerShell after activating the
+virtual environment. The Rust toolchain on Windows also needs the MSVC build
+tools (the `rustup-init.exe` installer prompts to install them if they are
+missing).
+
+You can confirm the extensions loaded after starting DecayCore: when an
+extension is missing, a fallback warning is logged and the Python implementation
+is used instead.
+
+---
+
 ### Windows
 
 1. Install Python from https://www.python.org/downloads/windows/ and enable `Add python.exe to PATH`.
@@ -148,14 +202,21 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-5. Start DecayCore:
+5. (Recommended) Build the optional Rust extensions. This requires a Rust toolchain — see [Optional Rust acceleration extensions](#optional-rust-acceleration-extensions):
+
+```powershell
+python -m pip install ./decaycore-scoring
+python -m pip install ./decaycore-dsp
+```
+
+6. Start DecayCore:
 
 ```powershell
 $env:PYTHONPATH = "src"
 python -m decaycore
 ```
 
-6. Open `http://127.0.0.1:8080` if the browser does not open automatically.
+7. Open `http://127.0.0.1:8080` if the browser does not open automatically.
 
 If PowerShell blocks activation, run:
 
@@ -191,13 +252,20 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-5. Start DecayCore:
+5. (Recommended) Build the optional Rust extensions. This requires a Rust toolchain — see [Optional Rust acceleration extensions](#optional-rust-acceleration-extensions):
+
+```bash
+python -m pip install ./decaycore-scoring
+python -m pip install ./decaycore-dsp
+```
+
+6. Start DecayCore:
 
 ```bash
 PYTHONPATH=src python -m decaycore
 ```
 
-6. Open `http://127.0.0.1:8080` if the browser does not open automatically.
+7. Open `http://127.0.0.1:8080` if the browser does not open automatically.
 
 ---
 
@@ -231,13 +299,20 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-6. Start DecayCore:
+6. (Recommended) Build the optional Rust extensions. This requires a Rust toolchain — see [Optional Rust acceleration extensions](#optional-rust-acceleration-extensions):
+
+```bash
+python -m pip install ./decaycore-scoring
+python -m pip install ./decaycore-dsp
+```
+
+7. Start DecayCore:
 
 ```bash
 PYTHONPATH=src python -m decaycore
 ```
 
-7. Open `http://127.0.0.1:8080` if the browser does not open automatically.
+8. Open `http://127.0.0.1:8080` if the browser does not open automatically.
 
 ---
 

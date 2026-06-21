@@ -1,4 +1,13 @@
 __pycache__/
 config.json
 .venv/
-
+# Rust / PyO3 build outputs
+decaycore-scoring/target/
+decaycore-dsp/target/
+# Compiled native extension modules (built locally / in CI, never committed)
+*.pyd
+*.so
+*.dylib
+*.dll
+*.egg-info/
+*.whl
