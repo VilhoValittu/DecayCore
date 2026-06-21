@@ -1,9 +1,0 @@
-﻿{
-  "mode": "auto",
-  "left_wav": "L.wav",
-  "right_wav": "R.wav",
-  "sample_rate": 48000,
-  "house_curve": "Harman10",
-  "correction_min_hz": 20,
-  "correction_max_hz": 250
-}
