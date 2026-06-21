@@ -1,3 +1,10 @@
+from .quality_report import (
+    _calc_target_match,
+    _float_allow_zero,
+    format_band_rt60_summary,
+    format_dsp_quality_report_block,
+)
+
 # DecayCore
 # Copyright (c) 2026 Vilho Valittu.
 # All rights reserved except as expressly granted in the LICENSE file.
@@ -13,7 +20,7 @@ import logging
 
 logger = logging.getLogger("DecayCore")
 
-from ...common.acoustic_stats import _clamp, calc_acoustic_score, calc_ai_summary_from_stats
+from ...common.acoustic_stats import calc_acoustic_score
 from ...common.comparison_stats import _make_comparison_stats
 from ...dsp.target_match import target_match_from_stats as _target_match_from_stats_ssot
 from ...ui_i18n import LVL_MODE_AUTO, lvl_mode_legacy_name
@@ -35,18 +42,6 @@ from ...ui_i18n import LVL_MODE_AUTO, lvl_mode_legacy_name
 
 _calc_acoustic_score = calc_acoustic_score
 
-__all__ = [
-    'format_band_rt60_summary',
-    '_float_allow_zero',
-    '_clamp',
-    'calc_acoustic_score',
-    '_calc_acoustic_score',
-    'calc_ai_summary_from_stats',
-    '_calc_target_match',
-    'calc_target_match_from_stats',
-    'format_dsp_quality_report_block',
-    'format_summary_content',
-]
 
 def _format_summary_content_legacy(settings, l_stats, r_stats):  # noqa: C901 - legacy summary formatting preserves compatibility branches
     """Jasentaa tai muotoilee: format summary content."""
@@ -530,17 +525,3 @@ def format_summary_content(settings, l_stats, r_stats):
 
 
 __all__ = ['_format_summary_content_legacy', 'format_summary_content']
-
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['quality_report', 'legacy_summary']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

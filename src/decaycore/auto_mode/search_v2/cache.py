@@ -12,13 +12,15 @@
 
 from __future__ import annotations
 
+import logging
 from types import SimpleNamespace
+
+logger = logging.getLogger("DecayCore")
 
 AUTO_SEARCH_CACHE_SCHEMA_VERSION = 4
 
 from ..cache_signature import _auto_cache_get_entry, _auto_cache_get_last_used_best
 from ..shared import _auto_filter_cache_key
-from ..shared import logger
 from .input_model import AutoSearchInput
 
 auto_api = SimpleNamespace(

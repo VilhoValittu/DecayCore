@@ -8,13 +8,22 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-import importlib as _importlib
+from .target_preselection_core import (
+    _auto_target_one_step_milder,
+    _auto_target_slope_estimate,
+    _auto_target_preselect_score,
+    _auto_target_adaptive_shortlist,
+    _auto_target_insert_cached_wildcard,
+    _auto_build_synth_target_candidate,
+    _auto_select_builtin_target_curve,
+)
 
-_MODULE_NAMES = ['target_preselection_core']
-for _module_name in _MODULE_NAMES:
-    _module = _importlib.import_module(f"{__name__}.{_module_name}")
-    for _symbol in dir(_module):
-        if not _symbol.startswith("__"):
-            globals().setdefault(_symbol, getattr(_module, _symbol))
-
-__all__ = sorted(_symbol for _symbol in globals() if not _symbol.startswith("__"))
+__all__ = [
+    '_auto_build_synth_target_candidate',
+    '_auto_select_builtin_target_curve',
+    '_auto_target_adaptive_shortlist',
+    '_auto_target_insert_cached_wildcard',
+    '_auto_target_one_step_milder',
+    '_auto_target_preselect_score',
+    '_auto_target_slope_estimate',
+]

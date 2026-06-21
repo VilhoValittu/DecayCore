@@ -17,6 +17,21 @@ import threading
 from pathlib import Path
 from typing import Callable
 
+from .measurement_tab_helpers import (
+    _build_preview_figure,
+    _build_upload_payload,
+    _device_option_label,
+    _measurement_audio_backend_message,
+    _measurement_output_channel_for_role,
+    _measurement_required_output_channels,
+    _measurement_sub_output_channel_default,
+    _measurement_sub_output_channel_value,
+    _measurement_sub_output_channel_visible,
+    _measurement_use_wasapi_value,
+    _pick_measurement_device_value,
+    _session_preview_bundles,
+)
+
 logger = logging.getLogger("DecayCore")
 
 import numpy as np
@@ -952,18 +967,15 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
         ui.timer(0.4, _refresh_view)
 
 
-__all__ = ['_session_preview_channel_options', '_session_preview_default_channel_key', '_session_preview_bundle', '_format_ms', '_measurement_summary_html', 'build_measurement_tab']
+__all__ = [
+    '_session_preview_channel_options',
+    '_session_preview_default_channel_key',
+    '_session_preview_bundle',
+    '_format_ms',
+    '_measurement_summary_html',
+    'build_measurement_tab',
+    'sys',
+    'ctrl',
+    '_sanitize_measurement_dither_level_db',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['measurement_tab_helpers', 'measurement_tab_builder']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

@@ -8,13 +8,58 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-import importlib as _importlib
+from .direct_dac_bass_integration import apply_direct_dac_bass_integration_result
+from .measurement_response_helpers import (
+    _build_measurement_side_ctx,
+    _phase_from_ir,
+    _to_axis,
+    _extract_lr_measurement_axes,
+    _resample_to_axis,
+    _resolve_sub_measurement_for_filter,
+    _interp_complex_to_axis,
+    _ir_fft_on_axis,
+)
+from .pipeline_execution import (
+    _call_generate_filter,
+    _call_generate_filter_pair,
+    _stats_level_comp_factor,
+    _apply_measured_rt60_override,
+    _inject_direct_dac_summed_prediction_for_plot,
+    dsp,
+    run_pipeline,
+)
+from .subwoofer_target import (
+    SUB_TARGET_LPF_HZ,
+    SUB_TARGET_LPF_MAX_ATTENUATION_DB,
+    SUB_TARGET_LPF_SLOPE_DB_PER_OCT,
+    SUB_TARGET_POLICY,
+    SubwooferTarget,
+    build_subwoofer_target_with_lpf,
+    subwoofer_target_metadata,
+)
 
-_MODULE_NAMES = ['measurement_response_helpers', 'pipeline_execution']
-for _module_name in _MODULE_NAMES:
-    _module = _importlib.import_module(f"{__name__}.{_module_name}")
-    for _symbol in dir(_module):
-        if not _symbol.startswith("__"):
-            globals().setdefault(_symbol, getattr(_module, _symbol))
-
-__all__ = sorted(_symbol for _symbol in globals() if not _symbol.startswith("__"))
+__all__ = [
+    'SUB_TARGET_LPF_HZ',
+    'SUB_TARGET_LPF_MAX_ATTENUATION_DB',
+    'SUB_TARGET_LPF_SLOPE_DB_PER_OCT',
+    'SUB_TARGET_POLICY',
+    'SubwooferTarget',
+    '_apply_measured_rt60_override',
+    '_build_measurement_side_ctx',
+    '_call_generate_filter',
+    '_call_generate_filter_pair',
+    '_extract_lr_measurement_axes',
+    '_inject_direct_dac_summed_prediction_for_plot',
+    '_interp_complex_to_axis',
+    '_ir_fft_on_axis',
+    '_phase_from_ir',
+    '_resample_to_axis',
+    '_resolve_sub_measurement_for_filter',
+    '_stats_level_comp_factor',
+    '_to_axis',
+    'apply_direct_dac_bass_integration_result',
+    'build_subwoofer_target_with_lpf',
+    'dsp',
+    'run_pipeline',
+    'subwoofer_target_metadata',
+]

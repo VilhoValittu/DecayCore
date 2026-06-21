@@ -250,18 +250,14 @@ def _detect_shared_coherent_anchor_sample(data: dict, *, logger=None) -> int | N
     return shared_anchor
 
 
-__all__ = ['_clean_local_path', '_get_uploaded_file', '_get_local_path', '_get_wav_window_params', '_is_wav_upload', '_load_coherent_transfer_slot', '_detect_coherent_slot_anchor_sample', '_detect_shared_coherent_anchor_sample']
+__all__ = [
+    '_clean_local_path',
+    '_get_uploaded_file',
+    '_get_local_path',
+    '_get_wav_window_params',
+    '_is_wav_upload',
+    '_load_coherent_transfer_slot',
+    '_detect_coherent_slot_anchor_sample',
+    '_detect_shared_coherent_anchor_sample',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['measurement_source_helpers', 'lr_measurement_loader', 'raw_ir_and_bass_loader']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

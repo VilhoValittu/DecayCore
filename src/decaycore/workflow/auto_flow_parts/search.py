@@ -34,6 +34,15 @@ from ...application.run_contracts import apply_auto_mode_result
 from ...ui.decaycore_utils import scale_taps_with_fs
 from ..bridge_types import ProcessRunCallbacks
 
+from .progress import (
+    _get_auto_status_callback,
+    _set_auto_progress,
+)
+from .status_text import (
+    _build_auto_finalize_status,
+    _build_auto_selected_text,
+)
+
 if typing.TYPE_CHECKING:
     from ..process_run_flow import ProcessRunSupport
 
@@ -359,18 +368,8 @@ def _run_auto_mode_search_if_needed(
         _set_auto_progress(ctx, support=support, value=_AUTO_PROGRESS_FINALIZE)
 
 
-__all__ = ['_run_auto_mode_search_if_needed']
+__all__ = [
+    '_run_auto_mode_search_if_needed',
+    '_run_auto_mode_search',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['progress', 'status_text', 'seed_phases', 'search']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

@@ -19,6 +19,21 @@ import scipy.signal
 
 from ..dsp_config import CfgReader
 
+from .validation_checks import (
+    _fir_to_mag_db,
+    _gd_metrics_from_fir,
+    _is_minimum_phase,
+    _magnitude_metrics,
+    _skip_pre_ringing,
+    _stereo_metrics,
+    _temporal_energy_metrics,
+)
+from .validation_setup import (
+    FinalIRValidationResult,
+    _bump_severity,
+    _safe_arr,
+)
+
 _EPS = 1e-12
 _SEVERITY_ORDER: dict[str, int] = {"ok": 0, "warn": 1, "reject": 2}
 
@@ -484,16 +499,3 @@ def final_ir_validation_to_stats(result: FinalIRValidationResult) -> dict[str, A
 
 __all__ = ['_safe_missing_result', 'validate_final_fir_against_ir', 'final_ir_validation_to_stats']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['validation_setup', 'validation_checks', 'validation_metrics']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

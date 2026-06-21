@@ -29,6 +29,14 @@ from ..mag_stage import (
     run_mag_raw_stage,
 )
 
+from .bass_smoothing import (
+    _apply_confidence_adaptive_bass_smoothing,
+    _apply_peak_priority_error_shaping,
+    _apply_post_limits_and_metrics,
+    _apply_smoothing,
+    _select_bass_adaptive_conf_mask,
+)
+
 def _run_mag_raw_stage(inputs: _MagPipelineInputs) -> _MagRawStageOutputs:
     return run_mag_raw_stage(
         inputs,
@@ -184,18 +192,10 @@ def _run_mag_correction_pipeline(inputs: _MagPipelineInputs) -> _MagCorrectionCo
     )
 
 
-__all__ = ['_run_mag_raw_stage', '_run_mag_bassfirst_afdw_conf_stage', '_run_mag_core_stage', '_run_mag_correction_pipeline']
+__all__ = [
+    '_run_mag_raw_stage',
+    '_run_mag_bassfirst_afdw_conf_stage',
+    '_run_mag_core_stage',
+    '_run_mag_correction_pipeline',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['bass_smoothing', 'mag_pipeline']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

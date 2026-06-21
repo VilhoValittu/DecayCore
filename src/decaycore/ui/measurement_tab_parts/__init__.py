@@ -8,13 +8,61 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-import importlib as _importlib
+from .measurement_tab_builder import (
+    _session_preview_channel_options,
+    _session_preview_default_channel_key,
+    _session_preview_bundle,
+    _format_ms,
+    _measurement_summary_html,
+    build_measurement_tab,
+    sys,
+    ctrl,
+    _sanitize_measurement_dither_level_db,
+)
+from .measurement_tab_helpers import (
+    _build_upload_payload,
+    _device_option_label,
+    _measurement_use_wasapi_value,
+    _measurement_sub_output_channel_default,
+    _measurement_sub_output_channel_value,
+    _measurement_sub_output_channel_visible,
+    _measurement_output_channel_for_role,
+    _measurement_required_output_channels,
+    _pick_measurement_device_value,
+    _filter_measurement_devices_for_wasapi,
+    _measurement_audio_backend_message,
+    _preview_magnitude_for_plot,
+    _build_preview_figure,
+    _session_preview_bundles,
+    sys,
+    check_measurement_audio_backend,
+    _view_mags_for_plot,
+)
 
-_MODULE_NAMES = ['measurement_tab_helpers', 'measurement_tab_builder']
-for _module_name in _MODULE_NAMES:
-    _module = _importlib.import_module(f"{__name__}.{_module_name}")
-    for _symbol in dir(_module):
-        if not _symbol.startswith("__"):
-            globals().setdefault(_symbol, getattr(_module, _symbol))
-
-__all__ = sorted(_symbol for _symbol in globals() if not _symbol.startswith("__"))
+__all__ = [
+    '_build_preview_figure',
+    '_build_upload_payload',
+    '_device_option_label',
+    '_filter_measurement_devices_for_wasapi',
+    '_format_ms',
+    '_measurement_audio_backend_message',
+    '_measurement_output_channel_for_role',
+    '_measurement_required_output_channels',
+    '_measurement_sub_output_channel_default',
+    '_measurement_sub_output_channel_value',
+    '_measurement_sub_output_channel_visible',
+    '_measurement_summary_html',
+    '_measurement_use_wasapi_value',
+    '_pick_measurement_device_value',
+    '_preview_magnitude_for_plot',
+    '_sanitize_measurement_dither_level_db',
+    '_session_preview_bundle',
+    '_session_preview_bundles',
+    '_session_preview_channel_options',
+    '_session_preview_default_channel_key',
+    '_view_mags_for_plot',
+    'build_measurement_tab',
+    'check_measurement_audio_backend',
+    'ctrl',
+    'sys',
+]

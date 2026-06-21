@@ -23,6 +23,14 @@ import math
 import time
 from typing import Any
 
+from .plots_export import _render_plots_and_export
+from .quality import (
+    _render_dsp_quality,
+    _render_hybrid_iir_cuts,
+    _render_ir_alignment,
+    _render_lr_difference,
+)
+
 # ---------------------------------------------------------------------------
 # Interactive plot render cache
 # Key: (run_signature, channel, plot_smoothing_level)
@@ -223,6 +231,8 @@ def render_results(
         _render_run_overview(data=data, l_st_f=l_st_f, r_st_f=r_st_f)
         _render_auto_diagnostics(data=data)
         _append_auto_polish_to_status_log(data=data)
+        from .bass_integration import _render_bass_integration
+
         _render_bass_integration(data=data)
         _render_hybrid_iir_cuts(l_st_f=l_st_f, r_st_f=r_st_f)
         _render_ir_alignment(l_st_f=l_st_f)
@@ -727,18 +737,16 @@ def _update_crossover_recommendation_label(data: dict) -> None:
         logger.exception("bass integration recommended XO label")
 
 
-__all__ = ['_format_recommended_xo_hz', 'render_results', '_esc', '_metric_table_html', '_section', '_render_run_overview', '_build_auto_polish_lines', '_append_auto_polish_to_status_log', '_build_p6_validation_block', '_render_auto_diagnostics', '_update_crossover_recommendation_label']
-
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['overview', 'bass_integration', 'quality', 'plots_export']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()
+__all__ = [
+    '_format_recommended_xo_hz',
+    'render_results',
+    '_esc',
+    '_metric_table_html',
+    '_section',
+    '_render_run_overview',
+    '_build_auto_polish_lines',
+    '_append_auto_polish_to_status_log',
+    '_build_p6_validation_block',
+    '_render_auto_diagnostics',
+    '_update_crossover_recommendation_label',
+]

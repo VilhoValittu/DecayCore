@@ -598,18 +598,19 @@ def _prepare_ui_and_measurements(
     }
 
 
-__all__ = ['_get_wav_window_params', '_extract_generated_source_rt60', '_extract_generated_source_snr', '_load_generated_measurement_pair', '_prepare_ui_and_measurements']
-
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['bass_diagnostics', 'measurements', 'target_context']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()
+__all__ = [
+    '_get_wav_window_params',
+    '_extract_generated_source_rt60',
+    '_extract_generated_source_snr',
+    '_load_generated_measurement_pair',
+    '_prepare_ui_and_measurements',
+    '_try_load_harmonic_sidecar',
+    '_try_load_rt60_sidecar',
+    'compute_health',
+    'filter_type_short',
+    'load_bass_integration_measurements',
+    'load_measurements_lr',
+    'load_raw_ir_sub',
+    'load_raw_irs_lr',
+    'save_config',
+]

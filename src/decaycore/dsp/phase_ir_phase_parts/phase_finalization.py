@@ -30,6 +30,23 @@ from ..phase_ir_metrics import compute_pre_post_energy_metrics as _compute_pre_p
 from ..phase_ir_utils import _max_abs_group_delay_ms
 from ..phase_authority import apply_phase_authority_gating as _apply_phase_authority_gating
 
+from .phase_computation import (
+    _gd_grad_limiter,
+    _merge_minphase_and_excess,
+    _phase_confidence_profile,
+    _phase_region_profiles,
+    _weighted_mean,
+    _weighted_share,
+)
+from .phase_windowing import (
+    _PhaseComponents,
+    _apply_mixed_excess_mask,
+    _enforce_linear_tail_decay,
+    _linear_excess_weight,
+    _linear_to_minphase_blend_mask,
+    _smooth_linear_boundary,
+)
+
 def _store_phase_profile_metrics(
     *,
     freq_axis: np.ndarray,
@@ -981,18 +998,10 @@ def _apply_phase_model(  # noqa: C901 - phase containment and spike suppression 
     return final_phase
 
 
-__all__ = ['_store_phase_profile_metrics', '_has_active_theoretical_phase_model', '_pre_ringing_band_protection_floor', '_apply_phase_model']
+__all__ = [
+    '_store_phase_profile_metrics',
+    '_has_active_theoretical_phase_model',
+    '_pre_ringing_band_protection_floor',
+    '_apply_phase_model',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['phase_windowing', 'phase_computation', 'phase_finalization']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

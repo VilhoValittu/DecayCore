@@ -20,6 +20,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from .overview import (
+    _format_recommended_xo_hz,
+    _section,
+)
+
 # ---------------------------------------------------------------------------
 # Interactive plot render cache
 # Key: (run_signature, channel, plot_smoothing_level)
@@ -572,16 +577,3 @@ def _render_bass_integration(*, data: dict) -> None:
 
 __all__ = ['_render_bass_integration']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['overview', 'bass_integration', 'quality', 'plots_export']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

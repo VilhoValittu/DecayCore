@@ -12,10 +12,13 @@
 
 from __future__ import annotations
 
+import logging
 import os
 
 from ..app_paths import decaycore_data_dir, program_version_token
-from .shared import AUTO_MODE_CACHE_FILENAME, logger
+from .shared import AUTO_MODE_CACHE_FILENAME
+
+logger = logging.getLogger("DecayCore")
 
 
 def _auto_cache_compat_token(compat_version: str | None = None) -> str:

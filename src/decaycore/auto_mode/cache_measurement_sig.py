@@ -12,13 +12,16 @@
 
 from __future__ import annotations
 
+import logging
 import hashlib
 import json
 
 import numpy as np
 
 from .cache_io import _AUTO_CACHE_LOCK
-from .shared import _auto_hash_array_full, _auto_safe_float, logger
+from .shared import _auto_hash_array_full, _auto_safe_float
+
+logger = logging.getLogger("DecayCore")
 
 _RECOVERABLE_HASH_EXCEPTIONS = (
     AttributeError,

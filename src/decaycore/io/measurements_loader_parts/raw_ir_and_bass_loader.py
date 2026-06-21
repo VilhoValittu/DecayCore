@@ -1,3 +1,14 @@
+from .lr_measurement_loader import _silent_transfer_like
+from .measurement_source_helpers import (
+    _clean_local_path,
+    _detect_coherent_slot_anchor_sample,
+    _detect_shared_coherent_anchor_sample,
+    _get_local_path,
+    _get_uploaded_file,
+    _get_wav_window_params,
+    _load_coherent_transfer_slot,
+)
+
 # DecayCore
 # Copyright (c) 2026 Vilho Valittu.
 # All rights reserved except as expressly granted in the LICENSE file.
@@ -581,16 +592,3 @@ def load_bass_integration_measurements(data: dict, *, logger=None):
 
 __all__ = ['_load_raw_wav_from_source', 'load_raw_irs_lr', 'load_raw_ir_sub', 'load_bass_integration_measurements']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['measurement_source_helpers', 'lr_measurement_loader', 'raw_ir_and_bass_loader']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

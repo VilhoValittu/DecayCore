@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 
 from .cache_io import _AUTO_CACHE_STATS, _auto_cache_guard, _auto_cache_load, _auto_cache_save
@@ -25,8 +26,9 @@ from .shared import (
     _auto_filter_cache_key,
     _auto_goal_norm,
     _auto_safe_float,
-    logger,
 )
+
+logger = logging.getLogger("DecayCore")
 
 
 @_auto_cache_guard

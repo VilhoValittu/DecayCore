@@ -49,18 +49,6 @@ from ...dsp.target_match import target_match_from_stats as _target_match_from_st
 
 _calc_acoustic_score = calc_acoustic_score
 
-__all__ = [
-    'format_band_rt60_summary',
-    '_float_allow_zero',
-    '_clamp',
-    'calc_acoustic_score',
-    '_calc_acoustic_score',
-    'calc_ai_summary_from_stats',
-    '_calc_target_match',
-    'calc_target_match_from_stats',
-    'format_dsp_quality_report_block',
-    'format_summary_content',
-]
 
 def format_band_rt60_summary(bands, *, picks=None):
     if not bands:
@@ -680,18 +668,14 @@ def format_dsp_quality_report_block(settings, l_stats, r_stats):
     return _quality_report_build_lines(lq, rq, debug_report=debug_report)
 
 
-__all__ = ['format_band_rt60_summary', '_float_allow_zero', '_calc_target_match', 'calc_target_match_from_stats', 'format_dsp_quality_report_block']
-
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['quality_report', 'legacy_summary']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()
+__all__ = [
+    'format_band_rt60_summary',
+    '_float_allow_zero',
+    '_calc_target_match',
+    'calc_target_match_from_stats',
+    'format_dsp_quality_report_block',
+    '_clamp',
+    'calc_acoustic_score',
+    '_calc_acoustic_score',
+    'calc_ai_summary_from_stats',
+]

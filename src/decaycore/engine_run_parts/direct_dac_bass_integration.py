@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+import numpy as np
+
 import logging
 from typing import Any
 
@@ -186,4 +188,4 @@ def apply_direct_dac_bass_integration_result(
         return {}
 
 
-__all__ = ["apply_direct_dac_bass_integration_result"]
+__all__ = ['apply_direct_dac_bass_integration_result']

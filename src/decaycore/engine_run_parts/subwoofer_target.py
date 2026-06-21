@@ -115,11 +115,11 @@ def subwoofer_target_metadata(target: SubwooferTarget) -> dict[str, float | str 
 
 
 __all__ = [
-    "SUB_TARGET_LPF_HZ",
-    "SUB_TARGET_LPF_MAX_ATTENUATION_DB",
-    "SUB_TARGET_LPF_SLOPE_DB_PER_OCT",
-    "SUB_TARGET_POLICY",
-    "SubwooferTarget",
-    "build_subwoofer_target_with_lpf",
-    "subwoofer_target_metadata",
+    'SUB_TARGET_LPF_HZ',
+    'SUB_TARGET_LPF_MAX_ATTENUATION_DB',
+    'SUB_TARGET_LPF_SLOPE_DB_PER_OCT',
+    'SUB_TARGET_POLICY',
+    'SubwooferTarget',
+    'build_subwoofer_target_with_lpf',
+    'subwoofer_target_metadata',
 ]

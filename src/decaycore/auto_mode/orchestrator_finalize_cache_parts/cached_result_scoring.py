@@ -30,6 +30,8 @@ from ..scoring_ranking import (
 )
 from ..shared import AUTO_MODE_CACHE_SCHEMA_VERSION, _auto_builtin_target_name, _auto_safe_float
 
+from .cache_finalize_status import _override_candidates
+
 logger = logging.getLogger("DecayCore")
 
 _LOW_BASS_CUT_WINNER_POLISH_STEP_HZ = 2.0
@@ -294,18 +296,14 @@ def _attach_cached_debug(
     }
 
 
-__all__ = ['_apply_residual_peak_safety_override', '_resolve_winner_auto_exc_hz', '_resolve_target_seed_preset', '_preset_with_target_hc_mode', '_save_cached_best', '_validate_cached_result', '_score_cached_result', '_attach_cached_debug']
+__all__ = [
+    '_apply_residual_peak_safety_override',
+    '_resolve_winner_auto_exc_hz',
+    '_resolve_target_seed_preset',
+    '_preset_with_target_hc_mode',
+    '_save_cached_best',
+    '_validate_cached_result',
+    '_score_cached_result',
+    '_attach_cached_debug',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['cache_finalize_status', 'cached_result_scoring', 'cached_result_materialization']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

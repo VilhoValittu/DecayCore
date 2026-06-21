@@ -260,18 +260,11 @@ def _compute_selected_bass_integration_diagnostics(bundle: object, data: dict) -
         return dict(getattr(bundle, "diagnostics", {}) or {}) if bundle is not None else {}
 
 
-__all__ = ['_status', '_direct_dac_filter_params', '_direct_dac_alignment_params', '_compute_direct_dac_prepare_recommendation', '_compute_selected_bass_integration_diagnostics']
+__all__ = [
+    '_status',
+    '_direct_dac_filter_params',
+    '_direct_dac_alignment_params',
+    '_compute_direct_dac_prepare_recommendation',
+    '_compute_selected_bass_integration_diagnostics',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['bass_diagnostics', 'measurements', 'target_context']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

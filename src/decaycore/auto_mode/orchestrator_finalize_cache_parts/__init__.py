@@ -8,13 +8,52 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-import importlib as _importlib
+from .cache_finalize_status import (
+    _fmt_status_metric,
+    _build_phase2_pareto_status,
+    _build_modal_intelligence_debug,
+    _stereo_refine_materialize_base_data,
+    _public_stereo_policy_refine_meta,
+    _cache_refine_winner_phase_label,
+    _cache_refine_winner_summary,
+    _override_candidates,
+    _LOW_BASS_CUT_WINNER_POLISH_STEP_HZ,
+    _LOW_BASS_CUT_WINNER_POLISH_MAX_DELTA_HZ,
+)
+from .cached_result_materialization import (
+    _materialize_cached_result,
+    _return_cached_result,
+)
+from .cached_result_scoring import (
+    _apply_residual_peak_safety_override,
+    _resolve_winner_auto_exc_hz,
+    _resolve_target_seed_preset,
+    _preset_with_target_hc_mode,
+    _save_cached_best,
+    _validate_cached_result,
+    _score_cached_result,
+    _attach_cached_debug,
+)
 
-_MODULE_NAMES = ['cache_finalize_status', 'cached_result_materialization', 'cached_result_scoring']
-for _module_name in _MODULE_NAMES:
-    _module = _importlib.import_module(f"{__name__}.{_module_name}")
-    for _symbol in dir(_module):
-        if not _symbol.startswith("__"):
-            globals().setdefault(_symbol, getattr(_module, _symbol))
-
-__all__ = sorted(_symbol for _symbol in globals() if not _symbol.startswith("__"))
+__all__ = [
+    '_LOW_BASS_CUT_WINNER_POLISH_MAX_DELTA_HZ',
+    '_LOW_BASS_CUT_WINNER_POLISH_STEP_HZ',
+    '_apply_residual_peak_safety_override',
+    '_attach_cached_debug',
+    '_build_modal_intelligence_debug',
+    '_build_phase2_pareto_status',
+    '_cache_refine_winner_phase_label',
+    '_cache_refine_winner_summary',
+    '_fmt_status_metric',
+    '_materialize_cached_result',
+    '_override_candidates',
+    '_preset_with_target_hc_mode',
+    '_public_stereo_policy_refine_meta',
+    '_resolve_target_seed_preset',
+    '_resolve_winner_auto_exc_hz',
+    '_return_cached_result',
+    '_save_cached_best',
+    '_score_cached_result',
+    '_stereo_refine_materialize_base_data',
+    '_validate_cached_result',
+]

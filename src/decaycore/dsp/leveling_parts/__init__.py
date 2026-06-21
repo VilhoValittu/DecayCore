@@ -8,24 +8,102 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-"""Equalization leveling (loudness matching by octave band).
+from .api import (
+    find_stable_level_window,
+    find_shared_stereo_level_window,
+    compute_leveling,
+    compute_leveling_impl,
+    find_shared_stereo_level_window_impl,
+    find_stable_level_window_impl,
+)
+from .state_cache import (
+    StereoLinkContext,
+    _LEVELING_CACHE,
+    _LEVELING_CACHE_LOCK,
+    _LEVELING_CACHE_MAX,
+    _LEVEL_WINDOW_CACHE,
+    _LEVEL_WINDOW_CACHE_LOCK,
+    _LEVEL_WINDOW_CACHE_MAX,
+    _to_float,
+    _to_bool,
+    _remember_leveling_error,
+    _safe_setattr,
+    _normalize_optional_float,
+    _normalize_optional_window,
+    _normalize_hpf_freq,
+    _normalize_level_window_params,
+    _hash_leveling_array,
+    _stable_level_window_cache_key,
+    _leveling_cache_key,
+    _capture_leveling_state,
+    _restore_leveling_state,
+    _clear_leveling_cache,
+    _clear_level_window_cache,
+)
+from .tilt_helpers import (
+    _resample_log_axis,
+    _log_median,
+    _lower_tail_robust_std_db,
+    _centered_rms,
+    _tilt_fit_linear_log_axis,
+    _smooth_tilt_fit_series,
+    _tilt_fit_lf_piecewise_log_axis,
+    _window_offset_consistency_score,
+    _tilt_aware_offset_db,
+    _tilt_fit_offset_and_slope_db_per_oct,
+)
+from .window_scoring import (
+    _hz_to_erb_number,
+    _perceptual_importance_weights,
+    _weighted_centered_rms,
+    _perceptual_shape_score,
+    _prepare_level_window_search,
+    _evaluate_level_window_candidate,
+)
 
-Split into:
-- .api: Main public entry points
-- .window_scoring: Candidate window evaluation with metrics
-- .tilt_helpers: Tilt and target curve utilities
-- .state_cache: Configuration and state caching
-
-Uses dynamic imports with explicit __all__ for IDE support.
-"""
-
-import importlib as _importlib
-
-_MODULE_NAMES = ['tilt_helpers', 'window_scoring', 'api', 'state_cache']
-for _module_name in _MODULE_NAMES:
-    _module = _importlib.import_module(f"{__name__}.{_module_name}")
-    for _symbol in dir(_module):
-        if not _symbol.startswith("__"):
-            globals().setdefault(_symbol, getattr(_module, _symbol))
-
-__all__ = sorted(_symbol for _symbol in globals() if not _symbol.startswith("__"))
+__all__ = [
+    'StereoLinkContext',
+    '_LEVELING_CACHE',
+    '_LEVELING_CACHE_LOCK',
+    '_LEVELING_CACHE_MAX',
+    '_LEVEL_WINDOW_CACHE',
+    '_LEVEL_WINDOW_CACHE_LOCK',
+    '_LEVEL_WINDOW_CACHE_MAX',
+    '_capture_leveling_state',
+    '_centered_rms',
+    '_clear_level_window_cache',
+    '_clear_leveling_cache',
+    '_evaluate_level_window_candidate',
+    '_hash_leveling_array',
+    '_hz_to_erb_number',
+    '_leveling_cache_key',
+    '_log_median',
+    '_lower_tail_robust_std_db',
+    '_normalize_hpf_freq',
+    '_normalize_level_window_params',
+    '_normalize_optional_float',
+    '_normalize_optional_window',
+    '_perceptual_importance_weights',
+    '_perceptual_shape_score',
+    '_prepare_level_window_search',
+    '_remember_leveling_error',
+    '_resample_log_axis',
+    '_restore_leveling_state',
+    '_safe_setattr',
+    '_smooth_tilt_fit_series',
+    '_stable_level_window_cache_key',
+    '_tilt_aware_offset_db',
+    '_tilt_fit_lf_piecewise_log_axis',
+    '_tilt_fit_linear_log_axis',
+    '_tilt_fit_offset_and_slope_db_per_oct',
+    '_to_bool',
+    '_to_float',
+    '_weighted_centered_rms',
+    '_window_offset_consistency_score',
+    'compute_leveling',
+    'compute_leveling_impl',
+    'find_shared_stereo_level_window',
+    'find_shared_stereo_level_window_impl',
+    'find_stable_level_window',
+    'find_stable_level_window_impl',
+]

@@ -8,23 +8,50 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-"""Final impulse response validation and quality checks.
+from .validation_checks import (
+    _temporal_energy_metrics,
+    _fir_spectrum,
+    _gd_metrics_from_fir,
+    _fir_to_mag_db,
+    _skip_pre_ringing,
+    _is_minimum_phase,
+    _magnitude_metrics,
+    _stereo_metrics,
+)
+from .validation_metrics import (
+    _safe_missing_result,
+    validate_final_fir_against_ir,
+    final_ir_validation_to_stats,
+)
+from .validation_setup import (
+    FinalIRValidationResult,
+    _bump_severity,
+    _next_pow2,
+    _main_peak_index,
+    _safe_energy,
+    _safe_rms,
+    _safe_arr,
+    _freq_mask,
+)
 
-Split into:
-- .final_ir_validation_01: Input preparation and basic checks
-- .final_ir_validation_02: Mid-stage validation logic
-- .final_ir_validation_03: Final quality assessment and metrics
-
-Uses dynamic imports with explicit __all__ for IDE support.
-"""
-
-import importlib as _importlib
-
-_MODULE_NAMES = ['validation_setup', 'validation_checks', 'validation_metrics']
-for _module_name in _MODULE_NAMES:
-    _module = _importlib.import_module(f"{__name__}.{_module_name}")
-    for _symbol in dir(_module):
-        if not _symbol.startswith("__"):
-            globals().setdefault(_symbol, getattr(_module, _symbol))
-
-__all__ = sorted(_symbol for _symbol in globals() if not _symbol.startswith("__"))
+__all__ = [
+    'FinalIRValidationResult',
+    '_bump_severity',
+    '_fir_spectrum',
+    '_fir_to_mag_db',
+    '_freq_mask',
+    '_gd_metrics_from_fir',
+    '_is_minimum_phase',
+    '_magnitude_metrics',
+    '_main_peak_index',
+    '_next_pow2',
+    '_safe_arr',
+    '_safe_energy',
+    '_safe_missing_result',
+    '_safe_rms',
+    '_skip_pre_ringing',
+    '_stereo_metrics',
+    '_temporal_energy_metrics',
+    'final_ir_validation_to_stats',
+    'validate_final_fir_against_ir',
+]

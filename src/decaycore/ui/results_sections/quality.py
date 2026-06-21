@@ -22,8 +22,7 @@ import math
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    # _section is loaded at runtime by _link_sibling_exports() from overview.py.
-    # This import is only for static analysis; it is never executed at runtime.
+    # Imported only for static analysis; runtime imports are explicit below.
     from .overview import _section  # noqa: F401
 
 # ---------------------------------------------------------------------------
@@ -457,19 +456,13 @@ def _render_hybrid_iir_cuts(*, l_st_f: dict, r_st_f: dict) -> None:
     _section(t("results_section_hybrid_iir_cuts"), rows, summary_lines or None)
 
 
-__all__ = ['_render_ir_alignment', '_render_dsp_quality', '_render_lr_difference',
-           '_render_hybrid_iir_cuts', '_fmt_biquad', '_fmt_external_iir_hpf', '_rejected_reasons']
+__all__ = [
+    '_render_ir_alignment',
+    '_render_dsp_quality',
+    '_render_lr_difference',
+    '_render_hybrid_iir_cuts',
+    '_fmt_biquad',
+    '_fmt_external_iir_hpf',
+    '_rejected_reasons',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['overview', 'bass_integration', 'quality', 'plots_export']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

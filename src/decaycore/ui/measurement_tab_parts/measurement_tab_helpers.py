@@ -302,18 +302,23 @@ def _session_preview_bundles(session: MeasurementSessionAggregate) -> dict[str, 
     return bundles
 
 
-__all__ = ['_build_upload_payload', '_device_option_label', '_measurement_use_wasapi_value', '_measurement_sub_output_channel_default', '_measurement_sub_output_channel_value', '_measurement_sub_output_channel_visible', '_measurement_output_channel_for_role', '_measurement_required_output_channels', '_pick_measurement_device_value', '_filter_measurement_devices_for_wasapi', '_measurement_audio_backend_message', '_preview_magnitude_for_plot', '_build_preview_figure', '_session_preview_bundles']
+__all__ = [
+    '_build_upload_payload',
+    '_device_option_label',
+    '_measurement_use_wasapi_value',
+    '_measurement_sub_output_channel_default',
+    '_measurement_sub_output_channel_value',
+    '_measurement_sub_output_channel_visible',
+    '_measurement_output_channel_for_role',
+    '_measurement_required_output_channels',
+    '_pick_measurement_device_value',
+    '_filter_measurement_devices_for_wasapi',
+    '_measurement_audio_backend_message',
+    '_preview_magnitude_for_plot',
+    '_build_preview_figure',
+    '_session_preview_bundles',
+    'sys',
+    'check_measurement_audio_backend',
+    '_view_mags_for_plot',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['measurement_tab_helpers', 'measurement_tab_builder']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

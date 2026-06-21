@@ -350,16 +350,3 @@ def _append_lr_difference_summary(summary_content: str, l_st: dict, r_st: dict) 
 
 __all__ = ['_append_acoustic_events', '_append_lr_difference_summary']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['runtime', 'bass_integration', 'stereo_policy', 'dsp_effective', 'events']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

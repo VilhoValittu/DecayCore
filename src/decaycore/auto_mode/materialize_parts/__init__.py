@@ -8,13 +8,10 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-import importlib as _importlib
+from .materialize_helpers import (
+    AutoModeMaterializeContext,
+    _sync_auto_hpf_runtime_fields,
+    build_materialize_helpers,
+)
 
-_MODULE_NAMES = ['materialize_helpers']
-for _module_name in _MODULE_NAMES:
-    _module = _importlib.import_module(f"{__name__}.{_module_name}")
-    for _symbol in dir(_module):
-        if not _symbol.startswith("__"):
-            globals().setdefault(_symbol, getattr(_module, _symbol))
-
-__all__ = sorted(_symbol for _symbol in globals() if not _symbol.startswith("__"))
+__all__ = ['AutoModeMaterializeContext', '_sync_auto_hpf_runtime_fields', 'build_materialize_helpers']

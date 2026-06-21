@@ -864,16 +864,3 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
 
 __all__ = ['_prediction_plot_fft_context', '_resolve_magnitude_display_offset_db', 'generate_prediction_plot']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['prediction_plot']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

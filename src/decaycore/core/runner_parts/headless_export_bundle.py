@@ -22,6 +22,12 @@ import numpy as np
 
 from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
 
+from .headless_metrics_output import _f
+from .headless_progress import (
+    _headless_winner_rank_score,
+    _safe_filename_token,
+)
+
 
 def _convert_ir_for_export(ir: np.ndarray, fmt: str) -> np.ndarray:
     if fmt == "S32_LE":
@@ -92,12 +98,6 @@ logger = logging.getLogger("DecayCore")
 
 
 
-__all__ = [
-    "ConsoleProgressSink",
-    "ProgressSink",
-    "prepare_headless_config",
-    "run_batch",
-]
 
 def _headless_camilladsp_yaml_name(*, data: dict | None, ft_short: str, irw_tag: str, fs_v: int | None = None) -> str:
     parts = ["camilladsp", str(ft_short)]
@@ -486,18 +486,14 @@ def _normalize_headless_config(config: dict, *, config_dir: Path, output_dir: Pa
     return data
 
 
-__all__ = ['_headless_camilladsp_yaml_name', '_headless_summary_content', '_build_headless_export_zip', '_save_headless_export_bundle', '_read_json', '_resolve_path', '_first_existing', '_normalize_headless_config']
+__all__ = [
+    '_headless_camilladsp_yaml_name',
+    '_headless_summary_content',
+    '_build_headless_export_zip',
+    '_save_headless_export_bundle',
+    '_read_json',
+    '_resolve_path',
+    '_first_existing',
+    '_normalize_headless_config',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['headless_progress', 'headless_export_bundle', 'headless_metrics_output', 'headless_batch_runner']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

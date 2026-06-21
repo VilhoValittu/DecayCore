@@ -37,7 +37,6 @@ AUTO_TDC_DECAY_SCORING_VERSION = 2
 
 
 
-__all__ = ["_auto_score_result"]
 
 def _auto_score_result(
     result,
@@ -616,16 +615,3 @@ def _auto_score_result(
 
 __all__ = ['_auto_score_result']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['auto_score_result']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

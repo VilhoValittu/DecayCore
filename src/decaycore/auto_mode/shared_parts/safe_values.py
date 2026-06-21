@@ -115,18 +115,11 @@ def _clip(v, lo, hi):
     return float(np.clip(_auto_safe_float(v, vlo), vlo, vhi))
 
 
-__all__ = ['_auto_safe_float', '_auto_safe_bool', '_auto_safe_int', '_auto_output_tilt_bounds', '_clip']
+__all__ = [
+    '_auto_safe_float',
+    '_auto_safe_bool',
+    '_auto_safe_int',
+    '_auto_output_tilt_bounds',
+    '_clip',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['cache_hash', 'goal_profile', 'safe_values', 'backend', 'config', 'phase_sampling']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

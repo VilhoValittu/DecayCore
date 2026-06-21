@@ -393,16 +393,3 @@ def _apply_hard_clamps(
 
 __all__ = ['_apply_soft_clamps', '_apply_hard_clamps']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['low_frequency', 'authority', 'clamps', 'metrics', 'pipeline']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

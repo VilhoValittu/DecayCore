@@ -81,12 +81,6 @@ logger = logging.getLogger("DecayCore")
 
 
 
-__all__ = [
-    "ConsoleProgressSink",
-    "ProgressSink",
-    "prepare_headless_config",
-    "run_batch",
-]
 
 @dataclass
 class ProgressSink:
@@ -181,9 +175,13 @@ class _HeadlessBridge:
         return None
 
     def build_export_zip(self, **kwargs: Any) -> tuple[io.BytesIO, dict, dict]:
+        from .headless_export_bundle import _build_headless_export_zip
+
         return _build_headless_export_zip(**kwargs)
 
     def save_export_bundle(self, zip_buffer: io.BytesIO, **kwargs: Any) -> tuple[str, str, str]:
+        from .headless_export_bundle import _save_headless_export_bundle
+
         return _save_headless_export_bundle(zip_buffer, output_dir=self.output_dir, **kwargs)
 
     def make_callbacks(self, run_started_at: float) -> _HeadlessCallbacks:
@@ -251,18 +249,13 @@ def _headless_winner_rank_score(data: dict | None) -> float:
         return float("nan")
 
 
-__all__ = ['ProgressSink', 'ConsoleProgressSink', '_HeadlessCallbacks', '_HeadlessBridge', '_utc_now', '_git_commit', '_safe_filename_token', '_headless_winner_rank_score']
-
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['headless_progress', 'headless_export_bundle', 'headless_metrics_output', 'headless_batch_runner']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()
+__all__ = [
+    'ProgressSink',
+    'ConsoleProgressSink',
+    '_HeadlessCallbacks',
+    '_HeadlessBridge',
+    '_utc_now',
+    '_git_commit',
+    '_safe_filename_token',
+    '_headless_winner_rank_score',
+]

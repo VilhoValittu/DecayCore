@@ -31,6 +31,22 @@ from ...workflow.process_support import (
 from ...workflow.run_finalize import _finalize_run_outputs
 from ...workflow.run_prepare import _prepare_target_curve_and_run_context, _prepare_ui_and_measurements
 
+from .headless_export_bundle import (
+    _normalize_headless_config,
+    _read_json,
+)
+from .headless_metrics_output import (
+    _build_metrics,
+    _load_optional_metadata,
+    _write_outputs,
+)
+from .headless_progress import (
+    ConsoleProgressSink,
+    ProgressSink,
+    _HeadlessBridge,
+    _utc_now,
+)
+
 logger = logging.getLogger("DecayCore")
 
 
@@ -88,12 +104,6 @@ logger = logging.getLogger("DecayCore")
 
 
 
-__all__ = [
-    "ConsoleProgressSink",
-    "ProgressSink",
-    "prepare_headless_config",
-    "run_batch",
-]
 
 def _copy_export_artifacts(saved_filters_dir: str | None, output_dir: Path) -> None:
     if not saved_filters_dir:
@@ -197,16 +207,3 @@ def prepare_headless_config(config_path: Path, output_dir: Path, *, no_plots: bo
 
 __all__ = ['_copy_export_artifacts', 'run_batch', 'prepare_headless_config']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['headless_progress', 'headless_export_bundle', 'headless_metrics_output', 'headless_batch_runner']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

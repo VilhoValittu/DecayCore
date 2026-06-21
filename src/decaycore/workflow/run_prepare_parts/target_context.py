@@ -36,6 +36,12 @@ from ...config.decaycore_pipeline import (
 from ...io.measurements_txt import parse_measurements_from_path
 from ..bridge_types import ProcessRunCallbacks
 
+from .bass_diagnostics import (
+    _compute_direct_dac_prepare_recommendation,
+    _compute_selected_bass_integration_diagnostics,
+    _status,
+)
+
 if typing.TYPE_CHECKING:
     from ..process_run_flow import ProcessRunSupport
 
@@ -691,18 +697,16 @@ def _prepare_target_curve_and_run_context(
     )
 
 
-__all__ = ['_prepare_target_curve_and_run_context']
-
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['bass_diagnostics', 'measurements', 'target_context']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()
+__all__ = [
+    '_build_bass_integration_metadata_unified',
+    '_prepare_target_curve_and_run_context',
+    '_prepare_target_curve_bass_integration_context',
+    '_safe_float_from_dict',
+    'build_xos_hpf',
+    'choose_dash_fs',
+    'choose_target_rates',
+    'detect_is_wav_source',
+    'filter_type_short',
+    'load_house_curve',
+    'log_df_smoothing_toggle',
+]

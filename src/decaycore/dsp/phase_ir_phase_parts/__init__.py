@@ -8,23 +8,52 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-"""Phase response construction and processing.
+from .phase_computation import (
+    _merge_minphase_and_excess,
+    _phase_region_profiles,
+    _phase_confidence_profile,
+    _max_abs_gd_gradient_ms_per_oct,
+    _gd_grad_metrics,
+    _gd_grad_limiter,
+    _weighted_mean,
+    _weighted_share,
+)
+from .phase_finalization import (
+    _store_phase_profile_metrics,
+    _has_active_theoretical_phase_model,
+    _pre_ringing_band_protection_floor,
+    _apply_phase_model,
+)
+from .phase_windowing import (
+    _PhaseComponents,
+    _unwrap_phases,
+    _compute_excess_phase,
+    _apply_mixed_excess_mask,
+    _linear_excess_weight,
+    _smooth_linear_boundary,
+    _enforce_linear_tail_decay,
+    _linear_to_minphase_blend_mask,
+)
 
-Split into:
-- .phase_ir_phase_01: Input preparation and windowing
-- .phase_ir_phase_02: Phase computation and alignment
-- .phase_ir_phase_03: Post-processing and finalization
-
-Uses dynamic imports with explicit __all__ for IDE support.
-"""
-
-import importlib as _importlib
-
-_MODULE_NAMES = ['phase_windowing', 'phase_computation', 'phase_finalization']
-for _module_name in _MODULE_NAMES:
-    _module = _importlib.import_module(f"{__name__}.{_module_name}")
-    for _symbol in dir(_module):
-        if not _symbol.startswith("__"):
-            globals().setdefault(_symbol, getattr(_module, _symbol))
-
-__all__ = sorted(_symbol for _symbol in globals() if not _symbol.startswith("__"))
+__all__ = [
+    '_PhaseComponents',
+    '_apply_mixed_excess_mask',
+    '_apply_phase_model',
+    '_compute_excess_phase',
+    '_enforce_linear_tail_decay',
+    '_gd_grad_limiter',
+    '_gd_grad_metrics',
+    '_has_active_theoretical_phase_model',
+    '_linear_excess_weight',
+    '_linear_to_minphase_blend_mask',
+    '_max_abs_gd_gradient_ms_per_oct',
+    '_merge_minphase_and_excess',
+    '_phase_confidence_profile',
+    '_phase_region_profiles',
+    '_pre_ringing_band_protection_floor',
+    '_smooth_linear_boundary',
+    '_store_phase_profile_metrics',
+    '_unwrap_phases',
+    '_weighted_mean',
+    '_weighted_share',
+]

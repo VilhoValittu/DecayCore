@@ -1,3 +1,13 @@
+from .bass_integration import (
+    _append_bass_integration_allpass_auto_summary,
+    _append_bass_integration_summary,
+)
+from .runtime import (
+    _append_main_speaker_xo_hpf_summary,
+    _polish_display_rank,
+)
+from .stereo_policy import _append_auto_stereo_policy_summary
+
 # DecayCore
 # Copyright (c) 2026 Vilho Valittu.
 # All rights reserved except as expressly granted in the LICENSE file.
@@ -1189,16 +1199,3 @@ def _append_realized_phase_limit(summary_content: str, data, l_st, r_st) -> str:
 
 __all__ = ['_append_dsp_effective_params', '_append_realized_phase_limit']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['runtime', 'bass_integration', 'stereo_policy', 'dsp_effective', 'events']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

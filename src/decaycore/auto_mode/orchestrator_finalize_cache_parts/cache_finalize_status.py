@@ -188,18 +188,16 @@ def _override_candidates(search_state) -> list[dict]:
     return out
 
 
-__all__ = ['_fmt_status_metric', '_build_phase2_pareto_status', '_build_modal_intelligence_debug', '_stereo_refine_materialize_base_data', '_public_stereo_policy_refine_meta', '_cache_refine_winner_phase_label', '_cache_refine_winner_summary', '_override_candidates']
+__all__ = [
+    '_fmt_status_metric',
+    '_build_phase2_pareto_status',
+    '_build_modal_intelligence_debug',
+    '_stereo_refine_materialize_base_data',
+    '_public_stereo_policy_refine_meta',
+    '_cache_refine_winner_phase_label',
+    '_cache_refine_winner_summary',
+    '_override_candidates',
+    '_LOW_BASS_CUT_WINNER_POLISH_STEP_HZ',
+    '_LOW_BASS_CUT_WINNER_POLISH_MAX_DELTA_HZ',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['cache_finalize_status', 'cached_result_scoring', 'cached_result_materialization']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

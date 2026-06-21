@@ -728,16 +728,3 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
 
 __all__ = ['_format_session_progress_percent', 'build_measurement_session_dialog']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['session_dialog_builder']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

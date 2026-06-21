@@ -50,6 +50,8 @@ from ...config.decaycore_pipeline import (
 from ...ui.decaycore_utils import scale_taps_with_fs
 from ..bridge_types import ProcessRunCallbacks
 
+from .progress import _get_auto_status_callback
+
 if typing.TYPE_CHECKING:
     from ..process_run_flow import ProcessRunSupport
 
@@ -1038,16 +1040,3 @@ def _run_auto_mode_seed_phases(
 
 __all__ = ['_run_auto_mode_seed_phases']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['progress', 'status_text', 'seed_phases', 'search']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

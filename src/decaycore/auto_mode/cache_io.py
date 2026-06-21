@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import logging
 import json
 import os
 from functools import wraps
@@ -22,8 +23,9 @@ from .shared import (
     AUTO_MODE_CACHE_FILTER_KEYS,
     AUTO_MODE_CACHE_SCHEMA_VERSION,
     AUTO_MODE_COMPAT_VERSION,
-    logger,
 )
+
+logger = logging.getLogger("DecayCore")
 
 _AUTO_CACHE_LOCK = RLock()
 _AUTO_CACHE_RUNTIME: dict[str, dict] = {}

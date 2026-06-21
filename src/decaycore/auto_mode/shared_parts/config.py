@@ -15,6 +15,8 @@ import numpy as np
 
 from ...config.schema import normalize_flat_config
 from ._constants import *
+from .safe_values import _auto_safe_bool, _auto_safe_float, _auto_safe_int
+from .goal_profile import _auto_goal_norm
 
 logger = logging.getLogger("DecayCore")
 
@@ -739,16 +741,3 @@ class AutoModeConfig:
 
 __all__ = ['AutoModeConfig']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['cache_hash', 'goal_profile', 'safe_values', 'backend', 'config', 'phase_sampling']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

@@ -12,7 +12,7 @@
 
 from __future__ import annotations
 
-from ..shared import logger
+import logging
 from .legacy_adapter import (
     build_execution_context,
     finalize_from_cache_refine,
@@ -22,6 +22,8 @@ from .legacy_adapter import (
     run_refine_stages,
 )
 from .plan import AutoSearchPlan
+
+logger = logging.getLogger("DecayCore")
 
 
 def _base_data_with_plan_seed(base_data: dict, decision) -> dict:

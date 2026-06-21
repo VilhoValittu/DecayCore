@@ -184,18 +184,13 @@ def _auto_sample_mag_low_pair(
     return float(round(mag, 1)), float(round(low, 1))
 
 
-__all__ = ['_auto_is_phase_search_filter', '_auto_phase_limit_clip', '_auto_phase_limit_center', '_auto_mag_c_min_center', '_auto_phase_limit_prior_penalty', '_jitter', '_auto_sample_mag_low_pair']
+__all__ = [
+    '_auto_is_phase_search_filter',
+    '_auto_phase_limit_clip',
+    '_auto_phase_limit_center',
+    '_auto_mag_c_min_center',
+    '_auto_phase_limit_prior_penalty',
+    '_jitter',
+    '_auto_sample_mag_low_pair',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['cache_hash', 'goal_profile', 'safe_values', 'backend', 'config', 'phase_sampling']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

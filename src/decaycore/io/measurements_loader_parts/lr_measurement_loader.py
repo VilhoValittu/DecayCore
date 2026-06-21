@@ -1,3 +1,9 @@
+from .measurement_source_helpers import (
+    _get_local_path,
+    _get_uploaded_file,
+    _get_wav_window_params,
+)
+
 # DecayCore
 # Copyright (c) 2026 Vilho Valittu.
 # All rights reserved except as expressly granted in the LICENSE file.
@@ -235,18 +241,14 @@ def load_measurements_lr(data: dict, *, logger=None):
     return None, None, None, None, None, None
 
 
-__all__ = ['_silent_transfer_like', 'parse_measurements_from_upload', '_try_load_harmonic_sidecar', '_measurement_sidecar_stems', '_measurement_sidecar_candidates', '_try_load_measurement_metadata_sidecar', '_try_load_rt60_sidecar', 'load_measurements_lr']
+__all__ = [
+    '_silent_transfer_like',
+    'parse_measurements_from_upload',
+    '_try_load_harmonic_sidecar',
+    '_measurement_sidecar_stems',
+    '_measurement_sidecar_candidates',
+    '_try_load_measurement_metadata_sidecar',
+    '_try_load_rt60_sidecar',
+    'load_measurements_lr',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['measurement_source_helpers', 'lr_measurement_loader', 'raw_ir_and_bass_loader']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

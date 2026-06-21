@@ -69,10 +69,6 @@ _MATERIALIZE_CACHE_META_KEYS = {
 
 
 
-__all__ = [
-    "AutoModeMaterializeContext",
-    "build_materialize_helpers",
-]
 
 @dataclass
 class AutoModeMaterializeContext:
@@ -798,16 +794,3 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):  # noqa: C901 - 
 
 __all__ = ['AutoModeMaterializeContext', '_sync_auto_hpf_runtime_fields', 'build_materialize_helpers']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['materialize_helpers']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

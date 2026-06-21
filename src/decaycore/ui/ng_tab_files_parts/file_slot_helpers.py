@@ -195,18 +195,14 @@ def _file_slot_input_name(path_key: str, slot_variant: str) -> str:
     return f"{path_key}__{slot_variant}"
 
 
-__all__ = ['_normalize_layout_value', '_guess_upload_format', '_normalize_local_path_value', '_describe_local_path', '_format_upload_size', '_build_upload_payload', '_file_slot_scope_name', '_file_slot_input_name']
+__all__ = [
+    '_normalize_layout_value',
+    '_guess_upload_format',
+    '_normalize_local_path_value',
+    '_describe_local_path',
+    '_format_upload_size',
+    '_build_upload_payload',
+    '_file_slot_scope_name',
+    '_file_slot_input_name',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['file_slot_helpers', 'measurement_token_matching', 'files_tab_builder']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

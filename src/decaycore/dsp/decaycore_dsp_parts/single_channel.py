@@ -623,18 +623,11 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
     return _assemble_generate_filter_result(impulse, stats)
 
 
-__all__ = ['_run_generate_filter_stereo_link_presolve_stats', '_normalize_impulse_if_requested', 'generate_filter']
+__all__ = [
+    '_run_generate_filter_stereo_link_presolve_stats',
+    '_normalize_impulse_if_requested',
+    'generate_filter',
+    '_limit_gd_gradient_ms_per_oct',
+    'apply_confidence_weighted_target_pull',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['single_channel', 'pair']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

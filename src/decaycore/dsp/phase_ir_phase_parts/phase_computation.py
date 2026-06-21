@@ -137,18 +137,14 @@ def _weighted_share(
     return float(np.clip(num / den, 0.0, 1.0))
 
 
-__all__ = ['_merge_minphase_and_excess', '_phase_region_profiles', '_phase_confidence_profile', '_max_abs_gd_gradient_ms_per_oct', '_gd_grad_metrics', '_gd_grad_limiter', '_weighted_mean', '_weighted_share']
+__all__ = [
+    '_merge_minphase_and_excess',
+    '_phase_region_profiles',
+    '_phase_confidence_profile',
+    '_max_abs_gd_gradient_ms_per_oct',
+    '_gd_grad_metrics',
+    '_gd_grad_limiter',
+    '_weighted_mean',
+    '_weighted_share',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['phase_windowing', 'phase_computation', 'phase_finalization']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

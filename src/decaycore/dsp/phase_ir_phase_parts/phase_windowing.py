@@ -90,18 +90,14 @@ def _linear_to_minphase_blend_mask(
     return _linear_to_minphase_blend_mask_impl(freq_axis, phase_lim_hz, cfg, st)
 
 
-__all__ = ['_PhaseComponents', '_unwrap_phases', '_compute_excess_phase', '_apply_mixed_excess_mask', '_linear_excess_weight', '_smooth_linear_boundary', '_enforce_linear_tail_decay', '_linear_to_minphase_blend_mask']
+__all__ = [
+    '_PhaseComponents',
+    '_unwrap_phases',
+    '_compute_excess_phase',
+    '_apply_mixed_excess_mask',
+    '_linear_excess_weight',
+    '_smooth_linear_boundary',
+    '_enforce_linear_tail_decay',
+    '_linear_to_minphase_blend_mask',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['phase_windowing', 'phase_computation', 'phase_finalization']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

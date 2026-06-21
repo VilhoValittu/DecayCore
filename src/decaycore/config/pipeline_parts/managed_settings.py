@@ -276,4 +276,11 @@ def _apply_auto_mode_managed_settings(data: Dict[str, Any]) -> None:
         data["unsafe_raw_dsp"] = True
 
 
-__all__ = ['_finite_float_or_default', '_advanced_manual_output_tilt_enabled', '_effective_output_tilt_source', '_resolve_output_tilt_db_per_oct', '_apply_auto_mode_managed_settings']
+__all__ = [
+    '_finite_float_or_default',
+    '_advanced_manual_output_tilt_enabled',
+    '_effective_output_tilt_source',
+    '_resolve_output_tilt_db_per_oct',
+    '_apply_auto_mode_managed_settings',
+    'get_auto_mode_filter_auto_defaults',
+]

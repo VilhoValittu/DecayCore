@@ -8,24 +8,40 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-"""Room mode detection and modal analysis.
+from .modal_preparation import (
+    RoomModeEvent,
+    ModalAnalysisResult,
+    _empty_result,
+    _as_float_array,
+    _smooth_log_box,
+    _safe_confidence,
+    _prepare_arrays,
+    _width_bounds,
+)
+from .mode_detection import (
+    _modal_candidate_geometry,
+    _voice_weight,
+    modal_support_for_band,
+    _lr_consistency_at,
+    _decay_severity_at,
+    _classify_event,
+    detect_room_modes,
+)
 
-Split into:
-- .modal_analysis_01: Input preparation and helper functions
-- .modal_analysis_02: Mode detection and classification logic
-
-Public API: detect_room_modes()
-
-Uses dynamic imports with explicit __all__ for IDE support.
-"""
-
-import importlib as _importlib
-
-_MODULE_NAMES = ['modal_preparation', 'mode_detection']
-for _module_name in _MODULE_NAMES:
-    _module = _importlib.import_module(f"{__name__}.{_module_name}")
-    for _symbol in dir(_module):
-        if not _symbol.startswith("__"):
-            globals().setdefault(_symbol, getattr(_module, _symbol))
-
-__all__ = sorted(_symbol for _symbol in globals() if not _symbol.startswith("__"))
+__all__ = [
+    'ModalAnalysisResult',
+    'RoomModeEvent',
+    '_as_float_array',
+    '_classify_event',
+    '_decay_severity_at',
+    '_empty_result',
+    '_lr_consistency_at',
+    '_modal_candidate_geometry',
+    '_prepare_arrays',
+    '_safe_confidence',
+    '_smooth_log_box',
+    '_voice_weight',
+    '_width_bounds',
+    'detect_room_modes',
+    'modal_support_for_band',
+]

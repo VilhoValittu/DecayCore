@@ -288,18 +288,24 @@ def _get_auto_status_callback(
     return _status
 
 
-__all__ = ['_progress_lerp', '_auto_progress_fraction', '_estimate_auto_progress_from_status', '_set_auto_progress', '_get_auto_status_callback']
+__all__ = [
+    '_progress_lerp',
+    '_auto_progress_fraction',
+    '_estimate_auto_progress_from_status',
+    '_set_auto_progress',
+    '_get_auto_status_callback',
+    '_AUTO_PROGRESS_INIT',
+    '_AUTO_PROGRESS_TARGET_MODE',
+    '_AUTO_PROGRESS_TARGET_PRESELECT',
+    '_AUTO_PROGRESS_TARGET_TRIALS_START',
+    '_AUTO_PROGRESS_TARGET_TRIALS_END',
+    '_AUTO_PROGRESS_PRESET_SEARCH_START',
+    '_AUTO_PROGRESS_PHASE1_START',
+    '_AUTO_PROGRESS_PHASE1_END',
+    '_AUTO_PROGRESS_PHASE2_START',
+    '_AUTO_PROGRESS_PHASE2_END',
+    '_AUTO_PROGRESS_PHASE3_START',
+    '_AUTO_PROGRESS_PHASE3_END',
+    '_AUTO_PROGRESS_FINALIZE',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['progress', 'status_text', 'seed_phases', 'search']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

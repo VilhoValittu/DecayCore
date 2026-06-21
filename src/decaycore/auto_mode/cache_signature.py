@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import logging
 import hashlib
 import json
 import random
@@ -72,10 +73,11 @@ from .shared import (
     _auto_goal_norm as _auto_goal_norm,
     _auto_hash_array,
     _auto_safe_float,
-    logger,
 )
 from ..dsp.hybrid_iir import HYBRID_IIR_POLICY_VERSION
 from ..dsp.hpf_policy import HPF_IIR_TAP_THRESHOLD, hpf_settings_should_use_iir
+
+logger = logging.getLogger("DecayCore")
 
 def _auto_cache_resolve_path(*, compat_version: str | None = None) -> str:
     if compat_version is None:

@@ -8,13 +8,68 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-import importlib as _importlib
+from .headless_batch_runner import (
+    _copy_export_artifacts,
+    run_batch,
+    prepare_headless_config,
+)
+from .headless_export_bundle import (
+    _headless_camilladsp_yaml_name,
+    _headless_summary_content,
+    _build_headless_export_zip,
+    _save_headless_export_bundle,
+    _read_json,
+    _resolve_path,
+    _first_existing,
+    _normalize_headless_config,
+)
+from .headless_metrics_output import (
+    _load_optional_metadata,
+    _f,
+    _pick,
+    _extract_rt60,
+    _extract_harmonics,
+    _build_metrics,
+    _write_summary,
+    _write_outputs,
+)
+from .headless_progress import (
+    ProgressSink,
+    ConsoleProgressSink,
+    _HeadlessCallbacks,
+    _HeadlessBridge,
+    _utc_now,
+    _git_commit,
+    _safe_filename_token,
+    _headless_winner_rank_score,
+)
 
-_MODULE_NAMES = ['headless_progress', 'headless_metrics_output', 'headless_batch_runner', 'headless_export_bundle']
-for _module_name in _MODULE_NAMES:
-    _module = _importlib.import_module(f"{__name__}.{_module_name}")
-    for _symbol in dir(_module):
-        if not _symbol.startswith("__"):
-            globals().setdefault(_symbol, getattr(_module, _symbol))
-
-__all__ = sorted(_symbol for _symbol in globals() if not _symbol.startswith("__"))
+__all__ = [
+    'ConsoleProgressSink',
+    'ProgressSink',
+    '_HeadlessBridge',
+    '_HeadlessCallbacks',
+    '_build_headless_export_zip',
+    '_build_metrics',
+    '_copy_export_artifacts',
+    '_extract_harmonics',
+    '_extract_rt60',
+    '_f',
+    '_first_existing',
+    '_git_commit',
+    '_headless_camilladsp_yaml_name',
+    '_headless_summary_content',
+    '_headless_winner_rank_score',
+    '_load_optional_metadata',
+    '_normalize_headless_config',
+    '_pick',
+    '_read_json',
+    '_resolve_path',
+    '_safe_filename_token',
+    '_save_headless_export_bundle',
+    '_utc_now',
+    '_write_outputs',
+    '_write_summary',
+    'prepare_headless_config',
+    'run_batch',
+]

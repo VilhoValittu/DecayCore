@@ -679,18 +679,13 @@ def _auto_select_builtin_target_curve(
     }
 
 
-__all__ = ['_auto_target_one_step_milder', '_auto_target_slope_estimate', '_auto_target_preselect_score', '_auto_target_adaptive_shortlist', '_auto_target_insert_cached_wildcard', '_auto_build_synth_target_candidate', '_auto_select_builtin_target_curve']
+__all__ = [
+    '_auto_target_one_step_milder',
+    '_auto_target_slope_estimate',
+    '_auto_target_preselect_score',
+    '_auto_target_adaptive_shortlist',
+    '_auto_target_insert_cached_wildcard',
+    '_auto_build_synth_target_candidate',
+    '_auto_select_builtin_target_curve',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['target_preselection_core']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

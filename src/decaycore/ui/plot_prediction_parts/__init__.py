@@ -8,13 +8,10 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-import importlib as _importlib
+from .prediction_plot import (
+    _prediction_plot_fft_context,
+    _resolve_magnitude_display_offset_db,
+    generate_prediction_plot,
+)
 
-_MODULE_NAMES = ['prediction_plot']
-for _module_name in _MODULE_NAMES:
-    _module = _importlib.import_module(f"{__name__}.{_module_name}")
-    for _symbol in dir(_module):
-        if not _symbol.startswith("__"):
-            globals().setdefault(_symbol, getattr(_module, _symbol))
-
-__all__ = sorted(_symbol for _symbol in globals() if not _symbol.startswith("__"))
+__all__ = ['_prediction_plot_fft_context', '_resolve_magnitude_display_offset_db', 'generate_prediction_plot']

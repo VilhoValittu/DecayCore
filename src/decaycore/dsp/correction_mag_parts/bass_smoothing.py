@@ -880,18 +880,15 @@ def _apply_post_limits_and_metrics(inputs: _MagPostProcessInputs) -> _MagPostPro
     )
 
 
-__all__ = ['_apply_peak_priority_error_shaping', '_apply_smoothing', '_apply_confidence_adaptive_bass_smoothing', '_select_bass_adaptive_conf_mask', '_apply_mid_refit_pre_slope', '_apply_bass_boost_post_restore', '_apply_confpull_post_slope', '_apply_post_limits_and_metrics']
+__all__ = [
+    '_apply_peak_priority_error_shaping',
+    '_apply_smoothing',
+    '_apply_confidence_adaptive_bass_smoothing',
+    '_select_bass_adaptive_conf_mask',
+    '_apply_mid_refit_pre_slope',
+    '_apply_bass_boost_post_restore',
+    '_apply_confpull_post_slope',
+    '_apply_post_limits_and_metrics',
+    '_apply_hard_boost_cut_clamp',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['bass_smoothing', 'mag_pipeline']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

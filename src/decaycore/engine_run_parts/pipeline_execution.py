@@ -45,6 +45,17 @@ from ..engine_summary import summarize_run
 from .direct_dac_bass_integration import apply_direct_dac_bass_integration_result
 from .subwoofer_target import build_subwoofer_target_with_lpf, subwoofer_target_metadata
 
+from .measurement_response_helpers import (
+    _build_measurement_side_ctx,
+    _extract_lr_measurement_axes,
+    _interp_complex_to_axis,
+    _ir_fft_on_axis,
+    _phase_from_ir,
+    _resample_to_axis,
+    _resolve_sub_measurement_for_filter,
+    _to_axis,
+)
+
 logger = logging.getLogger("DecayCore")
 
 def _call_generate_filter(freqs, mags, phases, cfg, *, include_response_arrays: bool):
@@ -843,18 +854,12 @@ def run_pipeline(  # noqa: C901 - pipeline orchestration is intentionally centra
     return result
 
 
-__all__ = ['_call_generate_filter', '_call_generate_filter_pair', '_stats_level_comp_factor', '_apply_measured_rt60_override', '_inject_direct_dac_summed_prediction_for_plot', 'run_pipeline']
-
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['measurement_response_helpers', 'pipeline_execution']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()
+__all__ = [
+    '_call_generate_filter',
+    '_call_generate_filter_pair',
+    '_stats_level_comp_factor',
+    '_apply_measured_rt60_override',
+    '_inject_direct_dac_summed_prediction_for_plot',
+    'dsp',
+    'run_pipeline',
+]

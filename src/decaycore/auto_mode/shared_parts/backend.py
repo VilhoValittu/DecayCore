@@ -85,16 +85,3 @@ def _auto_trial_chunk_size(workers: int) -> int:
 
 __all__ = ['_auto_optimizer_backend', '_auto_optuna_sampler_kwargs', '_auto_trial_workers', '_auto_trial_chunk_size']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['cache_hash', 'goal_profile', 'safe_values', 'backend', 'config', 'phase_sampling']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

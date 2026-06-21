@@ -12,9 +12,11 @@
 
 from __future__ import annotations
 
-from ..shared import logger
+import logging
 from .cache import AUTO_SEARCH_CACHE_SCHEMA_VERSION
 from .plan import AutoSearchPlanDecision
+
+logger = logging.getLogger("DecayCore")
 
 
 def log_plan_decision(decision: AutoSearchPlanDecision, *, seed_source: str | None = None) -> None:

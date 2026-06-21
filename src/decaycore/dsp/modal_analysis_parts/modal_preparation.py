@@ -55,7 +55,6 @@ except ImportError:
 
 MODAL_ANALYSIS_VERSION = 2
 
-__all__ = ["RoomModeEvent", "ModalAnalysisResult", "detect_room_modes", "modal_support_for_band"]
 
 @dataclass(frozen=True)
 class RoomModeEvent:
@@ -367,18 +366,14 @@ def _width_bounds(excess: np.ndarray, peak_idx: int, min_floor: float) -> tuple[
     return int(left), int(right)
 
 
-__all__ = ['RoomModeEvent', 'ModalAnalysisResult', '_empty_result', '_as_float_array', '_smooth_log_box', '_safe_confidence', '_prepare_arrays', '_width_bounds']
+__all__ = [
+    'RoomModeEvent',
+    'ModalAnalysisResult',
+    '_empty_result',
+    '_as_float_array',
+    '_smooth_log_box',
+    '_safe_confidence',
+    '_prepare_arrays',
+    '_width_bounds',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['modal_preparation', 'mode_detection']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

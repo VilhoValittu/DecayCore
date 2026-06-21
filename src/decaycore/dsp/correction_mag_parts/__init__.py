@@ -8,22 +8,36 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-"""Magnitude correction pipeline submodules.
+from .bass_smoothing import (
+    _apply_peak_priority_error_shaping,
+    _apply_smoothing,
+    _apply_confidence_adaptive_bass_smoothing,
+    _select_bass_adaptive_conf_mask,
+    _apply_mid_refit_pre_slope,
+    _apply_bass_boost_post_restore,
+    _apply_confpull_post_slope,
+    _apply_post_limits_and_metrics,
+    _apply_hard_boost_cut_clamp,
+)
+from .mag_pipeline import (
+    _run_mag_raw_stage,
+    _run_mag_bassfirst_afdw_conf_stage,
+    _run_mag_core_stage,
+    _run_mag_correction_pipeline,
+)
 
-Split into:
-- .correction_mag_01: Bass smoothing and mid refit logic
-- .correction_mag_02: Core pipeline orchestration
-
-Uses dynamic imports with explicit __all__ for IDE support.
-"""
-
-import importlib as _importlib
-
-_MODULE_NAMES = ['bass_smoothing', 'mag_pipeline']
-for _module_name in _MODULE_NAMES:
-    _module = _importlib.import_module(f"{__name__}.{_module_name}")
-    for _symbol in dir(_module):
-        if not _symbol.startswith("__"):
-            globals().setdefault(_symbol, getattr(_module, _symbol))
-
-__all__ = sorted(_symbol for _symbol in globals() if not _symbol.startswith("__"))
+__all__ = [
+    '_apply_bass_boost_post_restore',
+    '_apply_confidence_adaptive_bass_smoothing',
+    '_apply_confpull_post_slope',
+    '_apply_hard_boost_cut_clamp',
+    '_apply_mid_refit_pre_slope',
+    '_apply_peak_priority_error_shaping',
+    '_apply_post_limits_and_metrics',
+    '_apply_smoothing',
+    '_run_mag_bassfirst_afdw_conf_stage',
+    '_run_mag_core_stage',
+    '_run_mag_correction_pipeline',
+    '_run_mag_raw_stage',
+    '_select_bass_adaptive_conf_mask',
+]

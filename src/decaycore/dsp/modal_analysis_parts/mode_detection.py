@@ -14,6 +14,13 @@ from typing import Sequence
 
 import numpy as np
 
+from .modal_preparation import (
+    ModalAnalysisResult,
+    RoomModeEvent,
+    _empty_result,
+    _smooth_log_box,
+    _width_bounds,
+)
 
 
 
@@ -45,7 +52,7 @@ import numpy as np
 
 
 
-__all__ = ["RoomModeEvent", "ModalAnalysisResult", "detect_room_modes", "modal_support_for_band"]
+
 
 def _modal_candidate_geometry(
     freq: np.ndarray,
@@ -545,18 +552,13 @@ def detect_room_modes(
         return _empty_result()
 
 
-__all__ = ['_modal_candidate_geometry', '_voice_weight', 'modal_support_for_band', '_lr_consistency_at', '_decay_severity_at', '_classify_event', 'detect_room_modes']
+__all__ = [
+    '_modal_candidate_geometry',
+    '_voice_weight',
+    'modal_support_for_band',
+    '_lr_consistency_at',
+    '_decay_severity_at',
+    '_classify_event',
+    'detect_room_modes',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['modal_preparation', 'mode_detection']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

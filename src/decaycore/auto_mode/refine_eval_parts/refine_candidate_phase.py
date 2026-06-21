@@ -42,14 +42,6 @@ from ..shared import (
 )
 
 logger = logging.getLogger("DecayCore")
-__all__ = [
-    "RefineEvalContext",
-    "apply_refine_mode_soft_penalty",
-    "build_phase2_rollup_telemetry",
-    "evaluate_search_candidate",
-    "normalize_trial_preset",
-    "run_candidate_phase",
-]
 
 
 
@@ -66,14 +58,6 @@ __all__ = [
 
 
 
-__all__ = [
-    "apply_refine_mode_soft_penalty",
-    "RefineEvalContext",
-    "build_phase2_rollup_telemetry",
-    "evaluate_search_candidate",
-    "normalize_trial_preset",
-    "run_candidate_phase",
-]
 
 @dataclass
 class RefineEvalContext:
@@ -1086,18 +1070,13 @@ def run_candidate_phase(
     )
 
 
-__all__ = ['RefineEvalContext', 'apply_refine_mode_soft_penalty', 'normalize_trial_preset', 'build_phase2_rollup_telemetry', 'evaluate_search_candidate', '_consume_phase_result', 'run_candidate_phase']
+__all__ = [
+    'RefineEvalContext',
+    'apply_refine_mode_soft_penalty',
+    'normalize_trial_preset',
+    'build_phase2_rollup_telemetry',
+    'evaluate_search_candidate',
+    '_consume_phase_result',
+    'run_candidate_phase',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['refine_candidate_phase']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

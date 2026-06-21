@@ -207,18 +207,10 @@ def _build_auto_finalize_status(
     )
 
 
-__all__ = ['_build_auto_selected_text', '_resolve_auto_hpf_seed_source', '_auto_finalize_status_suffix', '_build_auto_finalize_status']
+__all__ = [
+    '_build_auto_selected_text',
+    '_resolve_auto_hpf_seed_source',
+    '_auto_finalize_status_suffix',
+    '_build_auto_finalize_status',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['progress', 'status_text', 'seed_phases', 'search']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

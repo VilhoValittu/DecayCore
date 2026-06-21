@@ -55,6 +55,20 @@ from ..mag_telemetry import (
 from ..phase_ir_utils import _cosine_fade_out_01
 from ..smoothing import smooth_gain_fractional_octave
 
+from .authority import (
+    _apply_acoustic_authority_caps,
+    _apply_candidate_metrics,
+)
+from .clamps import (
+    _apply_hard_clamps,
+    _apply_soft_clamps,
+)
+from .low_frequency import (
+    _apply_low_frequency_policy,
+    _prepare_boost_caps,
+)
+from .metrics import _store_realized_pre_ir_metrics
+
 
 def _run_softclip_stage(
     gain_apply,
@@ -1112,16 +1126,3 @@ def apply_post_limits_and_metrics(
 
 __all__ = ['apply_post_limits_and_metrics']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['low_frequency', 'authority', 'clamps', 'metrics', 'pipeline']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

@@ -1556,18 +1556,6 @@ __all__ = [
     '_schedule_target_preview_refresh',
     '_on_target_preview_relayout',
     '_build_target_preview_fig',
+    'ctrl',
 ]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['target_tab_builder']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

@@ -8,13 +8,50 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-import importlib as _importlib
+from .bass_integration import _render_bass_integration
+from .overview import (
+    _format_recommended_xo_hz,
+    render_results,
+    _esc,
+    _metric_table_html,
+    _section,
+    _render_run_overview,
+    _build_auto_polish_lines,
+    _append_auto_polish_to_status_log,
+    _build_p6_validation_block,
+    _render_auto_diagnostics,
+    _update_crossover_recommendation_label,
+)
+from .plots_export import _render_plots_and_export
+from .quality import (
+    _render_ir_alignment,
+    _render_dsp_quality,
+    _render_lr_difference,
+    _render_hybrid_iir_cuts,
+    _fmt_biquad,
+    _fmt_external_iir_hpf,
+    _rejected_reasons,
+)
 
-_MODULE_NAMES = ['plots_export', 'quality', 'bass_integration', 'overview']
-for _module_name in _MODULE_NAMES:
-    _module = _importlib.import_module(f"{__name__}.{_module_name}")
-    for _symbol in dir(_module):
-        if not _symbol.startswith("__"):
-            globals().setdefault(_symbol, getattr(_module, _symbol))
-
-__all__ = sorted(_symbol for _symbol in globals() if not _symbol.startswith("__"))
+__all__ = [
+    '_append_auto_polish_to_status_log',
+    '_build_auto_polish_lines',
+    '_build_p6_validation_block',
+    '_esc',
+    '_fmt_biquad',
+    '_fmt_external_iir_hpf',
+    '_format_recommended_xo_hz',
+    '_metric_table_html',
+    '_rejected_reasons',
+    '_render_auto_diagnostics',
+    '_render_bass_integration',
+    '_render_dsp_quality',
+    '_render_hybrid_iir_cuts',
+    '_render_ir_alignment',
+    '_render_lr_difference',
+    '_render_plots_and_export',
+    '_render_run_overview',
+    '_section',
+    '_update_crossover_recommendation_label',
+    'render_results',
+]

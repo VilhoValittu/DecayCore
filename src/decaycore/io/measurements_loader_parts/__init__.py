@@ -8,13 +8,52 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-import importlib as _importlib
+from .lr_measurement_loader import (
+    _silent_transfer_like,
+    parse_measurements_from_upload,
+    _try_load_harmonic_sidecar,
+    _measurement_sidecar_stems,
+    _measurement_sidecar_candidates,
+    _try_load_measurement_metadata_sidecar,
+    _try_load_rt60_sidecar,
+    load_measurements_lr,
+)
+from .measurement_source_helpers import (
+    _clean_local_path,
+    _get_uploaded_file,
+    _get_local_path,
+    _get_wav_window_params,
+    _is_wav_upload,
+    _load_coherent_transfer_slot,
+    _detect_coherent_slot_anchor_sample,
+    _detect_shared_coherent_anchor_sample,
+)
+from .raw_ir_and_bass_loader import (
+    _load_raw_wav_from_source,
+    load_raw_irs_lr,
+    load_raw_ir_sub,
+    load_bass_integration_measurements,
+)
 
-_MODULE_NAMES = ['measurement_source_helpers', 'raw_ir_and_bass_loader', 'lr_measurement_loader']
-for _module_name in _MODULE_NAMES:
-    _module = _importlib.import_module(f"{__name__}.{_module_name}")
-    for _symbol in dir(_module):
-        if not _symbol.startswith("__"):
-            globals().setdefault(_symbol, getattr(_module, _symbol))
-
-__all__ = sorted(_symbol for _symbol in globals() if not _symbol.startswith("__"))
+__all__ = [
+    '_clean_local_path',
+    '_detect_coherent_slot_anchor_sample',
+    '_detect_shared_coherent_anchor_sample',
+    '_get_local_path',
+    '_get_uploaded_file',
+    '_get_wav_window_params',
+    '_is_wav_upload',
+    '_load_coherent_transfer_slot',
+    '_load_raw_wav_from_source',
+    '_measurement_sidecar_candidates',
+    '_measurement_sidecar_stems',
+    '_silent_transfer_like',
+    '_try_load_harmonic_sidecar',
+    '_try_load_measurement_metadata_sidecar',
+    '_try_load_rt60_sidecar',
+    'load_bass_integration_measurements',
+    'load_measurements_lr',
+    'load_raw_ir_sub',
+    'load_raw_irs_lr',
+    'parse_measurements_from_upload',
+]

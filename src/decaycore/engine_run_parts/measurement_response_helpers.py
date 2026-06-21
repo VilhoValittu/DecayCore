@@ -254,18 +254,14 @@ def _ir_fft_on_axis(ir: np.ndarray, fs: int, f_axis: np.ndarray) -> np.ndarray:
     return _interp_complex_to_axis(f_fft, h_fft, fa)
 
 
-__all__ = ['_build_measurement_side_ctx', '_phase_from_ir', '_to_axis', '_extract_lr_measurement_axes', '_resample_to_axis', '_resolve_sub_measurement_for_filter', '_interp_complex_to_axis', '_ir_fft_on_axis']
+__all__ = [
+    '_build_measurement_side_ctx',
+    '_phase_from_ir',
+    '_to_axis',
+    '_extract_lr_measurement_axes',
+    '_resample_to_axis',
+    '_resolve_sub_measurement_for_filter',
+    '_interp_complex_to_axis',
+    '_ir_fft_on_axis',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['measurement_response_helpers', 'pipeline_execution']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

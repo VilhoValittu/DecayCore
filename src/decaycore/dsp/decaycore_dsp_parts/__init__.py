@@ -8,22 +8,24 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-"""Core DSP processing split by channel configuration.
+from .pair import (
+    _maybe_per_channel_cfg,
+    generate_filter_pair,
+)
+from .single_channel import (
+    _run_generate_filter_stereo_link_presolve_stats,
+    _normalize_impulse_if_requested,
+    generate_filter,
+    _limit_gd_gradient_ms_per_oct,
+    apply_confidence_weighted_target_pull,
+)
 
-Split into:
-- .pair: Stereo/multi-channel processing
-- .single_channel: Mono/single-channel processing
-
-Uses dynamic imports with explicit __all__ for IDE support.
-"""
-
-import importlib as _importlib
-
-_MODULE_NAMES = ['pair', 'single_channel']
-for _module_name in _MODULE_NAMES:
-    _module = _importlib.import_module(f"{__name__}.{_module_name}")
-    for _symbol in dir(_module):
-        if not _symbol.startswith("__"):
-            globals().setdefault(_symbol, getattr(_module, _symbol))
-
-__all__ = sorted(_symbol for _symbol in globals() if not _symbol.startswith("__"))
+__all__ = [
+    '_limit_gd_gradient_ms_per_oct',
+    '_maybe_per_channel_cfg',
+    '_normalize_impulse_if_requested',
+    '_run_generate_filter_stereo_link_presolve_stats',
+    'apply_confidence_weighted_target_pull',
+    'generate_filter',
+    'generate_filter_pair',
+]

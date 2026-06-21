@@ -16,6 +16,14 @@ from __future__ import annotations
 import numpy as np
 import scipy.signal
 
+from .validation_setup import (
+    _freq_mask,
+    _main_peak_index,
+    _next_pow2,
+    _safe_energy,
+    _safe_rms,
+)
+
 
 _EPS = 1e-12
 _SEVERITY_ORDER: dict[str, int] = {"ok": 0, "warn": 1, "reject": 2}
@@ -302,18 +310,14 @@ def _stereo_metrics(
     }
 
 
-__all__ = ['_temporal_energy_metrics', '_fir_spectrum', '_gd_metrics_from_fir', '_fir_to_mag_db', '_skip_pre_ringing', '_is_minimum_phase', '_magnitude_metrics', '_stereo_metrics']
+__all__ = [
+    '_temporal_energy_metrics',
+    '_fir_spectrum',
+    '_gd_metrics_from_fir',
+    '_fir_to_mag_db',
+    '_skip_pre_ringing',
+    '_is_minimum_phase',
+    '_magnitude_metrics',
+    '_stereo_metrics',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['validation_setup', 'validation_checks', 'validation_metrics']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

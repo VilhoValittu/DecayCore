@@ -16,6 +16,11 @@ from ..dsp_config import CfgReader
 from ..dsp_telemetry import safe_put_many
 from ..smoothing import smooth_gain_fractional_octave
 
+from .low_frequency import (
+    _authority_band_metrics,
+    _stats_array,
+)
+
 def _authority_metrics_payload(
     *,
     st,
@@ -252,16 +257,3 @@ def _apply_candidate_metrics(
 
 __all__ = ['_apply_acoustic_authority_caps', '_apply_candidate_metrics']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['low_frequency', 'authority', 'clamps', 'metrics', 'pipeline']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

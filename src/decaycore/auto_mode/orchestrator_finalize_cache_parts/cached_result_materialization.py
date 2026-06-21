@@ -17,6 +17,16 @@ from ..candidate_generation import _seed_auto_mode_candidate_optuna_params
 from ..rank_score import attach_official_rank_score
 from ..scoring_ranking import maybe_override_hard_failed_winner
 
+from .cache_finalize_status import (
+    _cache_refine_winner_summary,
+    _public_stereo_policy_refine_meta,
+    _stereo_refine_materialize_base_data,
+)
+from .cached_result_scoring import (
+    _attach_cached_debug,
+    _save_cached_best,
+)
+
 _LOW_BASS_CUT_WINNER_POLISH_STEP_HZ = 2.0
 _LOW_BASS_CUT_WINNER_POLISH_MAX_DELTA_HZ = 8.0
 
@@ -229,16 +239,3 @@ def _return_cached_result(
 
 __all__ = ['_materialize_cached_result', '_return_cached_result']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['cache_finalize_status', 'cached_result_scoring', 'cached_result_materialization']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

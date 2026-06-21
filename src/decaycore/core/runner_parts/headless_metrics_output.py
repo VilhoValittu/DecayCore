@@ -20,6 +20,8 @@ from typing import Any
 from ...auto_mode.rank_score import attach_official_rank_score, official_rank_score
 from ...version import VERSION
 
+from .headless_progress import _git_commit
+
 logger = logging.getLogger("DecayCore")
 
 
@@ -77,14 +79,10 @@ logger = logging.getLogger("DecayCore")
 
 
 
-__all__ = [
-    "ConsoleProgressSink",
-    "ProgressSink",
-    "prepare_headless_config",
-    "run_batch",
-]
 
 def _load_optional_metadata(config_dir: Path, config: dict) -> tuple[dict, dict, dict]:
+    from .headless_export_bundle import _read_json
+
     metadata = {}
     if isinstance(config.get("measurement_metadata"), dict):
         metadata.update(config.get("measurement_metadata") or {})
@@ -352,18 +350,13 @@ def _write_outputs(output_dir: Path, metrics_doc: dict) -> None:
     _write_summary(output_dir / "summary.txt", metrics_doc)
 
 
-__all__ = ['_load_optional_metadata', '_f', '_pick', '_extract_rt60', '_extract_harmonics', '_build_metrics', '_write_summary', '_write_outputs']
-
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['headless_progress', 'headless_export_bundle', 'headless_metrics_output', 'headless_batch_runner']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()
+__all__ = [
+    '_load_optional_metadata',
+    '_f',
+    '_pick',
+    '_extract_rt60',
+    '_extract_harmonics',
+    '_build_metrics',
+    '_write_summary',
+    '_write_outputs',
+]

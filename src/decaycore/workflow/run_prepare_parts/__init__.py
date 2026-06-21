@@ -8,13 +8,70 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-import importlib as _importlib
+from .bass_diagnostics import (
+    _status,
+    _direct_dac_filter_params,
+    _direct_dac_alignment_params,
+    _compute_direct_dac_prepare_recommendation,
+    _compute_selected_bass_integration_diagnostics,
+)
+from .measurements import (
+    _get_wav_window_params,
+    _extract_generated_source_rt60,
+    _extract_generated_source_snr,
+    _load_generated_measurement_pair,
+    _prepare_ui_and_measurements,
+    _try_load_harmonic_sidecar,
+    _try_load_rt60_sidecar,
+    compute_health,
+    filter_type_short,
+    load_bass_integration_measurements,
+    load_measurements_lr,
+    load_raw_ir_sub,
+    load_raw_irs_lr,
+    save_config,
+)
+from .target_context import (
+    _build_bass_integration_metadata_unified,
+    _prepare_target_curve_and_run_context,
+    _prepare_target_curve_bass_integration_context,
+    _safe_float_from_dict,
+    build_xos_hpf,
+    choose_dash_fs,
+    choose_target_rates,
+    detect_is_wav_source,
+    load_house_curve,
+    log_df_smoothing_toggle,
+)
 
-_MODULE_NAMES = ['measurements', 'target_context', 'bass_diagnostics']
-for _module_name in _MODULE_NAMES:
-    _module = _importlib.import_module(f"{__name__}.{_module_name}")
-    for _symbol in dir(_module):
-        if not _symbol.startswith("__"):
-            globals().setdefault(_symbol, getattr(_module, _symbol))
-
-__all__ = sorted(_symbol for _symbol in globals() if not _symbol.startswith("__"))
+__all__ = [
+    '_build_bass_integration_metadata_unified',
+    '_compute_direct_dac_prepare_recommendation',
+    '_compute_selected_bass_integration_diagnostics',
+    '_direct_dac_alignment_params',
+    '_direct_dac_filter_params',
+    '_extract_generated_source_rt60',
+    '_extract_generated_source_snr',
+    '_get_wav_window_params',
+    '_load_generated_measurement_pair',
+    '_prepare_target_curve_and_run_context',
+    '_prepare_target_curve_bass_integration_context',
+    '_prepare_ui_and_measurements',
+    '_safe_float_from_dict',
+    '_status',
+    '_try_load_harmonic_sidecar',
+    '_try_load_rt60_sidecar',
+    'build_xos_hpf',
+    'choose_dash_fs',
+    'choose_target_rates',
+    'compute_health',
+    'detect_is_wav_source',
+    'filter_type_short',
+    'load_bass_integration_measurements',
+    'load_house_curve',
+    'load_measurements_lr',
+    'load_raw_ir_sub',
+    'load_raw_irs_lr',
+    'log_df_smoothing_toggle',
+    'save_config',
+]

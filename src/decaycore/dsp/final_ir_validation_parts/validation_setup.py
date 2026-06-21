@@ -167,18 +167,14 @@ def _freq_mask(freq: np.ndarray, lo: float, hi: float) -> np.ndarray:
     return (freq >= float(lo)) & (freq <= float(hi))
 
 
-__all__ = ['FinalIRValidationResult', '_bump_severity', '_next_pow2', '_main_peak_index', '_safe_energy', '_safe_rms', '_safe_arr', '_freq_mask']
+__all__ = [
+    'FinalIRValidationResult',
+    '_bump_severity',
+    '_next_pow2',
+    '_main_peak_index',
+    '_safe_energy',
+    '_safe_rms',
+    '_safe_arr',
+    '_freq_mask',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['validation_setup', 'validation_checks', 'validation_metrics']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

@@ -158,18 +158,14 @@ def _token_is_sub2ish(token: str) -> bool:
     )
 
 
-__all__ = ['_measurement_hint_tokens', '_measurement_entry_mtime_ns', '_token_has_numeric_suffix', '_token_is_leftish', '_token_is_rightish', '_token_is_subish', '_token_is_sub1ish', '_token_is_sub2ish']
+__all__ = [
+    '_measurement_hint_tokens',
+    '_measurement_entry_mtime_ns',
+    '_token_has_numeric_suffix',
+    '_token_is_leftish',
+    '_token_is_rightish',
+    '_token_is_subish',
+    '_token_is_sub1ish',
+    '_token_is_sub2ish',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['file_slot_helpers', 'measurement_token_matching', 'files_tab_builder']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

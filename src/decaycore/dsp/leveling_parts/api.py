@@ -19,12 +19,26 @@ from ..leveling_window import (
     find_stable_level_window_impl,
 )
 
-__all__ = [
-    "StereoLinkContext",
-    "find_stable_level_window",
-    "find_shared_stereo_level_window",
-    "compute_leveling",
-]
+from .state_cache import (
+    StereoLinkContext,
+    _capture_leveling_state,
+    _leveling_cache_key,
+    _remember_leveling_error,
+    _restore_leveling_state,
+    _safe_setattr,
+    _stable_level_window_cache_key,
+    _to_bool,
+    _to_float,
+)
+from .tilt_helpers import (
+    _log_median,
+    _lower_tail_robust_std_db,
+    _resample_log_axis,
+    _tilt_fit_offset_and_slope_db_per_oct,
+    _window_offset_consistency_score,
+)
+from .window_scoring import _perceptual_shape_score
+
 
 
 
@@ -224,18 +238,12 @@ def compute_leveling(
     return result
 
 
-__all__ = ['find_stable_level_window', 'find_shared_stereo_level_window', 'compute_leveling']
+__all__ = [
+    'find_stable_level_window',
+    'find_shared_stereo_level_window',
+    'compute_leveling',
+    'compute_leveling_impl',
+    'find_shared_stereo_level_window_impl',
+    'find_stable_level_window_impl',
+]
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['state_cache', 'tilt_helpers', 'window_scoring', 'api']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

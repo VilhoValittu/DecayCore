@@ -308,4 +308,13 @@ def detect_is_wav_source(data: Dict[str, Any]) -> bool:
     )
 
 
-__all__ = ['_apply_auto_hpf_runtime_override', 'build_xos_hpf', 'filter_type_short', 'filter_type_supports_xo_phase_model', 'multi_rate_target_rates', 'choose_target_rates', 'choose_dash_fs', 'detect_is_wav_source']
+__all__ = [
+    '_apply_auto_hpf_runtime_override',
+    'build_xos_hpf',
+    'filter_type_short',
+    'filter_type_supports_xo_phase_model',
+    'multi_rate_target_rates',
+    'choose_target_rates',
+    'choose_dash_fs',
+    'detect_is_wav_source',
+]

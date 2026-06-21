@@ -16,12 +16,6 @@ import threading
 import numpy as np
 
 
-__all__ = [
-    "StereoLinkContext",
-    "find_stable_level_window",
-    "find_shared_stereo_level_window",
-    "compute_leveling",
-]
 
 
 
@@ -276,18 +270,27 @@ def _clear_level_window_cache() -> None:
         _LEVEL_WINDOW_CACHE.clear()
 
 
-__all__ = ['StereoLinkContext', '_to_float', '_to_bool', '_remember_leveling_error', '_safe_setattr', '_normalize_optional_float', '_normalize_optional_window', '_normalize_hpf_freq', '_normalize_level_window_params', '_hash_leveling_array', '_stable_level_window_cache_key', '_leveling_cache_key', '_capture_leveling_state', '_restore_leveling_state', '_clear_leveling_cache', '_clear_level_window_cache']
-
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['state_cache', 'tilt_helpers', 'window_scoring', 'api']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()
+__all__ = [
+    'StereoLinkContext',
+    '_LEVELING_CACHE',
+    '_LEVELING_CACHE_LOCK',
+    '_LEVELING_CACHE_MAX',
+    '_LEVEL_WINDOW_CACHE',
+    '_LEVEL_WINDOW_CACHE_LOCK',
+    '_LEVEL_WINDOW_CACHE_MAX',
+    '_to_float',
+    '_to_bool',
+    '_remember_leveling_error',
+    '_safe_setattr',
+    '_normalize_optional_float',
+    '_normalize_optional_window',
+    '_normalize_hpf_freq',
+    '_normalize_level_window_params',
+    '_hash_leveling_array',
+    '_stable_level_window_cache_key',
+    '_leveling_cache_key',
+    '_capture_leveling_state',
+    '_restore_leveling_state',
+    '_clear_leveling_cache',
+    '_clear_level_window_cache',
+]

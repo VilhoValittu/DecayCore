@@ -996,16 +996,3 @@ def _auto_run_optuna_eval_loop_core(
 
 __all__ = ['_auto_run_optuna_eval_loop_core']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['optuna_eval_loop']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

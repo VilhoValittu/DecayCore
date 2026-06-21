@@ -8,13 +8,42 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-import importlib as _importlib
+from .bass_integration import (
+    _append_bass_integration_summary,
+    _append_bass_integration_allpass_auto_summary,
+)
+from .dsp_effective import (
+    _append_dsp_effective_params,
+    _append_realized_phase_limit,
+)
+from .events import (
+    _append_acoustic_events,
+    _append_lr_difference_summary,
+)
+from .leveling import _append_leveling_summary
+from .runtime import (
+    _polish_display_rank,
+    _format_recommended_xo_hz,
+    _auto_search_space_summary,
+    _module_runtime_version,
+    _runtime_versions_text,
+    _append_main_speaker_xo_hpf_summary,
+)
+from .stereo_policy import _append_auto_stereo_policy_summary
 
-_MODULE_NAMES = ['events', 'runtime', 'bass_integration', 'stereo_policy', 'dsp_effective', 'leveling']
-for _module_name in _MODULE_NAMES:
-    _module = _importlib.import_module(f"{__name__}.{_module_name}")
-    for _symbol in dir(_module):
-        if not _symbol.startswith("__"):
-            globals().setdefault(_symbol, getattr(_module, _symbol))
-
-__all__ = sorted(_symbol for _symbol in globals() if not _symbol.startswith("__"))
+__all__ = [
+    '_append_acoustic_events',
+    '_append_auto_stereo_policy_summary',
+    '_append_bass_integration_allpass_auto_summary',
+    '_append_bass_integration_summary',
+    '_append_dsp_effective_params',
+    '_append_leveling_summary',
+    '_append_lr_difference_summary',
+    '_append_main_speaker_xo_hpf_summary',
+    '_append_realized_phase_limit',
+    '_auto_search_space_summary',
+    '_format_recommended_xo_hz',
+    '_module_runtime_version',
+    '_polish_display_rank',
+    '_runtime_versions_text',
+]

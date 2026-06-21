@@ -1,3 +1,8 @@
+from .single_channel import (
+    _run_generate_filter_stereo_link_presolve_stats,
+    generate_filter,
+)
+
 # DecayCore
 # Copyright (c) 2026 Vilho Valittu.
 # All rights reserved except as expressly granted in the LICENSE file.
@@ -423,16 +428,3 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
 
 __all__ = ['_maybe_per_channel_cfg', 'generate_filter_pair']
 
-
-def _link_sibling_exports() -> None:
-    import importlib
-    package = __package__
-    for module_name in ['single_channel', 'pair']:
-        if module_name == __name__.rsplit('.', 1)[-1]:
-            continue
-        module = importlib.import_module(f"{package}.{module_name}")
-        for symbol in getattr(module, "__all__", ()):
-            globals().setdefault(symbol, getattr(module, symbol))
-
-
-_link_sibling_exports()

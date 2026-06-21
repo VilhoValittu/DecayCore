@@ -8,13 +8,22 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-import importlib as _importlib
+from .refine_candidate_phase import (
+    RefineEvalContext,
+    apply_refine_mode_soft_penalty,
+    normalize_trial_preset,
+    build_phase2_rollup_telemetry,
+    evaluate_search_candidate,
+    _consume_phase_result,
+    run_candidate_phase,
+)
 
-_MODULE_NAMES = ['refine_candidate_phase']
-for _module_name in _MODULE_NAMES:
-    _module = _importlib.import_module(f"{__name__}.{_module_name}")
-    for _symbol in dir(_module):
-        if not _symbol.startswith("__"):
-            globals().setdefault(_symbol, getattr(_module, _symbol))
-
-__all__ = sorted(_symbol for _symbol in globals() if not _symbol.startswith("__"))
+__all__ = [
+    'RefineEvalContext',
+    '_consume_phase_result',
+    'apply_refine_mode_soft_penalty',
+    'build_phase2_rollup_telemetry',
+    'evaluate_search_candidate',
+    'normalize_trial_preset',
+    'run_candidate_phase',
+]
