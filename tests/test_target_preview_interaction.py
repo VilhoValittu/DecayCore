@@ -38,7 +38,7 @@ def test_extract_vertical_shift_from_shapes_path_payload_uses_current_manual_off
     shifted_path = build_target_curve_path([10.0, 20.0, 40.0], [0.0, 1.0, 2.5])
 
     updated = extract_vertical_shift_from_shape_relayout(
-        {"shapes[0].path": shifted_path},
+        {"shapes": [{"path": shifted_path}]},
         base_points,
     )
 
@@ -65,12 +65,20 @@ def test_extract_vertical_shift_anchors_repeated_drag_events_to_same_rendered_ba
     base_points = [(10.0, -2.0), (20.0, -1.0), (40.0, 0.5)]
 
     first = extract_vertical_shift_from_shape_relayout(
-        {"shapes[0].path": build_target_curve_path([10.0, 20.0, 40.0], [-1.0, 0.0, 1.5])},
+        {
+            "shapes": [
+                {"path": build_target_curve_path([10.0, 20.0, 40.0], [-1.0, 0.0, 1.5])}
+            ]
+        },
         base_points,
     )
     manual.value = first
     second = extract_vertical_shift_from_shape_relayout(
-        {"shapes[0].path": build_target_curve_path([10.0, 20.0, 40.0], [-0.5, 0.5, 2.0])},
+        {
+            "shapes": [
+                {"path": build_target_curve_path([10.0, 20.0, 40.0], [-0.5, 0.5, 2.0])}
+            ]
+        },
         base_points,
     )
 
@@ -87,7 +95,11 @@ def test_extract_vertical_shift_returns_none_when_only_tilt_handle_shape_changed
     updated = extract_vertical_shift_from_shape_relayout(
         {
             "shapes": [
-                {"path": build_target_curve_path([10.0, 20.0, 40.0], [-2.0, -1.0, 0.5])},
+                {
+                    "path": build_target_curve_path(
+                        [10.0, 20.0, 40.0], [-2.0, -1.0, 0.5]
+                    )
+                },
                 {"path": moved_tilt_handle},
             ]
         },
@@ -104,22 +116,22 @@ def test_extract_target_tilt_from_shape_relayout_uses_right_side_handle_y_drag()
     moved_handle_path = build_tilt_handle_path(-3.0)
 
     updated = extract_target_tilt_from_shape_relayout(
-        {"shapes[1].path": moved_handle_path},
+        {"shapes": [{}, {"path": moved_handle_path}]},
         base_handle_points,
     )
 
     assert updated == 0.5
 
 
-def test_extract_target_tilt_from_shape_relayout_ignores_x_drag_but_keeps_rebuild_value():
+def test_extract_target_tilt_from_shape_relayout_ignores_unchanged_handle_path():
     ctrl.reset()
     ctrl.register("manual_target_tilt_db_per_oct", _DummyControl(-0.5))
     base_handle_points = parse_svg_path_points(build_tilt_handle_path(-1.0))
-    x_shift_only_path = build_target_curve_path([14000.0, 19000.0], [-1.0, -1.0])
+    x_shift_only_path = build_tilt_handle_path(-1.0)
 
     updated = extract_target_tilt_from_shape_relayout(
         {"shapes": [{}, {"path": x_shift_only_path}]},
         base_handle_points,
     )
 
-    assert updated == -0.5
+    assert updated is None

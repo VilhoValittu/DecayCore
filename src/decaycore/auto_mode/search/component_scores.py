@@ -12,4 +12,4 @@ from __future__ import annotations
 
 from .component_bass_stereo import *
 from .component_fit_safety import *
-from .residual_score import score_residual_peaks
+from .residual_score import score_residual_peaks as score_residual_peaks

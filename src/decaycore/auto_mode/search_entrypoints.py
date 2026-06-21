@@ -15,7 +15,10 @@ from __future__ import annotations
 import logging
 
 from . import api as auto_api
-from . import orchestrator_finalize, orchestrator_refine
+from . import (
+    orchestrator_finalize as orchestrator_finalize,
+    orchestrator_refine as orchestrator_refine,
+)
 logger = logging.getLogger("DecayCore")
 
 

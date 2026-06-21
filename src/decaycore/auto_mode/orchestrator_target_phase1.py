@@ -17,7 +17,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
 
-from .cache_signature import _auto_apply_seed
 from .candidate_generation import (
     _build_auto_mode_candidates_local,
     _seed_auto_mode_candidate_local_optuna_params,

@@ -10,42 +10,13 @@
 
 from __future__ import annotations
 
-import inspect
 import logging
-import math
-import sys
 
 import numpy as np
 
 _logger = logging.getLogger(__name__)
 
-from ...common.acoustic_stats import calc_acoustic_score, calc_ai_summary_from_stats
-from ...config.models import StereoAutoPolicyConfig, StereoResolvedAutoPolicies
-from ...dsp.quality_metrics import (
-    band_lr_mismatch_change_from_stats,
-    band_lr_mismatch_rms_from_stats,
-    normalized_policy_divergence_score,
-    worst_channel_relief_db,
-)
-from ...dsp.modal_analysis import ModalAnalysisResult, RoomModeEvent, detect_room_modes
-from ...dsp.smoothing import smooth_gain_fractional_octave
-from ...dsp.target_match import target_match_from_stats
 from .. import shared
-from ..rank_score import (
-    OFFICIAL_RANK_SCORE_CONTEXT,
-    attach_official_rank_score,
-    calibrated_auto_quality,
-    compute_rank_score_components,
-)
-from ..runtime_context import (
-    _auto_collect_reflections,
-    _auto_event_penalty_weighted,
-    _auto_event_severity,
-    _auto_get_top_modes_hz,
-    _auto_get_worst_mode_hz,
-    _auto_mode_band,
-    _auto_pick_metric,
-)
 
 from .metrics_common import _auto_stats_pick_arr
 

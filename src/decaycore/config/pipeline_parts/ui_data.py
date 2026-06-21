@@ -10,30 +10,29 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Tuple
 import logging
 import math
-import numpy as np
 
-from ...auto_mode.filter_priors import get_auto_mode_filter_auto_defaults
 from ...auto_mode.shared import AUTO_MODE_GOAL_FLAT, _auto_bass_integration_profile_norm, _auto_goal_norm
 from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
-from ...config.mode_policy import MODE_DEFAULTS
-from ...config.models import StereoAutoPolicyConfig
+from ...config.schema import (
+    AUTO_MODE_DEFAULT_CFG_TO_UI,
+    HIDDEN_CONF_DEFAULTS_ADVANCED,
+    HIDDEN_CONF_DEFAULTS_BASIC_AUTO,
+    LIST_BOOL_KEYS,
+    UI_PIN_KEYS,
+    RunConfigSnapshot,
+    normalize_list_backed_booleans,
+)
 from ...dsp.bass_integration import normalize_sub_combine_mode
 from ...ui_i18n import (
     LAYOUT_MONO,
     LVL_ALGO_MEDIAN,
     LVL_MODE_AUTO,
-    LVL_MODE_MANUAL,
-    OUTPUT_TILT_SOURCE_MANUAL_TARGET_TILT,
-    OUTPUT_TILT_SOURCE_OFF,
-    lvl_algo_legacy_name,
-    lvl_mode_legacy_name,
     normalize_layout_value,
     normalize_lvl_algo_value,
     normalize_lvl_mode_value,
-    normalize_output_tilt_source_value,
 )
 from .managed_settings import (
     _apply_auto_mode_managed_settings,
@@ -210,6 +209,12 @@ _HIDDEN_CONF_DEFAULTS_BASIC_AUTO = {
     "low_bass_cut_strength": 0.0,
 }
 
+_AUTO_MODE_DEFAULT_CFG_TO_UI = AUTO_MODE_DEFAULT_CFG_TO_UI
+_UI_PIN_KEYS = UI_PIN_KEYS
+_LIST_BOOL_KEYS = LIST_BOOL_KEYS
+_HIDDEN_CONF_DEFAULTS_ADVANCED = HIDDEN_CONF_DEFAULTS_ADVANCED
+_HIDDEN_CONF_DEFAULTS_BASIC_AUTO = HIDDEN_CONF_DEFAULTS_BASIC_AUTO
+
 _UI_PARSE_EXCEPTIONS = (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError)
 
 
@@ -241,9 +246,7 @@ def _safe_positive_float(value: Any, default: float) -> float:
 
 
 def _normalize_list_backed_booleans(data: Dict[str, Any]) -> None:
-    for key in _LIST_BOOL_KEYS:
-        if isinstance(data.get(key, None), list):
-            data[key] = bool(data[key])
+    normalize_list_backed_booleans(data)
 
 
 def _normalize_mode_and_auto_flags(data: Dict[str, Any]) -> Tuple[str, bool]:
@@ -522,6 +525,11 @@ def collect_ui_data(pin) -> Dict[str, Any]:
     )
     return data
 
+
+def collect_ui_config(pin) -> RunConfigSnapshot:
+    return RunConfigSnapshot(values=collect_ui_data(pin))
+
+
 def log_df_smoothing_toggle(source, logger) -> bool:
     try:
         if isinstance(source, dict):
@@ -534,4 +542,4 @@ def log_df_smoothing_toggle(source, logger) -> bool:
     return df_on
 
 
-__all__ = ['collect_ui_data', 'log_df_smoothing_toggle']
+__all__ = ['collect_ui_config', 'collect_ui_data', 'log_df_smoothing_toggle']

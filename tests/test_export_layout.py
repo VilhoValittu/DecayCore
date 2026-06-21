@@ -5,7 +5,7 @@ import numpy as np
 import scipy.io.wavfile
 
 from decaycore.config.results import FilterResult
-from decaycore.core.runner_parts.runner_02 import _build_headless_export_zip
+from decaycore.core.runner_parts.headless_export_bundle import _build_headless_export_zip
 from decaycore.ui.export_bundle import build_export_zip
 
 

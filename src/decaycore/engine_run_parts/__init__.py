@@ -10,7 +10,7 @@
 
 import importlib as _importlib
 
-_MODULE_NAMES = ['engine_run_01', 'engine_run_02']
+_MODULE_NAMES = ['measurement_response_helpers', 'pipeline_execution']
 for _module_name in _MODULE_NAMES:
     _module = _importlib.import_module(f"{__name__}.{_module_name}")
     for _symbol in dir(_module):

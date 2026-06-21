@@ -10,7 +10,7 @@
 
 import importlib as _importlib
 
-_MODULE_NAMES = ['ng_tab_target_01']
+_MODULE_NAMES = ['target_tab_builder']
 for _module_name in _MODULE_NAMES:
     _module = _importlib.import_module(f"{__name__}.{_module_name}")
     for _symbol in dir(_module):

@@ -10,32 +10,25 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict
 import logging
 import math
-import numpy as np
 
 from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
+from ...config.schema import AUTO_MODE_DEFAULT_CFG_TO_UI
 from ...auto_mode.filter_priors import get_auto_mode_filter_auto_defaults
 from ...auto_mode.shared import (
     AUTO_MODE_GOAL_FLAT,
-    _auto_bass_integration_profile_norm,
     _auto_filter_type_for_key,
     _auto_goal_norm,
 )
 from ...config.mode_policy import MODE_DEFAULTS
-from ...config.models import StereoAutoPolicyConfig
-from ...dsp.bass_integration import normalize_sub_combine_mode
 from ...ui_i18n import (
-    LAYOUT_MONO,
     LVL_ALGO_MEDIAN,
     LVL_MODE_AUTO,
     LVL_MODE_MANUAL,
     OUTPUT_TILT_SOURCE_MANUAL_TARGET_TILT,
     OUTPUT_TILT_SOURCE_OFF,
-    lvl_algo_legacy_name,
-    lvl_mode_legacy_name,
-    normalize_layout_value,
     normalize_lvl_algo_value,
     normalize_lvl_mode_value,
     normalize_output_tilt_source_value,
@@ -100,6 +93,8 @@ _AUTO_MODE_DEFAULT_CFG_TO_UI = {
     "stereo_link": "stereo_link",
     "low_bass_cut_enable": "low_bass_cut_enable",
 }
+
+_AUTO_MODE_DEFAULT_CFG_TO_UI = AUTO_MODE_DEFAULT_CFG_TO_UI
 
 def _finite_float_or_default(value: Any, default: float = 0.0) -> float:
     try:
@@ -260,6 +255,8 @@ def _apply_auto_mode_managed_settings(data: Dict[str, Any]) -> None:
     }
 
     for cfg_key, ui_key in _AUTO_MODE_DEFAULT_CFG_TO_UI.items():
+        if cfg_key == "filter_type_str":
+            continue
         if cfg_key in merged_defaults:
             if ui_key == "enable_afdw" and data.get("enable_afdw", None) is not None:
                 forced[ui_key] = bool(data.get("enable_afdw", False))

@@ -35,7 +35,7 @@ from .optuna_backend_constraints import (
 )
 from .optuna_backend_storage import (
     _auto_optuna_note_trial_scan,
-    _auto_optuna_study_scan_stats_snapshot,
+    _auto_optuna_study_scan_stats_snapshot as _auto_optuna_study_scan_stats_snapshot,
 )
 
 logger = logging.getLogger("DecayCore")

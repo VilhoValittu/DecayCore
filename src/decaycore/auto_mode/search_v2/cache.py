@@ -12,7 +12,6 @@
 
 from __future__ import annotations
 
-import time
 from types import SimpleNamespace
 
 AUTO_SEARCH_CACHE_SCHEMA_VERSION = 4

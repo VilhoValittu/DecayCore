@@ -10,7 +10,7 @@
 
 import importlib as _importlib
 
-_MODULE_NAMES = ['orchestrator_finalize_cache_01', 'orchestrator_finalize_cache_03', 'orchestrator_finalize_cache_02']
+_MODULE_NAMES = ['cache_finalize_status', 'cached_result_materialization', 'cached_result_scoring']
 for _module_name in _MODULE_NAMES:
     _module = _importlib.import_module(f"{__name__}.{_module_name}")
     for _symbol in dir(_module):

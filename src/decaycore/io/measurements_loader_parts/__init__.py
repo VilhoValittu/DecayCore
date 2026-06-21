@@ -10,7 +10,7 @@
 
 import importlib as _importlib
 
-_MODULE_NAMES = ['measurements_loader_01', 'measurements_loader_03', 'measurements_loader_02']
+_MODULE_NAMES = ['measurement_source_helpers', 'raw_ir_and_bass_loader', 'lr_measurement_loader']
 for _module_name in _MODULE_NAMES:
     _module = _importlib.import_module(f"{__name__}.{_module_name}")
     for _symbol in dir(_module):

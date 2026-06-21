@@ -10,7 +10,7 @@
 
 import importlib as _importlib
 
-_MODULE_NAMES = ['runner_01', 'runner_03', 'runner_04', 'runner_02']
+_MODULE_NAMES = ['headless_progress', 'headless_metrics_output', 'headless_batch_runner', 'headless_export_bundle']
 for _module_name in _MODULE_NAMES:
     _module = _importlib.import_module(f"{__name__}.{_module_name}")
     for _symbol in dir(_module):

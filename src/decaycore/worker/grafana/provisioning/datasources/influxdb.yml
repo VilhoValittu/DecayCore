@@ -1,0 +1,16 @@
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB
+    uid: influxdb
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    isDefault: true
+    jsonData:
+      version: Flux
+      organization: camillafir
+      defaultBucket: metrics
+      tlsSkipVerify: true
+    secureJsonData:
+      token: supertoken

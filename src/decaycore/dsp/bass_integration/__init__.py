@@ -53,7 +53,7 @@ from ._gd_feasibility import (
     compute_direct_dac_bass_integration_analysis,
     compute_direct_dac_bass_integration_diagnostics,
     compute_xo_gd_continuity,
-    _main_guard_band_drop_db,
+    _main_guard_band_drop_db as _main_guard_band_drop_db,
 )
 from ._recommend_alignment import recommend_direct_dac_alignment
 from ._recommend_allpass import recommend_direct_dac_allpass
@@ -69,7 +69,7 @@ from ._sub_combine import (
     prepare_dual_sub_peak_aligned_average,
     sum_complex_responses,
     sum_complex_responses_aligned,
-    _xcorr_lag_from_spectra,
+    _xcorr_lag_from_spectra as _xcorr_lag_from_spectra,
 )
 from ._utils import normalize_sub_combine_mode
 from .direct_dac import (
@@ -77,18 +77,21 @@ from .direct_dac import (
     run_direct_dac_bass_integration,
     score_direct_dac_bass_integration,
 )
-from ..bass_cache import _BUTTER_RESPONSE_CACHE, clear_bass_integration_caches
+from ..bass_cache import (
+    _BUTTER_RESPONSE_CACHE as _BUTTER_RESPONSE_CACHE,
+    clear_bass_integration_caches as clear_bass_integration_caches,
+)
 
 # Private helpers re-exported for callers that import them from this package
 from ._filters import (
-    _apply_allpass_to_transfer,
-    _apply_branch_filters,
-    _apply_delay_to_transfer,
-    _apply_gain_trim_to_transfer,
-    _apply_polarity_to_transfer,
-    _get_filtered_branches,
+    _apply_allpass_to_transfer as _apply_allpass_to_transfer,
+    _apply_branch_filters as _apply_branch_filters,
+    _apply_delay_to_transfer as _apply_delay_to_transfer,
+    _apply_gain_trim_to_transfer as _apply_gain_trim_to_transfer,
+    _apply_polarity_to_transfer as _apply_polarity_to_transfer,
+    _get_filtered_branches as _get_filtered_branches,
 )
-from ._bundles import _build_direct_dac_trial_bundle
+from ._bundles import _build_direct_dac_trial_bundle as _build_direct_dac_trial_bundle
 
 __all__ = [
     "AVR_CROSSOVER_CANDIDATES",

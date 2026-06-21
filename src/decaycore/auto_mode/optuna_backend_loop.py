@@ -16,7 +16,6 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
-import numpy as np
 
 from ..dsp._pruning import (
     clear_pruning_hook as _clear_pruning_hook,

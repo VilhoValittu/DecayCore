@@ -15,10 +15,8 @@ import sys
 from ...config.decaycore_pipeline import filter_type_supports_xo_phase_model
 
 logger = logging.getLogger(__name__)
-from ...dsp.smoothing import AFDW_BW_MAX_OCT, AFDW_BW_MIN_OCT
-from ...dsp.lr_difference_metrics import compute_lr_difference_metrics
-from ...auto_mode.rank_score import attach_official_rank_score, calibrated_auto_quality, display_rank_score, official_rank_score, _quality_band
-from ..export_scoring import _pick_metric, _safe_float
+from ...auto_mode.rank_score import calibrated_auto_quality
+from ..export_scoring import _safe_float
 
 _AUTO_ASYM_PHASE1_SEARCH_SPACE_EST = 1877500016615829065655090169509480
 

@@ -10,30 +10,20 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional
 import logging
 import math
 import numpy as np
 
 from ...config.legacy_keys import is_auto_mode
-from ...auto_mode.filter_priors import get_auto_mode_filter_auto_defaults
-from ...auto_mode.shared import AUTO_MODE_GOAL_FLAT, _auto_bass_integration_profile_norm, _auto_goal_norm
-from ...config.mode_policy import MODE_DEFAULTS
 from ...config.models import StereoAutoPolicyConfig
+from ...config.schema import AUTO_MODE_DEFAULT_CFG_TO_UI
 from ...dsp.bass_integration import normalize_sub_combine_mode
 from ...ui_i18n import (
-    LAYOUT_MONO,
     LVL_ALGO_MEDIAN,
     LVL_MODE_AUTO,
-    LVL_MODE_MANUAL,
-    OUTPUT_TILT_SOURCE_MANUAL_TARGET_TILT,
-    OUTPUT_TILT_SOURCE_OFF,
     lvl_algo_legacy_name,
     lvl_mode_legacy_name,
-    normalize_layout_value,
-    normalize_lvl_algo_value,
-    normalize_lvl_mode_value,
-    normalize_output_tilt_source_value,
 )
 from .managed_settings import _effective_output_tilt_source, _resolve_output_tilt_db_per_oct
 
@@ -97,6 +87,8 @@ _AUTO_MODE_DEFAULT_CFG_TO_UI = {
     "stereo_link": "stereo_link",
     "low_bass_cut_enable": "low_bass_cut_enable",
 }
+
+_AUTO_MODE_DEFAULT_CFG_TO_UI = AUTO_MODE_DEFAULT_CFG_TO_UI
 
 
 def _filter_config_set_if_hasattr(kwargs: dict, FilterConfig_cls, key: str, value) -> None:

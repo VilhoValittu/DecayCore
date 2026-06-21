@@ -373,7 +373,7 @@ def _run_search_refine_phase1_core(
     # Clear target-search seed baseline so phase 1 evaluates the seed preset in its own
     # scoring context. The target-search score (from a different evaluation context) is
     # unreachable by phase 1 trials, causing no-improve plateau after every startup trial.
-    # refine_eval_01.py:377 handles best_metrics=None: first trial always wins and sets
+    # refine_candidate_phase.py:377 handles best_metrics=None: first trial always wins and sets
     # the baseline. _maybe_revalidate_seed_winner becomes a no-op (gap≈0), which is correct.
     ctx.search_state.best_metrics = None
     ctx.search_state.best_preset = None

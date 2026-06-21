@@ -10,7 +10,7 @@
 
 import importlib as _importlib
 
-_MODULE_NAMES = ['ng_tab_files_01', 'ng_tab_files_03', 'ng_tab_files_02']
+_MODULE_NAMES = ['file_slot_helpers', 'files_tab_builder', 'measurement_token_matching']
 for _module_name in _MODULE_NAMES:
     _module = _importlib.import_module(f"{__name__}.{_module_name}")
     for _symbol in dir(_module):

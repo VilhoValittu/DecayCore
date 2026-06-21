@@ -28,11 +28,9 @@ _RECOVERABLE_QUALITY_EXCEPTIONS = (
 _RECOVERABLE_FLOAT_PARSE_EXCEPTIONS = (TypeError, ValueError, OverflowError)
 
 from ...common.acoustic_stats import _clamp, calc_acoustic_score, calc_ai_summary_from_stats
-from ...common.comparison_stats import _make_comparison_stats
 from ...dsp.phase_ir_metrics import format_pre_energy_status
 from ...dsp.quality_metrics import _mag_error_db, _rms
 from ...dsp.target_match import target_match_from_stats as _target_match_from_stats_ssot
-from ...ui_i18n import LVL_MODE_AUTO, lvl_mode_legacy_name
 
 
 

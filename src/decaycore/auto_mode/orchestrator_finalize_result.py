@@ -20,13 +20,11 @@ from .auto_mode_profile import profiled_section
 from .cache_signature import _auto_cache_stats_snapshot
 from .rank_score import attach_official_rank_score
 from .scoring_ranking import _auto_rank_key
-from .shared import AUTO_MODE_CACHE_SCHEMA_VERSION, _auto_safe_float, _m
+from .shared import AUTO_MODE_CACHE_SCHEMA_VERSION, _auto_safe_float
 from .orchestrator_finalize_cache import (
     _apply_residual_peak_safety_override,
     _build_modal_intelligence_debug,
     _override_candidates,
-    _resolve_winner_auto_exc_hz,
-    _stereo_refine_materialize_base_data,
 )
 
 logger = logging.getLogger("DecayCore")

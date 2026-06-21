@@ -9,7 +9,6 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 import logging
-import math
 from typing import Any
 
 logger = logging.getLogger("DecayCore")
@@ -17,9 +16,7 @@ logger = logging.getLogger("DecayCore")
 from . import decaycore_plot as plots
 from ..config.results import FilterResult
 from ..auto_mode.rank_score import (
-    attach_official_rank_score,
     compute_run_ranking_score_components,
-    official_rank_score,
 )
 
 

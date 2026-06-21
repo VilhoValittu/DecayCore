@@ -16,108 +16,119 @@ orchestrator modules under ``auto_mode``.
 """
 
 import logging
-import json
 import os
-import hashlib
-import re
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import numpy as np
 
-from ..common.house_curves import get_house_curve_by_name
-from ..engine import build_config, run_pipeline, summarize_run
-from ..app_paths import decaycore_data_dir, program_version_token
+from . import orchestrator_target
+from . import (
+    orchestrator_finalize as orchestrator_finalize,
+    orchestrator_refine as orchestrator_refine,
+)
 from .cache_signature import (
-    _auto_cache_get_best,
-    _auto_cache_get_best_target,
-    _auto_cache_get_entry,
-    _auto_cache_get_last_used_best,
-    _auto_cache_get_target_for_measurements,
-    _auto_cache_get_target_for_measurements_global,
-    _auto_cache_put_target_for_measurements_global,
-    _auto_compat_version,
-    _auto_signature,
-    get_auto_mode_cache_path,
+    _auto_cache_get_best as _auto_cache_get_best,
+    _auto_cache_get_best_target as _auto_cache_get_best_target,
+    _auto_cache_get_entry as _auto_cache_get_entry,
+    _auto_cache_get_last_used_best as _auto_cache_get_last_used_best,
+    _auto_cache_get_target_for_measurements as _auto_cache_get_target_for_measurements,
+    _auto_cache_get_target_for_measurements_global as _auto_cache_get_target_for_measurements_global,
+    _auto_cache_put_target_for_measurements_global as _auto_cache_put_target_for_measurements_global,
+    _auto_compat_version as _auto_compat_version,
+    _auto_signature as _auto_signature,
+    get_auto_mode_cache_path as get_auto_mode_cache_path,
 )
 from .candidate_generation import (
-    _build_auto_mode_candidates,
-    _build_auto_mode_candidates_local,
-    _build_auto_mode_candidates_micro,
-    _build_auto_mode_candidates_optuna,
-    _suggest_auto_mode_candidate_optuna,
+    _build_auto_mode_candidates as _build_auto_mode_candidates,
+    _build_auto_mode_candidates_local as _build_auto_mode_candidates_local,
+    _build_auto_mode_candidates_micro as _build_auto_mode_candidates_micro,
+    _build_auto_mode_candidates_optuna as _build_auto_mode_candidates_optuna,
+    _suggest_auto_mode_candidate_optuna as _suggest_auto_mode_candidate_optuna,
 )
-from .filter_priors import get_auto_mode_filter_seed_preset
-from .materialize import AutoModeMaterializeContext, build_materialize_helpers
+from .filter_priors import get_auto_mode_filter_seed_preset as get_auto_mode_filter_seed_preset
+from .materialize import (
+    AutoModeMaterializeContext as AutoModeMaterializeContext,
+    build_materialize_helpers as build_materialize_helpers,
+)
 from .protection_seed import (
-    _estimate_auto_hpf_from_response,
-    _estimate_auto_mag_c_min_hz,
-    _resolve_auto_hpf_application,
+    _estimate_auto_hpf_from_response as _estimate_auto_hpf_from_response,
+    _estimate_auto_mag_c_min_hz as _estimate_auto_mag_c_min_hz,
+    _resolve_auto_hpf_application as _resolve_auto_hpf_application,
 )
 from .scoring_metrics import (
-    _auto_score_result,
-    _auto_exc_penalty_bins_from_dbg,
-    _auto_exc_zero_penalty_freq_hz_from_stats,
+    _auto_exc_penalty_bins_from_dbg as _auto_exc_penalty_bins_from_dbg,
+    _auto_exc_zero_penalty_freq_hz_from_stats as _auto_exc_zero_penalty_freq_hz_from_stats,
+    _auto_score_result as _auto_score_result,
 )
-from . import orchestrator_finalize, orchestrator_refine, orchestrator_target
 from .scoring_ranking import (
-    _auto_build_winner_explanation,
-    _auto_hybrid_mixed_freq_penalty,
-    _auto_is_better_refine,
-    _auto_rank_key,
-    _auto_rank_key_goal,
-    _auto_reject,
-    _auto_ripple_metric_for_gate,
+    _auto_build_winner_explanation as _auto_build_winner_explanation,
+    _auto_hybrid_mixed_freq_penalty as _auto_hybrid_mixed_freq_penalty,
+    _auto_is_better_refine as _auto_is_better_refine,
+    _auto_rank_key as _auto_rank_key,
+    _auto_rank_key_goal as _auto_rank_key_goal,
+    _auto_reject as _auto_reject,
+    _auto_ripple_metric_for_gate as _auto_ripple_metric_for_gate,
 )
 from .search_state import (
-    _AutoModeSearchState,
-    _auto_set_search_winner,
+    _AutoModeSearchState as _AutoModeSearchState,
+    _auto_set_search_winner as _auto_set_search_winner,
 )
-from .target_preselection import _auto_select_builtin_target_curve
 from .shared import (
-    AutoModeConfig,
+    AUTO_MODE_COMPAT_VERSION as AUTO_MODE_COMPAT_VERSION,
     AUTO_MODE_CACHE_SCHEMA_VERSION as SHARED_AUTO_MODE_CACHE_SCHEMA_VERSION,
-    AUTO_MODE_COMPAT_VERSION,
     AUTO_MODE_LOW_BASS_MAX_HZ as SHARED_AUTO_MODE_LOW_BASS_MAX_HZ,
     AUTO_MODE_LOW_BASS_MIN_HZ as SHARED_AUTO_MODE_LOW_BASS_MIN_HZ,
     AUTO_MODE_MAG_C_MAX_MIN_HZ as SHARED_AUTO_MODE_MAG_C_MAX_MIN_HZ,
     AUTO_MODE_MAG_C_MIN_MAX_HZ as SHARED_AUTO_MODE_MAG_C_MIN_MAX_HZ,
     AUTO_MODE_MAG_C_MIN_MIN_HZ as SHARED_AUTO_MODE_MAG_C_MIN_MIN_HZ,
-    AUTO_MODE_OPTUNA_CONSTRAINTS_ENABLED,
-    AUTO_MODE_OPTUNA_CONSTRAINTS_USE_EVENTS_IN_REFINE,
-    AUTO_MODE_OPTUNA_CONSTRAINTS_ZERO_FEASIBLE_FALLBACK,
-    AUTO_MODE_OPTUNA_CONSTRAINTS_MAX_EVENTS_SEVERITY,
-    AUTO_MODE_OPTUNA_CONSTRAINTS_MAX_MODE_RIPPLE_DB,
-    AUTO_MODE_OPTUNA_CONSTRAINTS_MAX_NET_BOOST_DB,
-    AUTO_MODE_OPTUNA_CONSTRAINTS_REFINE_ONLY,
-    AUTO_MODE_OPTUNA_CROSS_STUDY_SEEDS,
-    AUTO_MODE_OPTUNA_CROSS_STUDY_SEEDS_TOP_N,
+    AUTO_MODE_OPTUNA_CONSTRAINTS_ENABLED as AUTO_MODE_OPTUNA_CONSTRAINTS_ENABLED,
+    AUTO_MODE_OPTUNA_CONSTRAINTS_MAX_EVENTS_SEVERITY as AUTO_MODE_OPTUNA_CONSTRAINTS_MAX_EVENTS_SEVERITY,
+    AUTO_MODE_OPTUNA_CONSTRAINTS_MAX_MODE_RIPPLE_DB as AUTO_MODE_OPTUNA_CONSTRAINTS_MAX_MODE_RIPPLE_DB,
+    AUTO_MODE_OPTUNA_CONSTRAINTS_MAX_NET_BOOST_DB as AUTO_MODE_OPTUNA_CONSTRAINTS_MAX_NET_BOOST_DB,
+    AUTO_MODE_OPTUNA_CONSTRAINTS_REFINE_ONLY as AUTO_MODE_OPTUNA_CONSTRAINTS_REFINE_ONLY,
+    AUTO_MODE_OPTUNA_CONSTRAINTS_USE_EVENTS_IN_REFINE as AUTO_MODE_OPTUNA_CONSTRAINTS_USE_EVENTS_IN_REFINE,
+    AUTO_MODE_OPTUNA_CONSTRAINTS_ZERO_FEASIBLE_FALLBACK as AUTO_MODE_OPTUNA_CONSTRAINTS_ZERO_FEASIBLE_FALLBACK,
+    AUTO_MODE_OPTUNA_CROSS_STUDY_SEEDS as AUTO_MODE_OPTUNA_CROSS_STUDY_SEEDS,
+    AUTO_MODE_OPTUNA_CROSS_STUDY_SEEDS_TOP_N as AUTO_MODE_OPTUNA_CROSS_STUDY_SEEDS_TOP_N,
     AUTO_MODE_OPTUNA_DUPLICATE_MAX_ATTEMPTS as SHARED_AUTO_MODE_OPTUNA_DUPLICATE_MAX_ATTEMPTS,
-    AUTO_MODE_OPTUNA_PRUNING_ENABLED,
-    AUTO_MODE_OPTUNA_PRUNING_N_STARTUP,
+    AUTO_MODE_OPTUNA_PRUNING_ENABLED as AUTO_MODE_OPTUNA_PRUNING_ENABLED,
+    AUTO_MODE_OPTUNA_PRUNING_N_STARTUP as AUTO_MODE_OPTUNA_PRUNING_N_STARTUP,
     AUTO_MODE_OPTUNA_STORAGE_FILENAME as SHARED_AUTO_MODE_OPTUNA_STORAGE_FILENAME,
-    AUTO_MODE_OPTUNA_TELEMETRY,
-    AUTO_MODE_OPTUNA_TELEMETRY_LOG_SUMMARY,
+    AUTO_MODE_OPTUNA_TELEMETRY as AUTO_MODE_OPTUNA_TELEMETRY,
+    AUTO_MODE_OPTUNA_TELEMETRY_LOG_SUMMARY as AUTO_MODE_OPTUNA_TELEMETRY_LOG_SUMMARY,
     AUTO_MODE_OPTUNA_USER_ATTR_OUT as SHARED_AUTO_MODE_OPTUNA_USER_ATTR_OUT,
     AUTO_MODE_PHASE_LIMIT_DEFAULT_HZ as SHARED_AUTO_MODE_PHASE_LIMIT_DEFAULT_HZ,
     AUTO_MODE_PHASE_LIMIT_MAX_HZ as SHARED_AUTO_MODE_PHASE_LIMIT_MAX_HZ,
     AUTO_MODE_PHASE_LIMIT_MIN_HZ as SHARED_AUTO_MODE_PHASE_LIMIT_MIN_HZ,
-    _auto_filter_cache_key,
-    _auto_filter_type_for_key,
-    _auto_goal,
-    _auto_goal_basis_text,
-    _auto_goal_norm,
-    _auto_optimizer_backend,
-    _auto_optuna_sampler_kwargs,
-    _auto_phase_limit_center,
-    _auto_safe_bool,
-    _auto_safe_float,
+    AutoModeConfig as AutoModeConfig,
+    _auto_filter_cache_key as _auto_filter_cache_key,
+    _auto_filter_type_for_key as _auto_filter_type_for_key,
+    _auto_goal as _auto_goal,
+    _auto_goal_basis_text as _auto_goal_basis_text,
+    _auto_goal_norm as _auto_goal_norm,
+    _auto_optimizer_backend as _auto_optimizer_backend,
+    _auto_optuna_sampler_kwargs as _auto_optuna_sampler_kwargs,
+    _auto_phase_limit_center as _auto_phase_limit_center,
+    _auto_safe_bool as _auto_safe_bool,
+    _auto_safe_float as _auto_safe_float,
     _auto_safe_int,
-    _auto_trial_chunk_size,
+    _auto_trial_chunk_size as _auto_trial_chunk_size,
     _auto_trial_workers,
 )
+from .target_preselection import _auto_select_builtin_target_curve as _auto_select_builtin_target_curve
+from ..app_paths import (
+    decaycore_data_dir as decaycore_data_dir,
+    program_version_token as program_version_token,
+)
+from ..common.house_curves import get_house_curve_by_name as get_house_curve_by_name
 from ..dsp._pruning import (
     clear_pruning_hook as _clear_pruning_hook,
     set_pruning_hook as _set_pruning_hook,
+)
+_clear_pruning_hook = _clear_pruning_hook
+_set_pruning_hook = _set_pruning_hook
+from ..engine import (
+    build_config as build_config,
+    run_pipeline as run_pipeline,
+    summarize_run as summarize_run,
 )
 from . import optuna_backend as _optuna_backend
 from . import optuna_telemetry as _optuna_telemetry

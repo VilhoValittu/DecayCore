@@ -33,11 +33,19 @@ class TestLoadConfigBasics:
             assert key in cfg
         assert "measurement_dither_level_db" in cfg
 
-    def test_load_config_key_count(self):
-        """load_config has approximately 196 keys."""
+    def test_load_config_has_required_config_groups(self):
+        """load_config exposes required config groups without relying on key count."""
         cfg = decaycore_config.load_config()
-        # Allow some variance in key count
-        assert 180 <= len(cfg) <= 220
+        groups = [
+            ("engine", ["fs", "taps", "filter_type", "mode"]),
+            ("magnitude", ["mag_c_min", "mag_c_max", "max_boost", "max_cut_db"]),
+            ("phase", ["mixed_freq", "phase_limit", "ir_export_window_mode"]),
+            ("measurement", ["measurement_library_dir", "measurement_dither_level_db"]),
+            ("auto", ["auto_goal", "auto_target_mode", "camillafir_automatic_mode"]),
+        ]
+        for _group, keys in groups:
+            for key in keys:
+                assert key in cfg
 
     def test_load_config_mode_is_string(self):
         """mode is a string."""

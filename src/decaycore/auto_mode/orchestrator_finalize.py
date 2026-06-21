@@ -37,19 +37,19 @@ from .orchestrator_finalize_run import (
 from .orchestrator_finalize_cache import (
     _build_phase2_pareto_status,
     _build_modal_intelligence_debug,
+    _cache_refine_winner_phase_label as _cache_refine_winner_phase_label,
+    _cache_refine_winner_summary as _cache_refine_winner_summary,
     _resolve_winner_auto_exc_hz,
-    _cache_refine_winner_summary,
-    _cache_refine_winner_phase_label,
+)
+from .cache_signature import (
+    _auto_cache_put_best as _auto_cache_put_best,
+    _auto_cache_put_last_used_best as _auto_cache_put_last_used_best,
+    _auto_cache_put_target_for_measurements as _auto_cache_put_target_for_measurements,
+    _auto_measurement_signature as _auto_measurement_signature,
+    _auto_signature as _auto_signature,
 )
 from .orchestrator_finalize_polish import (
     _save_cached_best as _save_cached_best,  # needed so tests can call it via this module
-)
-from .cache_signature import (
-    _auto_measurement_signature,
-    _auto_signature,
-    _auto_cache_put_best,
-    _auto_cache_put_last_used_best,
-    _auto_cache_put_target_for_measurements,
 )
 from .scoring_ranking import (
     _auto_phase2_pareto_front,
@@ -63,7 +63,7 @@ from .winner_polish import (
     apply_mag_c_min_winner_polish,
     apply_phase_limit_winner_polish,
     apply_residual_peak_winner_polish,
-    apply_tdc_strength_winner_polish,
+    apply_tdc_strength_winner_polish as apply_tdc_strength_winner_polish,
 )
 
 __all__ = [
@@ -77,7 +77,14 @@ __all__ = [
     # re-exported for test imports and monkeypatching
     "_build_phase2_pareto_status",
     "_build_modal_intelligence_debug",
+    "_cache_refine_winner_phase_label",
+    "_cache_refine_winner_summary",
     "_resolve_winner_auto_exc_hz",
+    "_auto_cache_put_best",
+    "_auto_cache_put_last_used_best",
+    "_auto_cache_put_target_for_measurements",
+    "_auto_measurement_signature",
+    "_auto_signature",
     "_auto_phase2_pareto_front",
     "_auto_select_best_scored",
     "apply_stereo_policy_refine",
@@ -87,4 +94,5 @@ __all__ = [
     "apply_mag_c_min_winner_polish",
     "apply_phase_limit_winner_polish",
     "apply_residual_peak_winner_polish",
+    "apply_tdc_strength_winner_polish",
 ]

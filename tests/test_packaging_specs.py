@@ -129,7 +129,7 @@ def test_packaging_specs_include_dynamic_part_modules(spec_name: str):
     hiddenimports = captured["analysis"]["kwargs"]["hiddenimports"]
 
     assert "decaycore.config.pipeline_parts.managed_settings" in hiddenimports
-    assert "decaycore.auto_mode.orchestrator_finalize_cache_parts.orchestrator_finalize_cache_01" in hiddenimports
+    assert "decaycore.auto_mode.orchestrator_finalize_cache_parts.cache_finalize_status" in hiddenimports
 
 
 @pytest.mark.parametrize("spec_name", SPEC_NAMES)

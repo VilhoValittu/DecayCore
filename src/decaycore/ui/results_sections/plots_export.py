@@ -17,11 +17,7 @@ can call it without changes to workflow code.
 """
 from __future__ import annotations
 
-import html
 import logging
-import math
-import time
-from typing import Any
 
 # ---------------------------------------------------------------------------
 # Interactive plot render cache
@@ -37,32 +33,8 @@ def clear_plot_render_cache() -> None:
     _PLOT_RENDER_CACHE.clear()
 
 from ...resources.i8n.decaycore_i18n import t
-from ...auto_mode.rank_score import calibrated_auto_quality
 from .. import decaycore_plot as plots
-from .. import ui_state
-from ..results_formatters import (
-    anchor_label,
-    boost_diag,
-    fmt_ai_match,
-    fmt_ai_score,
-    fmt_freq_window,
-    fmt_tilt,
-    format_ir_window,
-    gd_grad_max_label,
-    gd_limiter_label,
-    hpf_diff_raw_label,
-    hpf_model_label,
-    metric_row,
-    mixed_blend_label,
-    phase_clamp_label,
-    plot_smoothing_label,
-    safe_float,
-    shared_window_label,
-    stereo_link_mode_label,
-    xo_fc_gd_label,
-)
 
-from ...dsp.lr_difference_metrics import compute_lr_difference_metrics
 
 logger = logging.getLogger("DecayCore")
 

@@ -23,6 +23,7 @@ from .config.decaycore_pipeline import (
 )
 from .config.mode_policy import apply_mode_to_cfg
 from .config.models import FilterConfig, StereoResolvedAutoPolicies
+from .config.schema import FilterConfigProjection, RunConfigSnapshot
 from .auto_mode.shared import AUTO_MODE_GOAL_FLAT, _auto_goal_norm
 
 logger = logging.getLogger("DecayCore")
@@ -404,7 +405,7 @@ def _build_config_apply_post_mode_settings(cfg: FilterConfig, data: dict) -> Non
 
 
 def build_config(
-    ui_data: dict,
+    ui_data: dict | RunConfigSnapshot | FilterConfigProjection,
     preset: dict | None = None,
     *,
     fs_v: int | None = None,
@@ -422,7 +423,12 @@ def build_config(
     This function intentionally delegates to `config.decaycore_pipeline`
     to keep config behavior unchanged.
     """
-    data = dict(ui_data or {})
+    if isinstance(ui_data, FilterConfigProjection):
+        data = ui_data.to_legacy_dict()
+    elif isinstance(ui_data, RunConfigSnapshot):
+        data = FilterConfigProjection.from_run_config(ui_data).to_legacy_dict()
+    else:
+        data = dict(ui_data or {})
     if isinstance(preset, dict) and preset:
         data.update(preset)
 
@@ -457,3 +463,10 @@ def build_config(
     _build_config_apply_post_mode_settings(cfg, data)
 
     return cfg
+
+
+def build_config_from_snapshot(
+    snapshot: RunConfigSnapshot | FilterConfigProjection,
+    **kwargs,
+) -> FilterConfig:
+    return build_config(FilterConfigProjection.from_run_config(snapshot), **kwargs)

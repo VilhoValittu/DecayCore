@@ -27,7 +27,6 @@ from .shared import (
     AUTO_MODE_OPTUNA_CONSTRAINTS_USE_EVENTS_IN_REFINE,
     AUTO_MODE_OPTUNA_USER_ATTR_OUT,
     _auto_filter_cache_key,
-    AutoModeConfig,
     _auto_safe_bool,
     _auto_safe_float,
 )

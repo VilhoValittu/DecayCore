@@ -10,60 +10,23 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable
 
 import numpy as np
-import scipy.ndimage
 
 from decaycore.auto_mode.auto_mode_profile import profiled_section
 
-from .. import bassfirst as bf
-from ..decaycore_analysis import _sigma_bins_from_hz
 from ..correction_types import (
     _MagAdaptiveStageOutputs,
     _MagCoreOutputs,
     _MagCorrectionContext,
     _MagPipelineInputs,
     _MagPostProcessInputs,
-    _MagPostProcessOutputs,
     _MagRawStageOutputs,
-)
-from ..dsp_config import CfgReader
-from ..dsp_telemetry import safe_put_many
-from ..gain_policy import apply_cuts_only_guard, build_low_frequency_guard_mask, resolve_gain_policy
-from ..mag_limits import (
-    _apply_hard_boost_cut_clamp,
-    _apply_max_boost_cut,
-    _apply_slope_limits,
-    _blend_masked_fractional_octave,
-)
-from ..mag_post_limits import apply_post_limits_and_metrics as _apply_post_limits_and_metrics_impl
-from ..mag_postprocess import apply_bass_boost_post_restore, apply_confpull_post_slope
-from ..mag_shape import (
-    _apply_confidence_logic,
-    _apply_regularization,
-    _compute_error_db,
-    _error_to_correction_mag,
-    _resolve_filter_smooth,
-    _select_active_band,
 )
 from ..mag_stage import (
     run_mag_bassfirst_afdw_conf_stage,
     run_mag_core_stage,
     run_mag_raw_stage,
-)
-from ..mag_telemetry import (
-    _log_stage_stats,
-    _record_stage_probe,
-    _summarize_correction_metrics,
-)
-from ..phase_ir_utils import _cosine_fade_out_01
-from ..smoothing import (
-    AFDW_BW_MAX_OCT,
-    AFDW_BW_MIN_OCT,
-    apply_adaptive_fdw,
-    psycho_smooth_safe_gain,
-    smooth_gain_fractional_octave,
 )
 
 def _run_mag_raw_stage(inputs: _MagPipelineInputs) -> _MagRawStageOutputs:

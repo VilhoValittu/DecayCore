@@ -12,7 +12,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..config.decaycore_pipeline import collect_ui_data
+from ..config.decaycore_pipeline import collect_ui_config
+from ..config.schema import REQUEST_RUNTIME_DEFAULTS
 
 from .run_request import RunRequest
 
@@ -23,12 +24,8 @@ def build_run_request_from_pin(
     version: str,
     auto_mode_compat_version: str,
 ) -> RunRequest:
-    data = collect_ui_data(pin_obj)
-    data["bass_adaptive_isolation_mode"] = False
-    data["bass_smooth_sigma_scale"] = 1.20
-    data["bass_smooth_conf_floor"] = 0.25
-    data["bass_smooth_w_gamma"] = 2.40
-    data["bass_smooth_w_max"] = 0.45
+    data = collect_ui_config(pin_obj).to_flat_dict()
+    data.update(REQUEST_RUNTIME_DEFAULTS)
     data["program_version"] = str(version)
     data["auto_mode_compat_version"] = str(auto_mode_compat_version)
     return RunRequest(raw_ui_data=dict(data))

@@ -1,0 +1,54 @@
+services:
+  influxdb:
+    image: influxdb:2
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: admin123
+      DOCKER_INFLUXDB_INIT_ORG: camillafir
+      DOCKER_INFLUXDB_INIT_BUCKET: metrics
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: supertoken
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - influxdb
+
+  worker:
+    image: python:3.12-slim
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./worker:/app
+      - ./data/in:/data/in
+      - ./data/out:/data/out
+      - ./DecayCore-source:/src:ro
+    environment:
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: supertoken
+      INFLUX_ORG: camillafir
+      INFLUX_BUCKET: metrics
+    command: >
+      sh -c "pip install numpy scipy influxdb-client watchdog tomli &&
+             python worker.py"
+    depends_on:
+      - influxdb
+
+volumes:
+  influxdb-data:
+  grafana-data:

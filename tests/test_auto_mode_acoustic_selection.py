@@ -608,7 +608,7 @@ def test_mag_c_min_winner_polish_prefers_auto_mag_c_min_seed_center():
 
     assert bool(improved) is True
     assert float(meta.get("start_mag_c_min_hz", 0.0)) == pytest.approx(18.0, abs=1e-9)
-    assert [float(v) for v in list(meta.get("tested_mag_c_min_hz", []) or [])] == [16.0, 20.0, 22.0]
+    assert [float(v) for v in list(meta.get("tested_mag_c_min_hz", []) or [])] == [16.0, 20.0, 14.0, 22.0]
     assert 20.0 in [float(v) for v in list(meta.get("accepted_mag_c_min_hz", []) or [])]
     assert float(best_preset.get("mag_c_min", 0.0)) == pytest.approx(20.0, abs=1e-9)
     assert float(best_metrics.get("rank_score", 0.0)) == pytest.approx(80.0, abs=1e-9)

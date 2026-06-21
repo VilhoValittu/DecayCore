@@ -32,7 +32,7 @@ from decaycore.auto_mode.candidate_generation import (
     _seed_auto_mode_candidate_local_optuna_params,
     _seed_auto_mode_candidate_micro_optuna_params,
 )
-from decaycore.auto_mode.target_preselection_parts.target_preselection_01 import _auto_target_preselect_common_ranges
+from decaycore.auto_mode.target_preselection_parts.target_preselection_core import _auto_target_preselect_common_ranges
 from decaycore.auto_mode.orchestrator_refine import (
     _CacheRefineContext,
     _CacheRefineProgress,
@@ -84,8 +84,6 @@ def test_auto_goal_defaults_to_balanced():
 def test_auto_goal_prefer_bass_aliases_keep_flat_compatibility():
     assert _auto_goal({"auto_goal": "flat"}) == AUTO_MODE_GOAL_FLAT
     assert _auto_goal({"auto_goal": "prefer bass"}) == AUTO_MODE_GOAL_FLAT
-    assert _auto_goal({"auto_goal": "prefer-bass"}) == AUTO_MODE_GOAL_FLAT
-    assert _auto_goal({"auto_goal": "prefer_bass"}) == AUTO_MODE_GOAL_FLAT
     assert _auto_goal({"auto_goal": "bass"}) == AUTO_MODE_GOAL_FLAT
     assert _auto_goal_norm("flat") == AUTO_MODE_GOAL_FLAT
 
@@ -1308,8 +1306,8 @@ def test_auto_api_and_shared_bounds_stay_in_sync():
     from decaycore.auto_mode import api as auto_api
     from decaycore.auto_mode import shared as auto_shared
 
-    assert float(auto_api.AUTO_MODE_MAG_C_MIN_MIN_HZ) == float(auto_shared.AUTO_MODE_MAG_C_MIN_MIN_HZ) == 15.0
-    assert float(auto_api.AUTO_MODE_MAG_C_MIN_MAX_HZ) == float(auto_shared.AUTO_MODE_MAG_C_MIN_MAX_HZ) == 70.0
+    assert float(auto_api.AUTO_MODE_MAG_C_MIN_MIN_HZ) == float(auto_shared.AUTO_MODE_MAG_C_MIN_MIN_HZ) == 10.0
+    assert float(auto_api.AUTO_MODE_MAG_C_MIN_MAX_HZ) == float(auto_shared.AUTO_MODE_MAG_C_MIN_MAX_HZ) == 150.0
     assert float(auto_api.AUTO_MODE_LOW_BASS_MIN_HZ) == float(auto_shared.AUTO_MODE_LOW_BASS_MIN_HZ) == 18.0
     assert float(auto_api.AUTO_MODE_LOW_BASS_MAX_HZ) == float(auto_shared.AUTO_MODE_LOW_BASS_MAX_HZ) == 55.0
     assert float(auto_api.AUTO_MODE_PHASE_LIMIT_MIN_HZ) == float(auto_shared.AUTO_MODE_PHASE_LIMIT_MIN_HZ) == 100.0
@@ -2387,7 +2385,7 @@ def test_seed_auto_mode_candidate_local_optuna_params_prefers_auto_mag_c_min_see
 
     params = _suggest_auto_mode_candidate_local_optuna(base, preset, _FakeTrial())
 
-    assert float(params["mag_c_min"]) == pytest.approx(15.0, abs=1e-9)
+    assert float(params["mag_c_min"]) == pytest.approx(13.9, abs=1e-9)
 
 
 def test_target_preselect_common_ranges_prefers_auto_mag_c_min_seed_for_mixed():

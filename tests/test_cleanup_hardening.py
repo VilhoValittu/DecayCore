@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from decaycore.config.decaycore_pipeline import collect_ui_data
-from decaycore.engine_run_parts.engine_run_02 import _stats_level_comp_factor
+from decaycore.engine_run_parts.pipeline_execution import _stats_level_comp_factor
 from decaycore.measurement.devices import get_default_input_device_index
 from decaycore.ui.export_outputs import _direct_dac_yaml_export_settings
 from decaycore.ui.results_formatters import safe_float

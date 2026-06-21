@@ -16,9 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-import scipy.signal
 
-from ..dsp_config import CfgReader
 
 _EPS = 1e-12
 _SEVERITY_ORDER: dict[str, int] = {"ok": 0, "warn": 1, "reject": 2}

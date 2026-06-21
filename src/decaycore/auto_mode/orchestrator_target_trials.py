@@ -41,14 +41,11 @@ from .candidate_generation import _build_auto_mode_candidates
 from .search_v2.candidates import deduplicate_presets
 from .shared import (
     MAX_SAFE_BOOST,
-    AUTO_MODE_TARGET_TRIALS_PER_CURVE,
-    _auto_filter_cache_key,
     _auto_phase_limit_center,
     _auto_phase_limit_clip,
     _auto_safe_float,
     _auto_trial_chunk_size,
     _clip,
-    _auto_builtin_target_name,
 )
 from .orchestrator_target_types import (
     _TargetEvalMaterialization,

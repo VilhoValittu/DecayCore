@@ -41,7 +41,7 @@ from .scoring_ranking import (
     _auto_is_better_refine,
 )
 from .stereo_policy_refine import apply_stereo_policy_refine
-from .shared import AUTO_MODE_CACHE_SCHEMA_VERSION, _auto_builtin_target_name, _auto_safe_float, _m
+from .shared import _auto_builtin_target_name, _auto_safe_float
 from .winner_polish import (
     apply_excess_phase_strength_winner_polish,
     apply_hpf_winner_polish,

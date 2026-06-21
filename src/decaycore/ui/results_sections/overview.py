@@ -43,22 +43,13 @@ from ..results_formatters import (
     fmt_ai_score,
     fmt_freq_window,
     fmt_tilt,
-    format_ir_window,
-    gd_grad_max_label,
-    gd_limiter_label,
-    hpf_diff_raw_label,
-    hpf_model_label,
     metric_row,
-    mixed_blend_label,
-    phase_clamp_label,
     plot_smoothing_label,
     safe_float,
     shared_window_label,
     stereo_link_mode_label,
-    xo_fc_gd_label,
 )
 
-from ...dsp.lr_difference_metrics import compute_lr_difference_metrics
 
 logger = logging.getLogger("DecayCore")
 

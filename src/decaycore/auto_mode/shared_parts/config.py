@@ -9,11 +9,11 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 import logging
-import os
 from dataclasses import dataclass
 
 import numpy as np
 
+from ...config.schema import normalize_flat_config
 from ._constants import *
 
 logger = logging.getLogger("DecayCore")
@@ -117,7 +117,7 @@ class AutoModeConfig:
 
     @classmethod
     def from_base_data(cls, base_data: dict | None) -> "AutoModeConfig":
-        data = dict(base_data or {})
+        data = normalize_flat_config(dict(base_data or {}), include_runtime=True)
         legacy_startup = max(
             1,
             _auto_safe_int(

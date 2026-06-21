@@ -17,13 +17,11 @@ import logging
 import numpy as np
 
 from .cache_signature import (
-    _auto_apply_seed,
     _auto_signature,
 )
 from .cache_measurement_sig import _auto_get_measurement_signature
 from .shared import (
     AUTO_MODE_CACHE_ENABLED,
-    AUTO_MODE_CACHE_SCHEMA_VERSION,
     AUTO_MODE_SYNTH_TARGET_NAME,
     _auto_builtin_target_name,
     _auto_safe_float,

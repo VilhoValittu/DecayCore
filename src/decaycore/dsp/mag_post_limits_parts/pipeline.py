@@ -15,7 +15,6 @@ import scipy.ndimage
 
 from ..decaycore_analysis import _sigma_bins_from_hz
 from ..correction_types import _MagPostProcessInputs, _MagPostProcessOutputs
-from .._measurement_ctx_local import get_measurement_ctx
 from ..dsp_config import CfgReader
 from ..dsp_telemetry import safe_put_many
 from ..gain_policy import apply_cuts_only_guard, build_low_frequency_guard_mask, resolve_gain_policy
@@ -44,14 +43,11 @@ from ..mag_authority_trace import (
 )
 from ..mag_limits import (
     _apply_hard_boost_cut_clamp,
-    _apply_max_boost_cut,
     _apply_slope_limits,
     _blend_masked_fractional_octave,
 )
 from ..mag_postprocess import apply_bass_boost_post_restore, apply_confpull_post_slope
 from ..mag_telemetry import (
-    _band_delta_metrics,
-    _band_error_rms,
     _log_stage_stats,
     _record_stage_probe,
     _summarize_correction_metrics,

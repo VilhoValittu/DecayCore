@@ -88,7 +88,7 @@ def _auto_worker_init() -> None:
         pass
 
     try:
-        from ..dsp.dsp_ops import _gradient1d, _gd_smooth_loop
+        from ..dsp.dsp_ops import _gradient1d
 
         _f2 = np.linspace(20.0, 20000.0, 64, dtype=np.float64)
         _g = np.zeros(64, dtype=np.float64)

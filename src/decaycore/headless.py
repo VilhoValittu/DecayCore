@@ -16,7 +16,6 @@ import logging
 import sys
 import traceback
 from pathlib import Path
-from typing import Any
 
 from .config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from .core.runner import ConsoleProgressSink, prepare_headless_config, run_batch

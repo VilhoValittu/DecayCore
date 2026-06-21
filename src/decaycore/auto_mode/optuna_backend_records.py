@@ -21,7 +21,6 @@ from .shared import (
     AUTO_MODE_OPTUNA_USER_ATTR_OUT,
     _auto_goal_norm,
     _auto_safe_float,
-    _auto_safe_bool,
     _auto_optuna_sampler_kwargs,
 )
 from .optuna_backend_params import (

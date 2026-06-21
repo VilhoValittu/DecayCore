@@ -44,9 +44,7 @@ from .shared import (
     AUTO_MODE_TARGET_MILDER_MAX_FIT_RMS_ADD_DB,
     AUTO_MODE_TARGET_PREFER_MILDER_STEP,
     AUTO_MODE_TARGET_LOCAL_REFINE_ENABLED,
-    AUTO_MODE_TARGET_TOP_N,
     AUTO_MODE_TARGET_TOP_N_SPREAD_DB,
-    AUTO_MODE_TARGET_TRIALS_PER_CURVE,
     _auto_safe_bool,
     _auto_safe_float,
 )
@@ -67,10 +65,6 @@ from .orchestrator_target_cache import (
 )
 from .orchestrator_target_trials import (
     _evaluate_target_curve,
-    _materialize_target_candidate,
-    _run_target_eval_trials,
-    _summarize_target_eval,
-    _build_target_eval_result,
 )
 
 logger = logging.getLogger("DecayCore")

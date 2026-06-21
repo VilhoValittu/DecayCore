@@ -18,55 +18,58 @@ import random
 
 import numpy as np
 
-from .cache_get_put import (
-    _auto_cache_get_best,
-    _auto_cache_get_best_target,
-    _auto_cache_get_entry,
-    _auto_cache_get_target_for_measurements,
-    _auto_cache_get_target_for_measurements_global,
-    _auto_cache_put_best,
-    _auto_cache_put_target_for_measurements,
-    _auto_cache_put_target_for_measurements_global,
-)
 from .cache_io import (
-    _AUTO_CACHE_LOCK,
+    _AUTO_CACHE_LOCK as _AUTO_CACHE_LOCK,
     _AUTO_CACHE_RUNTIME,
     _AUTO_CACHE_STATS,
     _auto_cache_guard,
-    _auto_cache_load,
-    _auto_cache_save,
-    _auto_cache_stats_snapshot,
+    _auto_cache_load as _auto_cache_load,
+    _auto_cache_save as _auto_cache_save,
+    _auto_cache_stats_snapshot as _auto_cache_stats_snapshot,
 )
-from .cache_lastused import _auto_cache_get_last_used_best, _auto_cache_put_last_used_best
+from .cache_get_put import (
+    _auto_cache_get_best as _auto_cache_get_best,
+    _auto_cache_get_best_target as _auto_cache_get_best_target,
+    _auto_cache_get_entry as _auto_cache_get_entry,
+    _auto_cache_get_target_for_measurements as _auto_cache_get_target_for_measurements,
+    _auto_cache_get_target_for_measurements_global as _auto_cache_get_target_for_measurements_global,
+    _auto_cache_put_best as _auto_cache_put_best,
+    _auto_cache_put_target_for_measurements as _auto_cache_put_target_for_measurements,
+    _auto_cache_put_target_for_measurements_global as _auto_cache_put_target_for_measurements_global,
+)
+from .cache_lastused import (
+    _auto_cache_get_last_used_best as _auto_cache_get_last_used_best,
+    _auto_cache_put_last_used_best as _auto_cache_put_last_used_best,
+)
 from .cache_measurement_sig import (
     _auto_get_measurement_signature,
     _auto_measurement_metadata_identity,
     _auto_measurement_signature,
 )
 from .cache_paths import (
-    _auto_cache_compat_token,
-    _auto_cache_filename,
+    _auto_cache_compat_token as _auto_cache_compat_token,
+    _auto_cache_filename as _auto_cache_filename,
     _auto_cache_path,
-    get_auto_mode_cache_path,
+    get_auto_mode_cache_path as get_auto_mode_cache_path,
 )
 from .cache_structure import (
-    _auto_cache_bucket,
-    _auto_cache_bucket_template,
-    _auto_cache_empty,
-    _auto_compat_version,
+    _auto_cache_bucket as _auto_cache_bucket,
+    _auto_cache_bucket_template as _auto_cache_bucket_template,
+    _auto_cache_empty as _auto_cache_empty,
+    _auto_compat_version as _auto_compat_version,
 )
 from .cache_synth_target import (
     _SYNTH_TARGET_CACHE,
     _SYNTH_TARGET_CACHE_LOCK,
-    _SYNTH_TARGET_MISS,
-    _synth_target_cache_key,
-    get_or_build_synth_target,
+    _SYNTH_TARGET_MISS as _SYNTH_TARGET_MISS,
+    _synth_target_cache_key as _synth_target_cache_key,
+    get_or_build_synth_target as get_or_build_synth_target,
 )
 from .shared import (
     AUTO_MODE_CACHE_SCHEMA_VERSION,
-    AUTO_MODE_COMPAT_VERSION,
+    AUTO_MODE_COMPAT_VERSION as AUTO_MODE_COMPAT_VERSION,
     _auto_goal,
-    _auto_goal_norm,
+    _auto_goal_norm as _auto_goal_norm,
     _auto_hash_array,
     _auto_safe_float,
     logger,

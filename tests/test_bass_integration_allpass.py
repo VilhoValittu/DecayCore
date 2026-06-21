@@ -280,7 +280,7 @@ def test_build_combined_sub_transfer_aligned_sum_uses_wide_default_lag(monkeypat
     np.testing.assert_allclose(combined.complex_spec, 2.0 * ref.complex_spec, atol=1e-12)
 
 
-def test_recommend_direct_dac_alignment_searches_beyond_legacy_bounds(monkeypatch) -> None:
+def test_recommend_direct_dac_alignment_respects_documented_delay_bounds(monkeypatch) -> None:
     bundle = _bundle()
 
     def _fake_metrics(_bundle, _fc_hz, _profile, **kwargs):
@@ -303,7 +303,7 @@ def test_recommend_direct_dac_alignment_searches_beyond_legacy_bounds(monkeypatc
     )
 
     assert result["applied"] is True
-    assert float(result["sub_delay_ms"]) == 35.0
+    assert float(result["sub_delay_ms"]) == 15.0
     assert float(result["sub_gain_trim_db"]) == -12.0
 
 
