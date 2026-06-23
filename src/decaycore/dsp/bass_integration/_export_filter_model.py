@@ -20,7 +20,7 @@ from ._utils import _build_transfer_like, _interp_complex_response, _safe_float
 _EXPORT_BIQUAD_Q = 0.707107
 
 
-def _camilladsp_crossover_order_model(value: int | float | str | None, default: int = 2) -> int:
+def _camilladsp_crossover_order_model(value: float | str | None, default: int = 2) -> int:
     try:
         order = int(round(float(value))) if value is not None else int(default)
     except (

@@ -56,7 +56,7 @@ class PhaseIROutputs:
     auto_headroom_db: float
     current_peak_gain: float
     final_gain_total: np.ndarray
-    residual_telemetry: "ResidualTelemetry | None" = None
+    residual_telemetry: ResidualTelemetry | None = None
 
 
 @dataclass

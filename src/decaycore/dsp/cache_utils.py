@@ -7,8 +7,7 @@
 # Commercial use requires separate written permission.
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
-"""
-Yhtenainen rajattu LRU-valimuisti DSP-moduulien moduulitason cacheille.
+"""Yhtenainen rajattu LRU-valimuisti DSP-moduulien moduulitason cacheille.
 
 Korvaa aiemmat erilliset toteutukset (plain dict + clear-all, dict + FIFO,
 OrderedDict + move_to_end), joilla oli keskenaan eri evict-politiikat.

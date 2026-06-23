@@ -37,7 +37,7 @@ class HybridIIRPolicy:
     max_voice_clarity_risk: float = 0.45
 
     @classmethod
-    def from_config(cls, cfg: Any) -> "HybridIIRPolicy":
+    def from_config(cls, cfg: Any) -> HybridIIRPolicy:
         return cls(
             enabled=bool(getattr(cfg, "hybrid_iir_enabled", False)),
             max_filters_per_channel=_safe_int(getattr(cfg, "hybrid_iir_max_filters_per_channel", 3), 3),
@@ -52,7 +52,7 @@ class HybridIIRPolicy:
             min_cut_priority=_safe_float(getattr(cfg, "hybrid_iir_min_cut_priority", 0.0), 0.0),
         ).normalized()
 
-    def normalized(self) -> "HybridIIRPolicy":
+    def normalized(self) -> HybridIIRPolicy:
         min_f = max(1.0, float(self.min_freq_hz))
         max_f = max(min_f + 1.0, float(self.max_freq_hz))
         min_q = max(0.2, float(self.min_q))
@@ -142,7 +142,7 @@ class HybridIIRResult:
 def design_hybrid_iir(
     events: Sequence[RoomModeEvent],
     freq_axis: np.ndarray,
-    fs: int | float,
+    fs: float,
     policy: HybridIIRPolicy,
     measured_mag_db: np.ndarray | None = None,
 ) -> HybridIIRResult:
@@ -288,7 +288,7 @@ def _refine_biquad_against_measurement(
         return biquad
 
 
-def peaking_eq_response(freq_axis: np.ndarray, fs: int | float, freq_hz: float, q: float, gain_db: float) -> np.ndarray:
+def peaking_eq_response(freq_axis: np.ndarray, fs: float, freq_hz: float, q: float, gain_db: float) -> np.ndarray:
     b0, b1, b2, a0, a1, a2 = peaking_eq_coefficients(float(fs), float(freq_hz), float(q), float(gain_db))
     freq = np.asarray(freq_axis, dtype=float).reshape(-1)
     omega = 2.0 * np.pi * np.clip(freq, 0.0, max(1.0, float(fs) / 2.0)) / max(float(fs), 1.0)

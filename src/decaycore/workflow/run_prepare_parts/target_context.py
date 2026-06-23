@@ -142,7 +142,7 @@ def _log_xo_hpf_info(xos, hpf) -> None:
         pass
 
 
-def _prepare_house_curve_context(data: dict, support: "ProcessRunSupport") -> tuple[object, object, str, str]:
+def _prepare_house_curve_context(data: dict, support: ProcessRunSupport) -> tuple[object, object, str, str]:
     hc_f, hc_m, hc_source = load_house_curve(
         data,
         parse_measurements_from_path=parse_measurements_from_path,
@@ -166,7 +166,7 @@ def _prepare_bass_integration_state(
     *,
     ctx: dict,
     data: dict,
-    callbacks: "ProcessRunCallbacks | None",
+    callbacks: ProcessRunCallbacks | None,
 ) -> dict:
     state = {
         "bi_recommended_xo_hz": None,
@@ -195,7 +195,7 @@ def _prepare_xo_hpf(data: dict) -> tuple[object, object]:
     return xos, hpf
 
 
-def _prepare_export_parameters(data: dict, support: "ProcessRunSupport") -> dict:
+def _prepare_export_parameters(data: dict, support: ProcessRunSupport) -> dict:
     target_rates = choose_target_rates(data)
     multi_rate_on = bool(data.get("multi_rate_opt"))
     dash_fs = choose_dash_fs(
@@ -215,7 +215,7 @@ def _prepare_export_parameters(data: dict, support: "ProcessRunSupport") -> dict
         data.get("ir_export_tukey_alpha"),
     )
 
-    val_raw = data.get("ir_export_window_mode", None)
+    val_raw = data.get("ir_export_window_mode")
     if not isinstance(val_raw, str) or val_raw.strip() == "":
         val_raw = data.get("ir_window_mode", "auto")
     irw_mode = str(val_raw or "auto").strip().lower()
@@ -381,7 +381,7 @@ def _build_measurements_dict(
         "harmonic_magnitudes_db_r": ctx.get("harmonic_magnitudes_db_r"),
     }
     if bool(data.get("bass_integration_enable", False)):
-        bundle = ctx.get("bass_integration_bundle", None)
+        bundle = ctx.get("bass_integration_bundle")
         bundle_diagnostics = dict(getattr(bundle, "diagnostics", {}) or {})
         meta_dict, measurements_updates = _build_bass_integration_metadata_unified(
             data=data,
@@ -453,9 +453,9 @@ def _prepare_target_curve_bass_integration_context(
     *,
     ctx: dict,
     data: dict,
-    callbacks: "ProcessRunCallbacks | None",
+    callbacks: ProcessRunCallbacks | None,
 ) -> dict:
-    bundle = ctx.get("bass_integration_bundle", None)
+    bundle = ctx.get("bass_integration_bundle")
     bi_mode = "direct_dac"
     data["bass_integration_mode"] = bi_mode
     _mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
@@ -538,8 +538,8 @@ def _prepare_target_curve_bass_integration_context(
         "invert" if bool(data.get("bass_integration_sub_polarity_invert", False)) else "normal",
         float(data.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0),
     )
-    bi_recommended_xo_hz = _bi_unified.get("recommended_hz", None)
-    bi_recommended_sub_lpf_hz = _bi_unified.get("recommended_sub_lpf_hz", None)
+    bi_recommended_xo_hz = _bi_unified.get("recommended_hz")
+    bi_recommended_sub_lpf_hz = _bi_unified.get("recommended_sub_lpf_hz")
     bi_rec_xo_l = None
     bi_rec_xo_r = None
     if bi_recommended_xo_hz is not None:
@@ -585,7 +585,7 @@ def _prepare_target_curve_bass_integration_context(
     else:
         logger.info(
             "Bass Integration Direct-DAC auto allpass kept OFF: "
-            f"{str(data.get('bass_integration_allpass_reason', '') or 'No meaningful improvement found.')}"
+            f"{data.get('bass_integration_allpass_reason', '') or 'No meaningful improvement found.'!s}"
         )
 
     bi_selected_diagnostics = _refresh_target_curve_bass_integration_diagnostics(
@@ -649,7 +649,7 @@ def _log_target_curve_bass_integration_summary(bundle, data: dict, elapsed_s: fl
 
 def _refresh_target_curve_bass_integration_diagnostics(
     *,
-    callbacks: "ProcessRunCallbacks | None",
+    callbacks: ProcessRunCallbacks | None,
     auto_active: bool,
     bundle,
     data: dict,
@@ -663,7 +663,7 @@ def _prepare_target_curve_and_run_context(
     ctx: dict,
     *,
     support: ProcessRunSupport,
-    callbacks: "ProcessRunCallbacks | None" = None,
+    callbacks: ProcessRunCallbacks | None = None,
 ):
     data = ctx.get("resolved_data", ctx["data"])
     ctx["resolved_data"] = data

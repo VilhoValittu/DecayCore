@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Tuple
+from typing import Any
 import logging
 import math
 
@@ -245,12 +245,12 @@ def _safe_positive_float(value: Any, default: float) -> float:
     return parsed if parsed > 0.0 else default
 
 
-def _normalize_list_backed_booleans(data: Dict[str, Any]) -> None:
+def _normalize_list_backed_booleans(data: dict[str, Any]) -> None:
     normalize_list_backed_booleans(data)
 
 
-def _normalize_mode_and_auto_flags(data: Dict[str, Any]) -> Tuple[str, bool]:
-    mode_raw = data.get("mode", None)
+def _normalize_mode_and_auto_flags(data: dict[str, Any]) -> tuple[str, bool]:
+    mode_raw = data.get("mode")
     mode_explicit = mode_raw not in (None, "")
     try:
         mode_u = str(mode_raw or "BASIC").strip().upper()
@@ -280,13 +280,13 @@ def _normalize_mode_and_auto_flags(data: Dict[str, Any]) -> Tuple[str, bool]:
     return mode_u, is_auto_mode
 
 
-def _normalize_ui_modes(data: Dict[str, Any]) -> None:
+def _normalize_ui_modes(data: dict[str, Any]) -> None:
     data["layout"] = normalize_layout_value(data.get("layout", LAYOUT_MONO))
     data["lvl_mode"] = normalize_lvl_mode_value(data.get("lvl_mode", LVL_MODE_AUTO))
     data["lvl_algo"] = normalize_lvl_algo_value(data.get("lvl_algo", LVL_ALGO_MEDIAN))
 
 
-def _normalize_auto_target_mode(data: Dict[str, Any]) -> None:
+def _normalize_auto_target_mode(data: dict[str, Any]) -> None:
     try:
         atm = str(data.get("auto_target_mode", "auto") or "auto").strip().lower()
     except _UI_PARSE_EXCEPTIONS:
@@ -300,14 +300,14 @@ def _normalize_auto_target_mode(data: Dict[str, Any]) -> None:
     data["auto_target_mode"] = str(atm)
 
 
-def _normalize_channel_policy_defaults(data: Dict[str, Any]) -> None:
-    if data.get("enable_channel_specific_auto_policy", None) is None:
+def _normalize_channel_policy_defaults(data: dict[str, Any]) -> None:
+    if data.get("enable_channel_specific_auto_policy") is None:
         data["enable_channel_specific_auto_policy"] = False
-    if data.get("channel_specific_policy_max_hz", None) in (None, ""):
+    if data.get("channel_specific_policy_max_hz") in (None, ""):
         data["channel_specific_policy_max_hz"] = 220.0
 
 
-def _normalize_stereo_link_strategy(data: Dict[str, Any]) -> None:
+def _normalize_stereo_link_strategy(data: dict[str, Any]) -> None:
     try:
         sls = str(data.get("stereo_link_strategy", "") or "").strip().lower()
     except _UI_PARSE_EXCEPTIONS:
@@ -322,21 +322,21 @@ def _normalize_stereo_link_strategy(data: Dict[str, Any]) -> None:
     data["stereo_link_strategy"] = sls
 
 
-def _apply_hidden_conf_defaults(data: Dict[str, Any], mode_u: str) -> None:
+def _apply_hidden_conf_defaults(data: dict[str, Any], mode_u: str) -> None:
     defaults = _HIDDEN_CONF_DEFAULTS_ADVANCED if mode_u == "ADVANCED" else _HIDDEN_CONF_DEFAULTS_BASIC_AUTO
     for key, value in defaults.items():
-        if data.get(key, None) in (None, ""):
+        if data.get(key) in (None, ""):
             data[key] = value
 
 
-def _collect_xo_fields(pin: Any, data: Dict[str, Any]) -> None:
+def _collect_xo_fields(pin: Any, data: dict[str, Any]) -> None:
     for i in range(1, 6):
         for suffix in ("f", "s"):
             key = f"xo{i}_{suffix}"
             data[key] = _read_pin_value(pin, key)
 
 
-def _normalize_level_controls(data: Dict[str, Any]) -> None:
+def _normalize_level_controls(data: dict[str, Any]) -> None:
     data["max_cut_db"] = abs(_safe_float(data.get("max_cut_db", 15.0) or 15.0, 15.0))
     for key, default in (
         ("max_slope_db_per_oct", 24.0),
@@ -351,7 +351,7 @@ def _normalize_level_controls(data: Dict[str, Any]) -> None:
     data["output_tilt_db_per_oct"] = _resolve_output_tilt_db_per_oct(data)
 
 
-def _normalize_misc_numeric_controls(data: Dict[str, Any]) -> None:
+def _normalize_misc_numeric_controls(data: dict[str, Any]) -> None:
     data["gain"] = max(0.0, _safe_float(data.get("gain", 0.0) or 0.0, 0.0))
     try:
         data["auto_mode_workers"] = int(float(data.get("auto_mode_workers", 0) or 0))
@@ -360,7 +360,7 @@ def _normalize_misc_numeric_controls(data: Dict[str, Any]) -> None:
     data["avr_crossover_hz"] = _safe_float(data.get("avr_crossover_hz", 80.0) or 80.0, 80.0)
 
 
-def _normalize_bass_integration_mode_and_profile(data: Dict[str, Any]) -> None:
+def _normalize_bass_integration_mode_and_profile(data: dict[str, Any]) -> None:
     try:
         bi_mode = str(data.get("bass_integration_mode", "direct_dac") or "direct_dac").strip().lower()
     except _UI_PARSE_EXCEPTIONS:
@@ -375,7 +375,7 @@ def _normalize_bass_integration_mode_and_profile(data: Dict[str, Any]) -> None:
     data["bass_integration_profile"] = _auto_bass_integration_profile_norm(bi_profile)
 
 
-def _normalize_bass_integration_alignment_fields(data: Dict[str, Any], is_auto_mode: bool) -> None:
+def _normalize_bass_integration_alignment_fields(data: dict[str, Any], is_auto_mode: bool) -> None:
     data["bass_integration_sub_combine_mode"] = normalize_sub_combine_mode(
         data.get("bass_integration_sub_combine_mode", "average")
     )
@@ -418,7 +418,7 @@ def _normalize_bass_integration_alignment_fields(data: Dict[str, Any], is_auto_m
         data["bass_integration_allpass_auto_applied"] = False
 
 
-def _normalize_bass_integration_lpf(data: Dict[str, Any]) -> None:
+def _normalize_bass_integration_lpf(data: dict[str, Any]) -> None:
     main_xo_hz = _safe_float(
         data.get("sub_crossover_hz", data.get("avr_crossover_hz", 80.0))
         or data.get("avr_crossover_hz", 80.0)
@@ -435,8 +435,8 @@ def _normalize_bass_integration_lpf(data: Dict[str, Any]) -> None:
     data["direct_dac_sub_lpf_hz"] = float(direct_sub_lpf_hz)
 
 
-def _normalize_ir_window_mode(data: Dict[str, Any]) -> None:
-    v_raw = data.get("ir_export_window_mode", None)
+def _normalize_ir_window_mode(data: dict[str, Any]) -> None:
+    v_raw = data.get("ir_export_window_mode")
     if v_raw is None or (isinstance(v_raw, str) and v_raw.strip() == ""):
         v_raw = data.get("ir_window_mode", "auto")
     v = str(v_raw or "auto").strip().lower()
@@ -445,7 +445,7 @@ def _normalize_ir_window_mode(data: Dict[str, Any]) -> None:
     data["ir_window_mode"] = v
 
 
-def _normalize_ir_anchor_and_shape(data: Dict[str, Any]) -> None:
+def _normalize_ir_anchor_and_shape(data: dict[str, Any]) -> None:
     am = str(data.get("ir_anchor_mode", "min_causal") or "min_causal").strip().lower()
     if am not in ("peak", "centroid", "min_causal"):
         am = "min_causal"
@@ -459,7 +459,7 @@ def _normalize_ir_anchor_and_shape(data: Dict[str, Any]) -> None:
     data["ir_export_tukey_alpha"] = max(0.0, min(1.0, float(alpha)))
 
 
-def _force_asymmetric_window_defaults(data: Dict[str, Any]) -> None:
+def _force_asymmetric_window_defaults(data: dict[str, Any]) -> None:
     try:
         if filter_type_short(str(data.get("filter_type", "") or "")) == "Asymmetric":
             data["ir_export_window_mode"] = "rew_asym"
@@ -470,19 +470,19 @@ def _force_asymmetric_window_defaults(data: Dict[str, Any]) -> None:
         logger.debug("Failed to normalize asymmetric export-window defaults", exc_info=True)
 
 
-def _normalize_smoothing_defaults(data: Dict[str, Any]) -> None:
-    if data.get("filter_smooth", None) is None and data.get("smoothing_level", None) is not None:
+def _normalize_smoothing_defaults(data: dict[str, Any]) -> None:
+    if data.get("filter_smooth") is None and data.get("smoothing_level") is not None:
         data["filter_smooth"] = data.get("smoothing_level")
-    if data.get("plot_smoothing_level", None) is None:
+    if data.get("plot_smoothing_level") is None:
         data["plot_smoothing_level"] = "Psychoacoustic"
 
-def collect_ui_data(pin) -> Dict[str, Any]:
+def collect_ui_data(pin) -> dict[str, Any]:
     """Funktio: collect ui data."""
-    data: Dict[str, Any] = {key: _read_pin_value(pin, key) for key in _UI_PIN_KEYS}
+    data: dict[str, Any] = {key: _read_pin_value(pin, key) for key in _UI_PIN_KEYS}
 
-    if data.get("ir_window_right", None) in (None, ""):
+    if data.get("ir_window_right") in (None, ""):
         data["ir_window_right"] = data.get("ir_window", 500.0)
-    if data.get("ir_window", None) in (None, ""):
+    if data.get("ir_window") in (None, ""):
         data["ir_window"] = data.get("ir_window_right", 500.0)
 
     _normalize_list_backed_booleans(data)

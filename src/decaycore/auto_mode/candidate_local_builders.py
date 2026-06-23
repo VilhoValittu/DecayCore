@@ -67,7 +67,7 @@ def _build_auto_mode_candidates_local(
     prefer_bass = bool(_auto_goal(base) == AUTO_MODE_GOAL_FLAT)
     is_mixed = "mixed" in ft
     is_phase_search = _auto_is_phase_search_filter(ft)
-    phase_center = _auto_phase_limit_center(c.get("phase_limit", base.get("phase_limit", None)))
+    phase_center = _auto_phase_limit_center(c.get("phase_limit", base.get("phase_limit")))
 
     keep_tdc = bool(c.get("enable_tdc", True))
     keep_afdw = bool(c.get("enable_afdw", True))
@@ -120,15 +120,15 @@ def _build_auto_mode_candidates_local(
             "enable_tdc": bool(keep_tdc),
             "enable_afdw": bool(keep_afdw),
             "bass_first_ai": bool(keep_bass_first),
-            "fdw_cycles": round(_jitter(rng, c.get("fdw_cycles", None), 2.5 * s, 8.0, 16.0, base_data=base, key="fdw_cycles", default=10.0), 2),
-            "tdc_strength": round(_jitter(rng, c.get("tdc_strength", None), 12.0 * s, _TDC_STRENGTH_MIN, _TDC_STRENGTH_MAX, base_data=base, key="tdc_strength", default=50.0), 1),
-            "tdc_max_reduction_db": round(_jitter(rng, c.get("tdc_max_reduction_db", None), 6.0 * s, _TDC_MAX_REDUCTION_MIN_DB, _TDC_MAX_REDUCTION_MAX_DB, base_data=base, key="tdc_max_reduction_db", default=9.0), 1),
+            "fdw_cycles": round(_jitter(rng, c.get("fdw_cycles"), 2.5 * s, 8.0, 16.0, base_data=base, key="fdw_cycles", default=10.0), 2),
+            "tdc_strength": round(_jitter(rng, c.get("tdc_strength"), 12.0 * s, _TDC_STRENGTH_MIN, _TDC_STRENGTH_MAX, base_data=base, key="tdc_strength", default=50.0), 1),
+            "tdc_max_reduction_db": round(_jitter(rng, c.get("tdc_max_reduction_db"), 6.0 * s, _TDC_MAX_REDUCTION_MIN_DB, _TDC_MAX_REDUCTION_MAX_DB, base_data=base, key="tdc_max_reduction_db", default=9.0), 1),
             "tdc_slope_db_per_oct": float(slope_choices[idx]),
-            "reg_strength": round(_jitter(rng, c.get("reg_strength", None), 10.0 * s, 15.0, 45.0, base_data=base, key="reg_strength", default=30.0), 1),
+            "reg_strength": round(_jitter(rng, c.get("reg_strength"), 10.0 * s, 15.0, 45.0, base_data=base, key="reg_strength", default=30.0), 1),
             "max_boost": round(
                 _jitter(
                     rng,
-                    max(6.0, _auto_safe_float(c.get("max_boost", base.get("max_boost", 5.0)), 5.0)) if prefer_bass else c.get("max_boost", None),
+                    max(6.0, _auto_safe_float(c.get("max_boost", base.get("max_boost", 5.0)), 5.0)) if prefer_bass else c.get("max_boost"),
                     1.0 * s,
                     5.0 if prefer_bass else 3.0,
                     12.0,
@@ -139,19 +139,19 @@ def _build_auto_mode_candidates_local(
                 2,
             ),
             "mag_c_min": float(mag_c_min_cand),
-            "mag_c_max": round(_jitter(rng, c.get("mag_c_max", None), 25.0 * s, 170.0, 300.0, base_data=base, key="mag_c_max", default=220.0), 1),
-            "trans_width": round(_jitter(rng, c.get("trans_width", None), 25.0 * s, 70.0, 150.0, base_data=base, key="trans_width", default=100.0), 1),
-            "bass_first_mode_max_hz": round(_jitter(rng, c.get("bass_first_mode_max_hz", None), 25.0 * s, _BASS_FIRST_MODE_MIN_HZ, _BASS_FIRST_MODE_MAX_HZ, base_data=base, key="bass_first_mode_max_hz", default=180.0), 1),
-            "conf_pull_max_hz": round(_jitter(rng, c.get("conf_pull_max_hz", None), 30.0 * s, _CONF_PULL_MAX_MIN_HZ, _CONF_PULL_MAX_MAX_HZ, base_data=base, key="conf_pull_max_hz", default=200.0), 1),
+            "mag_c_max": round(_jitter(rng, c.get("mag_c_max"), 25.0 * s, 170.0, 300.0, base_data=base, key="mag_c_max", default=220.0), 1),
+            "trans_width": round(_jitter(rng, c.get("trans_width"), 25.0 * s, 70.0, 150.0, base_data=base, key="trans_width", default=100.0), 1),
+            "bass_first_mode_max_hz": round(_jitter(rng, c.get("bass_first_mode_max_hz"), 25.0 * s, _BASS_FIRST_MODE_MIN_HZ, _BASS_FIRST_MODE_MAX_HZ, base_data=base, key="bass_first_mode_max_hz", default=180.0), 1),
+            "conf_pull_max_hz": round(_jitter(rng, c.get("conf_pull_max_hz"), 30.0 * s, _CONF_PULL_MAX_MIN_HZ, _CONF_PULL_MAX_MAX_HZ, base_data=base, key="conf_pull_max_hz", default=200.0), 1),
             "low_bass_cut_hz": float(low_bass_cut_cand),
         }
         if is_mixed:
-            cand["mixed_freq"] = round(_jitter(rng, c.get("mixed_freq", None), 35.0 * s, 80.0, 320.0, base_data=base, key="mixed_freq", default=180.0), 1)
+            cand["mixed_freq"] = round(_jitter(rng, c.get("mixed_freq"), 35.0 * s, 80.0, 320.0, base_data=base, key="mixed_freq", default=180.0), 1)
         if is_phase_search:
             cand["phase_limit"] = round(
                 _jitter(
                     rng,
-                    c.get("phase_limit", None),
+                    c.get("phase_limit"),
                     float(AUTO_MODE_PHASE_LIMIT_LOCAL_SIGMA_HZ) * s,
                     float(AUTO_MODE_PHASE_LIMIT_MIN_HZ),
                     float(AUTO_MODE_PHASE_LIMIT_MAX_HZ),
@@ -212,7 +212,7 @@ def _build_auto_mode_candidates_micro(
     ]
 
     base_mixed = _auto_safe_float(p.get("mixed_freq", 180.0), 180.0)
-    base_phase = _auto_phase_limit_center(p.get("phase_limit", None))
+    base_phase = _auto_phase_limit_center(p.get("phase_limit"))
     base_tdc = _auto_safe_float(p.get("tdc_strength", 55.0), 55.0)
     base_fdw = _auto_safe_float(p.get("fdw_cycles", 10.0), 10.0)
     base_reg = _auto_safe_float(p.get("reg_strength", 30.0), 30.0)

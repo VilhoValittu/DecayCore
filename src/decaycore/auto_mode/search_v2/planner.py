@@ -106,10 +106,7 @@ def _decision(
     if plan in (AutoSearchPlan.CACHE_MICRO_REFINE, AutoSearchPlan.LAST_BEST_MICRO_REFINE):
         skipped = ("target_search", "phase1", "phase2", "phase3")
         enabled = ("phase4",)
-    elif plan == AutoSearchPlan.PRESELECTED_TARGET_REFINE:
-        skipped = ("target_search",)
-        enabled = ("phase1", "phase2", "phase3", "phase4")
-    elif plan == AutoSearchPlan.MANUAL_PRESET_REFINE:
+    elif plan == AutoSearchPlan.PRESELECTED_TARGET_REFINE or plan == AutoSearchPlan.MANUAL_PRESET_REFINE:
         skipped = ("target_search",)
         enabled = ("phase1", "phase2", "phase3", "phase4")
     elif plan == AutoSearchPlan.REUSE_VALID_RESULT:
@@ -374,7 +371,7 @@ def determine_auto_search_plan(
                 seed_source="exact_cache",
             )
         exact_status = _cache_status(exact_reason)
-        fallback_reasons.append(f"exact cache skipped: {str(exact_reason)}")
+        fallback_reasons.append(f"exact cache skipped: {exact_reason!s}")
         cache_read_failed = cache_read_failed or "read failed" in str(exact_reason).lower()
         exact_seed, exact_seed_reason = read_exact_cache_seed_with_reason(
             signature=signature,
@@ -409,7 +406,7 @@ def determine_auto_search_plan(
                     seed_source="old_exact_cache",
                 )
         elif str(exact_seed_reason or "").strip() and str(exact_seed_reason) != str(exact_reason):
-            fallback_reasons.append(f"exact cache seed skipped: {str(exact_seed_reason)}")
+            fallback_reasons.append(f"exact cache seed skipped: {exact_seed_reason!s}")
 
         if bool(has_cached_target_seed):
             plan = AutoSearchPlan.FIRST_RUN_FULL_SEARCH
@@ -479,7 +476,7 @@ def determine_auto_search_plan(
         last_best_status = _cache_status(last_reason)
         last_best_reason = str(last_reason)
         cache_read_failed = cache_read_failed or "read failed" in str(last_reason).lower()
-        fallback_reasons.append(f"last-best skipped: {str(last_reason)}")
+        fallback_reasons.append(f"last-best skipped: {last_reason!s}")
     else:
         fallback_reasons.append("cache skipped: disabled")
 

@@ -608,14 +608,14 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
         dialog.open()
 
     with ui.dialog().props("persistent") as dialog, ui.card().classes("w-full max-w-3xl gap-4 cf-modal-card"):
-        ui.label("Guided multi-take measurement").classes("text-xl font-semibold")
+        ui.label(t("session_guided_title")).classes("text-xl font-semibold")
 
         setup_col = ui.column().classes("w-full gap-4")
         with setup_col:
-            ui.label("Capture repeated measurements across one or more listening positions.").classes("text-sm text-gray-500")
+            ui.label(t("session_guided_desc")).classes("text-sm text-gray-500")
             with ui.row().classes("w-full gap-4"):
                 position_input = ui.number(
-                    label="Number of positions",
+                    label=t("session_num_positions"),
                     value=3,
                     min=1,
                     max=12,
@@ -623,7 +623,7 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
                     format="%.0f",
                 ).props("dense outlined").classes("flex-1")
                 repeats_input = ui.number(
-                    label="Repeats per channel",
+                    label=t("session_repeats"),
                     value=5,
                     min=1,
                     max=12,
@@ -631,7 +631,7 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
                     format="%.0f",
                 ).props("dense outlined").classes("flex-1")
                 primary_input = ui.number(
-                    label="Primary position",
+                    label=t("session_primary_position"),
                     value=1,
                     min=1,
                     max=12,
@@ -640,31 +640,31 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
                 ).props("dense outlined").classes("flex-1")
 
             with ui.row().classes("w-full gap-4 items-center"):
-                outlier_checkbox = ui.checkbox("Enable outlier rejection", value=True)
+                outlier_checkbox = ui.checkbox(t("session_enable_outlier"), value=True)
                 strictness_select = ui.select(
                     options={
-                        "safe": "Safe",
-                        "normal": "Normal",
-                        "strict": "Strict",
+                        "safe": t("session_strictness_safe"),
+                        "normal": t("session_strictness_normal"),
+                        "strict": t("session_strictness_strict"),
                     },
                     value="normal",
-                    label="Outlier strictness",
+                    label=t("session_outlier_strictness"),
                 ).props("dense outlined").classes("w-40")
 
             with ui.row().classes("w-full gap-6 items-center"):
-                left_checkbox = ui.checkbox("Measure Left", value=True)
-                right_checkbox = ui.checkbox("Measure Right", value=True)
-                sub1_checkbox = ui.checkbox("Measure Sub 1", value=False)
-                sub2_checkbox = ui.checkbox("Measure Sub 2", value=False)
-            ui.label("Sub 1 and Sub 2 are applied to the existing subwoofer slots.").classes("text-xs text-gray-500")
+                left_checkbox = ui.checkbox(t("session_measure_left"), value=True)
+                right_checkbox = ui.checkbox(t("session_measure_right"), value=True)
+                sub1_checkbox = ui.checkbox(t("session_measure_sub1"), value=False)
+                sub2_checkbox = ui.checkbox(t("session_measure_sub2"), value=False)
+            ui.label(t("session_sub_slots_note")).classes("text-xs text-gray-500")
 
-            ui.label("Sequence preview").classes("text-sm font-medium")
+            ui.label(t("session_sequence_preview")).classes("text-sm font-medium")
             sequence_preview_label = ui.label("").classes("whitespace-pre-wrap text-sm text-gray-500")
             setup_error_label = ui.label("").classes("text-sm text-red-500")
 
             with ui.row().classes("w-full gap-3 justify-end"):
-                ui.button("Close", on_click=_close_dialog).props('flat color="secondary"')
-                ui.button("Start guided measurement", on_click=_start_session).props('unelevated color="positive"')
+                ui.button(t("manual_close_btn"), on_click=_close_dialog).props('flat color="secondary"')
+                ui.button(t("session_start"), on_click=_start_session).props('unelevated color="positive"')
 
         running_col = ui.column().classes("w-full gap-4")
         with running_col:
@@ -679,7 +679,7 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
                 counter_labels["right"] = ui.label("Right kept 0/0").classes("text-sm")
                 counter_labels["sub1"] = ui.label("Sub 1 kept 0/0").classes("text-sm")
                 counter_labels["sub2"] = ui.label("Sub 2 kept 0/0").classes("text-sm")
-            ui.label("Live event log").classes("text-sm font-medium")
+            ui.label(t("session_live_event_log")).classes("text-sm font-medium")
             log_label = ui.label("No events yet.").classes("whitespace-pre-wrap text-sm text-gray-500")
 
         pause_col = ui.column().classes("w-full gap-4")
@@ -687,8 +687,8 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
             pause_title = ui.label("").classes("text-2xl font-semibold")
             pause_help = ui.label("").classes("text-sm text-gray-500")
             with ui.row().classes("w-full gap-3 justify-end"):
-                ui.button("Cancel session", on_click=_cancel_session).props('flat color="negative"')
-                ui.button("Continue", on_click=_continue_after_pause).props('unelevated color="positive"')
+                ui.button(t("session_cancel"), on_click=_cancel_session).props('flat color="negative"')
+                ui.button(t("session_continue"), on_click=_continue_after_pause).props('unelevated color="positive"')
 
         summary_col = ui.column().classes("w-full gap-4")
         with summary_col:
@@ -697,8 +697,8 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
             summary_error_label.set_visibility(False)
             summary_html = ui.html("")
             with ui.row().classes("w-full gap-3 justify-end"):
-                use_final_btn = ui.button("Use final measurements", on_click=_use_final_measurements).props('unelevated color="positive"')
-                ui.button("Close", on_click=_close_dialog).props('flat color="secondary"')
+                use_final_btn = ui.button(t("session_use_final"), on_click=_use_final_measurements).props('unelevated color="positive"')
+                ui.button(t("manual_close_btn"), on_click=_close_dialog).props('flat color="secondary"')
 
     for control in (
         position_input,

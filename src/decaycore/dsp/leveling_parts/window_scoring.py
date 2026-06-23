@@ -88,8 +88,7 @@ def _perceptual_importance_weights(
             min_hz = 250.0
         if max_hz <= min_hz:
             min_hz, max_hz = 250.0, 4000.0
-        if max_weight < min_weight:
-            max_weight = min_weight
+        max_weight = max(max_weight, min_weight)
 
         weights = np.full(f.shape, float(min_weight), dtype=float)
         valid = np.isfinite(f) & (f > 0.0)

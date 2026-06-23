@@ -412,7 +412,7 @@ def _build_brand_header(*, version: str, dark_mode, initial_theme_dark: bool) ->
             ui.markdown(t("about_body"))
             with ui.dialog() as manual_dlg, ui.card().classes("w-full max-w-3xl max-h-[80vh] cf-modal-card"):
                 with ui.row().classes("w-full justify-between items-center shrink-0"):
-                    ui.label("User Manual").classes("text-lg font-semibold")
+                    ui.label(t("manual_dialog_title")).classes("text-lg font-semibold")
                     ui.button(icon="close", on_click=manual_dlg.close).props("flat dense round")
                 ui.markdown(manual_text).classes("w-full overflow-y-auto")
             ui.button(t("open_manual_btn"), on_click=manual_dlg.open).props("flat").classes("mt-2")

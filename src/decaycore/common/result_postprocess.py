@@ -317,7 +317,7 @@ def _avg_confidence_pct(st: dict) -> float:
         return 0.0
     mode = str(st.get("analysis_mode", "native")).lower()
     if mode == "comparison":
-        v = st.get("cmp_avg_confidence", None)
+        v = st.get("cmp_avg_confidence")
         if v is not None:
             try:
                 return float(v)
@@ -335,12 +335,12 @@ def _avg_confidence_pct(st: dict) -> float:
                 NameError,
             ):
                 logger.exception("cmp_avg_confidence parse")
-        cm_src = st.get("cmp_confidence_mask", None)
+        cm_src = st.get("cmp_confidence_mask")
         cm = np.asarray(cm_src if cm_src is not None else [], dtype=float)
         if cm.size:
             return float(np.mean(cm) * 100.0)
         return 0.0
-    v = st.get("avg_confidence", None)
+    v = st.get("avg_confidence")
     if v is not None:
         try:
             return float(v)
@@ -358,7 +358,7 @@ def _avg_confidence_pct(st: dict) -> float:
             NameError,
         ):
             logger.exception("avg_confidence parse")
-    cm_src = st.get("confidence_mask", None)
+    cm_src = st.get("confidence_mask")
     cm = np.asarray(cm_src if cm_src is not None else [], dtype=float)
     if cm.size:
         return float(np.mean(cm) * 100.0)

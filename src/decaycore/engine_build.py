@@ -31,8 +31,8 @@ logger = logging.getLogger("DecayCore")
 
 def _apply_max_boost_safety_cap(cfg: Any, *, max_safe_boost: float, unsafe_raw: bool) -> None:
     user_max_boost = float(getattr(cfg, "max_boost_db", 0.0) or 0.0)
-    setattr(cfg, "max_boost_db_user", user_max_boost)
-    setattr(cfg, "max_safe_boost_db", float(max_safe_boost))
+    cfg.max_boost_db_user = user_max_boost
+    cfg.max_safe_boost_db = float(max_safe_boost)
     if (not unsafe_raw) and user_max_boost > 0.0 and float(max_safe_boost) > 0.0:
         eff = min(user_max_boost, float(max_safe_boost))
         if eff < user_max_boost - 1e-9:
@@ -41,7 +41,7 @@ def _apply_max_boost_safety_cap(cfg: Any, *, max_safe_boost: float, unsafe_raw: 
                 f"user={user_max_boost:.2f} dB -> effective={eff:.2f} dB "
                 f"(MAX_SAFE_BOOST={float(max_safe_boost):.2f} dB)"
             )
-        setattr(cfg, "max_boost_db", float(eff))
+        cfg.max_boost_db = float(eff)
     elif unsafe_raw:
         logger.info("UNSAFE Raw DSP: bypassing MAX_SAFE_BOOST safety cap")
 
@@ -134,9 +134,9 @@ def _build_config_apply_mode_clamp(cfg: FilterConfig, mode_u: str) -> None:
 
 def _build_config_apply_resolved_policies(cfg: FilterConfig, data: dict) -> None:
     try:
-        overlay_data = data.get("_stereo_resolved_auto_policies", None)
+        overlay_data = data.get("_stereo_resolved_auto_policies")
         resolved_policies = StereoResolvedAutoPolicies.from_dict(overlay_data)
-        setattr(cfg, "stereo_resolved_auto_policies", resolved_policies)
+        cfg.stereo_resolved_auto_policies = resolved_policies
     except (
         AttributeError,
         TypeError,
@@ -156,7 +156,7 @@ def _build_config_apply_basic_stereo_clamp(cfg: FilterConfig, mode_u: str) -> No
     try:
         stereo_policy = getattr(cfg, "stereo_auto_policy", None)
         if mode_u == "BASIC" and stereo_policy is not None:
-            setattr(stereo_policy, "enable_channel_specific_auto_policy", False)
+            stereo_policy.enable_channel_specific_auto_policy = False
     except (
         AttributeError,
         TypeError,
@@ -196,7 +196,7 @@ def _build_config_apply_unsafe_raw(cfg: FilterConfig, data: dict, *, mode_u: str
     unsafe_raw_auto = bool(mode_u == "AUTO" and auto_goal == AUTO_MODE_GOAL_FLAT)
     unsafe_raw = bool(unsafe_raw_req and (mode_u == "ADVANCED" or unsafe_raw_auto))
     try:
-        setattr(cfg, "unsafe_raw_dsp", bool(unsafe_raw))
+        cfg.unsafe_raw_dsp = bool(unsafe_raw)
     except (
         AttributeError,
         TypeError,
@@ -228,33 +228,22 @@ def _build_config_apply_unsafe_raw(cfg: FilterConfig, data: dict, *, mode_u: str
         logger.exception("max_boost_db safety cap apply")
     if unsafe_raw:
         try:
-            setattr(
-                cfg,
-                "max_boost_db",
-                float(
-                    getattr(
-                        cfg,
-                        "max_boost_db_user",
-                        getattr(cfg, "max_boost_db", 0.0),
-                    )
-                    or 0.0
-                ),
-            )
-            setattr(cfg, "max_cut_db", float(max(120.0, abs(float(getattr(cfg, "max_cut_db", 0.0) or 0.0)))))
-            setattr(cfg, "max_slope_db_per_oct", 0.0)
-            setattr(cfg, "max_slope_boost_db_per_oct", 0.0)
-            setattr(cfg, "max_slope_cut_db_per_oct", 0.0)
-            setattr(cfg, "reg_strength", 0.0)
-            setattr(cfg, "low_bass_cut_enable", False)
-            setattr(cfg, "low_bass_cut_hz", 0.0)
-            setattr(cfg, "low_bass_cut_strength", 0.0)
-            setattr(cfg, "exc_prot", False)
-            setattr(cfg, "bass_boost_cap_enable", False)
-            setattr(cfg, "bass_boost_post_restore_enable", False)
-            setattr(cfg, "acoustic_authority_limits_enable", False)
-            setattr(cfg, "enable_residual_pass", False)
-            setattr(cfg, "bass_smooth_adaptive", False)
-            setattr(cfg, "enable_ir_pre_energy_guard", False)
+            cfg.max_boost_db = float(getattr(cfg, "max_boost_db_user", getattr(cfg, "max_boost_db", 0.0)) or 0.0)
+            cfg.max_cut_db = float(max(120.0, abs(float(getattr(cfg, "max_cut_db", 0.0) or 0.0))))
+            cfg.max_slope_db_per_oct = 0.0
+            cfg.max_slope_boost_db_per_oct = 0.0
+            cfg.max_slope_cut_db_per_oct = 0.0
+            cfg.reg_strength = 0.0
+            cfg.low_bass_cut_enable = False
+            cfg.low_bass_cut_hz = 0.0
+            cfg.low_bass_cut_strength = 0.0
+            cfg.exc_prot = False
+            cfg.bass_boost_cap_enable = False
+            cfg.bass_boost_post_restore_enable = False
+            cfg.acoustic_authority_limits_enable = False
+            cfg.enable_residual_pass = False
+            cfg.bass_smooth_adaptive = False
+            cfg.enable_ir_pre_energy_guard = False
             logger.info("UNSAFE Raw DSP: guard rails disabled (FOR TEST USE ONLY)")
         except (
             AttributeError,
@@ -307,13 +296,13 @@ def _build_config_apply_post_mode_settings(cfg: FilterConfig, data: dict) -> Non
         sh = "tukey"
         tukey_alpha = 0.25
 
-    setattr(cfg, "ir_export_window_mode", irw_mode)
-    setattr(cfg, "ir_export_window_shape", sh)
-    setattr(cfg, "ir_export_tukey_alpha", float(tukey_alpha))
+    cfg.ir_export_window_mode = irw_mode
+    cfg.ir_export_window_shape = sh
+    cfg.ir_export_tukey_alpha = float(tukey_alpha)
 
     try:
-        setattr(cfg, "ir_window", float(data.get("ir_window", getattr(cfg, "ir_window", 500.0)) or 500.0))
-        setattr(cfg, "ir_window_left", float(data.get("ir_window_left", getattr(cfg, "ir_window_left", 120.0)) or 120.0))
+        cfg.ir_window = float(data.get("ir_window", getattr(cfg, "ir_window", 500.0)) or 500.0)
+        cfg.ir_window_left = float(data.get("ir_window_left", getattr(cfg, "ir_window_left", 120.0)) or 120.0)
     except (
         AttributeError,
         TypeError,
@@ -331,18 +320,10 @@ def _build_config_apply_post_mode_settings(cfg: FilterConfig, data: dict) -> Non
         ir_anchor_mode = str(data.get("ir_anchor_mode", getattr(cfg, "ir_anchor_mode", "min_causal")) or "min_causal").strip().lower()
         if ir_anchor_mode not in ("peak", "centroid", "min_causal"):
             ir_anchor_mode = "min_causal"
-        setattr(cfg, "ir_anchor_mode", ir_anchor_mode)
-        setattr(cfg, "min_causal_ms", float(max(0.0, _as_float(data.get("min_causal_ms", getattr(cfg, "min_causal_ms", 80.0)), 80.0))))
-        setattr(
-            cfg,
-            "auto_asym_left_ratio",
-            float(np.clip(_as_float(data.get("auto_asym_left_ratio", getattr(cfg, "auto_asym_left_ratio", 0.35)), 0.35), 0.0, 1.0)),
-        )
-        setattr(
-            cfg,
-            "auto_asym_left_max_ms",
-            float(max(0.0, _as_float(data.get("auto_asym_left_max_ms", getattr(cfg, "auto_asym_left_max_ms", 25.0)), 25.0))),
-        )
+        cfg.ir_anchor_mode = ir_anchor_mode
+        cfg.min_causal_ms = float(max(0.0, _as_float(data.get("min_causal_ms", getattr(cfg, "min_causal_ms", 80.0)), 80.0)))
+        cfg.auto_asym_left_ratio = float(np.clip(_as_float(data.get("auto_asym_left_ratio", getattr(cfg, "auto_asym_left_ratio", 0.35)), 0.35), 0.0, 1.0))
+        cfg.auto_asym_left_max_ms = float(max(0.0, _as_float(data.get("auto_asym_left_max_ms", getattr(cfg, "auto_asym_left_max_ms", 25.0)), 25.0)))
     except (
         AttributeError,
         TypeError,
@@ -357,21 +338,9 @@ def _build_config_apply_post_mode_settings(cfg: FilterConfig, data: dict) -> Non
     ):
         logger.exception("ir anchor/asym attr set")
     try:
-        setattr(
-            cfg,
-            "enable_ir_pre_energy_guard",
-            bool(data.get("enable_ir_pre_energy_guard", getattr(cfg, "enable_ir_pre_energy_guard", True))),
-        )
-        setattr(
-            cfg,
-            "pre_energy_ratio_max",
-            float(max(0.0, _as_float(data.get("pre_energy_ratio_max", getattr(cfg, "pre_energy_ratio_max", 0.25)), 0.25))),
-        )
-        setattr(
-            cfg,
-            "pre_energy_guard_strength",
-            float(np.clip(_as_float(data.get("pre_energy_guard_strength", getattr(cfg, "pre_energy_guard_strength", 0.8)), 0.8), 0.0, 1.0)),
-        )
+        cfg.enable_ir_pre_energy_guard = bool(data.get("enable_ir_pre_energy_guard", getattr(cfg, "enable_ir_pre_energy_guard", True)))
+        cfg.pre_energy_ratio_max = float(max(0.0, _as_float(data.get("pre_energy_ratio_max", getattr(cfg, "pre_energy_ratio_max", 0.25)), 0.25)))
+        cfg.pre_energy_guard_strength = float(np.clip(_as_float(data.get("pre_energy_guard_strength", getattr(cfg, "pre_energy_guard_strength", 0.8)), 0.8), 0.0, 1.0))
     except (
         AttributeError,
         TypeError,
@@ -388,7 +357,7 @@ def _build_config_apply_post_mode_settings(cfg: FilterConfig, data: dict) -> Non
 
     is_wav = _build_config_detect_is_wav_source(data)
     try:
-        setattr(cfg, "is_wav_source", bool(is_wav))
+        cfg.is_wav_source = bool(is_wav)
     except (
         AttributeError,
         TypeError,
@@ -417,8 +386,7 @@ def build_config(
     filter_config_cls=FilterConfig,
     max_safe_boost: float = 12.0,
 ) -> FilterConfig:
-    """
-    Build a FilterConfig via existing pipeline builders and mode clamping.
+    """Build a FilterConfig via existing pipeline builders and mode clamping.
 
     This function intentionally delegates to `config.decaycore_pipeline`
     to keep config behavior unchanged.

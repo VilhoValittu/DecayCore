@@ -207,7 +207,7 @@ def _set_cached_target_state(
     if callable(status_cb) and not bool(state.cached_target_preset):
         status_cb(
             "DecayCore automatic mode: target preselect cache seed "
-            f"({str(status_label)} -> {str(state.cached_target_hc)})"
+            f"({status_label!s} -> {state.cached_target_hc!s})"
         )
     return True
 
@@ -724,7 +724,7 @@ def _try_exact_cached_target_result(
     if callable(status_cb):
         status_cb(
             "DecayCore automatic mode: target loaded directly from cache "
-            f"(same measurements -> {str(cache_state.cached_target_hc)}, "
+            f"(same measurements -> {cache_state.cached_target_hc!s}, "
             "skipping target comparison trials)"
         )
     return dict(fallback)
@@ -768,6 +768,6 @@ def _try_measurement_global_target_result(
     if callable(status_cb):
         status_cb(
             "DecayCore automatic mode: target cache hit for same measurements; "
-            f"using {str(hc)}"
+            f"using {hc!s}"
         )
     return dict(fallback)

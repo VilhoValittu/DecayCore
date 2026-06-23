@@ -67,6 +67,7 @@ def build_phase_authority_gain(
 
     Returns:
         phase_gain: np.ndarray, same shape as freq_axis, values in [0.0, 1.0].
+
     """
     f = np.asarray(freq_axis, dtype=float)
 

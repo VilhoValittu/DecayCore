@@ -325,7 +325,7 @@ def _seed_auto_mode_candidate_local_optuna_params(
             float(output_tilt_hi),
         )
     )
-    phase_center = _auto_phase_limit_center(c.get("phase_limit", base.get("phase_limit", None)))
+    phase_center = _auto_phase_limit_center(c.get("phase_limit", base.get("phase_limit")))
     mag_c_min_center = float(round(_auto_mag_c_min_center(c, default=25.0), 1))
     low_bass_cut_center = float(
         round(

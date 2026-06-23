@@ -34,7 +34,7 @@ TRANS_FILE = get_resource_path(os.path.join("i8n", "translations.json"))
 
 def load_translations() -> tuple[dict, dict]:
     try:
-        with open(TRANS_FILE, "r", encoding="utf-8") as f:
+        with open(TRANS_FILE, encoding="utf-8") as f:
             payload = json.load(f)
             if not isinstance(payload, dict):
                 raise ValueError("translations.json must contain a top-level object")

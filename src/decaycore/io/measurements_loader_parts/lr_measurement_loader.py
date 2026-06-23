@@ -52,8 +52,7 @@ def parse_measurements_from_upload(
     smoothing_level: int | None = None,
     logger=None,
 ):
-    """
-    Jasentaa selaimesta ladatun mittaustiedoston sisallon.
+    """Jasentaa selaimesta ladatun mittaustiedoston sisallon.
 
     Valitsee parserin tiedostopaateen tai RIFF-headerin perusteella:
     WAV -> WAV-parseri, muuten TXT-parseri.
@@ -174,7 +173,7 @@ def _try_load_measurement_metadata_sidecar(wav_path: str) -> dict[str, object] |
         metadata_path = next((p for p in candidates if os.path.isfile(p)), None)
         if metadata_path is None:
             return None
-        with open(metadata_path, "r", encoding="utf-8") as fh:
+        with open(metadata_path, encoding="utf-8") as fh:
             payload = json.load(fh)
         return payload if isinstance(payload, dict) else None
     except (
@@ -201,8 +200,7 @@ def _try_load_rt60_sidecar(wav_path: str) -> tuple[float | None, dict[float, flo
     return rt60_val, rt60_bands
 
 def load_measurements_lr(data: dict, *, logger=None):
-    """
-    Lataa vasemman ja oikean kanavan mittaukset ensisijaisuusjarjestyksessa.
+    """Lataa vasemman ja oikean kanavan mittaukset ensisijaisuusjarjestyksessa.
 
     Jarjestys:
     1) selainlataukset (`data["file_l"]`, `data["file_r"]`)

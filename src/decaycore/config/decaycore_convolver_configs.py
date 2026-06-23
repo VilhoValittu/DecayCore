@@ -156,7 +156,7 @@ def bypass_sub_filter_wav_export_spec(
     }
 
 
-def _camilladsp_crossover_order(value: int | float | str | None, default: int = 2) -> int:
+def _camilladsp_crossover_order(value: float | str | None, default: int = 2) -> int:
     try:
         order = int(round(float(value))) if value is not None else int(default)
     except _NUMERIC_PARSE_EXCEPTIONS:
@@ -257,9 +257,9 @@ def _resolve_raspberry_yaml_context(
     main_hpf_hz: float | None,
     sub_hpf_hz: float | None,
     sub_lpf_hz: float | None,
-    main_hpf_order: int | float | str | None,
-    sub_hpf_order: int | float | str | None,
-    sub_lpf_order: int | float | str | None,
+    main_hpf_order: float | str | None,
+    sub_hpf_order: float | str | None,
+    sub_lpf_order: float | str | None,
     device_format: str,
     left_iir_biquads,
     right_iir_biquads,
@@ -645,9 +645,9 @@ def generate_raspberry_yaml(
     main_hpf_hz: float | None = None,
     sub_hpf_hz: float | None = None,
     sub_lpf_hz: float | None = None,
-    main_hpf_order: int | float | str | None = None,
-    sub_hpf_order: int | float | str | None = None,
-    sub_lpf_order: int | float | str | None = None,
+    main_hpf_order: float | str | None = None,
+    sub_hpf_order: float | str | None = None,
+    sub_lpf_order: float | str | None = None,
     device_format: str = "S32_LE",
     left_iir_biquads=None,
     right_iir_biquads=None,

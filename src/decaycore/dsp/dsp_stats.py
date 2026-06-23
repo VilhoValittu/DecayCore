@@ -43,12 +43,12 @@ def apply_measured_mag_stats(
     f_ref = np.asarray(stats.get("freq_axis", freq_axis), dtype=float).reshape(-1)
     n_ref = int(f_ref.size)
 
-    m_corr_st = arr_if_valid_for_stats(stats.get("measured_mags", None), expected_size=n_ref)
+    m_corr_st = arr_if_valid_for_stats(stats.get("measured_mags"), expected_size=n_ref)
     m_corr = np.asarray(m_anal, dtype=float) - float(calc_offset_db) if m_corr_st is None else np.asarray(m_corr_st, dtype=float)
 
     stats["measured_mags"] = np.asarray(m_corr, dtype=float).tolist()
     if bool(include_raw):
-        m_raw_st = arr_if_valid_for_stats(stats.get("measured_mags_raw", None), expected_size=n_ref)
+        m_raw_st = arr_if_valid_for_stats(stats.get("measured_mags_raw"), expected_size=n_ref)
         m_raw = np.asarray(m_corr, dtype=float) + float(calc_offset_db) if m_raw_st is None else np.asarray(m_raw_st, dtype=float)
         stats["measured_mags_raw"] = np.asarray(m_raw, dtype=float).tolist()
 

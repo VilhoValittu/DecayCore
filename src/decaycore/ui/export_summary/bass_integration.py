@@ -12,6 +12,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 from ...auto_mode.rank_score import attach_official_rank_score
+from ...resources.i8n.decaycore_i18n import t
 from ..bass_integration_dsp_settings import build_bass_integration_dsp_settings
 from ..export_scoring import _safe_float
 
@@ -34,8 +35,8 @@ def _append_bass_integration_summary(
         summary_content += f"Mode: {bi_mode}\n"
         if raw_bi_mode == "direct_dac":
             pass
-        summary_content += f"Profile: {str(bi_meta.get('profile', ui_data.get('bass_integration_profile', 'safe')) or 'safe')}\n"
-        summary_content += f"Sub combine mode: {str(bi_meta.get('sub_combine_mode', ui_data.get('bass_integration_sub_combine_mode', 'average')) or 'average')}\n"
+        summary_content += f"Profile: {bi_meta.get('profile', ui_data.get('bass_integration_profile', 'safe')) or 'safe'!s}\n"
+        summary_content += f"Sub combine mode: {bi_meta.get('sub_combine_mode', ui_data.get('bass_integration_sub_combine_mode', 'average')) or 'average'!s}\n"
         dual_sub_diag = dict(bi_meta.get("diagnostics", {}) or {})
         combine_mode = str(
             dual_sub_diag.get(
@@ -97,7 +98,7 @@ def _append_bass_integration_summary(
         if dsp_settings:
             summary_content += "\n=== DSP SETTINGS TO ENTER IN YOUR DSP ===\n"
             for setting in dsp_settings:
-                summary_content += f"{setting.summary_label}: {setting.value}\n"
+                summary_content += f"{t(setting.label_key)}: {setting.value}\n"
             summary_content += "\n=== BASS INTEGRATION DIAGNOSTICS ===\n"
         if is_dual_sub_shared:
             summary_content += "Dual-sub output model: shared mono sub branch for both subwoofers.\n"
@@ -265,7 +266,7 @@ def _append_bass_integration_allpass_auto_summary(
         summary_content += f"- Overlap ripple: {_fmt(optimized.get('overlap_ripple_db', float('nan')), ' dB p2p')}\n"
         summary_content += f"- XO GD mismatch: {_fmt(optimized.get('xo_gd_mismatch_ms', float('nan')), ' ms')}\n"
         summary_content += f"Improvement score: {_fmt(allpass_meta.get('improvement_score', float('nan')))}\n"
-        summary_content += f"Reason: {str(allpass_meta.get('reason', ui_data.get('bass_integration_allpass_reason', '')) or '')}\n"
+        summary_content += f"Reason: {allpass_meta.get('reason', ui_data.get('bass_integration_allpass_reason', '')) or ''!s}\n"
         summary_content += "Does not change FIR generation.\n"
         summary_content += "Applied in the exported CamillaDSP Direct DAC sub pipeline when State is ON.\n"
         summary_content += "HLC config export is unchanged.\n"

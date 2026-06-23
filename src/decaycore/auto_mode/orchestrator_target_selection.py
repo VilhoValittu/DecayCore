@@ -242,7 +242,7 @@ def _finalize_target_selection_result(
         winner_best_metrics = dict(winner.get("best_metrics", {}) or {})
         status_cb(
             "DecayCore automatic mode: target finalize "
-            f"(winner {str(winner.get('hc_mode', 'n/a'))}, method {selection_method}, "
+            f"(winner {winner.get('hc_mode', 'n/a')!s}, method {selection_method}, "
             f"rank {official_rank_score(winner_best_metrics):.3f}, "
             f"avg {_auto_safe_float(winner_best_metrics.get('avg_score', 0.0), 0.0):.3f}, "
             f"pre {_auto_safe_float(winner.get('preselect_score', winner.get('fit_rms_db', 1e9)), 1e9):.3f}, "

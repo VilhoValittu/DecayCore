@@ -1,5 +1,5 @@
 # DecayCore: Time-Domain-First FIR Room Correction
-## Academic DSP Rationale and Mathematical Foundations (v1.0.7)
+## Academic DSP Rationale and Mathematical Foundations
 
 ### Abstract
 DecayCore is a FIR room-correction framework that separates:
@@ -8,7 +8,7 @@ DecayCore is a FIR room-correction framework that separates:
 - magnitude-domain target tracking,
 - temporal decay behavior (TDC).
 
-The current engine (v1.0.7) uses confidence-aware and safety-bounded processing in both magnitude and phase paths, with optional fixed-grid comparison analysis for reproducible scoring.
+The current engine uses confidence-aware and safety-bounded processing in both magnitude and phase paths, with optional fixed-grid comparison analysis for reproducible scoring.
 
 ---
 
@@ -56,8 +56,10 @@ A smoothed baseline \(GD_s(f)\) is subtracted and confidence is formed from devi
 \Delta GD(f)=|GD(f)-GD_s(f)|,
 \]
 \[
-C(f)=\frac{1}{1+\exp\left(1.5(\Delta GD(f)-2.5\text{ ms})\right)}.
+C(f)=\frac{1}{1+\exp\left(1.5(\Delta GD(f)-\theta(f))\right)}.
 \]
+
+Here \(\theta(f)\) is not a fixed constant: it is a frequency-local threshold curve derived per octave band from the 70th percentile of \(\Delta GD\), clamped to the range \([2.5, 8.0]\) ms (the floor of 2.5 ms applies where local deviation is small).
 
 Reflection/resonance nodes are detected as peaks of \(\Delta GD\) and later reused by TDC.
 

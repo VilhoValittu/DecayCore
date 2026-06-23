@@ -1,4 +1,4 @@
-# DecayCore Modes: AUTO vs BASIC vs ADVANCED (v1.0.7)
+# DecayCore Modes: AUTO vs BASIC vs ADVANCED
 
 DecayCore has three operating modes:
 
@@ -82,7 +82,7 @@ Goal: predictable manual results with hard guard rails.
 
 ### BASIC defaults
 
-- Filter type: `Linear Phase`
+- Filter type: `Mixed Phase`
 - Correction band: `25-250 Hz`
 - Max boost / cut: `+3 dB / -15 dB`
   - Interpretation: BASIC strongly favors safer cuts and keeps boost on a short leash.

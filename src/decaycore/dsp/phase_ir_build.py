@@ -428,8 +428,7 @@ def build_phase_and_ir(
     final_gain_total: np.ndarray,
     limit_gd_gradient_ms_per_oct_fn,
 ) -> dict:
-    """
-    Contract:
+    """Contract:
       - This stage builds phase + IR only.
       - It must not modify gain_db/autogain values.
       - Allowed side effects are st window/align/guard/metric indicators.

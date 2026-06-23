@@ -107,8 +107,8 @@ def _target_curve_progress_status(
     status_cb(
         "DecayCore automatic mode: selecting target curve "
         f"(best improved {int(done_n)}/{int(total_n)}, "
-        f"leader {str(best_done_item.get('hc_mode', 'n/a') or 'n/a')}, "
-        f"tested {str(hc_name or 'n/a')}, "
+        f"leader {best_done_item.get('hc_mode', 'n/a') or 'n/a'!s}, "
+        f"tested {hc_name or 'n/a'!s}, "
         f"{int(shortlist_state.trials_eff)} trials/curve{select_f6_txt}, goal {setup.goal}, "
         f"rank {official_rank_score(bm_now):.3f}, "
         f"avg {_auto_safe_float(bm_now.get('avg_score'), 0.0):.3f})"
@@ -385,7 +385,7 @@ def _apply_cached_wildcard_to_shortlist(
         if callable(status_cb):
             status_cb(
                 "DecayCore automatic mode: target shortlist cache wildcard inserted "
-                f"({str(cache_meta.get('hc_mode', cache_state.cached_target_hc))})"
+                f"({cache_meta.get('hc_mode', cache_state.cached_target_hc)!s})"
             )
         return list(shortlisted), None
     if str(cache_meta.get("reason", "")) == "already_shortlisted" and str(
@@ -406,7 +406,7 @@ def _apply_cached_wildcard_to_shortlist(
             if callable(status_cb):
                 status_cb(
                     "DecayCore automatic mode: target loaded directly from cache "
-                    f"(already_shortlisted -> {str(cache_meta.get('hc_mode', cache_state.cached_target_hc))}, "
+                    f"(already_shortlisted -> {cache_meta.get('hc_mode', cache_state.cached_target_hc)!s}, "
                     "skipping shortlist trials)"
                 )
             return list(shortlisted), _fallback_to_cached_target(
@@ -423,7 +423,7 @@ def _apply_cached_wildcard_to_shortlist(
     if callable(status_cb):
         status_cb(
             "DecayCore automatic mode: target shortlist cache wildcard "
-            f"{str(cache_meta.get('reason', 'skipped'))}"
+            f"{cache_meta.get('reason', 'skipped')!s}"
         )
     return list(shortlisted), None
 
@@ -508,7 +508,7 @@ def _try_include_milder_target(
         if callable(status_cb):
             status_cb(
                 "DecayCore automatic mode: target shortlist milder included "
-                f"({str(lead_hc)} -> {str(lead_milder)})"
+                f"({lead_hc!s} -> {lead_milder!s})"
             )
         return list(shortlisted)
     logger.info(
@@ -525,9 +525,9 @@ def _try_include_milder_target(
     if callable(status_cb):
         status_cb(
             "DecayCore automatic mode: target shortlist milder skipped "
-            f"({str(lead_hc)} -> {str(lead_milder)}, "
-            f"not_dup={str(cond_not_dup)}, fit_ok={str(cond_fit)}, "
-            f"pre_ok={str(cond_diff)}, asym_ok={str(cond_asym)})"
+            f"({lead_hc!s} -> {lead_milder!s}, "
+            f"not_dup={cond_not_dup!s}, fit_ok={cond_fit!s}, "
+            f"pre_ok={cond_diff!s}, asym_ok={cond_asym!s})"
         )
     return list(shortlisted)
 
@@ -618,7 +618,7 @@ def _load_quick_target_selection(
         ),
     )
     quick_rows = [
-        f"{str(tc.get('hc_mode', 'n/a'))}: "
+        f"{tc.get('hc_mode', 'n/a')!s}: "
         f"fit={_auto_safe_float(tc.get('fit_rms_db', float('nan')), float('nan')):.3f} dB, "
         f"pre={_tc_score(tc):.3f}, "
         f"boost={_auto_safe_float(tc.get('boost_penalty', 0.0), 0.0):.3f}, "
@@ -633,7 +633,7 @@ def _load_quick_target_selection(
         top3_txt = ", ".join(
             [
                 (
-                    f"{str(tc.get('hc_mode', 'n/a') or 'n/a')}"
+                    f"{tc.get('hc_mode', 'n/a') or 'n/a'!s}"
                     f"(pre={_tc_score(tc):.3f}, fit={_auto_safe_float(tc.get('fit_rms_db', 0.0), 0.0):.3f}, "
                     f"boost={_auto_safe_float(tc.get('boost_penalty', 0.0), 0.0):.3f}, "
                     f"asym={_auto_safe_float(tc.get('asym_penalty_db', 0.0), 0.0):.3f})"

@@ -252,7 +252,7 @@ def _auto_optuna_scope_with_context(
     extra: dict | None = None,
 ) -> str:
     ctx = _auto_optuna_scope_context_hash(center=center, shrink=shrink, extra=extra)
-    return f"{str(scope_base)}-{ctx}"
+    return f"{scope_base!s}-{ctx}"
 
 def _auto_optuna_param_signature(params: dict | None) -> str:
     if not isinstance(params, dict) or not params:
@@ -288,9 +288,9 @@ def _auto_optuna_trial_params(
 
 def _auto_optuna_trial_payload_preset(user_attrs: dict | None) -> dict:
     payload = dict((user_attrs or {}).get(AUTO_MODE_OPTUNA_USER_ATTR_OUT, {}) or {})
-    preset = payload.get("trial_preset", None)
+    preset = payload.get("trial_preset")
     if not isinstance(preset, dict) or not preset:
-        preset = payload.get("preset", None)
+        preset = payload.get("preset")
     return dict(preset or {})
 
 def _auto_optuna_tdc_min(base_data: dict | None) -> float:

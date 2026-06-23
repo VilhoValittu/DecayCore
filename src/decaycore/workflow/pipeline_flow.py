@@ -76,8 +76,8 @@ def _run_pipeline(ctx: dict, *, callbacks: ProcessRunCallbacks, support: Process
             max_safe_boost=float(support.max_safe_boost),
         )
         try:
-            setattr(cfg, "bass_smooth_w_gamma", float(data.get("bass_smooth_w_gamma", 2.40)))
-            setattr(cfg, "bass_smooth_w_max", float(data.get("bass_smooth_w_max", 0.45)))
+            cfg.bass_smooth_w_gamma = float(data.get("bass_smooth_w_gamma", 2.4))
+            cfg.bass_smooth_w_max = float(data.get("bass_smooth_w_max", 0.45))
         except Exception:
             logger.exception("bass smooth weight attr set")
 

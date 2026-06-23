@@ -72,21 +72,21 @@ def metric_row(label, left, right, *, left_compare=None, right_compare=None) -> 
 
 
 def fmt_ai_match(ai: dict) -> dict:
-    match = ai.get("match", None)
+    match = ai.get("match")
     if match is None:
         return metric_cell("n/a", "n/a")
     return metric_cell(f"{float(match):.1f}%", f"{float(match):.3f}")
 
 
 def fmt_ai_score(ai: dict) -> dict:
-    score = ai.get("score", None)
+    score = ai.get("score")
     if score is None:
         return metric_cell("n/a", "n/a")
     return metric_cell(f"{float(score):.3f}/100", f"{float(score):.3f}")
 
 
 def fmt_tilt(st: dict, warn_thr: float = 1.5):
-    tilt = st.get("tilt_slope_db_per_oct", None)
+    tilt = st.get("tilt_slope_db_per_oct")
     if tilt is None:
         return "-"
     try:
@@ -161,7 +161,7 @@ def shared_window_label(st: dict) -> str:
         resolved = str(st.get("stereo_link_mode", "") or "").strip().lower()
     except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError):
         resolved = ""
-    win = st.get("stereo_link_shared_window", None)
+    win = st.get("stereo_link_shared_window")
     if resolved == "hybrid":
         return "Not used (Hybrid)"
     return fmt_freq_window(win)
@@ -392,8 +392,8 @@ def hpf_model_label(st: dict) -> str:
 def format_ir_window(data: dict) -> str:
     mode = str(data.get("ir_export_window_mode", "") or "").lower()
     if mode == "rew_asym":
-        left = data.get("ir_window_left", None)
-        right = data.get("ir_window_right", data.get("ir_window", None))
+        left = data.get("ir_window_left")
+        right = data.get("ir_window_right", data.get("ir_window"))
         try:
             if left is not None and right is not None:
                 return f"Asymmetric (Left {float(left):.1f} ms, Right {float(right):.1f} ms)"

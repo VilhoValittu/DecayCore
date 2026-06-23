@@ -598,7 +598,7 @@ def _append_auto_polish_to_status_log(*, data: dict) -> None:
     ):
         return
     auto_enabled = is_auto_mode(data, mode_u)
-    auto_meta = data.get("_auto_mode_meta", None)
+    auto_meta = data.get("_auto_mode_meta")
     if not (auto_enabled and isinstance(auto_meta, dict)):
         return
 
@@ -664,7 +664,7 @@ def _render_auto_diagnostics(*, data: dict) -> None:
     ):
         mode_u = "BASIC"
     auto_enabled = is_auto_mode(data, mode_u)
-    auto_meta = data.get("_auto_mode_meta", None)
+    auto_meta = data.get("_auto_mode_meta")
     if not (auto_enabled and isinstance(auto_meta, dict)):
         return
 
@@ -715,7 +715,7 @@ def _update_crossover_recommendation_label(data: dict) -> None:
         if label_el is None:
             return
         bi_meta = dict((data or {}).get("_bass_integration_meta", {}) or {})
-        rec = bi_meta.get("recommended_crossover_hz", None)
+        rec = bi_meta.get("recommended_crossover_hz")
         if rec is not None:
             rec_label = t("bass_integration_main_hpf_recommended")
             label_el.set_text(f"{rec_label}: {_format_recommended_xo_hz(float(rec))}")

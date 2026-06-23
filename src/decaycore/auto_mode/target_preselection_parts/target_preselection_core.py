@@ -400,7 +400,7 @@ def _auto_target_preselect_score(
         * float(treble_shape_penalty)
     )
     if not np.isfinite(preselect_score):
-        preselect_score = float(1e9)
+        preselect_score = 1e9
 
     return {
         "fit_rms_db": float(fit_rms_db),

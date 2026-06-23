@@ -13,8 +13,7 @@ import numpy as np
 
 
 def parse_measurements_from_bytes(file_content):
-    """
-    Jasentaa REW-tyylisen mittausdatan tavu- tai merkkijonosyotteesta.
+    """Jasentaa REW-tyylisen mittausdatan tavu- tai merkkijonosyotteesta.
 
     Hyvaksyy rivit, joissa on vahintaan taajuus ja amplitudi, sekavia
     desimaalierottimia (pilkku/piste) seka valinnaisen vaihesarakkeen.
@@ -76,8 +75,7 @@ def parse_measurements_from_bytes(file_content):
 
 
 def parse_measurements_from_path(path, *, logger=None):
-    """
-    Lukee mittausdatan paikallisesta tekstitiedostosta ja jasentaa sen.
+    """Lukee mittausdatan paikallisesta tekstitiedostosta ja jasentaa sen.
 
     Polku siistitään turvallisesti, olemassaolo tarkistetaan ennen lukua ja
     mahdolliset virheet kirjataan loggeriin, jos logger on annettu.
@@ -92,7 +90,7 @@ def parse_measurements_from_path(path, *, logger=None):
                 logger.error(f"File not found: {p}")
             return None, None, None
 
-        with open(p, "r", encoding="utf-8", errors="ignore") as f:
+        with open(p, encoding="utf-8", errors="ignore") as f:
             content = f.read()
 
         return parse_measurements_from_bytes(content)

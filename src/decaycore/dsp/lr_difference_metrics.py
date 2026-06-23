@@ -172,6 +172,7 @@ def compute_lr_difference_metrics(
     -------
     LRDifferenceResult with magnitude RMS/MaxAbs fields.
     Fields are NaN when insufficient data is available.
+
     """
     try:
         l_st = dict(l_st or {})
@@ -199,16 +200,15 @@ def compute_lr_difference_metrics(
             freq = l_freq
             r_on_axis = r_mag if r_mag.size == freq.size else _interp_to_axis(freq, r_freq, r_mag)
             l_on_axis = l_mag if l_mag.size == freq.size else _interp_to_axis(freq, l_freq, l_mag)
+        # Different axes — interpolate both onto the shorter/coarser one.
+        elif l_freq.size <= r_freq.size:
+            freq = l_freq
+            l_on_axis = l_mag if l_mag.size == freq.size else _interp_to_axis(freq, l_freq, l_mag)
+            r_on_axis = _interp_to_axis(freq, r_freq, r_mag)
         else:
-            # Different axes — interpolate both onto the shorter/coarser one.
-            if l_freq.size <= r_freq.size:
-                freq = l_freq
-                l_on_axis = l_mag if l_mag.size == freq.size else _interp_to_axis(freq, l_freq, l_mag)
-                r_on_axis = _interp_to_axis(freq, r_freq, r_mag)
-            else:
-                freq = r_freq
-                r_on_axis = r_mag if r_mag.size == freq.size else _interp_to_axis(freq, r_freq, r_mag)
-                l_on_axis = _interp_to_axis(freq, l_freq, l_mag)
+            freq = r_freq
+            r_on_axis = r_mag if r_mag.size == freq.size else _interp_to_axis(freq, r_freq, r_mag)
+            l_on_axis = _interp_to_axis(freq, l_freq, l_mag)
 
         # Truncate to common length after axis alignment.
         n = min(freq.size, l_on_axis.size, r_on_axis.size)

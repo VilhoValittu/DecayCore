@@ -60,7 +60,6 @@ def run_target_search_stage(base_data: dict, decision, *, status_cb=None) -> dic
     search entry point. This adapter centralizes the stage boundary for
     search_v2 and preserves cached/fresh target seeds as refine seeds.
     """
-
     data = dict(base_data or {})
     seed = dict(getattr(decision, "seed_preset", {}) or {})
     if seed and not isinstance(data.get("_auto_target_seed_preset"), dict):
@@ -155,7 +154,7 @@ def execute_auto_search_plan(
             )
         return _fall_back_to_full_search(
             context,
-            reason=f"{str(plan.value)} unavailable: falling back to full search",
+            reason=f"{plan.value!s} unavailable: falling back to full search",
         )
 
     if plan == AutoSearchPlan.REUSE_VALID_RESULT:

@@ -188,7 +188,7 @@ def _resolve_sub_measurement_for_filter(
         )
         return aligned
 
-    bundle = measurements.get("bass_integration_bundle", None)
+    bundle = measurements.get("bass_integration_bundle")
     if bundle is not None:
         try:
             sub_transfer, _diag = build_bundle_combined_sub_transfer(

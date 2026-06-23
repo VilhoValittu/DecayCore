@@ -117,6 +117,7 @@ def _auto_cache_get_target_for_measurements_global(
 
     Caller must validate that the returned global entry contains a usable
     filter_seed_presets[filter_key] before using it to skip target search.
+
     """
     key = _auto_target_measurement_cache_key(measurements, goal)
     if not key:

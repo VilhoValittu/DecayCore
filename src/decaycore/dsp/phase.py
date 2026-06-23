@@ -14,8 +14,7 @@ import scipy.fft
 
 
 def limit_phase_deg(phase_rad, max_deg=45.0):
-    """
-    Rajaa vaiheen arvoalueen asteina annettuun maksimiin.
+    """Rajaa vaiheen arvoalueen asteina annettuun maksimiin.
 
     Syote oletetaan radiaaneina ja palautus on radiaaneina. Jos `max_deg` on
     `None`, vaihetta ei rajata.
@@ -31,8 +30,7 @@ def limit_phase_deg(phase_rad, max_deg=45.0):
 
 
 def calculate_minimum_phase(mags_lin_fft, max_phase_deg=45.0, oversample=4):
-    """
-    Laskee minimivaiheen amplitudispektrista homomorfisella
+    """Laskee minimivaiheen amplitudispektrista homomorfisella
     reaalikepstrimenetelmalla.
 
     Log-magnitudi interpoloidaan `oversample`-kertaa tihealle akselille,
@@ -69,8 +67,7 @@ def calculate_minimum_phase(mags_lin_fft, max_phase_deg=45.0, oversample=4):
 
 
 def calculate_theoretical_phase(freq_axis, crossovers, hpf_freq=None, hpf_slope=None, max_phase_deg=45.0):
-    """
-    Laskee teoreettisen vaiheen jakosuodattimista ja mahdollisesta HPF:sta.
+    """Laskee teoreettisen vaiheen jakosuodattimista ja mahdollisesta HPF:sta.
 
     Jokainen XO- ja HPF-vaihe mallinnetaan analogisena Butterworth-suodattimena,
     summataan yhteen, unwrapataan ja rajataan lopuksi aste-rajaan.
@@ -96,8 +93,7 @@ def calculate_theoretical_phase(freq_axis, crossovers, hpf_freq=None, hpf_slope=
 
 
 def _shift_zeropad(x: np.ndarray, shift: int) -> np.ndarray:
-    """
-    Siirtaa 1D-signaalia kokonaisilla naytteilla nollataytolla.
+    """Siirtaa 1D-signaalia kokonaisilla naytteilla nollataytolla.
 
     Positiivinen siirto liikuttaa signaalia oikealle, negatiivinen vasemmalle.
     Ei kayta kiertavaa wrap-around-kaytosta.
@@ -114,8 +110,7 @@ def _shift_zeropad(x: np.ndarray, shift: int) -> np.ndarray:
     return y
 
 def _raised_cosine_lp(freqs: np.ndarray, f0: float, f1: float) -> np.ndarray:
-    """
-    Muodostaa raised-cosine -alipaasopainon valille [f0, f1].
+    """Muodostaa raised-cosine -alipaasopainon valille [f0, f1].
 
     Paino on 1 alle f0, 0 yli f1 ja pehmea kosinisiirtyma niiden valissa.
     """
@@ -128,8 +123,7 @@ def _raised_cosine_lp(freqs: np.ndarray, f0: float, f1: float) -> np.ndarray:
     return w
 
 def combine_mixed_phase(ir_lin, ir_min, fs, split_freq=120.0, transition_hz=60.0):
-    """
-    Combine linear-phase and minimum-phase IRs using EXCESS-phase blending.
+    """Combine linear-phase and minimum-phase IRs using EXCESS-phase blending.
 
     Idea:
       phi_lin = phi_min + phi_excess
@@ -146,6 +140,7 @@ def combine_mixed_phase(ir_lin, ir_min, fs, split_freq=120.0, transition_hz=60.0
 
     Returns:
         Mixed-phase IR (time-domain), length = len(ir_lin)
+
     """
     ir_lin = np.asarray(ir_lin, dtype=float).reshape(-1)
     ir_min = np.asarray(ir_min, dtype=float).reshape(-1)
@@ -201,8 +196,7 @@ def combine_mixed_phase(ir_lin, ir_min, fs, split_freq=120.0, transition_hz=60.0
 
 
 def remove_time_of_flight(freq_axis, phase_rad):
-    """
-    Poistaa mittauksesta lineaarisen viivekomponentin vaiheesta.
+    """Poistaa mittauksesta lineaarisen viivekomponentin vaiheesta.
 
     Viive arvioidaan lineaarisella sovitteella alueelta 1-10 kHz ja vahennetaan
     koko vaihekayrasta.
@@ -215,8 +209,7 @@ def remove_time_of_flight(freq_axis, phase_rad):
 
 
 def get_min_phase_impulse(mags_db, n_fft):
-    """
-    Muodostaa minimivaiheisen impulssivasteen dB-amplitudista.
+    """Muodostaa minimivaiheisen impulssivasteen dB-amplitudista.
 
     Toteutus kayttaa kepstraalimenetelmaa (log-amplitudi -> IFFT/FFT -> IFFT).
     Parametri `n_fft` sailyy rajapinnassa yhteensopivuuden vuoksi.

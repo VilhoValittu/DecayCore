@@ -749,7 +749,6 @@ def apply_post_limits_and_metrics(
     apply_mid_refit_pre_slope,
 ) -> _MagPostProcessOutputs:
     """Ajaa mag-korjauksen loppuvaiheen: low-bass policy, clamping, slope/fade ja metriikat."""
-
     cfg = inputs.cfg
     cfg_reader = CfgReader(cfg)
     freq_axis = inputs.freq_axis

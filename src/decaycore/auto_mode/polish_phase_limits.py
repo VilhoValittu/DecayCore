@@ -192,8 +192,7 @@ def _run_phase_limit_candidates(
                 _auto_safe_float(cur_best_metrics.get("rank_score"), 0.0)
                 - _auto_safe_float(prev_best.get("rank_score"), 0.0)
             )
-            if rank_gain > best_rank_gain:
-                best_rank_gain = rank_gain
+            best_rank_gain = max(best_rank_gain, rank_gain)
             accepted = list(phase_limit_meta.get("accepted_phase_limits_hz", []) or [])
             accepted.append(float(cand_phase_limit))
             phase_limit_meta["accepted_phase_limits_hz"] = accepted

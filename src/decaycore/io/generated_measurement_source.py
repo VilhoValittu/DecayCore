@@ -84,10 +84,10 @@ def _apply_preferred_analysis_magnitude(
     *,
     logger=None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    analysis_freq_hz = source.get("analysis_freq_hz", None)
-    analysis_mag_db = source.get("analysis_magnitude_db", None)
-    spatial_avg_freq_hz = source.get("spatial_avg_analysis_freq_hz", None)
-    spatial_avg_mag_db = source.get("spatial_avg_analysis_magnitude_db", None)
+    analysis_freq_hz = source.get("analysis_freq_hz")
+    analysis_mag_db = source.get("analysis_magnitude_db")
+    spatial_avg_freq_hz = source.get("spatial_avg_analysis_freq_hz")
+    spatial_avg_mag_db = source.get("spatial_avg_analysis_magnitude_db")
     preferred_freq_hz = spatial_avg_freq_hz if spatial_avg_freq_hz is not None else analysis_freq_hz
     preferred_mag_db = spatial_avg_mag_db if spatial_avg_mag_db is not None else analysis_mag_db
     if preferred_freq_hz is None or preferred_mag_db is None:
@@ -120,8 +120,8 @@ def _apply_generated_source_calibration(
     *,
     logger=None,
 ) -> np.ndarray:
-    cal_freq_hz = source.get("calibration_freq_hz", None)
-    cal_db = source.get("calibration_db", None)
+    cal_freq_hz = source.get("calibration_freq_hz")
+    cal_db = source.get("calibration_db")
     if cal_freq_hz is None or cal_db is None:
         return mag_db
     try:
@@ -138,8 +138,8 @@ def _apply_generated_source_calibration(
 
 
 def _extract_harmonic_outputs(source: dict) -> tuple[np.ndarray | None, dict[int, np.ndarray] | None]:
-    harmonic_freq_hz = source.get("harmonic_freq_hz", None)
-    harmonic_magnitudes_db = source.get("harmonic_magnitudes_db", None)
+    harmonic_freq_hz = source.get("harmonic_freq_hz")
+    harmonic_magnitudes_db = source.get("harmonic_magnitudes_db")
     harmonic_freq_out = None if harmonic_freq_hz is None else np.asarray(harmonic_freq_hz, dtype=float)
     harmonic_mags_out: dict[int, np.ndarray] | None = None
     if isinstance(harmonic_magnitudes_db, dict) and harmonic_magnitudes_db:

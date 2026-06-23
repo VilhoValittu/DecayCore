@@ -123,8 +123,7 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
     *,
     include_response_arrays: bool = True,
 ):
-    """
-    Generoi vasemman ja oikean kanavan FIR-suodattimet.
+    """Generoi vasemman ja oikean kanavan FIR-suodattimet.
 
     Jos `stereo_link` ei ole paalla, kanavat lasketaan itsenaisesti.
     Jos `stereo_link` on paalla, toteutus tekee kaksivaiheisen ajon:

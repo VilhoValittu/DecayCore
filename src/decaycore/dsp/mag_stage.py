@@ -51,7 +51,7 @@ def _manual_target_bias_db(cfg, stats: dict) -> float:
         return 0.0
     if "manual" not in lvl_mode_s:
         return 0.0
-    st_shift = stats.get("target_shift_db", None) if isinstance(stats, dict) else None
+    st_shift = stats.get("target_shift_db") if isinstance(stats, dict) else None
     if st_shift is None:
         st_shift = getattr(cfg, "lvl_manual_db", 0.0)
     try:

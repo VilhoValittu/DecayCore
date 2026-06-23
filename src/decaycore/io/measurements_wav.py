@@ -68,7 +68,7 @@ def _select_wav_channel(sig: np.ndarray, channel_index: int = 0) -> np.ndarray:
     x = np.asarray(sig)
     if x.ndim == 2:
         ch = int(channel_index)
-        ch = 0 if ch < 0 else ch
+        ch = max(ch, 0)
         ch = (x.shape[1] - 1) if ch >= x.shape[1] else ch
         x = x[:, ch]
     return np.asarray(x)

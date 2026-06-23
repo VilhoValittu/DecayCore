@@ -47,7 +47,7 @@ def _select_has_valid_auto_mag_c_max(item: dict) -> bool:
 
 def _select_apply_mag_c_floor(pool: list[dict]) -> list[dict]:
     floor_pool = [dict(x or {}) for x in pool if _select_has_valid_auto_mag_c_max(dict(x or {}))]
-    return floor_pool if floor_pool else list(pool)
+    return floor_pool or list(pool)
 
 
 def _select_apply_finite_rank_filter(pool: list[dict]) -> list[dict]:
@@ -56,7 +56,7 @@ def _select_apply_finite_rank_filter(pool: list[dict]) -> list[dict]:
         for x in pool
         if np.isfinite(_auto_rank_value(dict((x or {}).get("metrics", {}) or {}), default=float("nan")))
     ]
-    return finite_pool if finite_pool else list(pool)
+    return finite_pool or list(pool)
 
 
 def _select_apply_hard_gate_filter(pool: list[dict], *, goal: str) -> list[dict]:

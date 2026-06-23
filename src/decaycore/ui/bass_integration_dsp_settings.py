@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..resources.i8n.decaycore_i18n import t
 from .results_formatters import safe_float
 
 
 @dataclass(frozen=True)
 class BassIntegrationDspSetting:
     label_key: str
-    summary_label: str
     value: str
 
 
@@ -94,56 +94,44 @@ def build_bass_integration_dsp_settings(data: dict | None) -> list[BassIntegrati
     )
     allpass_on = bool(allpass_meta.get("enabled", False))
     delay_label_key = "results_metric_bass_shared_sub_array_delay" if is_dual_sub_shared else "results_metric_bass_alignment_delay"
-    delay_label = "Shared sub-array delay" if is_dual_sub_shared else "Sub delay"
     delay_value = sub_array_delay_value if is_dual_sub_shared else sub_delay_value
     polarity_label_key = (
         "results_metric_bass_shared_sub_polarity" if is_dual_sub_shared else "results_metric_bass_alignment_polarity"
     )
-    polarity_label = "Shared sub polarity" if is_dual_sub_shared else "Sub polarity"
     gain_label_key = "results_metric_bass_shared_sub_gain" if is_dual_sub_shared else "results_metric_bass_alignment_gain"
-    gain_label = "Shared sub gain trim" if is_dual_sub_shared else "Sub gain trim"
     allpass_label_key = "results_metric_bass_shared_sub_allpass" if is_dual_sub_shared else "results_metric_bass_allpass"
-    allpass_label = "Shared bass allpass" if is_dual_sub_shared else "Bass allpass"
     allpass_freq_label_key = (
         "results_metric_bass_shared_sub_allpass_freq" if is_dual_sub_shared else "results_metric_bass_allpass_freq"
     )
-    allpass_freq_label = "Shared bass allpass freq" if is_dual_sub_shared else "Bass allpass freq"
     allpass_q_label_key = (
         "results_metric_bass_shared_sub_allpass_q" if is_dual_sub_shared else "results_metric_bass_allpass_q"
     )
-    allpass_q_label = "Shared bass allpass Q" if is_dual_sub_shared else "Bass allpass Q"
 
     settings = [
         BassIntegrationDspSetting(
             "results_metric_main_hpf",
-            "Main HPF",
             _fmt_filter_value(main_hpf_hz, main_hpf_slope_db_per_oct),
         ),
         BassIntegrationDspSetting(
             "results_metric_sub_lpf",
-            "Sub LPF",
             _fmt_filter_value(sub_lpf_hz, sub_lpf_slope_db_per_oct),
         ),
-        BassIntegrationDspSetting(delay_label_key, delay_label, _fmt_value(delay_value, " ms")),
+        BassIntegrationDspSetting(delay_label_key, _fmt_value(delay_value, " ms")),
         BassIntegrationDspSetting(
             "results_metric_bass_dsp_main_delay",
-            "Main delay L/R",
             f"L {_fmt_value(main_l_delay_value, ' ms')}, R {_fmt_value(main_r_delay_value, ' ms')}",
         ),
         BassIntegrationDspSetting(
             polarity_label_key,
-            polarity_label,
-            "INVERTED" if polarity_invert else "NORMAL",
+            t("state_inverted") if polarity_invert else t("state_normal"),
         ),
         BassIntegrationDspSetting(
             gain_label_key,
-            gain_label,
             _fmt_value(gain_trim_value, " dB"),
         ),
         BassIntegrationDspSetting(
             allpass_label_key,
-            allpass_label,
-            "ON" if allpass_on else "OFF",
+            t("state_on") if allpass_on else t("state_off"),
         ),
     ]
 
@@ -152,12 +140,10 @@ def build_bass_integration_dsp_settings(data: dict | None) -> list[BassIntegrati
             [
                 BassIntegrationDspSetting(
                     allpass_freq_label_key,
-                    allpass_freq_label,
                     f"{float(allpass_meta.get('freq_hz', 0.0) or 0.0):.1f} Hz",
                 ),
                 BassIntegrationDspSetting(
                     allpass_q_label_key,
-                    allpass_q_label,
                     f"{float(allpass_meta.get('q', 0.707) or 0.707):.3f}",
                 ),
             ]

@@ -306,8 +306,7 @@ def compute_theoretical_phase_and_store_stats(
     st: dict,
     logger,
 ) -> dict:
-    """
-    Contract:
+    """Contract:
       - This stage must not touch gain-domain data.
       - Allowed signal-domain mutation is only p_rad_interp phase-limit blending.
       - st updates and logging are allowed.

@@ -112,7 +112,7 @@ def _setup_clamp_phase_limit_if_needed(*, search_base_data: dict, filter_key: st
         return
     prev_phase_limit = auto_api._auto_safe_float(search_base_data.get("phase_limit", float("nan")), float("nan"))
     clamped_phase_limit = round(
-        float(auto_api._auto_phase_limit_center(search_base_data.get("phase_limit", None))),
+        float(auto_api._auto_phase_limit_center(search_base_data.get("phase_limit"))),
         1,
     )
     search_base_data["phase_limit"] = float(clamped_phase_limit)
@@ -120,7 +120,7 @@ def _setup_clamp_phase_limit_if_needed(*, search_base_data: dict, filter_key: st
         logger.info(
             "Automatic mode: clamped phase_limit seed "
             f"{float(prev_phase_limit):.1f} -> {float(clamped_phase_limit):.1f} Hz "
-            f"for {str(filter_key)} filter"
+            f"for {filter_key!s} filter"
         )
 
 

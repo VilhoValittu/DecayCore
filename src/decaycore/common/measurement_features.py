@@ -578,7 +578,7 @@ def aggregate_rt60_bands(
         else:
             result[float(freq)] = float(np.median(arr))
 
-    return result if result else None
+    return result or None
 
 
 def aggregate_rt60_value(

@@ -1,4 +1,4 @@
-# DecayCore vs Conventional EQ-Based Room Correction (v1.0.7)
+# DecayCore vs Conventional EQ-Based Room Correction
 
 ## Conventional approach (typical IIR / minimum-phase EQ)
 Many room-correction workflows:

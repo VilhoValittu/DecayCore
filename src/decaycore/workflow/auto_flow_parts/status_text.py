@@ -84,7 +84,7 @@ def _build_auto_selected_text(run_data: dict) -> str:
     hpf_freq = _auto_safe_float(run_data.get(hpf_freq_key, float("nan")), float("nan"))
     hpf_slope = _auto_safe_float(run_data.get(hpf_slope_key, float("nan")), float("nan"))
     if not is_direct_dac:
-        _hpf_ov = run_data.get("_auto_hpf_runtime_override", None)
+        _hpf_ov = run_data.get("_auto_hpf_runtime_override")
         if isinstance(_hpf_ov, dict):
             _ov_freq = _auto_safe_float(_hpf_ov.get("freq", float("nan")), float("nan"))
             _ov_order = _auto_safe_float(_hpf_ov.get("order", float("nan")), float("nan"))
@@ -134,7 +134,7 @@ def _resolve_auto_hpf_seed_source(
     bi_mode = "direct_dac"
     is_direct_dac = bool(data.get("bass_integration_enable", False) and bi_mode == "direct_dac")
     if is_direct_dac:
-        bundle = ctx.get("bass_integration_bundle", None)
+        bundle = ctx.get("bass_integration_bundle")
         try:
             if bundle is not None:
                 sub_f_l = np.asarray(getattr(bundle.l_sub, "freqs_hz", []), dtype=float)

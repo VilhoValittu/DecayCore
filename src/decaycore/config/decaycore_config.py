@@ -204,7 +204,7 @@ def _load_and_merge_saved_config(default_conf: dict) -> bool:
     if not config_path.exists():
         return saved_mode_explicit
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             saved = json.load(f)
         if not isinstance(saved, dict):
             return saved_mode_explicit
@@ -228,7 +228,7 @@ def _load_saved_config_dict() -> dict:
     if not config_path.exists():
         return {}
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             saved = json.load(f)
         if isinstance(saved, dict):
             return saved

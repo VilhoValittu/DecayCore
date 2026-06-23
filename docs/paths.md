@@ -57,9 +57,9 @@ $XDG_DATA_HOME/DecayCore/
 **Example:** `C:\Users\username\AppData\Roaming\DecayCore\`
 
 ### Legacy Fallback (Linux/macOS/Windows)
-If the primary data directory cannot be created, DecayCore falls back to:
+If the primary data directory cannot be created, DecayCore falls back to the legacy directory:
 ```
-~/.decaycore/
+~/.camillafir/
 ```
 
 ---
@@ -117,7 +117,7 @@ decaycore_optuna_target_[FILTER_TYPE]_[MEASUREMENT_ID]_[VERSION].log
 
 #### Legacy Fallback (if primary directory unavailable)
 ```
-~/.decaycore/decaycore_optuna_mixed_nomeasurement.log
+~/.camillafir/decaycore_optuna_mixed_nomeasurement.log
 ```
 
 ---
@@ -126,7 +126,7 @@ decaycore_optuna_target_[FILTER_TYPE]_[MEASUREMENT_ID]_[VERSION].log
 
 If you have DecayCore installed from a legacy version, configuration and Optuna databases are automatically migrated to the new platform-specific paths on first use:
 
-- **Old Optuna path** (`~/.decaycore/`) → New platform-specific data directory
+- **Old Optuna path** (`~/.camillafir/`) → New platform-specific data directory
 - **Old config path** → New platform-specific config directory (no auto-migration; starts fresh)
 
 The legacy `~/.camillafir/` directory is not deleted; you may remove it manually after confirming the migration was successful.

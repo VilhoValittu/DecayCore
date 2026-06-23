@@ -42,7 +42,7 @@ def apply_direct_dac_bass_integration_result(
         or str(getattr(cfg, "bass_integration_mode", "") or "").strip().lower() != "direct_dac"
     ):
         return {}
-    bundle = measurements.get("bass_integration_bundle", None)
+    bundle = measurements.get("bass_integration_bundle")
     if bundle is None:
         return {}
     try:
@@ -82,8 +82,8 @@ def apply_direct_dac_bass_integration_result(
         data["bass_integration_alignment_auto_applied"] = True
         data["bass_integration_alignment_reason"] = "Direct DAC final candidate verified with canonical evaluator."
         sub_target_policy = str(data.get("sub_target_policy", "") or "").strip()
-        sub_target_lpf_hz = data.get("sub_target_lpf_hz", None)
-        sub_target_slope = data.get("sub_target_lpf_slope_db_per_oct", None)
+        sub_target_lpf_hz = data.get("sub_target_lpf_hz")
+        sub_target_slope = data.get("sub_target_lpf_slope_db_per_oct")
         bi_meta = data.setdefault("_bass_integration_meta", {})
         if isinstance(bi_meta, dict):
             bi_meta.update(

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 from ..resources.i8n.decaycore_i18n import t
 
@@ -32,7 +32,7 @@ class Issue:
 class HealthResult:
     overall: Level
     blocked: bool
-    issues: List[Issue]
+    issues: list[Issue]
 
 
 def _tr(key: str, **kwargs: Any) -> str:
@@ -45,7 +45,7 @@ def _tr(key: str, **kwargs: Any) -> str:
     return text
 
 
-def _as_float(v: Any) -> Optional[float]:
+def _as_float(v: Any) -> float | None:
     try:
         if v is None or v == "":
             return None
@@ -54,7 +54,7 @@ def _as_float(v: Any) -> Optional[float]:
         return None
 
 
-def _as_int(v: Any) -> Optional[int]:
+def _as_int(v: Any) -> int | None:
     try:
         if v is None or v == "":
             return None
@@ -125,31 +125,31 @@ def _has_uploaded_file(v: Any) -> bool:
     return False
 
 
-def _has_wav_measurement_source(data: Dict[str, Any], *, file_key: str, path_key: str) -> bool:
-    if _has_uploaded_file(data.get(file_key, None)):
-        upload = data.get(file_key, None)
+def _has_wav_measurement_source(data: dict[str, Any], *, file_key: str, path_key: str) -> bool:
+    if _has_uploaded_file(data.get(file_key)):
+        upload = data.get(file_key)
         name = _uploaded_file_name(upload).lower()
         content = (upload or {}).get("content", None) if isinstance(upload, dict) else None
         riff = isinstance(content, (bytes, bytearray)) and len(content) >= 4 and content[:4] == b"RIFF"
         return bool(name.endswith(".wav") or riff)
-    if _has_path_text(data.get(path_key, None)):
-        path = _clean_path_text(data.get(path_key, None))
+    if _has_path_text(data.get(path_key)):
+        path = _clean_path_text(data.get(path_key))
         return bool(os.path.isfile(path) and path.lower().endswith(".wav"))
     return False
 
 
-def _has_any_measurement_source(data: Dict[str, Any], *, file_key: str, path_key: str) -> bool:
+def _has_any_measurement_source(data: dict[str, Any], *, file_key: str, path_key: str) -> bool:
     return bool(
-        _has_uploaded_file_name(data.get(file_key, None))
-        or _has_uploaded_file(data.get(file_key, None))
-        or _has_path_text(data.get(path_key, None))
+        _has_uploaded_file_name(data.get(file_key))
+        or _has_uploaded_file(data.get(file_key))
+        or _has_path_text(data.get(path_key))
     )
 
 
 
 
-def _health_bass_integration_issues(data: Dict[str, Any], mode_u: str) -> List[Issue]:
-    issues: List[Issue] = []
+def _health_bass_integration_issues(data: dict[str, Any], mode_u: str) -> list[Issue]:
+    issues: list[Issue] = []
     bi_mode = str(data.get("bass_integration_mode", "direct_dac") or "direct_dac")
     is_direct_dac = bi_mode == "direct_dac"
 
@@ -197,7 +197,7 @@ def _health_bass_integration_issues(data: Dict[str, Any], mode_u: str) -> List[I
             )
         )
 
-    avr_fc = _as_float(data.get("avr_crossover_hz", None))
+    avr_fc = _as_float(data.get("avr_crossover_hz"))
     if avr_fc is None or avr_fc <= 0.0:
         issues.append(Issue("crit", _tr("health_main_hpf_invalid")))
     elif avr_fc < 30.0 or avr_fc > 250.0:
@@ -215,15 +215,15 @@ def _health_bass_integration_issues(data: Dict[str, Any], mode_u: str) -> List[I
     return issues
 
 
-def _health_standard_measurement_issues(data: Dict[str, Any]) -> List[Issue]:
-    raw_up_l = _has_uploaded_file_name(data.get("file_l", None))
-    raw_up_r = _has_uploaded_file_name(data.get("file_r", None))
-    up_l = _has_uploaded_file(data.get("file_l", None))
-    up_r = _has_uploaded_file(data.get("file_r", None))
-    raw_lp_l = _has_path_text(data.get("local_path_l", None))
-    raw_lp_r = _has_path_text(data.get("local_path_r", None))
-    lp_l = _valid_path(data.get("local_path_l", None))
-    lp_r = _valid_path(data.get("local_path_r", None))
+def _health_standard_measurement_issues(data: dict[str, Any]) -> list[Issue]:
+    raw_up_l = _has_uploaded_file_name(data.get("file_l"))
+    raw_up_r = _has_uploaded_file_name(data.get("file_r"))
+    up_l = _has_uploaded_file(data.get("file_l"))
+    up_r = _has_uploaded_file(data.get("file_r"))
+    raw_lp_l = _has_path_text(data.get("local_path_l"))
+    raw_lp_r = _has_path_text(data.get("local_path_r"))
+    lp_l = _valid_path(data.get("local_path_l"))
+    lp_r = _valid_path(data.get("local_path_r"))
 
     has_upload_pair = bool(up_l and up_r)
     has_local_pair = bool(lp_l and lp_r)
@@ -235,12 +235,12 @@ def _health_standard_measurement_issues(data: Dict[str, Any]) -> List[Issue]:
     return [Issue("warn", _tr("health_measurements"), _tr("health_measurements_missing"))]
 
 
-def _health_target_curve_issues(data: Dict[str, Any]) -> List[Issue]:
-    issues: List[Issue] = []
+def _health_target_curve_issues(data: dict[str, Any]) -> list[Issue]:
+    issues: list[Issue] = []
     hc_mode = str(data.get("hc_mode") or "").strip()
     if hc_mode.lower() == "upload":
-        upload_ok = _has_uploaded_file(data.get("hc_custom_file", None))
-        local_ok = _valid_path(data.get("local_path_house", None))
+        upload_ok = _has_uploaded_file(data.get("hc_custom_file"))
+        local_ok = _valid_path(data.get("local_path_house"))
         if upload_ok or local_ok:
             issues.append(Issue("ok", _tr("health_target_curve"), _tr("health_upload_source_provided")))
         else:
@@ -258,11 +258,11 @@ def _health_target_curve_issues(data: Dict[str, Any]) -> List[Issue]:
     return issues
 
 
-def _health_correction_issues(data: Dict[str, Any]) -> List[Issue]:
-    issues: List[Issue] = []
+def _health_correction_issues(data: dict[str, Any]) -> list[Issue]:
+    issues: list[Issue] = []
     mag_on = bool(data.get("mag_correct", True))
-    fmin = _as_float(data.get("mag_c_min", None))
-    fmax = _as_float(data.get("mag_c_max", None))
+    fmin = _as_float(data.get("mag_c_min"))
+    fmax = _as_float(data.get("mag_c_max"))
     if not mag_on:
         issues.append(Issue("ok", _tr("health_magnitude_correction"), _tr("health_disabled")))
     elif (fmin is not None) and (fmax is not None):
@@ -277,14 +277,14 @@ def _health_correction_issues(data: Dict[str, Any]) -> List[Issue]:
     return issues
 
 
-def _health_engine_issues(data: Dict[str, Any]) -> List[Issue]:
-    issues: List[Issue] = []
-    fs = _as_int(data.get("fs", None))
-    taps = _as_int(data.get("taps", None))
+def _health_engine_issues(data: dict[str, Any]) -> list[Issue]:
+    issues: list[Issue] = []
+    fs = _as_int(data.get("fs"))
+    taps = _as_int(data.get("taps"))
     if fs and taps and fs > 0 and taps > 0:
         latency_ms = (taps / 2.0) / float(fs) * 1000.0
         bin_hz = float(fs) / float(taps)
-        ir_window_left_ms = _as_float(data.get("ir_window_left", data.get("ir_window", None)))
+        ir_window_left_ms = _as_float(data.get("ir_window_left", data.get("ir_window")))
         short_left_window = (ir_window_left_ms is not None) and (ir_window_left_ms < 120.0)
         ftype = str(data.get("filter_type") or "").lower()
         is_min = "min" in ftype
@@ -303,10 +303,10 @@ def _health_engine_issues(data: Dict[str, Any]) -> List[Issue]:
     return issues
 
 
-def _health_leveling_issues(data: Dict[str, Any]) -> List[Issue]:
-    issues: List[Issue] = []
-    lvl_min = _as_float(data.get("lvl_min", None))
-    lvl_max = _as_float(data.get("lvl_max", None))
+def _health_leveling_issues(data: dict[str, Any]) -> list[Issue]:
+    issues: list[Issue] = []
+    lvl_min = _as_float(data.get("lvl_min"))
+    lvl_max = _as_float(data.get("lvl_max"))
     if (lvl_min is not None) and (lvl_max is not None):
         if lvl_min >= lvl_max:
             issues.append(Issue("crit", _tr("health_leveling_range_invalid")))
@@ -315,9 +315,9 @@ def _health_leveling_issues(data: Dict[str, Any]) -> List[Issue]:
     return issues
 
 
-def _health_boost_phase_issues(data: Dict[str, Any]) -> List[Issue]:
-    issues: List[Issue] = []
-    max_boost = _as_float(data.get("max_boost", None))
+def _health_boost_phase_issues(data: dict[str, Any]) -> list[Issue]:
+    issues: list[Issue] = []
+    max_boost = _as_float(data.get("max_boost"))
     if max_boost is None:
         issues.append(Issue("ok", _tr("health_max_boost"), _tr("health_default")))
     else:
@@ -325,14 +325,14 @@ def _health_boost_phase_issues(data: Dict[str, Any]) -> List[Issue]:
         if max_boost > 10.0:
             issues.append(Issue("warn", _tr("health_max_boost_high")))
 
-    phase_limit = _as_float(data.get("phase_limit", None))
+    phase_limit = _as_float(data.get("phase_limit"))
     if (phase_limit is not None) and (phase_limit > 800.0):
         issues.append(Issue("warn", _tr("health_phase_limit_high"), f"{phase_limit:.0f} Hz"))
     return issues
 
 
-def _health_protection_issues(data: Dict[str, Any]) -> List[Issue]:
-    issues: List[Issue] = []
+def _health_protection_issues(data: dict[str, Any]) -> list[Issue]:
+    issues: list[Issue] = []
     exc_on = bool(data.get("exc_prot", False))
     if not exc_on:
         issues.append(Issue("warn", _tr("health_excursion_protection_off")))
@@ -341,9 +341,9 @@ def _health_protection_issues(data: Dict[str, Any]) -> List[Issue]:
 
     hpf_on = bool(data.get("hpf_enable", False))
     if hpf_on:
-        fs = _as_int(data.get("fs", None))
-        hpf_f = _as_float(data.get("hpf_freq", None))
-        hpf_s = _as_float(data.get("hpf_slope", None))
+        fs = _as_int(data.get("fs"))
+        hpf_f = _as_float(data.get("hpf_freq"))
+        hpf_s = _as_float(data.get("hpf_slope"))
         if (hpf_f is None) or (hpf_f <= 0.0):
             issues.append(Issue("crit", _tr("health_hpf_freq_invalid")))
         elif (hpf_f is not None) and (fs is not None) and (fs > 0) and (hpf_f >= 0.45 * fs):
@@ -354,13 +354,13 @@ def _health_protection_issues(data: Dict[str, Any]) -> List[Issue]:
     return issues
 
 
-def _health_mixed_issues(data: Dict[str, Any]) -> List[Issue]:
-    issues: List[Issue] = []
+def _health_mixed_issues(data: dict[str, Any]) -> list[Issue]:
+    issues: list[Issue] = []
     ftype = str(data.get("filter_type") or "").lower()
     if "mixed" in ftype:
-        fs = _as_int(data.get("fs", None))
-        mixed_f = _as_float(data.get("mixed_freq", None))
-        trans_w = _as_float(data.get("trans_width", None))
+        fs = _as_int(data.get("fs"))
+        mixed_f = _as_float(data.get("mixed_freq"))
+        trans_w = _as_float(data.get("trans_width"))
 
         if (mixed_f is None) or (mixed_f <= 0.0):
             issues.append(Issue("crit", _tr("health_mixed_split_invalid")))
@@ -377,8 +377,8 @@ def _health_mixed_issues(data: Dict[str, Any]) -> List[Issue]:
     return issues
 
 
-def compute_health(data: Dict[str, Any], mode: str) -> HealthResult:
-    issues: List[Issue] = []
+def compute_health(data: dict[str, Any], mode: str) -> HealthResult:
+    issues: list[Issue] = []
     mode_u = str(mode or "BASIC").strip().upper()
     bass_integration_on = bool(data.get("bass_integration_enable", False))
 

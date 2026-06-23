@@ -311,7 +311,7 @@ def _run_auto_mode_search_if_needed(
             f"DecayCore automatic mode: phase search init "
             f"(phase1 {n_trials_v} + phase2 {phase2_hint} + "
             f"micro {AUTO_MODE_PHASE3_MICRO_TRIALS} trials @ {auto_search_fs} Hz{f6_txt}, "
-            f"goal {auto_goal}, basis {auto_basis}, target {str(data.get('hc_mode', 'n/a') or 'n/a')})"
+            f"goal {auto_goal}, basis {auto_basis}, target {data.get('hc_mode', 'n/a') or 'n/a'!s})"
         )
         auto_res = _run_auto_mode_search(
             base_data=dict(data),

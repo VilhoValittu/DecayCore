@@ -56,12 +56,12 @@ Verify your CamillaDSP pipeline includes both stages before finalizing the deplo
 | `enabled` | `false` | Enable or disable hybrid IIR preconditioning |
 | `max_filters_per_channel` | `3` | Maximum number of IIR biquad cuts per channel |
 | `min_freq_hz` | `20 Hz` | Lowest frequency considered for IIR modal detection |
-| `max_freq_hz` | `150 Hz` | Highest frequency considered for IIR modal detection |
+| `max_freq_hz` | `200 Hz` | Highest frequency considered for IIR modal detection |
 | `min_peak_db` | `4.0 dB` | Minimum peak height required to qualify for an IIR cut |
 | `min_q` | `3.0` | Minimum allowed Q for designed biquads |
 | `max_q` | `12.0` | Maximum allowed Q for designed biquads |
 | `max_cut_db` | `6.0 dB` | Maximum allowed cut depth per biquad |
-| `min_confidence` | `0.65` | Minimum confidence required at the mode frequency |
+| `min_confidence` | `0.30` | Minimum confidence required at the mode frequency |
 | `min_gd_excess_ms` | `10.0 ms` | Minimum group delay excess required for mode detection |
 | `min_cut_priority` | `0.0` | Minimum cut priority score required to place a filter |
 

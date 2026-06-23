@@ -179,13 +179,13 @@ def _prepare_measurement_sidecar_metadata(
     float | None,
 ]:
     measured_rt60_l, measured_rt60_bands_l = _extract_generated_source_rt60(
-        data.get("generated_measurement_l", None)
+        data.get("generated_measurement_l")
     )
     measured_rt60_r, measured_rt60_bands_r = _extract_generated_source_rt60(
-        data.get("generated_measurement_r", None)
+        data.get("generated_measurement_r")
     )
-    measured_snr_db_l = _extract_generated_source_snr(data.get("generated_measurement_l", None))
-    measured_snr_db_r = _extract_generated_source_snr(data.get("generated_measurement_r", None))
+    measured_snr_db_l = _extract_generated_source_snr(data.get("generated_measurement_l"))
+    measured_snr_db_r = _extract_generated_source_snr(data.get("generated_measurement_r"))
 
     if bass_integration_enabled:
         _lp_l = str(data.get("local_path_l_main", "") or "").strip()
@@ -423,10 +423,10 @@ def _extract_generated_source_snr(source: object) -> float | None:
 
 
 def _load_generated_measurement_pair(data: dict) -> tuple | None:
-    generated_l = data.get("generated_measurement_l", None)
-    generated_r = data.get("generated_measurement_r", None)
-    upload_l = data.get("file_l", None)
-    upload_r = data.get("file_r", None)
+    generated_l = data.get("generated_measurement_l")
+    generated_r = data.get("generated_measurement_r")
+    upload_l = data.get("file_l")
+    upload_r = data.get("file_r")
     if not generated_source_matches_upload(generated_l, upload_l):
         return None
     if not generated_source_matches_upload(generated_r, upload_r):

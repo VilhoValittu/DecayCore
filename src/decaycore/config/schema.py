@@ -606,7 +606,7 @@ class RunConfigSnapshot:
     values: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_flat_dict(cls, data: dict[str, Any] | None) -> "RunConfigSnapshot":
+    def from_flat_dict(cls, data: dict[str, Any] | None) -> RunConfigSnapshot:
         return cls(values=normalize_flat_config(data or {}, include_runtime=True))
 
     def to_flat_dict(self) -> dict[str, Any]:
@@ -618,7 +618,7 @@ class FilterConfigProjection:
     values: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_run_config(cls, snapshot: RunConfigSnapshot | "FilterConfigProjection" | dict[str, Any]) -> "FilterConfigProjection":
+    def from_run_config(cls, snapshot: RunConfigSnapshot | FilterConfigProjection | dict[str, Any]) -> FilterConfigProjection:
         if isinstance(snapshot, FilterConfigProjection):
             return snapshot
         if isinstance(snapshot, RunConfigSnapshot):
@@ -778,7 +778,7 @@ def coerce_bool(value: Any, default: bool = False) -> bool:
 
 def normalize_list_backed_booleans(data: dict[str, Any]) -> None:
     for key in LIST_BOOL_KEYS:
-        if isinstance(data.get(key, None), list):
+        if isinstance(data.get(key), list):
             data[key] = coerce_bool(data[key], False)
 
 

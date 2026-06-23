@@ -146,7 +146,6 @@ def _identity_base_data(raw: dict) -> dict:
 
 def canonicalize_auto_search_base_data(raw_data: dict | None) -> dict:
     """Return raw user input stripped of winner/runtime fields."""
-
     raw = dict(raw_data or {})
     auto_applied_keys = _matching_auto_applied_keys(raw)
     out: dict[str, Any] = _identity_base_data(raw)

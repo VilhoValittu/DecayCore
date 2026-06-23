@@ -97,7 +97,7 @@ def _drain_pending_result_render() -> None:
 def _set_progress_overlay_text_dark(enabled: bool) -> None:
     add_class = "text-black" if enabled else "text-white"
     remove_class = "text-white" if enabled else "text-black"
-    for label in list(_progress_overlay_refs):
+    for label in _progress_overlay_refs:
         try:
             label.classes(add=add_class, remove=remove_class)
         except (
@@ -119,7 +119,7 @@ def _set_progress_overlay_text_dark(enabled: bool) -> None:
 def _set_progress_meta_completed(enabled: bool) -> None:
     add_class = "cf-progress-meta--complete" if enabled else "cf-progress-meta--running"
     remove_class = "cf-progress-meta--running" if enabled else "cf-progress-meta--complete"
-    for meta in list(_progress_meta_refs):
+    for meta in _progress_meta_refs:
         try:
             meta.classes(add=add_class, remove=remove_class)
         except (

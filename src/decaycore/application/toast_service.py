@@ -13,14 +13,14 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from .health_service import HealthResult
 from ..resources.i8n.decaycore_i18n import t
 
-_TOAST_LAST_SHOWN: Dict[str, float] = {}
-_TOAST_EDGE_STATE: Dict[str, bool] = {}
-_TOAST_CALLABLE: Optional[callable] = None
+_TOAST_LAST_SHOWN: dict[str, float] = {}
+_TOAST_EDGE_STATE: dict[str, bool] = {}
+_TOAST_CALLABLE: callable | None = None
 
 
 def _prune_toast_cache(
@@ -40,7 +40,7 @@ def _prune_toast_cache(
                 _TOAST_LAST_SHOWN.pop(k, None)
 
         if max_items > 0 and len(_TOAST_LAST_SHOWN) > int(max_items):
-            items: List[Tuple[str, float]] = [(k, float(v)) for k, v in _TOAST_LAST_SHOWN.items()]
+            items: list[tuple[str, float]] = [(k, float(v)) for k, v in _TOAST_LAST_SHOWN.items()]
             items.sort(key=lambda kv: kv[1], reverse=True)
             keep = set(k for k, _ in items[: int(max_items)])
             for k in list(_TOAST_LAST_SHOWN.keys()):
@@ -54,7 +54,7 @@ def _get_toast_callable():
     return _TOAST_CALLABLE
 
 
-def set_toast_callable(fn: Optional[callable]) -> None:
+def set_toast_callable(fn: callable | None) -> None:
     global _TOAST_CALLABLE
     _TOAST_CALLABLE = fn
 
@@ -63,8 +63,8 @@ def show_toast(
     msg: str,
     *,
     duration: float = 5.0,
-    color: Optional[str] = None,
-    dedupe_key: Optional[str] = None,
+    color: str | None = None,
+    dedupe_key: str | None = None,
     dedupe_window_s: float = 0.75,
 ) -> bool:
     key = str(dedupe_key or msg or "").strip()
@@ -95,8 +95,8 @@ def _toast_on_edge(
     active: bool,
     msg: str,
     duration: float,
-    color: Optional[str] = None,
-    dedupe_key: Optional[str] = None,
+    color: str | None = None,
+    dedupe_key: str | None = None,
 ) -> bool:
     prev = bool(_TOAST_EDGE_STATE.get(edge_key, False))
     _TOAST_EDGE_STATE[edge_key] = bool(active)
@@ -121,7 +121,7 @@ def _tr(key: str, **kwargs: Any) -> str:
     return text
 
 
-def _health_toast_color(level: str, mode_u: str) -> Optional[str]:
+def _health_toast_color(level: str, mode_u: str) -> str | None:
     if level == "warn":
         mode_s = str(mode_u or "").strip().upper()
         return "warn" if mode_s in ("BASIC", "AUTO") else "info"

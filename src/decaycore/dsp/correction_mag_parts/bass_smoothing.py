@@ -80,8 +80,7 @@ def _apply_peak_priority_error_shaping(
     mask_c: np.ndarray,
     logger: Any,
 ) -> np.ndarray:
-    """
-   Peak-priority error formulation:
+    """Peak-priority error formulation:
       - Keep CUT requests (negative error) intact.
       - Leave BOOST requests unchanged up to max_boost_db.
       - Soft-limit only the portion above max_boost_db so deep dips don't
@@ -580,8 +579,7 @@ def _mid_refit_resolve_params(cfg_reader: CfgReader) -> tuple[float, float, floa
         mid_lo = 200.0
     if (not np.isfinite(mid_hi)) or mid_hi <= (mid_lo + 1.0):
         mid_hi = 2000.0
-        if mid_hi <= (mid_lo + 1.0):
-            mid_hi = mid_lo + 1.0
+        mid_hi = max(mid_lo + 1.0, mid_hi)
 
     k_refit = cfg_reader.float("mid_refit_k", 0.45)
     if not np.isfinite(k_refit):

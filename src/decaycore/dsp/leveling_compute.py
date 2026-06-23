@@ -135,26 +135,25 @@ def _leveling_metrics_from_mask(
                 subwoofer_goal=bool(subwoofer_goal),
             )
             safe_setattr_fn(cfg, "_lvl_tilt_slope_db_per_oct", float(slope))
-    else:
-        if np.any(mask):
-            diff = m_anal[mask] - target_mags[mask]
-            if tilt_comp:
-                calc_offset_db, tilt_slope = _leveling_tilt_fit_for_window(
-                    tilt_fit_offset_and_slope_db_per_oct_fn,
-                    freq_axis[mask],
-                    diff,
-                    window_hi_hz=float(window_hi_hz),
-                    tilt_max_db_per_oct=float(tilt_max_db_per_oct),
-                    subwoofer_goal=bool(subwoofer_goal),
-                )
-                safe_setattr_fn(cfg, "_lvl_tilt_slope_db_per_oct", float(tilt_slope))
-                offset_method = f"{offset_prefix}TiltMedian"
-            else:
-                calc_offset_db = log_median_fn(freq_axis[mask], diff)
-                offset_method = f"{offset_prefix}Median"
+    elif np.any(mask):
+        diff = m_anal[mask] - target_mags[mask]
+        if tilt_comp:
+            calc_offset_db, tilt_slope = _leveling_tilt_fit_for_window(
+                tilt_fit_offset_and_slope_db_per_oct_fn,
+                freq_axis[mask],
+                diff,
+                window_hi_hz=float(window_hi_hz),
+                tilt_max_db_per_oct=float(tilt_max_db_per_oct),
+                subwoofer_goal=bool(subwoofer_goal),
+            )
+            safe_setattr_fn(cfg, "_lvl_tilt_slope_db_per_oct", float(tilt_slope))
+            offset_method = f"{offset_prefix}TiltMedian"
         else:
-            calc_offset_db = 0.0
-            offset_method = f"{offset_prefix}NoMask"
+            calc_offset_db = log_median_fn(freq_axis[mask], diff)
+            offset_method = f"{offset_prefix}Median"
+    else:
+        calc_offset_db = 0.0
+        offset_method = f"{offset_prefix}NoMask"
 
     perceptual_error_rms = _leveling_perceptual_error(
         enabled=bool(lvl_perceptual_weighting),

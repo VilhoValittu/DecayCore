@@ -8,8 +8,7 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-"""
-ir_alignment_check.py — vertaa kahden mittaus-IR:n ajoitusta, napaisuutta,
+"""ir_alignment_check.py — vertaa kahden mittaus-IR:n ajoitusta, napaisuutta,
 tasoa sekä vaihetta/ryhmäviivettä XO-pisteessä.
 
 Algoritmit poimittu tests/check_ir_alignment.py:stä.
@@ -74,8 +73,7 @@ def _xcorr_timing(
     fs_b: int, x_b: np.ndarray,
     max_lag_ms: float = 150.0,
 ) -> dict:
-    """
-    Laskee ristikorrelaation impulssiikkunoiden välillä ja palauttaa
+    """Laskee ristikorrelaation impulssiikkunoiden välillä ja palauttaa
     suhteellisen viiveen (positiivinen = B myöhässä A:sta).
     """
     peak_a = _peak_index(x_a)
@@ -182,8 +180,7 @@ def run_ir_alignment_check(
     xo_hz: float = 80.0,
     max_lag_ms: float = 150.0,
 ) -> dict:
-    """
-    Vertaa kahta mittaus-IR:ää (A = referenssi, B = vertailtava).
+    """Vertaa kahta mittaus-IR:ää (A = referenssi, B = vertailtava).
 
     Palauttaa dictionaryn ir_align_* -avaimilla, tai {} virhetilanteessa.
     """

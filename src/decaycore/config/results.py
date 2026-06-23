@@ -11,15 +11,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 
 
 @dataclass
 class FilterResult:
-    """
-    Normalized single-run output container for DSP, export and UI layers.
+    """Normalized single-run output container for DSP, export and UI layers.
 
     A single instance represents one sample-rate run.
     """
@@ -41,5 +40,5 @@ class FilterResult:
     # Optional payloads for export/report/plot consumers.
     measurements: dict[str, np.ndarray] = field(default_factory=dict)
     cfg: Any = None
-    sub_ir: Optional[np.ndarray] = None
-    sub_st: Optional[dict] = None
+    sub_ir: np.ndarray | None = None
+    sub_st: dict | None = None

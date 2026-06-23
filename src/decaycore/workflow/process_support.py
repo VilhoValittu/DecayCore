@@ -38,8 +38,7 @@ _RECOVERABLE_PROCESS_SUPPORT_EXCEPTIONS = (
 
 
 def auto_target_mode_norm(mode: typing.Any) -> str:
-    """
-    Normalisoi AUTO-tilan target-kayran valintatavan.
+    """Normalisoi AUTO-tilan target-kayran valintatavan.
 
     Palauttaa joko `auto` (etsi paras target-kayra),
     `adaptive` (johda mittauksista) tai `selected`
@@ -54,8 +53,7 @@ def auto_target_mode_norm(mode: typing.Any) -> str:
 
 
 def auto_target_selection_method_text(method: typing.Any) -> str:
-    """
-    Muuntaa auto-target-valinnan metodit luettaviksi loki- ja UI-teksteiksi.
+    """Muuntaa auto-target-valinnan metodit luettaviksi loki- ja UI-teksteiksi.
     """
     key = str(method).strip().lower() if method is not None else ""
 
@@ -183,7 +181,7 @@ def pick_target_curve_label(data: dict) -> str:
 def has_uploaded_target_file(data: dict) -> bool:
     """Checks if UI data contains an uploaded custom target file."""
     try:
-        up = data.get("hc_custom_file", None)
+        up = data.get("hc_custom_file")
     except _RECOVERABLE_PROCESS_SUPPORT_EXCEPTIONS:
         up = None
 
@@ -197,8 +195,7 @@ def has_uploaded_target_file(data: dict) -> bool:
 
 
 def resolve_ui_stats_fs(ui_stats_fs: typing.Any, selected_fs: typing.Any) -> int:
-    """
-    Valitsee UI-statistiikalle oikean sample raten.
+    """Valitsee UI-statistiikalle oikean sample raten.
 
     Priorisoi dashboardille valitun analyysinopeuden (`ui_stats_fs`) ja
     kaatuu turvallisesti UI-valintaan (`selected_fs`) tai 44100 Hz:iin.

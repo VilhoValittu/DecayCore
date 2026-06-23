@@ -107,8 +107,7 @@ def _apply_slope_passes_asym(g, x, boost, cut):
 
 
 def soft_clip_gain(gain_db, max_boost_db, max_cut_db):
-    """
-    Rajaa korjauskayran pehmeasti tanh-funktiolla.
+    """Rajaa korjauskayran pehmeasti tanh-funktiolla.
 
     Positiiviset arvot paastetaan muuttumattomina boost-kattoon asti.
     Katon ylittava osa pehmennetaan, ja myohemmat hard clamp -vaiheet
@@ -149,8 +148,7 @@ def soft_clip_gain(gain_db, max_boost_db, max_cut_db):
 
 
 def limit_slope_per_octave(freq_axis, gain_db, max_db_per_oct=12.0):
-    """
-    Rajoittaa gain-kayran muutosnopeuden (dB/oktaavi) symmetrisesti.
+    """Rajoittaa gain-kayran muutosnopeuden (dB/oktaavi) symmetrisesti.
 
     Toteutus tekee ensin eteenpain- ja sitten taaksepain-passit, jotta raja
     toteutuu molempiin suuntiin koko taajuusakselilla.
@@ -173,8 +171,7 @@ def limit_slope_per_octave(freq_axis, gain_db, max_db_per_oct=12.0):
 
 
 def limit_slope_per_octave_asym(freq_axis, gain_db, max_db_per_oct_boost, max_db_per_oct_cut):
-    """
-    Rajoittaa gain-kayran muutosnopeuden epasymmetrisesti (dB/oktaavi).
+    """Rajoittaa gain-kayran muutosnopeuden epasymmetrisesti (dB/oktaavi).
 
     Nouseville kohdille kaytetaan boost-rajaa ja laskeville kohdille cut-rajaa.
     Etu- ja takapassi pitavat rajoituksen vakaana koko kayralla.
@@ -206,8 +203,7 @@ def build_slope_limit_envelope(
     max_slope_boost_db_per_oct: float,
     max_slope_cut_db_per_oct: float,
 ):
-    """
-    Rakentaa UI:ta varten visuaalisen slope-rajoitusvaipan.
+    """Rakentaa UI:ta varten visuaalisen slope-rajoitusvaipan.
 
     Palauttaa tuple-arvon `(env_lo, env_hi, pivot_hz)`, jossa vaippa on
     laskettu korjausalueelle [mag_c_min, mag_c_max]. Jos syotedata ei ole
@@ -251,14 +247,14 @@ def build_slope_limit_envelope(
     # Right side: pivot_idx+1 .. end — cumsum of dx starting at pivot_idx
     if pivot_idx < f.size - 1:
         right_cs = np.cumsum(dx[pivot_idx:])
-        upper_delta[pivot_idx + 1:] = (b if b > 0.0 else 0.0) * right_cs
-        lower_delta[pivot_idx + 1:] = (c if c > 0.0 else 0.0) * right_cs
+        upper_delta[pivot_idx + 1:] = (max(0.0, b)) * right_cs
+        lower_delta[pivot_idx + 1:] = (max(0.0, c)) * right_cs
 
     # Left side: 0 .. pivot_idx-1 — suffix sums of dx[:pivot_idx]
     if pivot_idx > 0:
         left_cs = np.cumsum(dx[:pivot_idx][::-1])[::-1]
-        upper_delta[:pivot_idx] = (b if b > 0.0 else 0.0) * left_cs
-        lower_delta[:pivot_idx] = (c if c > 0.0 else 0.0) * left_cs
+        upper_delta[:pivot_idx] = (max(0.0, b)) * left_cs
+        lower_delta[:pivot_idx] = (max(0.0, c)) * left_cs
 
     env_hi = t + upper_delta
     env_lo = t - lower_delta

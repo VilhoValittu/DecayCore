@@ -88,7 +88,7 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):  # noqa: C901 - 
         )
         for key in keys:
             try:
-                value = st.get(key, None)
+                value = st.get(key)
                 if value is not None and np.isfinite(float(value)):
                     return True
             except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
@@ -119,7 +119,7 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):  # noqa: C901 - 
         max_hz = _safe_float(st.get("conf_pull_post_strength_max_hz", float("nan")), float("nan"))
         max_hz_txt = f" @ {max_hz:.1f} Hz" if np.isfinite(max_hz) else ""
         return (
-            f"{side}: floor/ceil {floor:.2f}/{ceil:.2f}, max {_fmt_confpull_max_hz(st.get('conf_pull_post_max_hz', None))}, "
+            f"{side}: floor/ceil {floor:.2f}/{ceil:.2f}, max {_fmt_confpull_max_hz(st.get('conf_pull_post_max_hz'))}, "
             f"cut/boost gamma {gamma_cut:.2f}/{gamma_boost:.2f}, active {active:.1f}%, "
             f"pull mean/max {mean:.2f}/{max_v:.2f}{max_hz_txt}"
         )
@@ -145,8 +145,8 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):  # noqa: C901 - 
         )
 
     def _phase_clamp_line(side: str, st: dict) -> str:
-        lim = st.get("phase_corr_clamp_deg", None)
-        bef = st.get("phase_corr_max_before_deg", None)
+        lim = st.get("phase_corr_clamp_deg")
+        bef = st.get("phase_corr_max_before_deg")
         if lim is None or bef is None:
             return f"{side}: n/a"
         diag = ""
@@ -172,7 +172,7 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):  # noqa: C901 - 
         )
         for k in keys:
             try:
-                v = float(st.get(k, None))
+                v = float(st.get(k))
                 if np.isfinite(v):
                     return float(v)
             except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
@@ -187,10 +187,10 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):  # noqa: C901 - 
         try:
             enabled = bool(st.get("gd_limiter_enabled", st.get("gd_grad_limiter_enabled", False)))
             reason = str(st.get("gd_limiter_reason", st.get("gd_grad_limiter_reason", "unknown")) or "unknown")
-            limit_v = st.get("gd_limiter_limit_ms_per_oct", st.get("gd_grad_limit_ms_per_oct", None))
+            limit_v = st.get("gd_limiter_limit_ms_per_oct", st.get("gd_grad_limit_ms_per_oct"))
             grad_before = st.get(
                 "gd_limiter_max_grad_before_ms_per_oct",
-                st.get("gd_grad_limiter_max_grad_before_ms_per_oct", None),
+                st.get("gd_grad_limiter_max_grad_before_ms_per_oct"),
             )
             grad_after = st.get(
                 "gd_limiter_max_grad_after_ms_per_oct",
@@ -198,7 +198,7 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):  # noqa: C901 - 
             )
             before_hz = st.get(
                 "gd_limiter_max_grad_before_hz",
-                st.get("gd_grad_limiter_max_grad_before_hz", None),
+                st.get("gd_grad_limiter_max_grad_before_hz"),
             )
 
             lim_txt = "n/a"
@@ -238,7 +238,7 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):  # noqa: C901 - 
         mode = str(st.get("fdw_mode", "") or "").strip().lower()
         if mode == "fixed":
             cyc = st.get("fdw_fixed_cycles", settings.get("fdw_cycles", None))
-            bw = st.get("fdw_fixed_bw_oct", None)
+            bw = st.get("fdw_fixed_bw_oct")
             try:
                 cyc_txt = f"{float(cyc):.2f}" if cyc is not None else "n/a"
             except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
@@ -252,9 +252,9 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):  # noqa: C901 - 
         active = bool(st.get("afdw_active", False)) or bool(settings.get("enable_afdw", False))
         if not active:
             return f"{side}: OFF"
-        mn = st.get("afdw_bw_min_oct", None)
-        me = st.get("afdw_bw_mean_oct", None)
-        mx = st.get("afdw_bw_max_oct", None)
+        mn = st.get("afdw_bw_min_oct")
+        me = st.get("afdw_bw_mean_oct")
+        mx = st.get("afdw_bw_max_oct")
         if mn is None or me is None or mx is None:
             return f"{side}: ON (effective bandwidth not available)"
         return f"{side}: ON | BW min/mean/max = {float(mn):.4f}/{float(me):.4f}/{float(mx):.4f} oct"
@@ -402,8 +402,8 @@ def _format_summary_content_legacy(settings, l_stats, r_stats):  # noqa: C901 - 
 
     lines.append("\n--- Analysis Mode ---")
     lines.append(
-        f"Analysis mode: L {str(l_stats.get('analysis_mode', 'native'))} | "
-        f"R {str(r_stats.get('analysis_mode', 'native'))}"
+        f"Analysis mode: L {l_stats.get('analysis_mode', 'native')!s} | "
+        f"R {r_stats.get('analysis_mode', 'native')!s}"
     )
     if str(l_stats.get("analysis_mode", "native")) == "comparison":
         lines.append(

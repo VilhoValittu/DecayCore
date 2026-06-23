@@ -28,7 +28,7 @@ _SEVERITY_GATE_THRESHOLD = 0.08
 
 def _policy_from_data(data: dict | None) -> StereoAutoPolicyConfig:
     src = dict(data or {})
-    nested = src.get("stereo_auto_policy", None)
+    nested = src.get("stereo_auto_policy")
     if isinstance(nested, StereoAutoPolicyConfig):
         return nested
     if isinstance(nested, dict):

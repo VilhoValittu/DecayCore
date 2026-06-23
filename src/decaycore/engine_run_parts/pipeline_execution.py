@@ -686,8 +686,7 @@ def run_pipeline(  # noqa: C901 - pipeline orchestration is intentionally centra
     debug: bool = False,
     include_response_arrays: bool = True,
 ) -> FilterResult:
-    """
-    Execute one DSP pipeline run and return normalized results.
+    """Execute one DSP pipeline run and return normalized results.
 
     `measurements` must contain L/R frequency, magnitude and phase arrays:
     `f_l,m_l,p_l,f_r,m_r,p_r`.

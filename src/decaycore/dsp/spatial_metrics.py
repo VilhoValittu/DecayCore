@@ -109,6 +109,7 @@ def compute_filter_similarity_metric(
     -------
     IACCResult with early, late, all, tau_ms fields.
     ``nan`` fields indicate insufficient data.
+
     """
     try:
         l = np.asarray(ir_l, dtype=float).reshape(-1)

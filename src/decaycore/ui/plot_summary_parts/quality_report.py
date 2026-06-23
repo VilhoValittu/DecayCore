@@ -550,8 +550,8 @@ def _quality_report_collect(st, settings, *, debug_report=False):
     out["ir_pre_post_ratio"] = _quality_report_pre_post_ratio(st, pre_db)
     out["pre_metric_suspect"], out["pre_metric_note"] = _quality_report_pre_metric_info(st, debug_report=debug_report)
     try:
-        dmax = _quality_report_safe_float(out.get("bass_adaptive_delta_max_20_200", None))
-        emax = _quality_report_safe_float(out.get("pred_mag_error_max_20_200", None))
+        dmax = _quality_report_safe_float(out.get("bass_adaptive_delta_max_20_200"))
+        emax = _quality_report_safe_float(out.get("pred_mag_error_max_20_200"))
         if dmax is not None and emax is not None and emax > 1e-9:
             out["bass_adaptive_effectiveness_pct"] = float((dmax / emax) * 100.0)
     except _RECOVERABLE_QUALITY_EXCEPTIONS:
@@ -589,7 +589,7 @@ def _quality_report_fmt_onoff(v):
 
 def _quality_report_fmt_src(v):
     s = str(v or "").strip()
-    return s if s else "n/a"
+    return s or "n/a"
 
 
 def _quality_report_build_lines(lq, rq, *, debug_report: bool):

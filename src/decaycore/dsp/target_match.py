@@ -215,8 +215,7 @@ def target_match_from_stats(
     default_range_hz: tuple[float, float] = (200.0, 5000.0),
     freq_range: tuple[float, float] | None = None,
 ) -> tuple[float | None, float | None]:
-    """
-    Single source of truth for target-match from stats payload.
+    """Single source of truth for target-match from stats payload.
 
     Returns `(rms_db, match_pct)`. If input is insufficient, returns `(None, None)`.
 

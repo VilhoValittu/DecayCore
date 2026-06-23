@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 import logging
 import math
 import numpy as np
@@ -177,7 +177,7 @@ def _cfg_as_float_allow_zero(v, default: float) -> float:
     return _cfg_as_float(v, default)
 
 
-def _cfg_as_float_or_none(v, default: Optional[float]) -> Optional[float]:
+def _cfg_as_float_or_none(v, default: float | None) -> float | None:
     if v is None:
         return default
     if isinstance(v, str):
@@ -205,7 +205,7 @@ def _cfg_as_float_or_none(v, default: Optional[float]) -> Optional[float]:
     return float(x)
 
 
-def _filter_config_control_values(data: Dict[str, Any]) -> dict:
+def _filter_config_control_values(data: dict[str, Any]) -> dict:
     try:
         mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
     except (
@@ -234,15 +234,15 @@ def _filter_config_control_values(data: Dict[str, Any]) -> dict:
         "lb_hz": float(lb_hz),
         "df_smoothing": _cfg_as_bool_default(data.get("df_smoothing", False), False),
         "bass_smooth_adaptive": _cfg_as_bool_default(data.get("bass_smooth_adaptive", True), True),
-        "bass_smooth_hz": _cfg_as_float_allow_zero(data.get("bass_smooth_hz", None), 200.0),
-        "bass_smooth_sigma_scale": _cfg_as_float_allow_zero(data.get("bass_smooth_sigma_scale", None), 1.4),
-        "bass_smooth_conf_floor": _cfg_as_float_allow_zero(data.get("bass_smooth_conf_floor", None), 0.3),
+        "bass_smooth_hz": _cfg_as_float_allow_zero(data.get("bass_smooth_hz"), 200.0),
+        "bass_smooth_sigma_scale": _cfg_as_float_allow_zero(data.get("bass_smooth_sigma_scale"), 1.4),
+        "bass_smooth_conf_floor": _cfg_as_float_allow_zero(data.get("bass_smooth_conf_floor"), 0.3),
         "mid_refit_enable": _cfg_as_bool_default(data.get("mid_refit_enable", True), True),
-        "mid_refit_hz_lo": _cfg_as_float_allow_zero(data.get("mid_refit_hz_lo", None), 200.0),
-        "mid_refit_hz_hi": _cfg_as_float_allow_zero(data.get("mid_refit_hz_hi", None), 2000.0),
-        "mid_refit_k": _cfg_as_float_allow_zero(data.get("mid_refit_k", None), 0.45),
-        "mid_refit_smooth_oct": _cfg_as_float_allow_zero(data.get("mid_refit_smooth_oct", None), 0.60),
-        "mid_refit_conf_min_avg": _cfg_as_float_allow_zero(data.get("mid_refit_conf_min_avg", None), 0.20),
+        "mid_refit_hz_lo": _cfg_as_float_allow_zero(data.get("mid_refit_hz_lo"), 200.0),
+        "mid_refit_hz_hi": _cfg_as_float_allow_zero(data.get("mid_refit_hz_hi"), 2000.0),
+        "mid_refit_k": _cfg_as_float_allow_zero(data.get("mid_refit_k"), 0.45),
+        "mid_refit_smooth_oct": _cfg_as_float_allow_zero(data.get("mid_refit_smooth_oct"), 0.60),
+        "mid_refit_conf_min_avg": _cfg_as_float_allow_zero(data.get("mid_refit_conf_min_avg"), 0.20),
         "bass_adaptive_isolation_mode": _cfg_as_bool_default(data.get("bass_adaptive_isolation_mode", False), False),
         "enable_afdw": _cfg_as_bool_default(data.get("enable_afdw", False), False),
         "enable_tdc": _cfg_as_bool_default(data.get("enable_tdc", False), False),
@@ -256,61 +256,61 @@ def _filter_config_control_values(data: Dict[str, Any]) -> dict:
     }
 
 
-def _filter_config_mixed_kwargs(FilterConfig_cls, data: Dict[str, Any]) -> dict:
+def _filter_config_mixed_kwargs(FilterConfig_cls, data: dict[str, Any]) -> dict:
     kwargs = {}
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "excess_phase_strength", float(max(0.0, min(1.0, _cfg_as_float_allow_zero(data.get("excess_phase_strength", None), 0.9)))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "excess_phase_strength", float(max(0.0, min(1.0, _cfg_as_float_allow_zero(data.get("excess_phase_strength"), 0.9)))))
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "phase_budget_mode", str(data.get("phase_budget_mode", "unified") or "unified").strip().lower() if str(data.get("phase_budget_mode", "unified") or "unified").strip().lower() in ("unified", "legacy") else "unified")
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "linear_excess_strength", float(max(0.0, min(1.0, _cfg_as_float_allow_zero(data.get("linear_excess_strength", None), 0.9)))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "phase_conf_gain_floor", float(np.clip(_cfg_as_float_allow_zero(data.get("phase_conf_gain_floor", None), 0.20), 0.0, 1.0)))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "phase_conf_gain_power", float(max(0.1, _cfg_as_float_allow_zero(data.get("phase_conf_gain_power", None), 1.0))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "phase_corr_clamp_lf_deg", float(max(0.0, _cfg_as_float_allow_zero(data.get("phase_corr_clamp_lf_deg", None), 540.0))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "phase_corr_clamp_hf_deg", float(max(0.0, _cfg_as_float_allow_zero(data.get("phase_corr_clamp_hf_deg", None), 90.0))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "max_excess_delay_cycles", float(max(0.0, _cfg_as_float_allow_zero(data.get("max_excess_delay_cycles", None), 1.0))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "low_freq_full_correction_hz", float(max(20.0, _cfg_as_float_allow_zero(data.get("low_freq_full_correction_hz", None), 140.0))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "high_freq_no_correction_hz", float(max(20.0, _cfg_as_float_allow_zero(data.get("high_freq_no_correction_hz", None), 900.0))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "mixed_phase_budget_lf_deg", float(max(0.0, _cfg_as_float_allow_zero(data.get("mixed_phase_budget_lf_deg", None), 40.0))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "mixed_phase_budget_hf_deg", float(max(0.0, _cfg_as_float_allow_zero(data.get("mixed_phase_budget_hf_deg", None), 22.5))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "linear_excess_strength", float(max(0.0, min(1.0, _cfg_as_float_allow_zero(data.get("linear_excess_strength"), 0.9)))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "phase_conf_gain_floor", float(np.clip(_cfg_as_float_allow_zero(data.get("phase_conf_gain_floor"), 0.20), 0.0, 1.0)))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "phase_conf_gain_power", float(max(0.1, _cfg_as_float_allow_zero(data.get("phase_conf_gain_power"), 1.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "phase_corr_clamp_lf_deg", float(max(0.0, _cfg_as_float_allow_zero(data.get("phase_corr_clamp_lf_deg"), 540.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "phase_corr_clamp_hf_deg", float(max(0.0, _cfg_as_float_allow_zero(data.get("phase_corr_clamp_hf_deg"), 90.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "max_excess_delay_cycles", float(max(0.0, _cfg_as_float_allow_zero(data.get("max_excess_delay_cycles"), 1.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "low_freq_full_correction_hz", float(max(20.0, _cfg_as_float_allow_zero(data.get("low_freq_full_correction_hz"), 140.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "high_freq_no_correction_hz", float(max(20.0, _cfg_as_float_allow_zero(data.get("high_freq_no_correction_hz"), 900.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "mixed_phase_budget_lf_deg", float(max(0.0, _cfg_as_float_allow_zero(data.get("mixed_phase_budget_lf_deg"), 40.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "mixed_phase_budget_hf_deg", float(max(0.0, _cfg_as_float_allow_zero(data.get("mixed_phase_budget_hf_deg"), 22.5))))
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "enable_ir_pre_energy_guard", bool(data.get("enable_ir_pre_energy_guard", True)))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "pre_energy_ratio_max", float(max(0.0, _cfg_as_float_allow_zero(data.get("pre_energy_ratio_max", None), 0.25))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "pre_energy_guard_strength", float(np.clip(_cfg_as_float_allow_zero(data.get("pre_energy_guard_strength", None), 0.8), 0.0, 1.0)))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "max_pre_ringing_db", float(min(0.0, _cfg_as_float_allow_zero(data.get("max_pre_ringing_db", None), -35.0))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "max_excess_delay_ms", float(max(0.0, _cfg_as_float_allow_zero(data.get("max_excess_delay_ms", None), 2.5))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "gd_grad_limit_ms_per_oct", float(max(0.0, _cfg_as_float_allow_zero(data.get("gd_grad_limit_ms_per_oct", None), 30.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "pre_energy_ratio_max", float(max(0.0, _cfg_as_float_allow_zero(data.get("pre_energy_ratio_max"), 0.25))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "pre_energy_guard_strength", float(np.clip(_cfg_as_float_allow_zero(data.get("pre_energy_guard_strength"), 0.8), 0.0, 1.0)))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "max_pre_ringing_db", float(min(0.0, _cfg_as_float_allow_zero(data.get("max_pre_ringing_db"), -35.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "max_excess_delay_ms", float(max(0.0, _cfg_as_float_allow_zero(data.get("max_excess_delay_ms"), 2.5))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "gd_grad_limit_ms_per_oct", float(max(0.0, _cfg_as_float_allow_zero(data.get("gd_grad_limit_ms_per_oct"), 30.0))))
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "ir_anchor_mode", str(data.get("ir_anchor_mode", "min_causal") or "min_causal").strip().lower() if str(data.get("ir_anchor_mode", "min_causal") or "min_causal").strip().lower() in ("peak", "centroid", "min_causal") else "min_causal")
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "min_causal_ms", float(max(0.0, _cfg_as_float_allow_zero(data.get("min_causal_ms", None), 80.0))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "auto_asym_left_ratio", float(np.clip(_cfg_as_float_allow_zero(data.get("auto_asym_left_ratio", None), 0.35), 0.0, 1.0)))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "auto_asym_left_max_ms", float(max(0.0, _cfg_as_float_allow_zero(data.get("auto_asym_left_max_ms", None), 25.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "min_causal_ms", float(max(0.0, _cfg_as_float_allow_zero(data.get("min_causal_ms"), 80.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "auto_asym_left_ratio", float(np.clip(_cfg_as_float_allow_zero(data.get("auto_asym_left_ratio"), 0.35), 0.0, 1.0)))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "auto_asym_left_max_ms", float(max(0.0, _cfg_as_float_allow_zero(data.get("auto_asym_left_max_ms"), 25.0))))
     return kwargs
 
 
-def _filter_config_bass_smooth_kwargs(FilterConfig_cls, data: Dict[str, Any]) -> dict:
+def _filter_config_bass_smooth_kwargs(FilterConfig_cls, data: dict[str, Any]) -> dict:
     kwargs = {}
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_smooth_adaptive", bool(_cfg_as_bool_default(data.get("bass_smooth_adaptive", True), True)))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_smooth_hz", float(max(20.0, _cfg_as_float_allow_zero(data.get("bass_smooth_hz", None), 200.0))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_smooth_sigma_scale", float(max(1.0, _cfg_as_float_allow_zero(data.get("bass_smooth_sigma_scale", None), 1.4))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_smooth_conf_floor", float(np.clip(_cfg_as_float_allow_zero(data.get("bass_smooth_conf_floor", None), 0.3), 0.05, 1.0)))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_smooth_hz", float(max(20.0, _cfg_as_float_allow_zero(data.get("bass_smooth_hz"), 200.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_smooth_sigma_scale", float(max(1.0, _cfg_as_float_allow_zero(data.get("bass_smooth_sigma_scale"), 1.4))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_smooth_conf_floor", float(np.clip(_cfg_as_float_allow_zero(data.get("bass_smooth_conf_floor"), 0.3), 0.05, 1.0)))
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_adaptive_isolation_mode", bool(_cfg_as_bool_default(data.get("bass_adaptive_isolation_mode", False), False)))
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "mid_refit_enable", bool(_cfg_as_bool_default(data.get("mid_refit_enable", True), True)))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "mid_refit_hz_lo", float(max(20.0, _cfg_as_float_allow_zero(data.get("mid_refit_hz_lo", None), 200.0))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "mid_refit_hz_hi", float(max(max(20.0, _cfg_as_float_allow_zero(data.get("mid_refit_hz_lo", None), 200.0)) + 1.0, _cfg_as_float_allow_zero(data.get("mid_refit_hz_hi", None), 2000.0))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "mid_refit_k", float(np.clip(_cfg_as_float_allow_zero(data.get("mid_refit_k", None), 0.45), 0.0, 1.0)))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "mid_refit_smooth_oct", float(np.clip(_cfg_as_float_allow_zero(data.get("mid_refit_smooth_oct", None), 0.60), 1.0 / 192.0, 1.0)))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "mid_refit_conf_min_avg", float(np.clip(_cfg_as_float_allow_zero(data.get("mid_refit_conf_min_avg", None), 0.20), 0.0, 1.0)))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "mid_refit_hz_lo", float(max(20.0, _cfg_as_float_allow_zero(data.get("mid_refit_hz_lo"), 200.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "mid_refit_hz_hi", float(max(max(20.0, _cfg_as_float_allow_zero(data.get("mid_refit_hz_lo"), 200.0)) + 1.0, _cfg_as_float_allow_zero(data.get("mid_refit_hz_hi"), 2000.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "mid_refit_k", float(np.clip(_cfg_as_float_allow_zero(data.get("mid_refit_k"), 0.45), 0.0, 1.0)))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "mid_refit_smooth_oct", float(np.clip(_cfg_as_float_allow_zero(data.get("mid_refit_smooth_oct"), 0.60), 1.0 / 192.0, 1.0)))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "mid_refit_conf_min_avg", float(np.clip(_cfg_as_float_allow_zero(data.get("mid_refit_conf_min_avg"), 0.20), 0.0, 1.0)))
     return kwargs
 
 
-def _filter_config_bass_boost_cap_kwargs(FilterConfig_cls, data: Dict[str, Any]) -> dict:
+def _filter_config_bass_boost_cap_kwargs(FilterConfig_cls, data: dict[str, Any]) -> dict:
     kwargs = {}
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_boost_cap_enable", bool(_cfg_as_bool_default(data.get("bass_boost_cap_enable", True), True)))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_boost_cap_hz", float(max(20.0, _cfg_as_float_allow_zero(data.get("bass_boost_cap_hz", None), 200.0))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_boost_cap_extra_db", float(max(0.0, _cfg_as_float_allow_zero(data.get("bass_boost_cap_extra_db", None), 5.0))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_boost_cap_conf_min", float(np.clip(_cfg_as_float_allow_zero(data.get("bass_boost_cap_conf_min", None), 0.55), 0.0, 0.99)))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_boost_cap_hz", float(max(20.0, _cfg_as_float_allow_zero(data.get("bass_boost_cap_hz"), 200.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_boost_cap_extra_db", float(max(0.0, _cfg_as_float_allow_zero(data.get("bass_boost_cap_extra_db"), 5.0))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_boost_cap_conf_min", float(np.clip(_cfg_as_float_allow_zero(data.get("bass_boost_cap_conf_min"), 0.55), 0.0, 0.99)))
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_boost_post_restore_enable", bool(_cfg_as_bool_default(data.get("bass_boost_post_restore_enable", True), True)))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_boost_post_restore_strength", float(np.clip(_cfg_as_float_allow_zero(data.get("bass_boost_post_restore_strength", None), 0.75), 0.0, 1.0)))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_boost_post_restore_strength", float(np.clip(_cfg_as_float_allow_zero(data.get("bass_boost_post_restore_strength"), 0.75), 0.0, 1.0)))
     return kwargs
 
 
-def _filter_config_residual_authority_kwargs(FilterConfig_cls, data: Dict[str, Any]) -> dict:
+def _filter_config_residual_authority_kwargs(FilterConfig_cls, data: dict[str, Any]) -> dict:
     kwargs = {}
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "residual_pass_mode", str(data.get("residual_pass_mode", "modal_polish") or "modal_polish").strip().lower() if str(data.get("residual_pass_mode", "modal_polish") or "modal_polish").strip().lower() in ("modal_polish", "general_fit", "off") else "modal_polish")
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "residual_null_guard_enable", bool(_cfg_as_bool_default(data.get("residual_null_guard_enable", True), True)))
@@ -327,17 +327,17 @@ def _filter_config_residual_authority_kwargs(FilterConfig_cls, data: Dict[str, A
         "residual_max_cut_general_db": 4.0,
         "residual_authority_smooth_oct": 1.0 / 9.0,
     }.items():
-        _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, _key, float(_cfg_as_float_allow_zero(data.get(_key, None), _default)))
+        _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, _key, float(_cfg_as_float_allow_zero(data.get(_key), _default)))
     return kwargs
 
 
-def _filter_config_bass_integration_kwargs(FilterConfig_cls, data: Dict[str, Any]) -> dict:
+def _filter_config_bass_integration_kwargs(FilterConfig_cls, data: dict[str, Any]) -> dict:
     kwargs = {}
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_integration_enable", bool(data.get("bass_integration_enable", False)))
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_integration_mode", "direct_dac")
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_integration_profile", str(data.get("bass_integration_profile", "safe") or "safe"))
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_integration_sub_combine_mode", str(normalize_sub_combine_mode(data.get("bass_integration_sub_combine_mode", "average"))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "avr_crossover_hz", float(_cfg_as_float_allow_zero(data.get("avr_crossover_hz", None), 80.0)))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "avr_crossover_hz", float(_cfg_as_float_allow_zero(data.get("avr_crossover_hz"), 80.0)))
     for _key in (
         "bass_integration_sub_delay_ms",
         "bass_integration_sub_array_delay_ms",
@@ -351,7 +351,7 @@ def _filter_config_bass_integration_kwargs(FilterConfig_cls, data: Dict[str, Any
             kwargs,
             FilterConfig_cls,
             _key,
-            float(_cfg_as_float_allow_zero(data.get(_key, None), 0.0)),
+            float(_cfg_as_float_allow_zero(data.get(_key), 0.0)),
         )
     _filter_config_set_if_hasattr(
         kwargs,
@@ -360,8 +360,8 @@ def _filter_config_bass_integration_kwargs(FilterConfig_cls, data: Dict[str, Any
         bool(data.get("bass_integration_sub_polarity_invert", False)),
     )
     if hasattr(FilterConfig_cls, "direct_dac_sub_lpf_hz"):
-        _main_xo_hz = float(_cfg_as_float_allow_zero(data.get("sub_crossover_hz", None), _cfg_as_float_allow_zero(data.get("avr_crossover_hz", None), 80.0)))
-        _direct_sub_lpf_hz = float(_cfg_as_float_allow_zero(data.get("direct_dac_sub_lpf_hz", None), _main_xo_hz))
+        _main_xo_hz = float(_cfg_as_float_allow_zero(data.get("sub_crossover_hz"), _cfg_as_float_allow_zero(data.get("avr_crossover_hz"), 80.0)))
+        _direct_sub_lpf_hz = float(_cfg_as_float_allow_zero(data.get("direct_dac_sub_lpf_hz"), _main_xo_hz))
         if str(data.get("bass_integration_mode", "") or "").strip().lower() == "direct_dac":
             _direct_sub_lpf_hz = max(_main_xo_hz, _direct_sub_lpf_hz)
         kwargs["direct_dac_sub_lpf_hz"] = float(_direct_sub_lpf_hz)
@@ -373,17 +373,17 @@ def _filter_config_bass_integration_kwargs(FilterConfig_cls, data: Dict[str, Any
                 kwargs[_k] = float(_v)
             except (TypeError, ValueError):
                 pass
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_integration_guard_lo_ratio", float(max(0.05, _cfg_as_float_allow_zero(data.get("bass_integration_guard_lo_ratio", None), 0.60))))
-    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_integration_guard_hi_ratio", float(max(float(kwargs.get("bass_integration_guard_lo_ratio", 0.60)) + 0.05, _cfg_as_float_allow_zero(data.get("bass_integration_guard_hi_ratio", None), 1.40))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_integration_guard_lo_ratio", float(max(0.05, _cfg_as_float_allow_zero(data.get("bass_integration_guard_lo_ratio"), 0.60))))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "bass_integration_guard_hi_ratio", float(max(float(kwargs.get("bass_integration_guard_lo_ratio", 0.60)) + 0.05, _cfg_as_float_allow_zero(data.get("bass_integration_guard_hi_ratio"), 1.40))))
     return kwargs
 
 
-def _filter_config_stereo_auto_policy(FilterConfig_cls, data: Dict[str, Any], mode_u: str):
+def _filter_config_stereo_auto_policy(FilterConfig_cls, data: dict[str, Any], mode_u: str):
     stereo_auto_policy = StereoAutoPolicyConfig.from_dict(
         {
             "enable_channel_specific_auto_policy": bool(data.get("enable_channel_specific_auto_policy", False)),
             "channel_specific_policy_max_hz": _cfg_as_float_allow_zero(
-                data.get("channel_specific_policy_max_hz", None),
+                data.get("channel_specific_policy_max_hz"),
                 220.0,
             ),
         }
@@ -393,23 +393,23 @@ def _filter_config_stereo_auto_policy(FilterConfig_cls, data: Dict[str, Any], mo
     return stereo_auto_policy
 
 
-def _filter_config_apply_basic_writable_attrs(cfg, data: Dict[str, Any]) -> None:
+def _filter_config_apply_basic_writable_attrs(cfg, data: dict[str, Any]) -> None:
     try:
-        setattr(cfg, "auto_gain_margin_db", float(max(0.0, _cfg_as_float_allow_zero(data.get("gain", None), 0.0))))
+        cfg.auto_gain_margin_db = float(max(0.0, _cfg_as_float_allow_zero(data.get("gain"), 0.0)))
     except (AttributeError, TypeError, ValueError):
         logger.debug("FilterConfig has no writable auto_gain_margin_db", exc_info=True)
     try:
-        setattr(cfg, "enable_residual_pass", bool(data.get("enable_residual_pass", False)))
+        cfg.enable_residual_pass = bool(data.get("enable_residual_pass", False))
     except (AttributeError, TypeError, ValueError):
         logger.debug("FilterConfig has no writable enable_residual_pass", exc_info=True)
     try:
-        setattr(cfg, "lvl_force_window", None)
-        setattr(cfg, "lvl_force_offset_db", None)
+        cfg.lvl_force_window = None
+        cfg.lvl_force_offset_db = None
     except (AttributeError, TypeError, ValueError):
         logger.debug("FilterConfig has no writable forced leveling fields", exc_info=True)
 
 
-def _filter_config_apply_sub_integration(cfg, data: Dict[str, Any], hpf, *, is_auto_mode: bool) -> None:
+def _filter_config_apply_sub_integration(cfg, data: dict[str, Any], hpf, *, is_auto_mode: bool) -> None:
     _is_direct_dac = (
         bool(data.get("bass_integration_enable", False))
         and str(data.get("bass_integration_mode", "") or "").strip() == "direct_dac"
@@ -464,7 +464,7 @@ def build_filter_config(
     FilterConfig_cls,
     fs_v: int,
     taps_v: int,
-    data: Dict[str, Any],
+    data: dict[str, Any],
     xos,
     hpf,
     hc_f,
@@ -472,7 +472,6 @@ def build_filter_config(
     pin=None,
 ) -> Any:
     """Rakentaa tai generoi: build filter config."""
-
     control = _filter_config_control_values(data)
     mode_u = str(control["mode_u"])
     is_auto_mode = bool(control["is_auto_mode"])
@@ -548,33 +547,33 @@ def build_filter_config(
         hpf_settings=hpf,
         house_freqs=hc_f,
         house_mags=hc_m,
-        trans_width=float(_cfg_as_float_allow_zero(data.get("trans_width", None), 100.0)),
+        trans_width=float(_cfg_as_float_allow_zero(data.get("trans_width"), 100.0)),
         bass_first_ai=bool(data.get("bass_first_ai", False)),
         bass_first_mode_max_hz=float(data.get("bass_first_mode_max_hz", 200.0) or 200.0),
-        conf_pull_floor=float(_cfg_as_float_allow_zero(data.get("conf_pull_floor", None), 0.05)),
-        conf_pull_ceil=float(_cfg_as_float_allow_zero(data.get("conf_pull_ceil", None), 0.85)),
-        conf_pull_max_hz=_cfg_as_float_or_none(data.get("conf_pull_max_hz", None), 200.0),
-        conf_pull_gamma_cut=float(_cfg_as_float_allow_zero(data.get("conf_pull_gamma_cut", None), 0.45)),
-        conf_pull_gamma_boost=float(_cfg_as_float_allow_zero(data.get("conf_pull_gamma_boost", None), 0.35)),
-        conf_pull_conf_smooth_sigma=float(_cfg_as_float_allow_zero(data.get("conf_pull_conf_smooth_sigma", None), 2.0)),
-        conf_pull_bass_floor_hz=float(_cfg_as_float_allow_zero(data.get("conf_pull_bass_floor_hz", None), 120.0)),
-        conf_pull_bass_floor_min=float(_cfg_as_float_allow_zero(data.get("conf_pull_bass_floor_min", None), 0.25)),
-        conf_pull_bass_boost_floor_hz=float(_cfg_as_float_allow_zero(data.get("conf_pull_bass_boost_floor_hz", None), 200.0)),
-        conf_pull_bass_boost_floor_min=float(_cfg_as_float_allow_zero(data.get("conf_pull_bass_boost_floor_min", None), 0.55)),
-        conf_pull_bass_boost_restore=float(_cfg_as_float_allow_zero(data.get("conf_pull_bass_boost_restore", None), 0.70)),
+        conf_pull_floor=float(_cfg_as_float_allow_zero(data.get("conf_pull_floor"), 0.05)),
+        conf_pull_ceil=float(_cfg_as_float_allow_zero(data.get("conf_pull_ceil"), 0.85)),
+        conf_pull_max_hz=_cfg_as_float_or_none(data.get("conf_pull_max_hz"), 200.0),
+        conf_pull_gamma_cut=float(_cfg_as_float_allow_zero(data.get("conf_pull_gamma_cut"), 0.45)),
+        conf_pull_gamma_boost=float(_cfg_as_float_allow_zero(data.get("conf_pull_gamma_boost"), 0.35)),
+        conf_pull_conf_smooth_sigma=float(_cfg_as_float_allow_zero(data.get("conf_pull_conf_smooth_sigma"), 2.0)),
+        conf_pull_bass_floor_hz=float(_cfg_as_float_allow_zero(data.get("conf_pull_bass_floor_hz"), 120.0)),
+        conf_pull_bass_floor_min=float(_cfg_as_float_allow_zero(data.get("conf_pull_bass_floor_min"), 0.25)),
+        conf_pull_bass_boost_floor_hz=float(_cfg_as_float_allow_zero(data.get("conf_pull_bass_boost_floor_hz"), 200.0)),
+        conf_pull_bass_boost_floor_min=float(_cfg_as_float_allow_zero(data.get("conf_pull_bass_boost_floor_min"), 0.55)),
+        conf_pull_bass_boost_restore=float(_cfg_as_float_allow_zero(data.get("conf_pull_bass_boost_restore"), 0.70)),
         low_bass_cut_enable=bool(data.get("low_bass_cut_enable", True)),
-        low_bass_cut_strength=float(max(0.0, min(1.0, _cfg_as_float_allow_zero(data.get("low_bass_cut_strength", None), 0.0)))),
+        low_bass_cut_strength=float(max(0.0, min(1.0, _cfg_as_float_allow_zero(data.get("low_bass_cut_strength"), 0.0)))),
         hybrid_iir_enabled=bool(data.get("hybrid_iir_enabled", False)),
-        hybrid_iir_max_filters_per_channel=int(max(0, _cfg_as_float_allow_zero(data.get("hybrid_iir_max_filters_per_channel", None), 3))),
-        hybrid_iir_min_freq_hz=float(max(1.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_min_freq_hz", None), 20.0))),
-        hybrid_iir_max_freq_hz=float(max(2.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_max_freq_hz", None), 200.0))),
-        hybrid_iir_min_peak_db=float(max(0.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_min_peak_db", None), 4.0))),
-        hybrid_iir_min_q=float(max(0.2, _cfg_as_float_allow_zero(data.get("hybrid_iir_min_q", None), 3.0))),
-        hybrid_iir_max_q=float(max(0.2, _cfg_as_float_allow_zero(data.get("hybrid_iir_max_q", None), 12.0))),
-        hybrid_iir_max_cut_db=float(max(0.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_max_cut_db", None), 6.0))),
-        hybrid_iir_min_confidence=float(max(0.0, min(1.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_min_confidence", None), 0.30)))),
-        hybrid_iir_min_gd_excess_ms=float(max(0.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_min_gd_excess_ms", None), 10.0))),
-        hybrid_iir_min_cut_priority=float(max(0.0, min(1.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_min_cut_priority", None), 0.0)))),
+        hybrid_iir_max_filters_per_channel=int(max(0, _cfg_as_float_allow_zero(data.get("hybrid_iir_max_filters_per_channel"), 3))),
+        hybrid_iir_min_freq_hz=float(max(1.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_min_freq_hz"), 20.0))),
+        hybrid_iir_max_freq_hz=float(max(2.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_max_freq_hz"), 200.0))),
+        hybrid_iir_min_peak_db=float(max(0.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_min_peak_db"), 4.0))),
+        hybrid_iir_min_q=float(max(0.2, _cfg_as_float_allow_zero(data.get("hybrid_iir_min_q"), 3.0))),
+        hybrid_iir_max_q=float(max(0.2, _cfg_as_float_allow_zero(data.get("hybrid_iir_max_q"), 12.0))),
+        hybrid_iir_max_cut_db=float(max(0.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_max_cut_db"), 6.0))),
+        hybrid_iir_min_confidence=float(max(0.0, min(1.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_min_confidence"), 0.30)))),
+        hybrid_iir_min_gd_excess_ms=float(max(0.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_min_gd_excess_ms"), 10.0))),
+        hybrid_iir_min_cut_priority=float(max(0.0, min(1.0, _cfg_as_float_allow_zero(data.get("hybrid_iir_min_cut_priority"), 0.0)))),
         **({"stereo_auto_policy": stereo_auto_policy} if "stereo_auto_policy" in dataclass_fields else {}),
         **bass_smooth_kwargs,
         **bass_boost_cap_kwargs,

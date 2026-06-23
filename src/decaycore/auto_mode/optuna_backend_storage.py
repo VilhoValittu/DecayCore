@@ -253,7 +253,6 @@ def _auto_optuna_storage_path(
             os.makedirs(legacy_base, exist_ok=True)
         except OSError:
             logger.debug("Failed to create legacy Optuna storage directory", exc_info=True)
-            pass
         logger.debug("Falling back to legacy Optuna storage directory", exc_info=True)
         return legacy_path
     try:
@@ -285,7 +284,6 @@ def _auto_optuna_storage_path(
                     os.remove(source_path)
                 except OSError:
                     logger.debug("Failed to remove migrated Optuna storage source file", exc_info=True)
-                    pass
             logger.info(f"Automatic mode Optuna storage migrated to: {preferred_path}")
     except OSError:
         logger.debug("Optuna storage setup failed; falling back to legacy path", exc_info=True)

@@ -651,9 +651,9 @@ def _direct_dac_run_global_search(
         )
     )
 
-    setattr(study, "_decaycore_eval_total", eval_total[0])
-    setattr(study, "_decaycore_eval_hits", eval_hits[0])
-    setattr(study, "_decaycore_eval_cache", eval_cache)
+    study._decaycore_eval_total = eval_total[0]
+    study._decaycore_eval_hits = eval_hits[0]
+    study._decaycore_eval_cache = eval_cache
     return (
         study,
         float(best_fc),

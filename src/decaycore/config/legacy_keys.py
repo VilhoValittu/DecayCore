@@ -1,5 +1,4 @@
-"""
-Legacy camillafir_* key constants and helpers.
+"""Legacy camillafir_* key constants and helpers.
 
 All string literals for keys that originated under the old "camillafir"
 namespace live here.  Import from this module instead of spelling the

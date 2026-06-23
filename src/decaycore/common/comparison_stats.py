@@ -54,7 +54,7 @@ def _comparison_stats_write_output(
     if bw_cmp is not None:
         out["cmp_afdw_bw_oct"] = np.clip(bw_cmp, 1.0 / 96.0, 1.0 / 3.0).tolist()
         out["cmp_offset_db"] = float(cmp_offset_db)
-    smart_scan_range = out.get("smart_scan_range", None)
+    smart_scan_range = out.get("smart_scan_range")
     if isinstance(smart_scan_range, (list, tuple)) and len(smart_scan_range) == 2:
         out["cmp_smart_scan_range"] = [float(smart_scan_range[0]), float(smart_scan_range[1])]
     if "eff_target_db" in stats and stats.get("eff_target_db") is not None:
@@ -104,8 +104,7 @@ def _comparison_stats_float_array(v):
 
 def _comparison_stats_prepare_freq_cmp(f, ref_fs: int, ref_taps: int):
     nfft = int(ref_taps)
-    if nfft < 1024:
-        nfft = 1024
+    nfft = max(nfft, 1024)
     if (nfft % 2) != 0:
         nfft += 1
     fmax = min(float(ref_fs) / 2.0, float(np.max(f)))
@@ -119,12 +118,12 @@ def _comparison_stats_get_raw_arrays(stats: dict):
     out = dict(stats)
     if str(out.get("analysis_mode", "native")).lower() == "comparison" and ("cmp_freq_axis" in out):
         return None
-    f = out.get("freq_axis", None)
-    m = out.get("measured_mags", None)
-    t = out.get("target_mags", None)
-    g = out.get("filter_mags", None)
-    c = out.get("confidence_mask", None)
-    mm = out.get("mag_mask", out.get("mask_c", None))
+    f = out.get("freq_axis")
+    m = out.get("measured_mags")
+    t = out.get("target_mags")
+    g = out.get("filter_mags")
+    c = out.get("confidence_mask")
+    mm = out.get("mag_mask", out.get("mask_c"))
     if f is None or m is None or t is None:
         return None
     return out, f, m, t, g, c, mm

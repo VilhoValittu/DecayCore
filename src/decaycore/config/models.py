@@ -9,7 +9,7 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Optional
 
 
 def _bool_value(value, default: bool = False) -> bool:
@@ -61,7 +61,7 @@ def _float_value(value, default: float) -> float:
     return float(parsed)
 
 
-def _float_or_none(value) -> Optional[float]:
+def _float_or_none(value) -> float | None:
     if value is None:
         return None
     if isinstance(value, str) and value.strip() == "":
@@ -115,7 +115,7 @@ class StereoAutoPolicyConfig:
     shared_preference_bias: float = 0.0
 
     @classmethod
-    def from_dict(cls, data: Optional[Dict]) -> "StereoAutoPolicyConfig":
+    def from_dict(cls, data: dict | None) -> "StereoAutoPolicyConfig":
         src = dict(data or {})
         return cls(
             enable_channel_specific_auto_policy=_bool_value(
@@ -224,7 +224,7 @@ class StereoAutoPolicyConfig:
             ),
         )
 
-    def to_dict(self) -> Dict[str, Union[bool, float, int]]:
+    def to_dict(self) -> dict[str, bool | float | int]:
         return {
             "enable_channel_specific_auto_policy": bool(
                 self.enable_channel_specific_auto_policy
@@ -285,15 +285,15 @@ class StereoAutoPolicyConfig:
 
 @dataclass
 class ResolvedChannelAutoPolicy:
-    conf_pull_floor: Optional[float] = None
-    tdc_strength: Optional[float] = None
-    tdc_max_reduction_db: Optional[float] = None
-    bass_first_mode_max_hz: Optional[float] = None
-    low_bass_cut_strength: Optional[float] = None
-    excess_phase_strength: Optional[float] = None
+    conf_pull_floor: float | None = None
+    tdc_strength: float | None = None
+    tdc_max_reduction_db: float | None = None
+    bass_first_mode_max_hz: float | None = None
+    low_bass_cut_strength: float | None = None
+    excess_phase_strength: float | None = None
 
     @classmethod
-    def from_dict(cls, data: Optional[Dict]) -> "ResolvedChannelAutoPolicy":
+    def from_dict(cls, data: dict | None) -> "ResolvedChannelAutoPolicy":
         src = dict(data or {})
         return cls(
             conf_pull_floor=_float_or_none(src.get("conf_pull_floor")),
@@ -304,8 +304,8 @@ class ResolvedChannelAutoPolicy:
             excess_phase_strength=_float_or_none(src.get("excess_phase_strength")),
         )
 
-    def to_dict(self) -> Dict[str, float]:
-        out: Dict[str, float] = {}
+    def to_dict(self) -> dict[str, float]:
+        out: dict[str, float] = {}
         if self.conf_pull_floor is not None:
             out["conf_pull_floor"] = float(self.conf_pull_floor)
         if self.tdc_strength is not None:
@@ -352,7 +352,7 @@ class StereoResolvedAutoPolicies:
     right: ResolvedChannelAutoPolicy = field(default_factory=ResolvedChannelAutoPolicy)
 
     @classmethod
-    def from_dict(cls, data: Optional[Dict]) -> Optional["StereoResolvedAutoPolicies"]:
+    def from_dict(cls, data: dict | None) -> Optional["StereoResolvedAutoPolicies"]:
         if not isinstance(data, dict) or not data:
             return None
         return cls(
@@ -362,7 +362,7 @@ class StereoResolvedAutoPolicies:
             right=ResolvedChannelAutoPolicy.from_dict(data.get("right")),
         )
 
-    def to_dict(self) -> Dict[str, Union[float, Dict[str, float]]]:
+    def to_dict(self) -> dict[str, float | dict[str, float]]:
         return {
             "split_hz": float(self.split_hz),
             "shared": self.shared.to_dict(),
@@ -391,7 +391,7 @@ class FilterConfig:
     enable_mag_correction: bool = True
     unsafe_raw_dsp: bool = False
 
-    plot_smoothing_level: Union[str, int] = "Psychoacoustic"
+    plot_smoothing_level: str | int = "Psychoacoustic"
     filter_smooth: int = 96
     fdw_cycles: float = 10.0
     reg_strength: float = 30.0
@@ -518,18 +518,18 @@ class FilterConfig:
     bass_integration_profile: str = "safe"
     bass_integration_sub_combine_mode: str = "average"
     avr_crossover_hz: float = 80.0
-    avr_crossover_hz_l: Optional[float] = (
+    avr_crossover_hz_l: float | None = (
         None  # per-channel HPF override; None = use avr_crossover_hz
     )
-    avr_crossover_hz_r: Optional[float] = None
+    avr_crossover_hz_r: float | None = None
     bass_integration_guard_lo_ratio: float = 0.60
     bass_integration_guard_hi_ratio: float = 1.40
 
-    hpf_settings: Optional[Dict] = None
-    lpf_settings: Optional[Dict] = None
-    crossovers: List[Dict] = field(default_factory=list)
-    house_freqs: Optional[List[float]] = None
-    house_mags: Optional[List[float]] = None
+    hpf_settings: dict | None = None
+    lpf_settings: dict | None = None
+    crossovers: list[dict] = field(default_factory=list)
+    house_freqs: list[float] | None = None
+    house_mags: list[float] | None = None
 
     lvl_mode: str = "Auto"
     lvl_algo: str = "Median"
@@ -541,8 +541,8 @@ class FilterConfig:
     lvl_max: float = 3000.0
     stereo_link: bool = False
     stereo_link_strategy: str = "auto"
-    lvl_force_window: Optional[Tuple[float, float]] = None
-    lvl_force_offset_db: Optional[float] = None
+    lvl_force_window: tuple[float, float] | None = None
+    lvl_force_offset_db: float | None = None
 
     do_normalize: bool = False
     exc_prot: bool = False
@@ -568,7 +568,7 @@ class FilterConfig:
 
     conf_pull_floor: float = 0.05
     conf_pull_ceil: float = 0.85
-    conf_pull_max_hz: Optional[float] = 200.0
+    conf_pull_max_hz: float | None = 200.0
     conf_pull_gamma_cut: float = 0.45
     conf_pull_gamma_boost: float = 0.35
 
@@ -585,4 +585,4 @@ class FilterConfig:
     stereo_auto_policy: StereoAutoPolicyConfig = field(
         default_factory=StereoAutoPolicyConfig
     )
-    stereo_resolved_auto_policies: Optional[StereoResolvedAutoPolicies] = None
+    stereo_resolved_auto_policies: StereoResolvedAutoPolicies | None = None

@@ -689,7 +689,7 @@ def _append_dsp_effective_auto_modal_summary(summary_content: str, bm: dict) -> 
     summary_content += f"- Detected modal events: {modal_count}\n"
     residual_modal_support = _safe_float(bm.get("residual_peak_modal_support", 0.0), 0.0)
     residual_modal_penalty = _safe_float(bm.get("residual_peak_modal_penalty", 0.0), 0.0)
-    residual_modal_hz = bm.get("residual_peak_modal_dominant_freq_hz", None)
+    residual_modal_hz = bm.get("residual_peak_modal_dominant_freq_hz")
     if residual_modal_support > 0.0:
         hz_txt = ""
         if residual_modal_hz is not None:
@@ -930,7 +930,7 @@ def _append_dsp_effective_auto_target_summary(summary_content: str, tc: dict) ->
         return summary_content
     tc_method = str(tc.get("selection_method", "fit_rms"))
     summary_content += (
-        f"Selected target curve: {str(tc.get('selected_hc_mode', 'n/a'))} "
+        f"Selected target curve: {tc.get('selected_hc_mode', 'n/a')!s} "
         f"(fit_rms={float(tc.get('fit_rms_db', 0.0)):.3f} dB, method={tc_method})\n"
     )
     if tc_method != "top3x10_trials":
@@ -946,7 +946,7 @@ def _append_dsp_effective_auto_target_summary(summary_content: str, tc: dict) ->
     for i, row in enumerate(ev[:3], start=1):
         bm_t = attach_official_rank_score(row.get("best_metrics", {}))
         summary_content += (
-            f"Target #{i}: {str(row.get('hc_mode', 'n/a'))} "
+            f"Target #{i}: {row.get('hc_mode', 'n/a')!s} "
             f"(best_rank={official_rank_score(bm_t):.3f}, "
             f"avg_rank={display_rank_score(row.get('avg_rank_score', 0.0)):.3f}, "
             f"ok={int(row.get('trials_ok', 0))}/{int(row.get('trials_total', 0))})\n"

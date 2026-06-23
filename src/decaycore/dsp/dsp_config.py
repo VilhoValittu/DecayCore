@@ -120,7 +120,7 @@ class CfgReader:
             return str(default)
         if isinstance(value, str):
             text = value.strip()
-            return text if text else str(default)
+            return text or str(default)
         try:
             return str(value)
         except (TypeError, ValueError):

@@ -367,7 +367,7 @@ def _run_cache_refine_rounds(
             f"executed {int(progress.executed_micro_trials_total)} trials, "
             f"improvements {int(progress.improved_count_total)}, "
             f"winner {'changed' if bool(winner_changed) else 'unchanged'}, "
-            f"stop {str(progress.stop_reason)})"
+            f"stop {progress.stop_reason!s})"
         )
     result = {
         "cache_target_name": str(progress.cache_target_name),

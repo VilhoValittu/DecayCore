@@ -1,4 +1,4 @@
-# DecayCore - Official Manual (v1.0.7)
+# DecayCore - Official Manual
 
 ## 1. Overview
 DecayCore generates **FIR room-correction filters** from built-in sweep measurements, compatible external measurement imports, and WAV/IR captures.
@@ -458,12 +458,12 @@ When hybrid IIR produces biquads, they are included in the exported CamillaDSP Y
 | `enabled` | `false` | Enables hybrid IIR preconditioning |
 | `max_filters_per_channel` | `3` | Maximum IIR biquad cuts per channel |
 | `min_freq_hz` | `20 Hz` | Lower bound of modal detection range |
-| `max_freq_hz` | `150 Hz` | Upper bound of modal detection range |
+| `max_freq_hz` | `200 Hz` | Upper bound of modal detection range |
 | `min_peak_db` | `4.0 dB` | Minimum peak height required to place a cut |
 | `min_q` | `3.0` | Minimum allowed biquad Q |
 | `max_q` | `12.0` | Maximum allowed biquad Q |
 | `max_cut_db` | `6.0 dB` | Maximum cut depth per biquad |
-| `min_confidence` | `0.65` | Minimum confidence required at the mode frequency |
+| `min_confidence` | `0.30` | Minimum confidence required at the mode frequency |
 | `min_gd_excess_ms` | `10.0 ms` | Minimum group delay excess required |
 | `min_cut_priority` | `0.0` | Minimum cut priority score to place a filter |
 | `max_voice_clarity_risk` | `0.45` | Limits cuts that could reduce voice clarity |

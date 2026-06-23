@@ -497,8 +497,7 @@ def _xcorr_lag_from_spectra(
     fs: int,
     max_lag_ms: float,
 ) -> tuple[float, float]:
-    """
-    Laskee cross-power spektrin kautta xcorr-viiveen main vs sub välillä.
+    """Laskee cross-power spektrin kautta xcorr-viiveen main vs sub välillä.
     Palauttaa (offset_ms, confidence).
     offset_ms > 0 tarkoittaa sub myöhässä mainista.
     """
@@ -540,8 +539,7 @@ def _apply_phase_advance(
     freqs_hz: np.ndarray,
     advance_s: float,
 ) -> np.ndarray:
-    """
-    Siirtää spektrin signaalia advance_s sekuntia aiemmaksi (positiivinen = advance).
+    """Siirtää spektrin signaalia advance_s sekuntia aiemmaksi (positiivinen = advance).
     spec * exp(+j * 2π * f * advance_s)
     """
     freqs = np.asarray(freqs_hz, dtype=float)
@@ -555,8 +553,7 @@ def sum_complex_responses_aligned(
     min_confidence: float = 0.35,
     label: str = "",
 ) -> tuple[TransferData, dict[str, Any]]:
-    """
-    Kuten sum_complex_responses, mutta korjaa ensin sub-kokonaisuuden
+    """Kuten sum_complex_responses, mutta korjaa ensin sub-kokonaisuuden
     xcorr-viiveen suhteessa mainiin ennen summaa.
 
     Palauttaa (total_TransferData, diagnostics_dict).

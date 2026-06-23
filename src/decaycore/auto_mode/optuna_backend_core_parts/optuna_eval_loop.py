@@ -655,7 +655,7 @@ def _auto_optuna_reuse_duplicate_trial(
 ) -> None:
     rec = dict(context.known_records.get(str(params_sig), {}) or {})
     out_prev = dict(rec.get("out", {}) or {})
-    val = rec.get("value", None)
+    val = rec.get("value")
     out_payload = _auto_optuna_attach_out_telemetry(
         out_prev,
         base_data=context.base_data,

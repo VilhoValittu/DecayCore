@@ -152,7 +152,7 @@ def _auto_cache_load(
             return cached
         _AUTO_CACHE_STATS["loads"] = int(_AUTO_CACHE_STATS.get("loads", 0) or 0) + 1
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 obj = json.load(f)
             if not isinstance(obj, dict):
                 obj = {}

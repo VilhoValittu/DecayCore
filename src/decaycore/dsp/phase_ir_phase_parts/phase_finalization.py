@@ -213,8 +213,7 @@ def _has_active_theoretical_phase_model(cfg) -> bool:
     return False
 
 def _pre_ringing_band_protection_floor(f: np.ndarray) -> np.ndarray:
-    """
-    Per-frequency minimum allowed guard_scale_total value.
+    """Per-frequency minimum allowed guard_scale_total value.
     Prevents the pre-ringing guard from over-reducing safe bass correction.
       20–80 Hz:   floor=0.55 (bass protected — rarely causes audible pre-ringing)
       80–200 Hz:  floor=0.35 (voice — moderate protection)

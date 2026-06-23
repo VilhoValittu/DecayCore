@@ -240,7 +240,7 @@ def _update_signature_harmonic_hashes(h, measurements: dict) -> None:
 def _update_signature_bass_integration(h, measurements: dict) -> None:
     if not bool(measurements.get("bass_integration_enabled", False)):
         return
-    bundle = measurements.get("bass_integration_bundle", None)
+    bundle = measurements.get("bass_integration_bundle")
     for attr_name in ("l_main", "r_main", "l_sub", "r_sub"):
         comp = getattr(bundle, attr_name, None)
         freqs = getattr(comp, "freqs_hz", None)

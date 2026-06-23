@@ -208,8 +208,8 @@ def _apply_adaptive_fdw_impl(freqs, mags, confidence_mask, base_cycles=15.0, min
 
     base_cycles = float(base_cycles)
     min_cycles = float(min_cycles)
-    if base_cycles < 1.0: base_cycles = 1.0
-    if min_cycles < 1.0: min_cycles = 1.0
+    base_cycles = max(base_cycles, 1.0)
+    min_cycles = max(min_cycles, 1.0)
     if min_cycles > base_cycles:
         min_cycles, base_cycles = base_cycles, min_cycles
 

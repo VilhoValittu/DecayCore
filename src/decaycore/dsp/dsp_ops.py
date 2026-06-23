@@ -129,11 +129,9 @@ def _gd_smooth_loop_py(
         max_ratio = 0.0
         for i in range(gd_grad.size):
             r = abs(gd_grad[i] / lim_arr[i])
-            if r > max_ratio:
-                max_ratio = r
+            max_ratio = max(max_ratio, r)
             rc = abs(gd_curv[i] / curv_lim_arr[i])
-            if rc > max_ratio:
-                max_ratio = rc
+            max_ratio = max(max_ratio, rc)
         if max_ratio <= 1.001:
             break
         gd_l = _gaussian1d_nearest(gd_l, sigma)

@@ -19,8 +19,7 @@ def _smoothstep01(x: np.ndarray) -> np.ndarray:
 
 
 def _cosine_fade_out_01(x: np.ndarray) -> np.ndarray:
-    """
-    x in [0..1] -> weight in [1..0] with cosine shape.
+    """X in [0..1] -> weight in [1..0] with cosine shape.
     0 -> 1.0
     1 -> 0.0
     """

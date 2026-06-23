@@ -935,7 +935,7 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
                 ui.label(f"· {path_format} · {size_text}").classes("text-gray-400 shrink-0")
                 if bool(local_path_info.get("has_harmonics", False)):
                     ui.label("· H2–H5").classes("text-green-500 shrink-0")
-                if local_path_info.get("rt60_val", None) is not None:
+                if local_path_info.get("rt60_val") is not None:
                     ui.label(f"· RT60 {float(local_path_info['rt60_val']):.2f}s").classes("text-green-500 shrink-0")
             return
         with ui.row().classes("items-center gap-2 text-xs overflow-hidden"):

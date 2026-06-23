@@ -262,7 +262,7 @@ def calculate_rt60(impulse, fs, policy: Rt60WindowPolicy | None = None):
         E0 = float(E[0]) + 1e-18
 
         noise_mult = 20.0
-        stop_candidates = np.where(E <= noise_mult * noise_power)[0]
+        stop_candidates = np.where(noise_mult * noise_power >= E)[0]
         stop_idx = int(stop_candidates[0]) if stop_candidates.size > 0 else (E.size - 1)
         stop_idx = max(stop_idx, 10)
 

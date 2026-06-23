@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 import threading
-from typing import Tuple
 import numpy as np
 
 from ..leveling_compute import compute_leveling_impl
@@ -81,7 +80,7 @@ def find_stable_level_window(
     perceptual_min_hz: float = 250.0,
     perceptual_max_hz: float = 4000.0,
     perceptual_tie_only: bool = False,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     cache_key = None
     try:
         cache_key = _stable_level_window_cache_key(
@@ -157,7 +156,7 @@ def find_shared_stereo_level_window(
     perceptual_min_hz: float = 250.0,
     perceptual_max_hz: float = 4000.0,
     perceptual_tie_only: bool = False,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     return find_shared_stereo_level_window_impl(
         freq_axis_l,
         magnitudes_l,

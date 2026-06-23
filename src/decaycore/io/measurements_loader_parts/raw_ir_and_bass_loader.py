@@ -96,8 +96,7 @@ def _wav_to_float_channel(data_raw) -> np.ndarray:
 
 
 def _load_raw_wav_from_source(file_dict=None, local_path: str = "") -> tuple:
-    """
-    Lataa raaka WAV-data (ilman ikkunointia/tasoitusta) ylöslatauksesta tai
+    """Lataa raaka WAV-data (ilman ikkunointia/tasoitusta) ylöslatauksesta tai
     paikallisesta tiedostosta. Palauttaa (ir_array, sample_rate) tai (None, 0).
 
     ir_array on float32-vektori (kanava 0), DC poistettu.
@@ -130,8 +129,7 @@ def load_raw_irs_lr(
     path_key_r: str = "local_path_r",
     logger=None,
 ) -> tuple:
-    """
-    Lataa vasemman ja oikean kanavan raaka WAV IR -datat (ilman ikkunointia)
+    """Lataa vasemman ja oikean kanavan raaka WAV IR -datat (ilman ikkunointia)
     annetuista L/R-sloteista.
 
     Palauttaa (raw_ir_l, fs_l, raw_ir_r, fs_r).
@@ -157,8 +155,7 @@ def load_raw_irs_lr(
     return None, 0, None, 0
 
 def load_raw_ir_sub(data: dict, *, logger=None) -> tuple:
-    """
-    Lataa sub-kanavan raaka WAV IR -data bass integration -sloteista
+    """Lataa sub-kanavan raaka WAV IR -data bass integration -sloteista
     (file_l_sub / local_path_l_sub, fallback file_r_sub / local_path_r_sub).
 
     Palauttaa (raw_ir_sub, fs_sub) tai (None, 0).
@@ -457,8 +454,7 @@ def _compute_bass_integration_diagnostics_for_bundle(
 
 
 def load_bass_integration_measurements(data: dict, *, logger=None):
-    """
-    Load decomposed bass-integration WAV measurements and build complex predicted totals.
+    """Load decomposed bass-integration WAV measurements and build complex predicted totals.
 
     Predicted left/right totals always use the summed sub field, so each main
     channel is evaluated against `sub_1 + sub_2` rather than only its matching

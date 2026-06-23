@@ -26,7 +26,7 @@ def _auto_goal_uses_hpf_limited_bass_boost(data: dict) -> bool:
 
 
 def _prefer_bass_hpf_freq_hz(data: dict) -> float:
-    hpf = data.get("hpf", None)
+    hpf = data.get("hpf")
     if isinstance(hpf, dict):
         enabled = bool(hpf.get("enabled", False))
         freq_raw = hpf.get("freq", data.get("hpf_freq", 0.0))
@@ -209,7 +209,7 @@ def _load_upload_house_curve(data: dict, *, mode_key: str):
     if mode_key != "Upload":
         return None, None, "Preset"
     try:
-        up = data.get("hc_custom_file", None) if isinstance(data, dict) else None
+        up = data.get("hc_custom_file") if isinstance(data, dict) else None
         if up and isinstance(up, dict) and up.get("content"):
             hc_f, hc_m = load_target_curve(up["content"])
             if hc_f is not None and hc_m is not None:

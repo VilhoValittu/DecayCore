@@ -91,7 +91,7 @@ def _remember_leveling_error(cfg, stage: str, exc: Exception | None = None) -> N
             msg = str(stage)
         else:
             msg = f"{stage}:{type(exc).__name__}"
-        setattr(cfg, "_lvl_last_error", msg)
+        cfg._lvl_last_error = msg
     except (AttributeError, TypeError, ValueError):
         return
 
@@ -164,7 +164,7 @@ def _normalize_level_window_params(
         perceptual_tie_only,
     )
 
-def _hash_leveling_array(h: "hashlib._Hash", value) -> None:
+def _hash_leveling_array(h: hashlib._Hash, value) -> None:
     arr = np.ascontiguousarray(np.asarray(value, dtype=np.float64))
     h.update(repr(arr.shape).encode("ascii"))
     h.update(arr.tobytes())

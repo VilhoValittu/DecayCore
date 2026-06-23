@@ -84,8 +84,7 @@ def apply_null_guard_target(
     max_total_relax_db: float = 12.0,# cap how much target can be relaxed downward vs original
     smooth_oct: float = 0.18,        # gaussian smoothing width (in octaves) for the mask
 ) -> np.ndarray:
-    """
-    Makes target more realistic by relaxing deep, narrow cancellation nulls.
+    """Makes target more realistic by relaxing deep, narrow cancellation nulls.
     We detect dips relative to a smoothed "envelope" of the measured response,
     then blend target toward measured at those frequencies.
     """
@@ -257,7 +256,6 @@ def _build_target_curve(
     interpolate_response: Callable[..., np.ndarray],
 ) -> np.ndarray:
     """Rakentaa tavoitekayran (house curve) nykyisen ehdollisen logiikan mukaan."""
-
     if (
         cfg.house_freqs is not None
         and cfg.house_mags is not None
@@ -270,7 +268,6 @@ def _build_target_curve(
 
 def _apply_target_preview_adjustments(target_mag_db: np.ndarray, cfg: Any) -> np.ndarray:
     """Paikka UI-preview-saadolle; nyt identiteetti, jotta kaytos sailyy ennallaan."""
-
     return target_mag_db
 
 
@@ -401,7 +398,7 @@ def _prepare_correction_baseline(  # noqa: C901 - baseline assembly intentionall
     tdc_telemetry: dict[str, Any] = {}
     if cfg_reader.bool("enable_tdc", False):
         with profiled_section("generate_filter.correction.baseline.tdc"):
-            rt60_for_tdc = rt60_bands if rt60_bands else current_rt60
+            rt60_for_tdc = rt60_bands or current_rt60
             tdc_strength = cfg_reader.float_allow_zero("tdc_strength", 50.0)
             tdc_max_red = cfg_reader.float_allow_zero("tdc_max_reduction_db", 9.0)
             tdc_slope = cfg_reader.float_allow_zero("tdc_slope_db_per_oct", 0.0)

@@ -240,7 +240,7 @@ class _ValueHolder:
     callbacks so hidden state can drive preview refreshes like normal controls.
     """
 
-    __slots__ = ("value", "_callbacks")
+    __slots__ = ("_callbacks", "value")
 
     def __init__(self, value: Any = None) -> None:
         self.value = value

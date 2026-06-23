@@ -182,8 +182,8 @@ def _refine_eval_prepare_trial_data(ctx: RefineEvalContext, preset: dict) -> dic
 
 def _refine_eval_apply_trial_tuning(cfg_trial, trial_data: dict) -> None:
     try:
-        setattr(cfg_trial, "bass_smooth_w_gamma", float(trial_data.get("bass_smooth_w_gamma", 2.40)))
-        setattr(cfg_trial, "bass_smooth_w_max", float(trial_data.get("bass_smooth_w_max", 0.45)))
+        cfg_trial.bass_smooth_w_gamma = float(trial_data.get("bass_smooth_w_gamma", 2.4))
+        cfg_trial.bass_smooth_w_max = float(trial_data.get("bass_smooth_w_max", 0.45))
     except (
 
         AttributeError,
@@ -203,7 +203,7 @@ def _refine_eval_apply_trial_tuning(cfg_trial, trial_data: dict) -> None:
 def _refine_eval_apply_bass_integration_metrics(result, trial_data: dict, trial_measurements: dict) -> None:
     try:
         if bool(trial_measurements.get("bass_integration_enabled", False)):
-            bundle = trial_measurements.get("bass_integration_bundle", None)
+            bundle = trial_measurements.get("bass_integration_bundle")
             if bundle is not None:
                 fc_hz = _auto_safe_float(
                     trial_data.get("avr_crossover_hz", trial_measurements.get("avr_crossover_hz", 80.0)),
@@ -713,7 +713,7 @@ def _run_candidate_phase_optuna(
         rescue_base_data = ctx.runtime.auto_optuna_base_data_without_constraints(
             optuna_base_data
         )
-        rescue_scope = f"{str(raw_scope)}-zf0"
+        rescue_scope = f"{raw_scope!s}-zf0"
         rescue_scope_eff = ctx.runtime.auto_optuna_effective_scope(
             rescue_base_data,
             rescue_scope,
@@ -742,7 +742,7 @@ def _run_candidate_phase_optuna(
                     scope=rescue_scope_eff,
                 ),
                 study_scope=rescue_scope,
-                phase_label=f"{str(phase_label)} rescue",
+                phase_label=f"{phase_label!s} rescue",
                 phase_kind=phase_kind,
             )
             or {}

@@ -677,11 +677,11 @@ def _render_target_decay_hint() -> None:
         ui.label(_target_hint_translate("target_decay_hint_title")).classes("text-sm font-semibold")
         with ui.row().classes("w-full items-center gap-2"):
             ui.html(
-                (
+                
                     '<span style="display:inline-block;padding:4px 10px;'
                     'border-radius:9999px;font-size:0.72rem;font-weight:700;'
                     f'background:{badge_color};color:#ffffff;">{_target_hint_translate(badge_key)}</span>'
-                )
+                
             )
             ui.label(_target_hint_translate(summary_key)).classes("text-xs cf-target-hint-summary")
         for key in detail_keys:
@@ -1306,7 +1306,7 @@ def _build_target_preview_fig():  # noqa: C901 - target preview figure is assemb
             for ch, up_key, path_key in (("L", "file_l", "local_path_l"), ("R", "file_r", "local_path_r")):
                 ff = None
                 mm = None
-                generated = generated_sources.get(ch, None)
+                generated = generated_sources.get(ch)
                 upload_value = _cv(up_key, None)
                 if generated_source_matches_upload(generated, upload_value):
                     ff_gen, mm_gen, _pp_gen, _raw_ir, _raw_ir_fs, _h_freq, _h_mags = parse_generated_source(

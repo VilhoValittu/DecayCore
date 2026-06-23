@@ -27,8 +27,8 @@ def _auto_stats_pick_arr(st: dict | None, base_key: str, *fallback_keys: str, _m
     mode = str(st.get("analysis_mode", "native") or "native").strip().lower()
     keys: list[str] = []
     if mode == "comparison":
-        keys.append(f"cmp_{str(base_key)}")
-        keys.extend([f"cmp_{str(k)}" for k in fallback_keys])
+        keys.append(f"cmp_{base_key!s}")
+        keys.extend([f"cmp_{k!s}" for k in fallback_keys])
     keys.append(str(base_key))
     keys.extend([str(k) for k in fallback_keys])
     for key in keys:
@@ -172,8 +172,8 @@ def _ai_score_with_fallback(st: dict, ai: dict, *, scoring_range) -> float:
         )
         if match_fb is None:
             return 0.0
-        rt60 = st.get("rt60_val", None)
-        rt_rel = st.get("rt60_reliability", None)
+        rt60 = st.get("rt60_val")
+        rt_rel = st.get("rt60_reliability")
         return shared._auto_safe_float(
             calc_acoustic_score(conf, float(match_fb), rt60_s=rt60, rt60_rel=rt_rel),
             0.0,

@@ -543,8 +543,7 @@ def apply_residual_pass_if_enabled(
     logger,
     cfg_float_allow_zero_fn,
 ) -> tuple[np.ndarray, ResidualTelemetry | None]:
-    """
-    Contract:
+    """Contract:
       - This stage may only change gain_db.
       - It must not mutate phase-domain or IR-domain arrays.
       - Telemetry is returned typed and adapted to stats outside this stage.
@@ -581,6 +580,5 @@ def apply_residual_pass_if_enabled(
         except (AttributeError, TypeError, ValueError, FloatingPointError, IndexError) as e:
             if logger is not None:
                 logger.warning("residual pass failed: %s", e)
-            pass
 
     return gain_db, residual_telemetry

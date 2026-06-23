@@ -228,7 +228,7 @@ def _apply_mode_defaults(*, t: Callable, get_val: Callable) -> None:
         defaults = dict(MODE_DEFAULTS.get(mode, {}))
 
         for cfg_key, ui_key in _MODE_DEFAULTS_KEY_MAP.items():
-            v = defaults.get(cfg_key, None)
+            v = defaults.get(cfg_key)
             if v is not None:
                 ctrl.set_value(ui_key, v)
 

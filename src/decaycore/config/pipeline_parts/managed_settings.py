@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 import logging
 import math
 
@@ -117,7 +117,7 @@ def _finite_float_or_default(value: Any, default: float = 0.0) -> float:
         logger.exception("float parse in pipeline config")
     return float(default)
 
-def _advanced_manual_output_tilt_enabled(data: Dict[str, Any]) -> bool:
+def _advanced_manual_output_tilt_enabled(data: dict[str, Any]) -> bool:
     try:
         mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
     except (
@@ -140,14 +140,14 @@ def _advanced_manual_output_tilt_enabled(data: Dict[str, Any]) -> bool:
 
     return normalize_lvl_mode_value(data.get("lvl_mode", LVL_MODE_AUTO)) == LVL_MODE_MANUAL
 
-def _effective_output_tilt_source(data: Dict[str, Any]) -> str:
+def _effective_output_tilt_source(data: dict[str, Any]) -> str:
     if _advanced_manual_output_tilt_enabled(data):
         return OUTPUT_TILT_SOURCE_MANUAL_TARGET_TILT
     return normalize_output_tilt_source_value(
         data.get("output_tilt_source", OUTPUT_TILT_SOURCE_OFF)
     )
 
-def _resolve_output_tilt_db_per_oct(data: Dict[str, Any]) -> float:
+def _resolve_output_tilt_db_per_oct(data: dict[str, Any]) -> float:
     try:
         mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
     except (
@@ -222,7 +222,7 @@ def _auto_mode_filter_type_or_default(value: Any) -> str:
         return str(raw)
     return str(_auto_filter_type_for_key("mixed"))
 
-def _apply_auto_mode_managed_settings(data: Dict[str, Any]) -> None:
+def _apply_auto_mode_managed_settings(data: dict[str, Any]) -> None:
     """Force AUTO mode to use program-managed settings except allowed user choices."""
     filter_type = _auto_mode_filter_type_or_default(data.get("filter_type", "Mixed"))
 
@@ -258,7 +258,7 @@ def _apply_auto_mode_managed_settings(data: Dict[str, Any]) -> None:
         if cfg_key == "filter_type_str":
             continue
         if cfg_key in merged_defaults:
-            if ui_key == "enable_afdw" and data.get("enable_afdw", None) is not None:
+            if ui_key == "enable_afdw" and data.get("enable_afdw") is not None:
                 forced[ui_key] = bool(data.get("enable_afdw", False))
                 continue
             if ui_key in ("mag_c_min", "mag_c_max") and data.get(ui_key) is not None:

@@ -102,7 +102,7 @@ def _append_boost_cut(summary_content: str, side: str, st: dict) -> str:
             f"{candidate_boost_peak:.2f} dB requested before safety limits; "
             "treat this as uncorrectable-room/target pressure rather than safe boost headroom.\n"
         )
-    summary_content += f"Boost blocked reason: {str(st.get('boost_blocked_reason', 'n/a'))}\n"
+    summary_content += f"Boost blocked reason: {st.get('boost_blocked_reason', 'n/a')!s}\n"
     return summary_content
 
 
@@ -133,7 +133,7 @@ def _append_hybrid_iir(summary_content: str, side: str, st: dict) -> str:
 
 def _append_clamp_diagnostics(summary_content: str, side: str, st: dict) -> str:
     summary_content += f"\n=== CLAMP DIAGNOSTICS ({side}) ===\n"
-    summary_content += f"{str(st.get('clamp_summary', 'n/a'))}\n"
+    summary_content += f"{st.get('clamp_summary', 'n/a')!s}\n"
     summary_content += (
         f"soft_clip: boost_bins={int(st.get('softclip_boost_bins', 0))}, "
         f"cut_bins={int(st.get('softclip_cut_bins', 0))}, "
@@ -235,19 +235,19 @@ def _append_bass_first_ai(summary_content: str, side: str, st: dict) -> str:
     summary_content += f"\n=== BASS-FIRST AI ({side}) ===\n"
     summary_content += f"Bass-first AI active: {'YES' if bool(st.get('bass_first_ai', False)) else 'NO'}\n"
 
-    pk_hz = st.get("bass_first_mode_peak_hz", None)
-    pk_sc = st.get("bass_first_mode_peak_score", None)
+    pk_hz = st.get("bass_first_mode_peak_hz")
+    pk_sc = st.get("bass_first_mode_peak_score")
     if (pk_hz is not None) and (pk_sc is not None):
         summary_content += f"Mode peak: {float(pk_hz):.1f} Hz (score {float(pk_sc):.2f})\n"
     else:
         summary_content += "Mode peak: n/a\n"
 
     summary_content += f"Smoothing conf floor applied: {'YES' if bool(st.get('bass_first_conf_floor_applied', False)) else 'NO'}\n"
-    rm_max = st.get("bass_first_roommode_max_20_200", None)
-    rel_mean = st.get("bass_first_rel_mean_20_200", None)
-    rel_min = st.get("bass_first_rel_min_20_200", None)
-    conf_eff_mean = st.get("bass_first_conf_eff_mean_20_200", None)
-    conf_eff_min = st.get("bass_first_conf_eff_min_20_200", None)
+    rm_max = st.get("bass_first_roommode_max_20_200")
+    rel_mean = st.get("bass_first_rel_mean_20_200")
+    rel_min = st.get("bass_first_rel_min_20_200")
+    conf_eff_mean = st.get("bass_first_conf_eff_mean_20_200")
+    conf_eff_min = st.get("bass_first_conf_eff_min_20_200")
     floor_applied = bool(st.get("bass_first_conf_floor_applied", False))
     if (rm_max is not None) or (rel_mean is not None) or (rel_min is not None) or (conf_eff_mean is not None):
         summary_content += (
@@ -260,7 +260,7 @@ def _append_bass_first_ai(summary_content: str, side: str, st: dict) -> str:
             f"conf_floor_applied={'YES' if floor_applied else 'NO'}\n"
         )
 
-    src = st.get("bass_first_source", None)
+    src = st.get("bass_first_source")
     if isinstance(src, str) and src.strip():
         summary_content += f"BassFirst source: {src.strip()}\n"
     return summary_content

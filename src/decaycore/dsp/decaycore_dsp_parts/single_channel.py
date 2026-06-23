@@ -68,7 +68,7 @@ def _run_generate_filter_stereo_link_presolve_stats(
         "offset_method": str(presolve["offset_method"]),
         "target_shift_db": float(presolve["target_shift_db"]),
         "tilt_slope_db_per_oct": (
-            float(getattr(cfg, "_lvl_tilt_slope_db_per_oct"))
+            float(cfg._lvl_tilt_slope_db_per_oct)
             if getattr(cfg, "_lvl_tilt_slope_db_per_oct", None) is not None
             else None
         ),
@@ -223,7 +223,7 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
         'target_level_db_window': float(target_level_db_window),
         'offset_method': str(offset_method),
             'tilt_slope_db_per_oct': (
-                float(getattr(cfg, "_lvl_tilt_slope_db_per_oct"))
+                float(cfg._lvl_tilt_slope_db_per_oct)
                 if getattr(cfg, "_lvl_tilt_slope_db_per_oct", None) is not None
                 else None
             ),
@@ -426,9 +426,9 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
     apply_boost_blocked_reason(stats, cfg=cfg)
 
     try:
-        authority_gd_ms = stats.get("group_delay_ms", None)
+        authority_gd_ms = stats.get("group_delay_ms")
         if authority_gd_ms is None:
-            authority_gd_ms = stats.get("gd_ms", None)
+            authority_gd_ms = stats.get("gd_ms")
         authority = build_acoustic_authority_map(
             freq_axis,
             m_anal - calc_offset_db,

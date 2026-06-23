@@ -623,7 +623,7 @@ def _seed_phases_extract_direct_dac_pre_measurements(
         return pre_f_l, pre_m_l, pre_f_r, pre_m_r
 
     try:
-        _bi_bundle = ctx.get("bass_integration_bundle", None)
+        _bi_bundle = ctx.get("bass_integration_bundle")
         if _bi_bundle is None:
             return pre_f_l, pre_m_l, pre_f_r, pre_m_r
         _lt = getattr(_bi_bundle, "l_total", None)

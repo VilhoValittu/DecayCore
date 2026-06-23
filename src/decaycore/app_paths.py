@@ -61,8 +61,7 @@ def decaycore_config_path() -> Path:
 
 
 def default_filters_export_base_dir() -> Path:
-    """
-    Return default base directory for exported filters.
+    """Return default base directory for exported filters.
 
     Prefer Documents on all platforms for discoverability.
     """
@@ -93,8 +92,7 @@ def default_measurements_dir() -> Path:
 
 
 def safe_measurements_dir(path: str | None, *, fallback: Path | None = None) -> str:
-    """
-    Resolve a writable measurement directory with conservative fallbacks.
+    """Resolve a writable measurement directory with conservative fallbacks.
 
     Measurement saves prefer Documents for discoverability, but macOS privacy
     prompts or platform-specific folder policies can make that location
@@ -148,8 +146,7 @@ def program_version_token(version: str | None, *, default: str = "v0") -> str:
 
 
 def safe_filters_dir(path: str | None, *, program_version: str | None = None) -> str:
-    """
-    Resolve a writable export filters directory with robust fallbacks.
+    """Resolve a writable export filters directory with robust fallbacks.
 
     Guards:
     - avoid top-level/root paths such as `/filters`

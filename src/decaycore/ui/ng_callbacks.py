@@ -49,7 +49,7 @@ def register_callbacks(*, t: Callable, get_val: Callable, max_safe_boost: float)
 # ---------------------------------------------------------------------------
 
 def _register_mode_callbacks(*, t: Callable) -> None:
-    """mode -> lvl_mode options, desc, auto controls, raw dsp visibility."""
+    """Mode -> lvl_mode options, desc, auto controls, raw dsp visibility."""
 
     def _on_mode_change(v: Any) -> None:
         from .ng_mode_controls import on_mode_change
@@ -68,7 +68,6 @@ def _register_mode_callbacks(*, t: Callable) -> None:
 
 def _register_target_callbacks(*, t: Callable) -> None:
     """hc_mode, hc_custom_file, auto_goal, auto_target_mode -> target preview."""
-
     _ensure_manual_hc_mode_holder()
 
     def _sync_hc_upload_visibility(v: Any) -> None:

@@ -376,8 +376,7 @@ def _window_offset_consistency_score(
     tilt_comp: bool = True,
     tilt_max_db_per_oct: float = 2.0,
 ) -> tuple[float, float, float]:
-    """
-    Arvioi kuinka luotettava level-offset on ikkunan sisalla.
+    """Arvioi kuinka luotettava level-offset on ikkunan sisalla.
 
     Palauttaa kolmen metriikan tuplen:
     1) offset-spread (dB) eri alajaksojen valilla

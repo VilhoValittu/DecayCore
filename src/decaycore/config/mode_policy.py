@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, Any, Tuple
+from typing import Any
 from decaycore.config.models import FilterConfig
 from decaycore.config.schema import MODE_CLAMPS as SCHEMA_MODE_CLAMPS
 from decaycore.config.schema import MODE_DEFAULTS as SCHEMA_MODE_DEFAULTS
@@ -43,13 +43,13 @@ def _clamp_float(v, lo: float, hi: float) -> float:
     return float(x)
 
 
-def _apply_defaults(cfg: FilterConfig, d: Dict[str, Any]) -> None:
+def _apply_defaults(cfg: FilterConfig, d: dict[str, Any]) -> None:
     for k, v in d.items():
         if hasattr(cfg, k):
             setattr(cfg, k, v)
 
 
-def _apply_clamps(cfg: FilterConfig, clamps: Dict[str, Tuple[Any, Any]]) -> None:
+def _apply_clamps(cfg: FilterConfig, clamps: dict[str, tuple[Any, Any]]) -> None:
     for k, lim in clamps.items():
         if not hasattr(cfg, k):
             continue
@@ -83,8 +83,8 @@ def _apply_clamps(cfg: FilterConfig, clamps: Dict[str, Tuple[Any, Any]]) -> None
             logger.exception("mode clamp apply")
 
 
-MODE_DEFAULTS: Dict[str, Dict[str, Any]] = {key: dict(value) for key, value in SCHEMA_MODE_DEFAULTS.items()}
-MODE_CLAMPS: Dict[str, Dict[str, Tuple[Any, Any]]] = {key: dict(value) for key, value in SCHEMA_MODE_CLAMPS.items()}
+MODE_DEFAULTS: dict[str, dict[str, Any]] = {key: dict(value) for key, value in SCHEMA_MODE_DEFAULTS.items()}
+MODE_CLAMPS: dict[str, dict[str, tuple[Any, Any]]] = {key: dict(value) for key, value in SCHEMA_MODE_CLAMPS.items()}
 
 
 def apply_mode_to_cfg(cfg: FilterConfig, mode: str | None, *, apply_defaults: bool = True) -> FilterConfig:

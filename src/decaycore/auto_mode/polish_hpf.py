@@ -432,7 +432,7 @@ def apply_hpf_winner_polish(
             if callable(status_cb):
                 status_cb(
                     "DecayCore automatic mode: hpf winner polish improved "
-                    f"({str(candidate['label'])}, "
+                    f"({candidate['label']!s}, "
                     f"rank {_polish_rank_status(cur_best_metrics)}, "
                     f"avg {_auto_safe_float(cur_best_metrics.get('avg_score'), 0.0):.3f})"
                 )

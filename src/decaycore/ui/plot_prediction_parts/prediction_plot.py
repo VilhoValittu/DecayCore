@@ -778,11 +778,10 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
                 js_mode = "assets/plotly.min.js"
             else:
                 js_mode = "cdn"
+        elif _plotly_js_path():
+            js_mode = "assets/plotly.min.js"
         else:
-            if _plotly_js_path():
-                js_mode = "assets/plotly.min.js"
-            else:
-                js_mode = "cdn"
+            js_mode = "cdn"
 
         config = {
             "responsive": True,
@@ -856,7 +855,7 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
         return html
 
     except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError) as e:
-        msg = f"Visual Engine Error: {str(e)}"
+        msg = f"Visual Engine Error: {e!s}"
         if bool(return_fig):
             return msg, None
         return msg

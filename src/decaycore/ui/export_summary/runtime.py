@@ -162,7 +162,7 @@ def _collect_xo_parts(ui_data: dict) -> list[str]:
         return []
     xo_parts: list[str] = []
     for i in range(1, 6):
-        f_raw = ui_data.get(f"xo{i}_f", None)
+        f_raw = ui_data.get(f"xo{i}_f")
         if f_raw in (None, "", 0):
             continue
         freq_hz = _safe_float_or(f_raw, float("nan"))

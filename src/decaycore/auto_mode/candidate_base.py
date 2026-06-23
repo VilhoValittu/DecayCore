@@ -109,7 +109,7 @@ def _auto_phase1_max_boost_hi(base_data: dict | None) -> float:
 
 def _auto_phase1_phase_limit_center(base_data: dict | None) -> float:
     data = dict(base_data or {})
-    raw = data.get("phase_limit", None)
+    raw = data.get("phase_limit")
     center = _auto_safe_float(raw, float("nan"))
     if not np.isfinite(center):
         center = float(AUTO_MODE_PHASE_LIMIT_PRIOR_CENTER_HZ)
@@ -163,7 +163,7 @@ def _auto_optuna_suggest_centered_unit_float(trial, name: str, center: float, sp
     lo_eff, hi_eff = _auto_optuna_window(center, span, lo, hi)
     if abs(float(hi_eff) - float(lo_eff)) <= 1e-9:
         return float(lo_eff)
-    u = float(trial.suggest_float(f"{str(name)}_u", 0.0, 1.0))
+    u = float(trial.suggest_float(f"{name!s}_u", 0.0, 1.0))
     return float(lo_eff + u * (hi_eff - lo_eff))
 
 
@@ -185,7 +185,7 @@ def _auto_optuna_choice_from_unit(trial, name: str, choices: list[float], center
         return float(center)
     if len(band) == 1:
         return float(band[0])
-    u = float(trial.suggest_float(f"{str(name)}_u", 0.0, 1.0))
+    u = float(trial.suggest_float(f"{name!s}_u", 0.0, 1.0))
     idx = int(np.clip(round(u * float(len(band) - 1)), 0, len(band) - 1))
     return float(band[idx])
 
@@ -445,7 +445,7 @@ def _build_auto_mode_candidates(
     mixed_center = _auto_safe_float(base_data.get("mixed_freq", 180.0), 180.0)
     if not np.isfinite(mixed_center) or mixed_center <= 0.0:
         mixed_center = 180.0
-    phase_center = _auto_phase_limit_center(base_data.get("phase_limit", None))
+    phase_center = _auto_phase_limit_center(base_data.get("phase_limit"))
 
     adaptive = _derive_adaptive_freq_bounds(base_data)
     _r_mag_c_min_lo = float(adaptive.get("mag_c_min_lo", AUTO_MODE_MAG_C_MIN_MIN_HZ))

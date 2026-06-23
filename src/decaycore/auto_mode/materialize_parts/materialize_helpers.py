@@ -117,7 +117,7 @@ def _sync_auto_hpf_runtime_fields(
     if bool(out.get("bass_integration_enable", False)) and bi_mode == "direct_dac":
         return out
 
-    override = out.get("_auto_hpf_runtime_override", None)
+    override = out.get("_auto_hpf_runtime_override")
     if not isinstance(override, dict) and not (
         bool(auto_mode_active)
         and isinstance(fallback_hpf, dict)
@@ -171,7 +171,7 @@ def _build_materialize_bass_integration_metrics(
 ) -> dict | None:
     if not bool(final_measurements.get("bass_integration_enabled", False)):
         return None
-    bundle = final_measurements.get("bass_integration_bundle", None)
+    bundle = final_measurements.get("bass_integration_bundle")
     if bundle is None:
         return None
     fc_hz = _auto_safe_float(
@@ -617,8 +617,8 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):  # noqa: C901 - 
                 max_safe_boost=float(ctx.max_safe_boost),
             )
         try:
-            setattr(cfg_final, "bass_smooth_w_gamma", float(final_data.get("bass_smooth_w_gamma", 2.40)))
-            setattr(cfg_final, "bass_smooth_w_max", float(final_data.get("bass_smooth_w_max", 0.45)))
+            cfg_final.bass_smooth_w_gamma = float(final_data.get("bass_smooth_w_gamma", 2.4))
+            cfg_final.bass_smooth_w_max = float(final_data.get("bass_smooth_w_max", 0.45))
         except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
             logger.debug("Could not set bass_smooth attrs on cfg: %s: %s", type(exc).__name__, exc)
 

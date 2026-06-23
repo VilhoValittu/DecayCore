@@ -376,7 +376,7 @@ def apply_low_bass_cut_winner_polish(
                 (
                     ""
                     if not isinstance(reuse_entry, dict)
-                    else f", reused={str(reuse_entry.get('source', 'search_candidate'))}"
+                    else f", reused={reuse_entry.get('source', 'search_candidate')!s}"
                 ),
             )
             if not bool(better):

@@ -243,9 +243,7 @@ def _estimate_auto_progress_from_status(msg: str) -> float | None:
         _estimate_auto_progress_cache,
         _estimate_auto_progress_misc,
     ):
-        if helper is _estimate_auto_progress_finalize:
-            progress = helper(lower)
-        elif helper is _estimate_auto_progress_misc:
+        if helper is _estimate_auto_progress_finalize or helper is _estimate_auto_progress_misc:
             progress = helper(lower)
         else:
             progress = helper(text, lower)

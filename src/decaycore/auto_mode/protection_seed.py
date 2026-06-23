@@ -308,7 +308,7 @@ def _auto_hpf_estimate_order(
 ) -> tuple[int, int]:
     f3 = float(prepared["f3"])
     f6 = float(prepared["f6"])
-    f12 = prepared.get("f12", None)
+    f12 = prepared.get("f12")
     f_lo = np.asarray(prepared["f_lo"], dtype=float)
     m_env = np.asarray(prepared["m_env"], dtype=float)
     ref_db = float(prepared["ref_db"])
@@ -385,7 +385,7 @@ def _auto_hpf_estimate_cutoff(
 ) -> float | None:
     f3 = float(prepared["f3"])
     f6 = float(prepared["f6"])
-    f12 = prepared.get("f12", None)
+    f12 = prepared.get("f12")
     c6 = float((10.0 ** 0.6) - 1.0)
     c12 = float((10.0 ** 1.2) - 1.0)
     ratio6 = float(np.power(c6, 1.0 / (2.0 * float(order))))
@@ -415,7 +415,7 @@ def _auto_hpf_estimate_quality(
     ref_db = float(prepared["ref_db"])
     f3 = float(prepared["f3"])
     f6 = float(prepared["f6"])
-    f12 = prepared.get("f12", None)
+    f12 = prepared.get("f12")
     fit_mask = (f_lo >= max(min_hz, fc_hz / 4.0)) & (f_lo <= min(search_max, fc_hz * 2.8))
     if int(np.count_nonzero(fit_mask)) < 12:
         fit_mask = (f_lo >= min_hz) & (f_lo <= search_max)

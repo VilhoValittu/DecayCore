@@ -44,7 +44,7 @@ def _tukey_window(n: int, alpha: float = 0.25) -> np.ndarray:
         return np.ones(max(n, 1), dtype=np.float32)
 
     a = float(alpha)
-    a = 0.0 if a < 0.0 else (1.0 if a > 1.0 else a)
+    a = 0.0 if a < 0.0 else (min(a, 1.0))
 
     if scipy is not None:
         try:
@@ -212,16 +212,14 @@ def _wav_window_resolve_n_fft(
     n_fft = int(seg_size)
     if zero_pad_pow2:
         n_fft = _next_pow2(n_fft)
-    if n_fft < seg_size:
-        n_fft = seg_size
+    n_fft = max(n_fft, seg_size)
     if min_n_fft is None:
         return n_fft
     try:
         mn = int(min_n_fft)
         if mn > 0:
             mn = _next_pow2(mn)
-            if n_fft < mn:
-                n_fft = mn
+            n_fft = max(n_fft, mn)
     except _WAV_WINDOW_RECOVERABLE_EXC:
         logger.exception(context)
     return n_fft

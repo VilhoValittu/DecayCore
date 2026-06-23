@@ -51,7 +51,7 @@ def _auto_metric_summary(values) -> dict:
 def _auto_metric_summary_text(name: str, summary: dict | None, ndigits: int = 3) -> str:
     s = dict(summary or {})
     if int(s.get("count", 0) or 0) <= 0:
-        return f"{str(name)} n/a"
+        return f"{name!s} n/a"
 
     def _fmt(x):
         try:
@@ -75,7 +75,7 @@ def _auto_metric_summary_text(name: str, summary: dict | None, ndigits: int = 3)
         return "n/a"
 
     return (
-        f"{str(name)} min/med/max "
+        f"{name!s} min/med/max "
         f"{_fmt(s.get('min'))}/{_fmt(s.get('median'))}/{_fmt(s.get('max'))}"
     )
 
@@ -111,8 +111,8 @@ def _auto_optuna_log_run_telemetry(logger, *, phase_label: str, tel: dict | None
             str(phase_label),
             int(tel.get("feasible_trials", 0) or 0),
             int(tel.get("infeasible_trials", 0) or 0),
-            "n/a" if tel.get("best_raw_value", None) is None else f"{float(tel['best_raw_value']):.6f}",
-            "n/a" if tel.get("best_feasible_value", None) is None else f"{float(tel['best_feasible_value']):.6f}",
+            "n/a" if tel.get("best_raw_value") is None else f"{float(tel['best_raw_value']):.6f}",
+            "n/a" if tel.get("best_feasible_value") is None else f"{float(tel['best_feasible_value']):.6f}",
             int((tel.get("violation_counts", {}) or {}).get("ripple", 0) or 0),
             int((tel.get("violation_counts", {}) or {}).get("events", 0) or 0),
             int((tel.get("violation_counts", {}) or {}).get("boost", 0) or 0),
@@ -192,7 +192,7 @@ def _auto_optuna_telemetry_text_ex(tel: dict | None, *, include_phase_kind: bool
     if bool(t.get("constraints_active", False)):
         parts.extend(_auto_optuna_constraint_summary_parts(t))
     else:
-        _auto_optuna_append_best_only(parts, t.get("best_raw_value", None))
+        _auto_optuna_append_best_only(parts, t.get("best_raw_value"))
 
     return ", ".join(parts)
 
@@ -206,7 +206,7 @@ def _auto_optuna_constraint_summary_parts(tel: dict) -> list[str]:
     parts.append(f"feas={feas_n}/{feas_n + infeas_n}")
     if not bool(cflags.get("use_events", True)):
         parts.append("events=off")
-    ripple_thr = thr.get("max_mode_ripple_db", None)
+    ripple_thr = thr.get("max_mode_ripple_db")
     if ripple_thr is not None:
         parts.append(f"ripple<={_auto_optuna_fmt_value(ripple_thr, 3)}")
     _auto_optuna_append_best_values(parts, tel)
@@ -222,8 +222,8 @@ def _auto_optuna_append_best_only(parts: list[str], best_raw) -> None:
 
 
 def _auto_optuna_append_best_values(parts: list[str], tel: dict) -> None:
-    best_raw = tel.get("best_raw_value", None)
-    best_feas = tel.get("best_feasible_value", None)
+    best_raw = tel.get("best_raw_value")
+    best_feas = tel.get("best_feasible_value")
     if best_raw is not None:
         parts.append(f"raw={_auto_optuna_fmt_value(best_raw, 3)}")
     if best_feas is not None:
@@ -244,7 +244,7 @@ def _auto_optuna_events_debug_text(tel: dict | None, ndigits: int = 3) -> str:
     thr = dict(t.get("constraint_thresholds", {}) or {})
     cflags = dict(t.get("constraint_flags", {}) or {})
     use_events = bool(cflags.get("use_events", True))
-    ev_thr = thr.get("max_events_severity", None)
+    ev_thr = thr.get("max_events_severity")
     summ = dict(t.get("events_summary", {}) or {})
 
     def _fmt(x):

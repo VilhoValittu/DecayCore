@@ -115,7 +115,7 @@ def _auto_optuna_constraint_info_for_metrics(
 def _auto_optuna_trial_objective_value(trial, out_payload: dict | None = None) -> float | None:
     out = dict(out_payload or {})
     opt_meta = dict(out.get("optuna", {}) or {})
-    val = opt_meta.get("objective_value", None)
+    val = opt_meta.get("objective_value")
     try:
         if val is not None and np.isfinite(float(val)):
             return float(val)
@@ -358,7 +358,7 @@ def _auto_optuna_update_run_telemetry_state_counts(state: dict, tr, opt_meta: di
 
 def _auto_optuna_update_run_telemetry_state_constraints(state: dict, opt_meta: dict) -> None:
     constraints_active = bool(opt_meta.get("constraints_active", False))
-    feasible = opt_meta.get("feasible", None)
+    feasible = opt_meta.get("feasible")
     violations = dict(opt_meta.get("violations", {}) or {})
     trial_constraint_flags = dict(opt_meta.get("constraint_flags", {}) or {})
     if trial_constraint_flags and not state["constraint_flags"]:
@@ -387,7 +387,7 @@ def _auto_optuna_update_run_telemetry_state_complete(state: dict, tr, out: dict,
     if np.isfinite(events_val):
         state["events_all"].append(float(events_val))
         constraints_active = bool(opt_meta.get("constraints_active", False))
-        feasible = opt_meta.get("feasible", None)
+        feasible = opt_meta.get("feasible")
         if constraints_active and feasible is True:
             state["events_feasible"].append(float(events_val))
         elif constraints_active and feasible is False:
@@ -399,7 +399,7 @@ def _auto_optuna_update_run_telemetry_state_complete(state: dict, tr, out: dict,
             state["best_raw_value"] = float(obj_val)
             state["best_raw_trial"] = int(getattr(tr, "number", -1))
 
-        feasible_ok = opt_meta.get("feasible", None)
+        feasible_ok = opt_meta.get("feasible")
         if feasible_ok is True:
             if state["best_feasible_value"] is None or float(obj_val) > float(state["best_feasible_value"]):
                 state["best_feasible_value"] = float(obj_val)

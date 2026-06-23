@@ -51,7 +51,7 @@ def _suggest_auto_mode_candidate_micro_optuna(
     s = float(np.clip(_auto_safe_float(shrink, 1.0), 0.25, 1.0))
 
     base_mixed = _auto_safe_float(p.get("mixed_freq", 180.0), 180.0)
-    base_phase = _auto_phase_limit_center(p.get("phase_limit", None))
+    base_phase = _auto_phase_limit_center(p.get("phase_limit"))
     base_tdc = _auto_safe_float(p.get("tdc_strength", 50.0), 50.0)
     base_fdw = _auto_safe_float(p.get("fdw_cycles", 10.0), 10.0)
     base_reg = _auto_safe_float(p.get("reg_strength", 30.0), 30.0)
@@ -149,7 +149,7 @@ def _seed_auto_mode_candidate_micro_optuna_params(
     is_mixed = "mixed" in ft
     is_phase_search = _auto_is_phase_search_filter(ft)
     base_mixed = _auto_safe_float(p.get("mixed_freq", 180.0), 180.0)
-    base_phase = _auto_phase_limit_center(p.get("phase_limit", None))
+    base_phase = _auto_phase_limit_center(p.get("phase_limit"))
     base_tdc = _auto_safe_float(p.get("tdc_strength", 50.0), 50.0)
     base_fdw = _auto_safe_float(p.get("fdw_cycles", 10.0), 10.0)
     base_reg = _auto_safe_float(p.get("reg_strength", 30.0), 30.0)

@@ -159,8 +159,7 @@ def compute_auto_gain_and_headroom(
     mask_c: np.ndarray,
     logger,
 ) -> dict:
-    """
-    Contract:
+    """Contract:
       - This stage is gain-only.
       - It must not mutate IR/phase arrays.
       - It may compute gain terms and emit logs.

@@ -29,7 +29,7 @@ _VOICE_KEYS = (
 
 
 def _empty_voice_metrics() -> dict[str, float]:
-    return {key: 0.0 for key in _VOICE_KEYS}
+    return dict.fromkeys(_VOICE_KEYS, 0.0)
 
 
 def _slice_optional(arr, idx: np.ndarray):

@@ -44,8 +44,8 @@ def _target_penalty_pick_arr(
 ) -> np.ndarray:
     keys: list[str] = []
     if str(mode) == "comparison":
-        keys.append(f"cmp_{str(base_key)}")
-        keys.extend([f"cmp_{str(k)}" for k in fallback_keys])
+        keys.append(f"cmp_{base_key!s}")
+        keys.extend([f"cmp_{k!s}" for k in fallback_keys])
     keys.append(str(base_key))
     keys.extend([str(k) for k in fallback_keys])
     for key in keys:

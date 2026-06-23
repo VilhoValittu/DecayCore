@@ -61,13 +61,13 @@ def build_export_zip(
     write_dashboards: bool = False,
     dash_fs: int | None = None,
 ) -> tuple[io.BytesIO, dict, dict]:
-    """
-    Build full export ZIP from pipeline results.
+    """Build full export ZIP from pipeline results.
 
     Returns:
     - zip_buffer: in-memory ZIP payload
     - ui_dashboards: optional dashboard HTML payloads
     - perf: {"zip_png_s": float, "per_fs_stats": {fs: {"zip_png_s": float}}}
+
     """
     zip_buffer = io.BytesIO()
     ui_dashboards: dict[str, Any] = {}

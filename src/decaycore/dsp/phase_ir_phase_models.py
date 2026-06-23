@@ -207,8 +207,7 @@ def apply_mixed_excess_mask(freq_axis, excess, cfg, st) -> np.ndarray:
     none_hz = float(getattr(cfg, "high_freq_no_correction_hz", phase_lim_hz) or phase_lim_hz)
     if phase_lim_hz > 0.0:
         none_hz = min(none_hz, phase_lim_hz)
-    if none_hz <= (full_hz + 1.0):
-        none_hz = full_hz + 1.0
+    none_hz = max(full_hz + 1.0, none_hz)
     w = _mixed_excess_weight(f, full_hz, none_hz)
     if phase_lim_hz > 0.0:
         w *= ((f > 0) & (f <= phase_lim_hz)).astype(float)
@@ -239,8 +238,7 @@ def linear_excess_weight(freq_axis: np.ndarray, phase_lim_hz: float) -> np.ndarr
     f2 = float(max(f0 + 1.0, f_lim))
     f1_hi = max(81.0, 0.88 * f2)
     f1 = float(np.clip(0.55 * f2, 80.0, f1_hi))
-    if f2 <= (f1 + 1.0):
-        f2 = f1 + 1.0
+    f2 = max(f1 + 1.0, f2)
     w0 = 0.30
     w1 = 0.16
     band = np.isfinite(f) & (f > 0.0) & (f <= f2)
@@ -303,8 +301,7 @@ def unified_correction_gain(
     spike_suppress: np.ndarray,
     phase_mask: np.ndarray,
 ) -> np.ndarray:
-    """
-    Single per-frequency gain governing excess-phase correction strength.
+    """Single per-frequency gain governing excess-phase correction strength.
 
     gain(f) = strength * base_w(f) * min(conf_gain(f), spike(f))
 
@@ -323,8 +320,7 @@ def unified_correction_gain(
     none_hz = float(_cfg_value(cfg, "high_freq_no_correction_hz", phase_lim_hz) or phase_lim_hz)
     if phase_lim_hz > 0.0:
         none_hz = min(none_hz, phase_lim_hz)
-    if none_hz <= (full_hz + 1.0):
-        none_hz = full_hz + 1.0
+    none_hz = max(full_hz + 1.0, none_hz)
     base_w = _mixed_excess_weight(f, full_hz, none_hz)
     base_w = np.asarray(base_w, dtype=float) * np.asarray(phase_mask, dtype=float)
 

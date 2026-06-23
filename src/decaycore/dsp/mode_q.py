@@ -7,8 +7,7 @@
 # Commercial use requires separate written permission.
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
-"""
-Jaettu Q-estimaattori spektripiikeille.
+"""Jaettu Q-estimaattori spektripiikeille.
 
 Q maaritellaan geometrisesti: piikin keskitaajuus jaettuna puoliprominenssi-
 kaistanleveydella (`scipy.signal.peak_widths`, rel_height=0.5). Sama
@@ -36,8 +35,7 @@ def estimate_peak_q(
     *,
     min_bw_ratio: float = 0.02,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Laskee Q-arvot ja kaistanleveydet annetuille piikeille.
+    """Laskee Q-arvot ja kaistanleveydet annetuille piikeille.
 
     `peak_indices` tulee olla `scipy.signal.find_peaks`-tuloksia samasta
     `values`-kayrasta. Kaistanleveys mitataan puoliprominenssitasolla

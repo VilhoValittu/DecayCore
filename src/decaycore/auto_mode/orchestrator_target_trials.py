@@ -134,16 +134,8 @@ def _target_eval_one(
         max_safe_boost=float(MAX_SAFE_BOOST),
     )
     try:
-        setattr(
-            cfg,
-            "bass_smooth_w_gamma",
-            float(trial_data.get("bass_smooth_w_gamma", 2.40)),
-        )
-        setattr(
-            cfg,
-            "bass_smooth_w_max",
-            float(trial_data.get("bass_smooth_w_max", 0.45)),
-        )
+        cfg.bass_smooth_w_gamma = float(trial_data.get("bass_smooth_w_gamma", 2.4))
+        cfg.bass_smooth_w_max = float(trial_data.get("bass_smooth_w_max", 0.45))
     except (
 
         AttributeError,
@@ -342,7 +334,7 @@ def _run_target_trials_optuna(*, dispatch: _TargetTrialDispatch) -> list[dict]:
     base_tc_optuna["_optuna_measurement_sig"] = _auto_get_measurement_signature(dispatch.measurements)
     base_tc_optuna["_optuna_journal_kind"] = "target"
     base_tc_optuna["_optuna_filter_key"] = str(dispatch.filter_key or "")
-    raw_scope = f"target-{str(dispatch.target_name)}-{str(dispatch.phase_tag)}"
+    raw_scope = f"target-{dispatch.target_name!s}-{dispatch.phase_tag!s}"
     scope_eff = dispatch.runtime.auto_optuna_effective_scope(
         base_tc_optuna,
         raw_scope,
@@ -390,7 +382,7 @@ def _run_target_trials_optuna(*, dispatch: _TargetTrialDispatch) -> list[dict]:
         seed_to_params=dispatch.seed_to_params,
         study_name=study_name,
         study_scope=raw_scope,
-        phase_label=f"target {str(dispatch.target_name)} {str(dispatch.phase_tag)}",
+        phase_label=f"target {dispatch.target_name!s} {dispatch.phase_tag!s}",
         phase_kind=dispatch.phase_kind,
         study_user_attrs={
             "decaycore_kind": "target_search",
@@ -780,7 +772,7 @@ def _prepare_target_trial_setup(
         base_tc["auto_mode_workers"] = int(curve_inner_workers)
     if str(filter_key) in ("linear", "asym"):
         base_tc["phase_limit"] = round(
-            float(_auto_phase_limit_center(base_tc.get("phase_limit", None))),
+            float(_auto_phase_limit_center(base_tc.get("phase_limit"))),
             1,
         )
     use_optuna_curve_trials = bool(

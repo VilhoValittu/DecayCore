@@ -46,9 +46,9 @@ def _store_correction_authority_stats(
     logger,
 ) -> None:
     try:
-        authority_gd_ms = st.get("group_delay_ms", None) if isinstance(st, dict) else None
+        authority_gd_ms = st.get("group_delay_ms") if isinstance(st, dict) else None
         if authority_gd_ms is None and isinstance(st, dict):
-            authority_gd_ms = st.get("gd_ms", None)
+            authority_gd_ms = st.get("gd_ms")
         authority = build_acoustic_authority_map(
             freq_axis,
             np.asarray(m_anal, dtype=float) - float(calc_offset_db),
