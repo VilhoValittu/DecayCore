@@ -122,6 +122,43 @@ decaycore_optuna_target_[FILTER_TYPE]_[MEASUREMENT_ID]_[VERSION].log
 
 ---
 
+## Resetting Caches and Configuration (Troubleshooting)
+
+If DecayCore behaves strangely — for example automatic mode returns unexpected
+results, reuses stale optimization data, or the app fails to start cleanly after
+a settings change — **deleting the automatic-mode disk caches and `config.json`
+is a recommended first step.** These files are regenerated automatically on the
+next run, so removing them is safe and only forces a fresh recomputation.
+
+What to remove:
+
+- **Optuna journals:** `decaycore*optuna*.log` (and any `.log.lock` files)
+- **Auto-mode result cache:** `decaycore_auto_mode_cache_*.json`
+- **Filter priors:** `auto_mode_filter_priors.json`
+- **Main config:** `config.json`
+
+from the data directory (and the legacy `~/.camillafir/` fallback), as listed in
+the tables above. Your saved measurements and exported filters under
+`Documents/DecayCore/` are **not** affected.
+
+### Helper scripts
+
+The repository ships ready-made cleanup scripts under
+[`config_delete/`](https://github.com/VilhoValittu/DecayCore/tree/main/config_delete)
+that locate and remove exactly these files for you. Run the one for your OS:
+
+| OS      | Script                                |
+|---------|---------------------------------------|
+| Windows | `delete_decaycore_data_windows.bat`   |
+| macOS   | `delete_decaycore_data_macos.sh`      |
+| Linux   | `delete_decaycore_data_linux.sh`      |
+
+Each script lists the files it will delete and asks for confirmation first. The
+shell scripts also accept `--dry-run` to preview without deleting, and
+`-y`/`--yes` to skip the prompt.
+
+---
+
 ## Migration from Legacy Paths
 
 If you have DecayCore installed from a legacy version, configuration and Optuna databases are automatically migrated to the new platform-specific paths on first use:

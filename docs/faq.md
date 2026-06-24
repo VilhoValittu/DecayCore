@@ -39,6 +39,19 @@ Download DecayCore from the official GitHub releases page:
 
 The built-in measurement feature is available in release builds published in the Releases section.
 
+## DecayCore behaves strangely — what should I try first?
+
+Deleting DecayCore's automatic-mode disk caches and `config.json` is a
+recommended first step. Stale Optuna journals, the auto-mode result cache, or a
+corrupted config can cause unexpected automatic-mode results or startup issues.
+These files are regenerated automatically on the next run, so removing them is
+safe — your saved measurements and exported filters are not affected.
+
+The repository includes ready-made cleanup scripts under `config_delete/` (one
+per operating system) that remove exactly these files for you. See
+[Configuration and Data Paths](paths.md#resetting-caches-and-configuration-troubleshooting)
+for the full list of files and locations.
+
 ## Is DecayCore open source?
 
 DecayCore source availability depends on the repository contents. Some components, such as measurement internals, may be excluded from the public source repository.
