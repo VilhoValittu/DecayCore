@@ -27,15 +27,34 @@ from .modal_intelligence import (
 )
 from .residual_metrics import _auto_merge_residual_peak_metrics, _auto_residual_peak_metrics_from_stats
 
+# Asymmetric (low-latency) filter cannot fully realize deep-bass correction with its
+# short pre-ring window, so a corrected bass mode leaves a partly artifactual residual.
+# Soften that residual region so the optimizer is not pushed to raise mag_c_min above
+# the bass modes (which would otherwise score better by excluding bass from the
+# residual window) and abandon bass correction. No-op for every other filter type.
+_ASYM_BASS_RESIDUAL_DAMPEN_HZ = 100.0
+_ASYM_BASS_RESIDUAL_DAMPEN_FACTOR = 0.25
+
+
 def score_residual_peaks(l_st, r_st, *, base_data) -> dict:
     bd_for_peaks = dict(base_data or {})
-    peak_lo = max(
-        20.0,
-        shared._auto_safe_float(
-            bd_for_peaks.get("mag_c_min", bd_for_peaks.get("mag_c_min_hz", 20.0)),
-            20.0,
-        ),
-    )
+    _ft = str(bd_for_peaks.get("filter_type", bd_for_peaks.get("filter_type_str", "")) or "").strip().lower()
+    _is_asym = "asym" in _ft
+    bass_dampen_hz = float(_ASYM_BASS_RESIDUAL_DAMPEN_HZ) if _is_asym else 0.0
+    bass_dampen_factor = float(_ASYM_BASS_RESIDUAL_DAMPEN_FACTOR) if _is_asym else 1.0
+    # Residual-peak window low bound is the frequency below which correction is
+    # legitimately not expected — the HPF cutoff, plus the sub crossover when bass
+    # management is active. It must NOT track the optimizer-chosen mag_c_min: doing
+    # so let the optimizer hide an uncorrected room mode simply by raising mag_c_min
+    # above it (residual is measured only inside [peak_lo, peak_hi]), which made auto
+    # mode abandon bass correction (mag_c_min climbed to ~120-140 Hz). Decoupling it
+    # keeps uncorrected bass modes penalized regardless of mag_c_min, for every filter.
+    peak_lo = 20.0
+    if shared._auto_safe_bool(bd_for_peaks.get("hpf_enable", False), False):
+        peak_lo = max(peak_lo, shared._auto_safe_float(bd_for_peaks.get("hpf_freq", 0.0), 0.0))
+    if shared._auto_safe_bool(bd_for_peaks.get("bass_integration_enabled", False), False):
+        peak_lo = max(peak_lo, shared._auto_safe_float(bd_for_peaks.get("avr_crossover_hz", 0.0), 0.0))
+    peak_lo = float(peak_lo)
     peak_hi_raw = shared._auto_safe_float(
         bd_for_peaks.get("mag_c_max", bd_for_peaks.get("mag_c_max_hz", shared.AUTO_MODE_RESIDUAL_PEAK_MAX_HZ)),
         shared.AUTO_MODE_RESIDUAL_PEAK_MAX_HZ,
@@ -81,6 +100,8 @@ def score_residual_peaks(l_st, r_st, *, base_data) -> dict:
                 hi_hz=float(peak_hi),
                 threshold_db=float(residual_peak_threshold_db),
                 hard_gate_db=float(residual_peak_hard_gate_db),
+                bass_dampen_hz=float(bass_dampen_hz),
+                bass_dampen_factor=float(bass_dampen_factor),
             )
             r_residual_peak_metrics = _auto_residual_peak_metrics_from_stats(
                 r_st,
@@ -88,6 +109,8 @@ def score_residual_peaks(l_st, r_st, *, base_data) -> dict:
                 hi_hz=float(peak_hi),
                 threshold_db=float(residual_peak_threshold_db),
                 hard_gate_db=float(residual_peak_hard_gate_db),
+                bass_dampen_hz=float(bass_dampen_hz),
+                bass_dampen_factor=float(bass_dampen_factor),
             )
         residual_peak_metrics = _auto_merge_residual_peak_metrics(
             l_residual_peak_metrics,

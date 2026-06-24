@@ -22,7 +22,7 @@ from .. import shared
 
 from .metrics_common import _auto_stats_band_n, _auto_stats_pick_arr
 
-BROAD_RESIDUAL_PEAK_SCORING_VERSION = 2
+BROAD_RESIDUAL_PEAK_SCORING_VERSION = 3
 MODAL_INTELLIGENCE_METRICS_VERSION = 1
 
 def _auto_min_broad_peak_width_oct(freq_hz: float) -> float:
@@ -39,6 +39,29 @@ def _auto_min_broad_peak_width_oct(freq_hz: float) -> float:
 def _auto_band_weight_for_correction_shape(freq_hz: np.ndarray) -> np.ndarray:
     f = np.asarray(freq_hz, dtype=float)
     return np.where(f < 80.0, 1.10, np.where(f < 150.0, 1.0, 0.85))
+
+
+def _bass_residual_dampen_multiplier(freq_hz, *, dampen_hz: float = 0.0, factor: float = 1.0):
+    """Per-peak severity multiplier that softens deep-bass residual peaks.
+
+    Used for the Asymmetric (low-latency) filter: its short pre-ring window cannot
+    fully realize deep-bass correction, so a corrected bass mode leaves a partly
+    artifactual residual. Without softening it, the optimizer escapes the
+    residual-peak penalty by raising mag_c_min above the bass modes and abandons
+    bass correction entirely. Disabled (returns 1.0 everywhere) when ``dampen_hz<=0``
+    or ``factor>=1`` — i.e. a no-op for every other filter type.
+
+    Ramps linearly from ``factor`` at/below ``dampen_hz`` to 1.0 at ``2*dampen_hz``.
+    Accepts a scalar or array and returns the same shape.
+    """
+    f = np.asarray(freq_hz, dtype=float)
+    if not (float(dampen_hz) > 0.0) or float(factor) >= 1.0:
+        return np.ones_like(f, dtype=float)
+    fac = float(np.clip(factor, 0.0, 1.0))
+    lo = float(dampen_hz)
+    hi = float(dampen_hz) * 2.0
+    ramp = np.clip((f - lo) / max(hi - lo, 1e-9), 0.0, 1.0)
+    return fac + (1.0 - fac) * ramp
 
 
 def _run_bounds_from_mask(run_mask: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -306,6 +329,8 @@ def _broad_residual_build_raw_peaks(
     lo: float,
     hi: float,
     conf_floor: float,
+    bass_dampen_hz: float = 0.0,
+    bass_dampen_factor: float = 1.0,
 ) -> list[dict]:
     run_mask = np.isfinite(detect) & (detect >= float(threshold_eff))
     run_left, run_right = _run_bounds_from_mask(run_mask)
@@ -349,6 +374,11 @@ def _broad_residual_build_raw_peaks(
         * freq_weights
         * conf_weights
         * band_weights
+    )
+    severity_vals = severity_vals * _bass_residual_dampen_multiplier(
+        peak_freqs,
+        dampen_hz=float(bass_dampen_hz),
+        factor=float(bass_dampen_factor),
     )
     keep_idxs = np.flatnonzero(
         np.isfinite(peak_freqs)
@@ -440,6 +470,8 @@ def _modal_residual_promoted_peaks(
     hard_gate_eff: float,
     lo: float,
     hi: float,
+    bass_dampen_hz: float = 0.0,
+    bass_dampen_factor: float = 1.0,
 ) -> list[dict]:
     try:
         modal = detect_room_modes(
@@ -506,6 +538,13 @@ def _modal_residual_promoted_peaks(
             + 0.75 * float(priority)
             + 0.25 * area_db_oct
         ) * max(0.35, confidence)
+        severity = float(severity) * float(
+            _bass_residual_dampen_multiplier(
+                float(freq),
+                dampen_hz=float(bass_dampen_hz),
+                factor=float(bass_dampen_factor),
+            )
+        )
         promoted.append(
             {
                 "freq_hz": float(freq),
@@ -623,6 +662,8 @@ def compute_broad_residual_peak_metrics(
     hard_gate_db: float | None = None,
     conf_floor: float = 0.25,
     top_n: int = 3,
+    bass_dampen_hz: float = 0.0,
+    bass_dampen_factor: float = 1.0,
 ) -> dict:
     st = dict(st or {})
     threshold_eff, hard_gate_eff = _broad_residual_thresholds(
@@ -680,6 +721,8 @@ def compute_broad_residual_peak_metrics(
             lo=float(lo),
             hi=float(hi),
             conf_floor=float(conf_floor),
+            bass_dampen_hz=float(bass_dampen_hz),
+            bass_dampen_factor=float(bass_dampen_factor),
         )
     raw_peaks.extend(
         _modal_residual_promoted_peaks(
@@ -691,6 +734,8 @@ def compute_broad_residual_peak_metrics(
             hard_gate_eff=float(hard_gate_eff),
             lo=float(lo),
             hi=float(hi),
+            bass_dampen_hz=float(bass_dampen_hz),
+            bass_dampen_factor=float(bass_dampen_factor),
         )
     )
     if not raw_peaks:

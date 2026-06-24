@@ -17,7 +17,7 @@ from types import SimpleNamespace
 
 logger = logging.getLogger("DecayCore")
 
-AUTO_SEARCH_CACHE_SCHEMA_VERSION = 4
+AUTO_SEARCH_CACHE_SCHEMA_VERSION = 5
 
 from ..cache_signature import _auto_cache_get_entry, _auto_cache_get_last_used_best
 from ..shared import _auto_filter_cache_key

@@ -6,6 +6,43 @@ All notable changes to **DecayCore** are documented in this file.
 
 ## DecayCore
 
+## [1.1.7] - 24-6-2026
+
+### Automatic mode: bass correction restored for every filter type
+
+Fixed an issue where automatic mode could leave low-frequency room modes uncorrected — the
+correction range started around 120–140 Hz instead of reaching down to the high-pass cutoff.
+The residual-peak score was measured only inside the chosen correction band, so the optimizer
+could "hide" an uncorrected bass mode by raising the lower correction bound (mag_c_min) above it
+and scoring a clean (but bass-less) result. The residual window is now anchored to the high-pass
+cutoff — and to the subwoofer crossover when bass integration is active — instead of the
+optimizer-chosen lower bound, so uncorrected bass modes are always penalised and automatic mode
+corrects the bass for every filter type. The Asymmetric (low-latency) filter additionally gets
+softened deep-bass residual scoring, because its short pre-ring window leaves a partly
+unavoidable residual that should not push the optimizer away from correcting the bass.
+
+Cache versions were bumped; previous automatic-mode results are recomputed on the next run.
+
+---
+
+### Automaattitila: basson korjaus palautettu kaikille filtterityypeille
+
+Korjattu vika, jossa automaattitila saattoi jättää matalat huonemoodit korjaamatta — korjausalue
+alkoi vasta noin 120–140 Hz:stä sen sijaan että olisi ulottunut alas ylipäästösuotimen
+rajataajuuteen asti. Residual-peak-pisteytys mitattiin vain valitulla korjauskaistalla, joten
+optimointi pystyi "piilottamaan" korjaamattoman bassomoodin nostamalla korjauksen alarajan
+(mag_c_min) sen yläpuolelle ja saamaan puhtaan (mutta bassottoman) tuloksen. Residual-ikkuna
+ankkuroidaan nyt hpf:n rajataajuuteen ja subbareiden jakotaajuuteen kun bass
+integration on käytössä, optimoinnin valitseman alarajan sijaan, joten korjaamattomat bassomoodit
+rangaistaan aina ja automaattitila korjaa basson kaikilla filtterityypeillä. Asymmetric
+(low-latency) -suotimelle pehmennetään lisäksi basson residual-pisteytystä, koska sen lyhyt
+pre-ring-ikkuna jättää osin väistämättömän jäännöksen, jonka ei pidä työntää optimointia pois
+basson korjaamisesta.
+
+Cache-versiot päivitettiin; aiemmat automaattitilan tulokset lasketaan uudelleen seuraavalla ajolla.
+
+---
+
 ## [1.1.6] - 21-6-2026
 
 ### Rust replaces Numba

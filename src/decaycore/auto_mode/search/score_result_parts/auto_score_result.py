@@ -27,7 +27,7 @@ from ..rank_combiner import combine_rank_score
 from ..residual_peaks import _build_modal_tdc_debug
 from ..score_result_finalize import finalize_score_result_metrics
 
-BROAD_RESIDUAL_PEAK_SCORING_VERSION = 2
+BROAD_RESIDUAL_PEAK_SCORING_VERSION = 3
 CORRECTION_SHARPNESS_SCORING_VERSION = 1
 DIP_FILL_RISK_SCORING_VERSION = 1
 CHANNEL_OVERFIT_SCORING_VERSION = 1

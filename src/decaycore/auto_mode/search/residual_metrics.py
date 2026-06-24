@@ -20,7 +20,7 @@ from .. import shared
 
 from .residual_analysis import compute_broad_residual_peak_metrics
 
-BROAD_RESIDUAL_PEAK_SCORING_VERSION = 2
+BROAD_RESIDUAL_PEAK_SCORING_VERSION = 3
 
 def _auto_residual_peak_metrics_from_stats(
     st: dict | None,
@@ -34,6 +34,8 @@ def _auto_residual_peak_metrics_from_stats(
     hard_gate_db: float | None = None,
     conf_floor: float = 0.25,
     top_n: int = 3,
+    bass_dampen_hz: float = 0.0,
+    bass_dampen_factor: float = 1.0,
 ) -> dict:
     return compute_broad_residual_peak_metrics(
         st,
@@ -46,6 +48,8 @@ def _auto_residual_peak_metrics_from_stats(
         hard_gate_db=hard_gate_db,
         conf_floor=conf_floor,
         top_n=top_n,
+        bass_dampen_hz=bass_dampen_hz,
+        bass_dampen_factor=bass_dampen_factor,
     )
 
 
