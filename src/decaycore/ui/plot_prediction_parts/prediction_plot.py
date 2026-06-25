@@ -125,204 +125,33 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
 ):
     try:
         analysis_meta_text = None
-        fft_ctx = _prediction_plot_fft_context(filt_ir=filt_ir, fs=fs, target_stats=target_stats)
-        VIS_POINTS = int(fft_ctx["vis_points"])
-        show_afdw = bool(fft_ctx["show_afdw"])
-        fig_height, fig_width = int(fft_ctx["fig_height"]), int(fft_ctx["fig_width"])
-        f_lin = fft_ctx["f_lin"]
-        h_filt = fft_ctx["h_filt"]
-        h_filt_display = fft_ctx["h_filt_display"]
-        filt_delay_ms = float(fft_ctx["filt_delay_ms"])
-
-        iir_biquads = target_stats.get("hybrid_iir_biquads", []) if target_stats else []
-        h_iir = _build_hybrid_iir_response(iir_biquads, f_lin, float(fs))
-
-        avg_t = target_stats.get("eff_target_db", 75) if target_stats else 75
-        if target_stats and "smart_scan_range" in target_stats:
-            match_range = target_stats.get("smart_scan_range", [500, 2000])
-        else:
-            match_range = target_stats.get("match_range", [500, 2000]) if target_stats else [500, 2000]
-        try:
-            f_win_min = float(match_range[0])
-            f_win_max = float(match_range[1])
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
-            f_win_min, f_win_max = 500.0, 2000.0
-        f_target = np.asarray(target_stats.get("freq_axis", []), dtype=float) if target_stats else np.asarray([], dtype=float)
-        target_curve = target_stats.get("target_mags", None) if target_stats else None
-        selected_target_curve = target_stats.get("selected_target_mags", None) if target_stats else None
-
-        direct_pred_export = None
-        direct_pred_comp = None
-
-        if target_stats and "measured_mags" in target_stats:
-            f_stats = f_target
-            m_stats_src = target_stats.get("measured_mags", [])
-            direct_m_stats = np.asarray(
-                target_stats.get("direct_dac_sum_measured_mags", []),
-                dtype=float,
-            ).reshape(-1)
-            if f_stats.size > 1 and direct_m_stats.size == f_stats.size:
-                m_stats_src = direct_m_stats
-            m_stats = _prepare_curve_for_target_plot(
-                f_stats,
-                m_stats_src,
-                avg_t_db=avg_t,
-                target_freqs_hz=f_target,
-                target_mags_db=target_curve,
-                f_min_hz=f_win_min,
-                f_max_hz=f_win_max,
-            )
-            m_interp = np.interp(f_lin, f_stats, m_stats)
-
-            m_lin_clean = _view_mags_for_plot(
-                f_lin,
-                m_interp,
-                plot_smoothing_level=plot_smoothing_level,
-            )
-
-            pred_stats = _maybe_shift_to_abs(
-                target_stats.get("direct_dac_sum_predicted_mags", []),
-                avg_t,
-            )
-            pred_stats = np.asarray(pred_stats, dtype=float).reshape(-1)
-            if f_stats.size > 1 and pred_stats.size == f_stats.size:
-                pred_aligned = _prepare_curve_for_target_plot(
-                    f_stats,
-                    pred_stats,
-                    avg_t_db=avg_t,
-                    target_freqs_hz=f_target,
-                    target_mags_db=target_curve,
-                    f_min_hz=f_win_min,
-                    f_max_hz=f_win_max,
-                )
-                pred_interp = np.interp(f_lin, f_stats, pred_aligned)
-                direct_pred_export = _view_mags_for_plot(
-                    f_lin,
-                    pred_interp,
-                    plot_smoothing_level=plot_smoothing_level,
-                )
-
-                pred_comp_stats = _maybe_shift_to_abs(
-                    target_stats.get("direct_dac_sum_predicted_mags_comp", []),
-                    avg_t,
-                )
-                pred_comp_stats = np.asarray(pred_comp_stats, dtype=float).reshape(-1)
-                if pred_comp_stats.size == f_stats.size:
-                    pred_comp_aligned = _prepare_curve_for_target_plot(
-                        f_stats,
-                        pred_comp_stats,
-                        avg_t_db=avg_t,
-                        target_freqs_hz=f_target,
-                        target_mags_db=target_curve,
-                        f_min_hz=f_win_min,
-                        f_max_hz=f_win_max,
-                    )
-                    pred_comp_interp = np.interp(f_lin, f_stats, pred_comp_aligned)
-                    direct_pred_comp = _view_mags_for_plot(
-                        f_lin,
-                        pred_comp_interp,
-                        plot_smoothing_level=plot_smoothing_level,
-                    )
-        else:
-            m_plot_src = _prepare_curve_for_target_plot(
-                orig_freqs,
-                orig_mags,
-                avg_t_db=avg_t,
-                target_freqs_hz=f_target,
-                target_mags_db=target_curve,
-                f_min_hz=f_win_min,
-                f_max_hz=f_win_max,
-            )
-            m_raw = np.interp(f_lin, orig_freqs, m_plot_src)
-            m_lin_clean = _view_mags_for_plot(
-                f_lin,
-                m_raw,
-                plot_smoothing_level=plot_smoothing_level,
-            )
-
-        p_lin = np.interp(f_lin, orig_freqs, orig_phases)
-        total_spec = 10 ** (np.asarray(m_lin_clean, dtype=float) / 20.0) * np.exp(1j * np.deg2rad(p_lin)) * h_filt * h_iir
-
-        plot_level_comp_db = 0.0
-        ag_db = 0.0
-        ah_db = 0.0
-        try:
-            if target_stats is not None:
-                ag_db = float(target_stats.get("auto_global_gain_db", 0.0) or 0.0)
-                ah_db = float(target_stats.get("auto_headroom_db", 0.0) or 0.0)
-                if np.isfinite(ag_db) and np.isfinite(ah_db):
-                    plot_level_comp_db = -(ag_db + ah_db)
-                elif np.isfinite(ag_db):
-                    plot_level_comp_db = -ag_db
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
-            plot_level_comp_db = 0.0
-            ag_db = 0.0
-            ah_db = 0.0
-
-        if direct_pred_export is not None:
-            p_sm_export = np.asarray(direct_pred_export, dtype=float)
-            if direct_pred_comp is not None:
-                p_sm_comp = np.asarray(direct_pred_comp, dtype=float)
-            else:
-                p_sm_comp = p_sm_export.copy()
-                if plot_level_comp_db != 0.0:
-                    p_sm_comp = p_sm_comp + float(plot_level_comp_db)
-        else:
-            p_sm_export = _view_mags_for_plot(
-                f_lin,
-                20.0 * np.log10(np.abs(total_spec) + 1e-12),
-                plot_smoothing_level=plot_smoothing_level,
-            )
-            p_sm_comp = p_sm_export.copy()
-            if plot_level_comp_db != 0.0:
-                p_sm_comp = p_sm_comp + float(plot_level_comp_db)
-        filt_sm_phase = smooth_complex(f_lin, h_filt_display, PHASE_SMOOTH_OCT)
-        ph_sm = (np.rad2deg(np.angle(filt_sm_phase)) + 180) % 360 - 180
-
-        filt_sm_gd = smooth_complex(f_lin, h_filt_display, GD_SMOOTH_OCT)
-        gd_sm = calculate_clean_gd(f_lin, filt_sm_gd)
-
-        filt_db_export = 20.0 * np.log10(np.abs(h_filt) + 1e-12)
-        filt_db_comp = filt_db_export.copy()
-        if plot_level_comp_db != 0.0:
-            filt_db_comp = filt_db_comp + float(plot_level_comp_db)
-
-        f_vis = np.geomspace(10, fs / 2, VIS_POINTS)
-
-        m_vis = np.interp(f_vis, f_lin, m_lin_clean)
-        p_vis_export = np.interp(f_vis, f_lin, p_sm_export)
-        p_vis_comp = np.interp(f_vis, f_lin, p_sm_comp)
-        mag_display_offset_db = _resolve_magnitude_display_offset_db(
+        _data = _compute_prediction_plot_arrays(
+            orig_freqs=orig_freqs,
+            orig_mags=orig_mags,
+            orig_phases=orig_phases,
+            filt_ir=filt_ir,
+            fs=fs,
             target_stats=target_stats,
-            target_curve=target_curve,
-            avg_t=avg_t,
+            plot_smoothing_level=plot_smoothing_level,
         )
-        if mag_display_offset_db != 0.0:
-            m_vis = m_vis - float(mag_display_offset_db)
-            p_vis_export = p_vis_export - float(mag_display_offset_db)
-            p_vis_comp = p_vis_comp - float(mag_display_offset_db)
-        ph_vis = np.interp(f_vis, f_lin, ph_sm)
-        gd_vis = np.interp(f_vis, f_lin, gd_sm)
-        filt_vis_export = np.interp(f_vis, f_lin, filt_db_export)
-        filt_vis_comp = np.interp(f_vis, f_lin, filt_db_comp)
-
-        conf_vis = None
-        if target_stats and f_target.size > 1:
-            conf_raw = np.asarray(target_stats.get("confidence_mask", []), dtype=float)
-            if conf_raw.size == f_target.size and conf_raw.size > 1:
-                conf_vis = np.interp(f_vis, f_target, conf_raw)
-                conf_vis = np.clip(conf_vis, 0.0, 1.0)
-                try:
-                    c_min = float(target_stats.get("mag_c_min", 0.0) or 0.0)
-                    c_max = float(target_stats.get("mag_c_max", 0.0) or 0.0)
-                    if np.isfinite(c_min) and np.isfinite(c_max) and c_min > 0 and c_max > c_min:
-                        conf_vis[(f_vis < c_min) | (f_vis > c_max)] = np.nan
-                except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
-                    pass
-
-        lf_guard_hz = 0.0
-        if target_stats:
-            lf_guard_hz = float(target_stats.get("lf_guard_hz", 0.0) or 0.0)
+        f_vis = _data["f_vis"]
+        m_vis = _data["m_vis"]
+        selected_target_curve = _data["selected_target_curve"]
+        f_target = _data["f_target"]
+        avg_t = _data["avg_t"]
+        mag_display_offset_db = _data["mag_display_offset_db"]
+        p_vis_export = _data["p_vis_export"]
+        p_vis_comp = _data["p_vis_comp"]
+        conf_vis = _data["conf_vis"]
+        ph_vis = _data["ph_vis"]
+        gd_vis = _data["gd_vis"]
+        filt_vis_export = _data["filt_vis_export"]
+        filt_vis_comp = _data["filt_vis_comp"]
+        filt_delay_ms = _data["filt_delay_ms"]
+        lf_guard_hz = _data["lf_guard_hz"]
+        show_afdw = _data["show_afdw"]
+        fig_height = _data["fig_height"]
+        fig_width = _data["fig_width"]
 
         _subplot_titles = (
             "<b>Magnitude & Alignment</b>",
@@ -773,30 +602,279 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
             zerolinecolor=_PLOT_GRID,
         )
 
-        if create_full_html:
-            if _plotly_js_path():
-                js_mode = "assets/plotly.min.js"
-            else:
-                js_mode = "cdn"
-        elif _plotly_js_path():
+        return _finalize_prediction_plot_html(
+            fig,
+            create_full_html=create_full_html,
+            return_fig=return_fig,
+        )
+
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError) as e:
+        msg = f"Visual Engine Error: {e!s}"
+        if bool(return_fig):
+            return msg, None
+        return msg
+
+
+
+def _compute_prediction_plot_arrays(
+    *,
+    orig_freqs,
+    orig_mags,
+    orig_phases,
+    filt_ir,
+    fs,
+    target_stats,
+    plot_smoothing_level,
+):
+    """Compute every curve/array the prediction-plot figure needs."""
+    fft_ctx = _prediction_plot_fft_context(filt_ir=filt_ir, fs=fs, target_stats=target_stats)
+    VIS_POINTS = int(fft_ctx["vis_points"])
+    show_afdw = bool(fft_ctx["show_afdw"])
+    fig_height, fig_width = int(fft_ctx["fig_height"]), int(fft_ctx["fig_width"])
+    f_lin = fft_ctx["f_lin"]
+    h_filt = fft_ctx["h_filt"]
+    h_filt_display = fft_ctx["h_filt_display"]
+    filt_delay_ms = float(fft_ctx["filt_delay_ms"])
+
+    iir_biquads = target_stats.get("hybrid_iir_biquads", []) if target_stats else []
+    h_iir = _build_hybrid_iir_response(iir_biquads, f_lin, float(fs))
+
+    avg_t = target_stats.get("eff_target_db", 75) if target_stats else 75
+    if target_stats and "smart_scan_range" in target_stats:
+        match_range = target_stats.get("smart_scan_range", [500, 2000])
+    else:
+        match_range = target_stats.get("match_range", [500, 2000]) if target_stats else [500, 2000]
+    try:
+        f_win_min = float(match_range[0])
+        f_win_max = float(match_range[1])
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        f_win_min, f_win_max = 500.0, 2000.0
+    f_target = np.asarray(target_stats.get("freq_axis", []), dtype=float) if target_stats else np.asarray([], dtype=float)
+    target_curve = target_stats.get("target_mags", None) if target_stats else None
+    selected_target_curve = target_stats.get("selected_target_mags", None) if target_stats else None
+
+    direct_pred_export = None
+    direct_pred_comp = None
+
+    if target_stats and "measured_mags" in target_stats:
+        f_stats = f_target
+        m_stats_src = target_stats.get("measured_mags", [])
+        direct_m_stats = np.asarray(
+            target_stats.get("direct_dac_sum_measured_mags", []),
+            dtype=float,
+        ).reshape(-1)
+        if f_stats.size > 1 and direct_m_stats.size == f_stats.size:
+            m_stats_src = direct_m_stats
+        m_stats = _prepare_curve_for_target_plot(
+            f_stats,
+            m_stats_src,
+            avg_t_db=avg_t,
+            target_freqs_hz=f_target,
+            target_mags_db=target_curve,
+            f_min_hz=f_win_min,
+            f_max_hz=f_win_max,
+        )
+        m_interp = np.interp(f_lin, f_stats, m_stats)
+
+        m_lin_clean = _view_mags_for_plot(
+            f_lin,
+            m_interp,
+            plot_smoothing_level=plot_smoothing_level,
+        )
+
+        pred_stats = _maybe_shift_to_abs(
+            target_stats.get("direct_dac_sum_predicted_mags", []),
+            avg_t,
+        )
+        pred_stats = np.asarray(pred_stats, dtype=float).reshape(-1)
+        if f_stats.size > 1 and pred_stats.size == f_stats.size:
+            pred_aligned = _prepare_curve_for_target_plot(
+                f_stats,
+                pred_stats,
+                avg_t_db=avg_t,
+                target_freqs_hz=f_target,
+                target_mags_db=target_curve,
+                f_min_hz=f_win_min,
+                f_max_hz=f_win_max,
+            )
+            pred_interp = np.interp(f_lin, f_stats, pred_aligned)
+            direct_pred_export = _view_mags_for_plot(
+                f_lin,
+                pred_interp,
+                plot_smoothing_level=plot_smoothing_level,
+            )
+
+            pred_comp_stats = _maybe_shift_to_abs(
+                target_stats.get("direct_dac_sum_predicted_mags_comp", []),
+                avg_t,
+            )
+            pred_comp_stats = np.asarray(pred_comp_stats, dtype=float).reshape(-1)
+            if pred_comp_stats.size == f_stats.size:
+                pred_comp_aligned = _prepare_curve_for_target_plot(
+                    f_stats,
+                    pred_comp_stats,
+                    avg_t_db=avg_t,
+                    target_freqs_hz=f_target,
+                    target_mags_db=target_curve,
+                    f_min_hz=f_win_min,
+                    f_max_hz=f_win_max,
+                )
+                pred_comp_interp = np.interp(f_lin, f_stats, pred_comp_aligned)
+                direct_pred_comp = _view_mags_for_plot(
+                    f_lin,
+                    pred_comp_interp,
+                    plot_smoothing_level=plot_smoothing_level,
+                )
+    else:
+        m_plot_src = _prepare_curve_for_target_plot(
+            orig_freqs,
+            orig_mags,
+            avg_t_db=avg_t,
+            target_freqs_hz=f_target,
+            target_mags_db=target_curve,
+            f_min_hz=f_win_min,
+            f_max_hz=f_win_max,
+        )
+        m_raw = np.interp(f_lin, orig_freqs, m_plot_src)
+        m_lin_clean = _view_mags_for_plot(
+            f_lin,
+            m_raw,
+            plot_smoothing_level=plot_smoothing_level,
+        )
+
+    p_lin = np.interp(f_lin, orig_freqs, orig_phases)
+    total_spec = 10 ** (np.asarray(m_lin_clean, dtype=float) / 20.0) * np.exp(1j * np.deg2rad(p_lin)) * h_filt * h_iir
+
+    plot_level_comp_db = 0.0
+    ag_db = 0.0
+    ah_db = 0.0
+    try:
+        if target_stats is not None:
+            ag_db = float(target_stats.get("auto_global_gain_db", 0.0) or 0.0)
+            ah_db = float(target_stats.get("auto_headroom_db", 0.0) or 0.0)
+            if np.isfinite(ag_db) and np.isfinite(ah_db):
+                plot_level_comp_db = -(ag_db + ah_db)
+            elif np.isfinite(ag_db):
+                plot_level_comp_db = -ag_db
+    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        plot_level_comp_db = 0.0
+        ag_db = 0.0
+        ah_db = 0.0
+
+    if direct_pred_export is not None:
+        p_sm_export = np.asarray(direct_pred_export, dtype=float)
+        if direct_pred_comp is not None:
+            p_sm_comp = np.asarray(direct_pred_comp, dtype=float)
+        else:
+            p_sm_comp = p_sm_export.copy()
+            if plot_level_comp_db != 0.0:
+                p_sm_comp = p_sm_comp + float(plot_level_comp_db)
+    else:
+        p_sm_export = _view_mags_for_plot(
+            f_lin,
+            20.0 * np.log10(np.abs(total_spec) + 1e-12),
+            plot_smoothing_level=plot_smoothing_level,
+        )
+        p_sm_comp = p_sm_export.copy()
+        if plot_level_comp_db != 0.0:
+            p_sm_comp = p_sm_comp + float(plot_level_comp_db)
+    filt_sm_phase = smooth_complex(f_lin, h_filt_display, PHASE_SMOOTH_OCT)
+    ph_sm = (np.rad2deg(np.angle(filt_sm_phase)) + 180) % 360 - 180
+
+    filt_sm_gd = smooth_complex(f_lin, h_filt_display, GD_SMOOTH_OCT)
+    gd_sm = calculate_clean_gd(f_lin, filt_sm_gd)
+
+    filt_db_export = 20.0 * np.log10(np.abs(h_filt) + 1e-12)
+    filt_db_comp = filt_db_export.copy()
+    if plot_level_comp_db != 0.0:
+        filt_db_comp = filt_db_comp + float(plot_level_comp_db)
+
+    f_vis = np.geomspace(10, fs / 2, VIS_POINTS)
+
+    m_vis = np.interp(f_vis, f_lin, m_lin_clean)
+    p_vis_export = np.interp(f_vis, f_lin, p_sm_export)
+    p_vis_comp = np.interp(f_vis, f_lin, p_sm_comp)
+    mag_display_offset_db = _resolve_magnitude_display_offset_db(
+        target_stats=target_stats,
+        target_curve=target_curve,
+        avg_t=avg_t,
+    )
+    if mag_display_offset_db != 0.0:
+        m_vis = m_vis - float(mag_display_offset_db)
+        p_vis_export = p_vis_export - float(mag_display_offset_db)
+        p_vis_comp = p_vis_comp - float(mag_display_offset_db)
+    ph_vis = np.interp(f_vis, f_lin, ph_sm)
+    gd_vis = np.interp(f_vis, f_lin, gd_sm)
+    filt_vis_export = np.interp(f_vis, f_lin, filt_db_export)
+    filt_vis_comp = np.interp(f_vis, f_lin, filt_db_comp)
+
+    conf_vis = None
+    if target_stats and f_target.size > 1:
+        conf_raw = np.asarray(target_stats.get("confidence_mask", []), dtype=float)
+        if conf_raw.size == f_target.size and conf_raw.size > 1:
+            conf_vis = np.interp(f_vis, f_target, conf_raw)
+            conf_vis = np.clip(conf_vis, 0.0, 1.0)
+            try:
+                c_min = float(target_stats.get("mag_c_min", 0.0) or 0.0)
+                c_max = float(target_stats.get("mag_c_max", 0.0) or 0.0)
+                if np.isfinite(c_min) and np.isfinite(c_max) and c_min > 0 and c_max > c_min:
+                    conf_vis[(f_vis < c_min) | (f_vis > c_max)] = np.nan
+            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+                pass
+
+    lf_guard_hz = 0.0
+    if target_stats:
+        lf_guard_hz = float(target_stats.get("lf_guard_hz", 0.0) or 0.0)
+
+    return {
+        "f_vis": f_vis,
+        "m_vis": m_vis,
+        "selected_target_curve": selected_target_curve,
+        "f_target": f_target,
+        "avg_t": avg_t,
+        "mag_display_offset_db": mag_display_offset_db,
+        "p_vis_export": p_vis_export,
+        "p_vis_comp": p_vis_comp,
+        "conf_vis": conf_vis,
+        "ph_vis": ph_vis,
+        "gd_vis": gd_vis,
+        "filt_vis_export": filt_vis_export,
+        "filt_vis_comp": filt_vis_comp,
+        "filt_delay_ms": filt_delay_ms,
+        "lf_guard_hz": lf_guard_hz,
+        "show_afdw": show_afdw,
+        "fig_height": fig_height,
+        "fig_width": fig_width,
+    }
+
+
+
+def _finalize_prediction_plot_html(fig, *, create_full_html, return_fig):
+    """Render the figure to HTML and inject the active-button styling JS."""
+    if create_full_html:
+        if _plotly_js_path():
             js_mode = "assets/plotly.min.js"
         else:
             js_mode = "cdn"
+    elif _plotly_js_path():
+        js_mode = "assets/plotly.min.js"
+    else:
+        js_mode = "cdn"
 
-        config = {
-            "responsive": True,
-            "scrollZoom": True,
-            "displaylogo": False,
-            "doubleClick": False,
-        }
+    config = {
+        "responsive": True,
+        "scrollZoom": True,
+        "displaylogo": False,
+        "doubleClick": False,
+    }
 
-        html = fig.to_html(
-            include_plotlyjs=js_mode,
-            full_html=create_full_html,
-            config=config,
-        )
+    html = fig.to_html(
+        include_plotlyjs=js_mode,
+        full_html=create_full_html,
+        config=config,
+    )
 
-        _active_btn_js = """
+    _active_btn_js = """
 <script>
 (function() {
   function _fixActiveBtns(root) {
@@ -842,24 +920,20 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
   }
 })();
 </script>""".replace("__ACTIVE_FILL__", _PLOT_ACTIVE_BTN_FILL).replace(
-            "__ACTIVE_STROKE__",
-            _PLOT_ACTIVE_BTN_STROKE,
-        )
-        if "</body>" in html:
-            html = html.replace("</body>", _active_btn_js + "\n</body>", 1)
-        else:
-            html = html + _active_btn_js
+        "__ACTIVE_STROKE__",
+        _PLOT_ACTIVE_BTN_STROKE,
+    )
+    if "</body>" in html:
+        html = html.replace("</body>", _active_btn_js + "\n</body>", 1)
+    else:
+        html = html + _active_btn_js
 
-        if bool(return_fig):
-            return html, fig
-        return html
+    if bool(return_fig):
+        return html, fig
+    return html
 
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError) as e:
-        msg = f"Visual Engine Error: {e!s}"
-        if bool(return_fig):
-            return msg, None
-        return msg
+
+
 
 
 __all__ = ['_prediction_plot_fft_context', '_resolve_magnitude_display_offset_db', 'generate_prediction_plot']
-

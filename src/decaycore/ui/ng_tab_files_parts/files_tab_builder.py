@@ -18,6 +18,7 @@ import asyncio
 import logging
 import os
 import re
+from dataclasses import dataclass
 from typing import Any, Callable
 
 from .file_slot_helpers import (
@@ -508,56 +509,32 @@ def _suggest_measurement_library_matches_if_ready(
         return {}
     return _suggest_measurement_library_matches(entries, path_keys=path_keys, min_score=min_score)
 
-def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - file tab coordinates upload, library, and path syncing
-    from nicegui import ui
-    mode_value = str(get_val("mode", "BASIC") or "BASIC").strip().upper()
-    if bool(get_val(CAMILLAFIR_AUTO_MODE, False)):
-        mode_value = "AUTO"
-    bass_integration_visible = bool(mode_value == "AUTO")
-    bass_integration_enabled = bool(get_val("bass_integration_enable", False))
-    bass_integration_active = bool(bass_integration_visible and bass_integration_enabled)
-    is_direct_dac = (
-        bass_integration_active
-        and str(get_val("bass_integration_mode", "") or "").strip() == "direct_dac"
-    )
+@dataclass
+class _FilesTabContext:
+    """Shared state and behavior for the Files tab.
 
-    # File uploads – store as {"filename": ..., "content": bytes} in holders
-    file_holders = {
-        "file_l": ctrl._ValueHolder(get_val("file_l", None)),
-        "file_r": ctrl._ValueHolder(get_val("file_r", None)),
-        "file_l_main": ctrl._ValueHolder(get_val("file_l_main", None)),
-        "file_r_main": ctrl._ValueHolder(get_val("file_r_main", None)),
-        "file_l_sub": ctrl._ValueHolder(get_val("file_l_sub", None)),
-        "file_r_sub": ctrl._ValueHolder(get_val("file_r_sub", None)),
-    }
-    for key, holder in file_holders.items():
-        ctrl.register(key, holder)
-    path_holders = {
-        "local_path_l": ctrl._ValueHolder(get_val("local_path_l", "")),
-        "local_path_r": ctrl._ValueHolder(get_val("local_path_r", "")),
-        "local_path_l_main": ctrl._ValueHolder(get_val("local_path_l_main", "")),
-        "local_path_r_main": ctrl._ValueHolder(get_val("local_path_r_main", "")),
-        "local_path_l_sub": ctrl._ValueHolder(get_val("local_path_l_sub", "")),
-        "local_path_r_sub": ctrl._ValueHolder(get_val("local_path_r_sub", "")),
-    }
-    for key, holder in path_holders.items():
-        ctrl.register(key, holder)
-    slot_configs: dict[str, list[dict[str, Any]]] = {key: [] for key in file_holders}
-    path_inputs: dict[str, list[Any]] = {key: [] for key in path_holders}
-    library_selects: dict[str, list[Any]] = {key: [] for key in path_holders}
-    library_state: dict[str, Any] = {
-        "entries": [],
-        "options": {},
-        "slot_options": {},
-        "is_scanning": False,
-        "refresh_token": 0,
-    }
-    syncing_paths: set[str] = set()
+    Replaces the closure soup that used to live inside ``build_files_tab``.
+    Each former nested helper is now a named method operating on ``self``
+    state; ``build_files_tab`` keeps only orchestration and the widget tree.
+    """
+
+    t: Callable
+    ui: Any
+    mode_value: str
+    bass_integration_enabled: bool
+    file_holders: dict[str, Any]
+    path_holders: dict[str, Any]
+    slot_configs: dict[str, list[dict[str, Any]]]
+    path_inputs: dict[str, list[Any]]
+    library_selects: dict[str, list[Any]]
+    library_state: dict[str, Any]
+    syncing_paths: set[str]
     measurement_library_input: Any | None = None
     measurement_library_status: Any | None = None
     measurement_library_suggest_button: Any | None = None
 
-    def _refresh_target_preview() -> None:
+    # --- rendering ---------------------------------------------------------
+    def refresh_target_preview(self) -> None:
         try:
             from ..ng_tab_target import refresh_target_preview  # noqa: PLC0415
 
@@ -577,25 +554,95 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
         ):
             logger.exception("target preview refresh from files tab")
 
-    def _render_measurement_slots(upload_key: str) -> None:
-        for slot_cfg in slot_configs.get(upload_key, []):
-            _render_file_status(
+    def render_measurement_slots(self, upload_key: str) -> None:
+        for slot_cfg in self.slot_configs.get(upload_key, []):
+            self.render_file_status(
                 channel_label=str(slot_cfg["channel_label"]),
-                holder=file_holders[upload_key],
+                holder=self.file_holders[upload_key],
                 scope_name=str(slot_cfg["scope_name"]),
-                path_holder=path_holders[str(slot_cfg["path_key"])],
+                path_holder=self.path_holders[str(slot_cfg["path_key"])],
                 upload_key=upload_key,
             )
 
-    for upload_key, holder in file_holders.items():
-        holder.on_value_change(
-            lambda _e, _upload_key=upload_key: (
-                _render_measurement_slots(_upload_key),
-                _refresh_target_preview(),
-            )
-        )
+    def render_uploaded_file_status(
+        self,
+        *,
+        file_data: dict,
+        upload_key: str,
+        holder,
+    ) -> None:
+        upload_format = _guess_upload_format(file_data)
+        if upload_format == "Unknown":
+            upload_format = self.t("file_status_unknown")
+        upload_size_bytes = int(file_data.get("size_bytes") or len(file_data.get("content", b"") or b""))
+        filename = str(file_data.get("filename", "") or "")
 
-    def _set_input_value(input_control: Any, value: Any) -> None:
+        def _clear_uploaded_file() -> None:
+            holder.set_value(None)
+            self.render_measurement_slots(upload_key)
+            self.refresh_target_preview()
+
+        with self.ui.row().classes("items-center gap-2 text-xs overflow-hidden"):
+            self.ui.label("●").classes("text-green-500 shrink-0")
+            self.ui.label(filename).classes("truncate")
+            self.ui.label(f"· {upload_format} · {_format_upload_size(upload_size_bytes)}").classes("text-gray-400 shrink-0")
+        self.ui.button(
+            self.t("file_status_clear"),
+            on_click=_clear_uploaded_file,
+        ).props('color="secondary" flat size="xs"').classes("shrink-0")
+
+    def render_local_path_status(self, *, local_path_info: dict) -> None:
+        path_format = str(local_path_info["format"] or "Unknown")
+        if path_format == "Unknown":
+            path_format = self.t("file_status_unknown")
+        filename = local_path_info["filename"]
+        if local_path_info["exists"]:
+            size_text = _format_upload_size(local_path_info["size_bytes"])
+            with self.ui.row().classes("items-center gap-2 text-xs overflow-hidden"):
+                self.ui.label("●").classes("text-green-500 shrink-0")
+                self.ui.label(filename).classes("truncate")
+                self.ui.label(f"· {path_format} · {size_text}").classes("text-gray-400 shrink-0")
+                if bool(local_path_info.get("has_harmonics", False)):
+                    self.ui.label("· H2–H5").classes("text-green-500 shrink-0")
+                if local_path_info.get("rt60_val") is not None:
+                    self.ui.label(f"· RT60 {float(local_path_info['rt60_val']):.2f}s").classes("text-green-500 shrink-0")
+            return
+        with self.ui.row().classes("items-center gap-2 text-xs overflow-hidden"):
+            self.ui.label("⚠").classes("text-yellow-500 shrink-0")
+            self.ui.label(filename).classes("truncate text-yellow-600")
+            self.ui.label(f"· {self.t('file_status_path_missing')}").classes("text-yellow-500 shrink-0")
+
+    def render_empty_file_status(self) -> None:
+        self.ui.label("○  " + self.t("file_status_not_loaded")).classes("text-xs text-gray-400")
+
+    def render_file_status(
+        self,
+        *,
+        channel_label: str,
+        holder,
+        scope_name: str,
+        path_holder,
+        upload_key: str,
+    ) -> None:
+        scope = ctrl.get_container(scope_name)
+        if scope is None:
+            return
+
+        file_data = holder.value if isinstance(holder.value, dict) else None
+        upload_loaded = bool(file_data and file_data.get("content"))
+        local_path_info = _describe_local_path(path_holder.value)
+        scope.clear()
+        with scope:
+            with self.ui.row().classes("w-full items-center justify-between gap-2 min-h-6"):
+                if upload_loaded:
+                    self.render_uploaded_file_status(file_data=file_data or {}, upload_key=upload_key, holder=holder)
+                elif local_path_info["entered"]:
+                    self.render_local_path_status(local_path_info=local_path_info)
+                else:
+                    self.render_empty_file_status()
+
+    # --- widget helpers ----------------------------------------------------
+    def set_input_value(self, input_control: Any, value: Any) -> None:
         try:
             input_control.set_value(value)
         except (
@@ -614,7 +661,7 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
             input_control.value = value
             input_control.update()
 
-    def _set_options(control: Any, options: dict[str, str]) -> None:
+    def set_options(self, control: Any, options: dict[str, str]) -> None:
         try:
             control.set_options(options)
         except (
@@ -633,20 +680,7 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
             control.options = options
             control.update()
 
-    def _current_measurement_path_keys() -> list[str]:
-        mode_current = str(ctrl.value("mode", mode_value) or mode_value).strip().upper()
-        auto_current = bool(mode_current == "AUTO" or ctrl.value(CAMILLAFIR_AUTO_MODE, False))
-        bass_integration_current = bool(ctrl.value("bass_integration_enable", bass_integration_enabled))
-        if auto_current and bass_integration_current:
-            return [
-                "local_path_l_main",
-                "local_path_r_main",
-                "local_path_l_sub",
-                "local_path_r_sub",
-            ]
-        return ["local_path_l", "local_path_r"]
-
-    def _set_enabled(control: Any, enabled: bool) -> None:
+    def set_enabled(self, control: Any, enabled: bool) -> None:
         if control is None:
             return
         try:
@@ -687,12 +721,26 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
             ):
                 logger.debug("measurement library control enable failed", exc_info=True)
 
-    def _set_measurement_library_scanning(is_scanning: bool) -> None:
-        library_state["is_scanning"] = bool(is_scanning)
-        _set_enabled(measurement_library_suggest_button, not is_scanning)
+    # --- measurement library ----------------------------------------------
+    def current_measurement_path_keys(self) -> list[str]:
+        mode_current = str(ctrl.value("mode", self.mode_value) or self.mode_value).strip().upper()
+        auto_current = bool(mode_current == "AUTO" or ctrl.value(CAMILLAFIR_AUTO_MODE, False))
+        bass_integration_current = bool(ctrl.value("bass_integration_enable", self.bass_integration_enabled))
+        if auto_current and bass_integration_current:
+            return [
+                "local_path_l_main",
+                "local_path_r_main",
+                "local_path_l_sub",
+                "local_path_r_sub",
+            ]
+        return ["local_path_l", "local_path_r"]
 
-    def _update_measurement_library_status(*, dir_value: str, exists: bool, entry_count: int, is_scanning: bool) -> None:
-        if measurement_library_status is None:
+    def set_measurement_library_scanning(self, is_scanning: bool) -> None:
+        self.library_state["is_scanning"] = bool(is_scanning)
+        self.set_enabled(self.measurement_library_suggest_button, not is_scanning)
+
+    def update_measurement_library_status(self, *, dir_value: str, exists: bool, entry_count: int, is_scanning: bool) -> None:
+        if self.measurement_library_status is None:
             return
         status_key = _measurement_library_status_key(
             dir_value=dir_value,
@@ -701,45 +749,46 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
             is_scanning=is_scanning,
         )
         if status_key == "measurement_library_status_found":
-            measurement_library_status.set_text(t(status_key).format(count=entry_count))
+            self.measurement_library_status.set_text(self.t(status_key).format(count=entry_count))
             return
-        measurement_library_status.set_text(t(status_key))
+        self.measurement_library_status.set_text(self.t(status_key))
 
-    def _apply_measurement_library_state(payload: dict[str, Any]) -> None:
+    def apply_measurement_library_state(self, payload: dict[str, Any]) -> None:
         entries = list(payload.get("entries") or [])
         options = dict(payload.get("options") or {})
         slot_options_raw = payload.get("slot_options") or {}
         slot_options = {
             str(path_key): dict(slot_options_raw.get(path_key) or {})
-            for path_key in library_selects
+            for path_key in self.library_selects
         }
-        library_state["entries"] = entries
-        library_state["options"] = options
-        library_state["slot_options"] = slot_options
+        self.library_state["entries"] = entries
+        self.library_state["options"] = options
+        self.library_state["slot_options"] = slot_options
 
-        for path_key, selects in library_selects.items():
-            slot_opts = library_state["slot_options"].get(path_key, library_state["options"])
+        for path_key, selects in self.library_selects.items():
+            slot_opts = self.library_state["slot_options"].get(path_key, self.library_state["options"])
             for select in selects:
-                _set_options(select, slot_opts)
-            _sync_library_selects(path_key)
+                self.set_options(select, slot_opts)
+            self.sync_library_selects(path_key)
 
-    def _sync_library_selects(path_key: str) -> None:
+    def sync_library_selects(self, path_key: str) -> None:
         guarded = False
-        if path_key not in syncing_paths:
-            syncing_paths.add(path_key)
+        if path_key not in self.syncing_paths:
+            self.syncing_paths.add(path_key)
             guarded = True
         try:
-            current_value = _normalize_local_path_value(path_holders[path_key].value)
-            slot_opts = library_state["slot_options"].get(path_key, library_state["options"])
+            current_value = _normalize_local_path_value(self.path_holders[path_key].value)
+            slot_opts = self.library_state["slot_options"].get(path_key, self.library_state["options"])
             desired_value = current_value if current_value in slot_opts else None
-            for select in library_selects[path_key]:
+            for select in self.library_selects[path_key]:
                 if getattr(select, "value", None) != desired_value:
-                    _set_input_value(select, desired_value)
+                    self.set_input_value(select, desired_value)
         finally:
             if guarded:
-                syncing_paths.discard(path_key)
+                self.syncing_paths.discard(path_key)
 
-    def _sync_path_value(
+    def sync_path_value(
+        self,
         *,
         path_key: str,
         upload_key: str,
@@ -747,44 +796,40 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
         value: Any,
         clear_upload: bool = False,
     ) -> None:
-        if path_key in syncing_paths:
+        if path_key in self.syncing_paths:
             return
-        syncing_paths.add(path_key)
+        self.syncing_paths.add(path_key)
         try:
             normalized_value = _normalize_local_path_value(value)
-            holder = path_holders[path_key]
+            holder = self.path_holders[path_key]
             if clear_upload and normalized_value:
-                file_holders[upload_key].set_value(None)
+                self.file_holders[upload_key].set_value(None)
             holder.set_value(normalized_value)
-            for peer in path_inputs[path_key]:
+            for peer in self.path_inputs[path_key]:
                 if peer is current_input:
                     continue
                 if getattr(peer, "value", None) != normalized_value:
-                    _set_input_value(peer, normalized_value)
-            slot_opts = library_state["slot_options"].get(path_key, library_state["options"])
-            for peer in library_selects[path_key]:
+                    self.set_input_value(peer, normalized_value)
+            slot_opts = self.library_state["slot_options"].get(path_key, self.library_state["options"])
+            for peer in self.library_selects[path_key]:
                 if peer is current_input:
                     continue
                 desired_value = normalized_value if normalized_value in slot_opts else None
                 if getattr(peer, "value", None) != desired_value:
-                    _set_input_value(peer, desired_value)
-            _render_measurement_slots(upload_key)
+                    self.set_input_value(peer, desired_value)
+            self.render_measurement_slots(upload_key)
         finally:
-            syncing_paths.discard(path_key)
-        _refresh_target_preview()
+            self.syncing_paths.discard(path_key)
+        self.refresh_target_preview()
 
-    default_library_dir = _normalize_local_path_value(
-        get_val("measurement_library_dir", str(default_measurements_dir()))
-    ) or str(default_measurements_dir())
-
-    async def _refresh_measurement_library_async(token: int) -> None:
-        if measurement_library_input is None:
+    async def refresh_measurement_library_async(self, token: int) -> None:
+        if self.measurement_library_input is None:
             return
-        path_keys = list(library_selects)
-        dir_value = _normalize_local_path_value(measurement_library_input.value)
-        _set_measurement_library_scanning(True)
-        _apply_measurement_library_state(_build_measurement_library_state([], path_keys=path_keys))
-        _update_measurement_library_status(
+        path_keys = list(self.library_selects)
+        dir_value = _normalize_local_path_value(self.measurement_library_input.value)
+        self.set_measurement_library_scanning(True)
+        self.apply_measurement_library_state(_build_measurement_library_state([], path_keys=path_keys))
+        self.update_measurement_library_status(
             dir_value=dir_value,
             exists=False,
             entry_count=0,
@@ -810,10 +855,10 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
             NameError,
         ):
             logger.exception("measurement library refresh failed")
-            if token == int(library_state["refresh_token"]):
-                _set_measurement_library_scanning(False)
-                _apply_measurement_library_state(_build_measurement_library_state([], path_keys=path_keys))
-                _update_measurement_library_status(
+            if token == int(self.library_state["refresh_token"]):
+                self.set_measurement_library_scanning(False)
+                self.apply_measurement_library_state(_build_measurement_library_state([], path_keys=path_keys))
+                self.update_measurement_library_status(
                     dir_value=dir_value,
                     exists=False,
                     entry_count=0,
@@ -824,29 +869,29 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
         applied_payload = _measurement_library_refresh_payload_for_token(
             payload,
             token=token,
-            current_token=int(library_state["refresh_token"]),
+            current_token=int(self.library_state["refresh_token"]),
         )
         if applied_payload is None:
             return
 
-        _apply_measurement_library_state(applied_payload)
-        _set_measurement_library_scanning(False)
-        _update_measurement_library_status(
+        self.apply_measurement_library_state(applied_payload)
+        self.set_measurement_library_scanning(False)
+        self.update_measurement_library_status(
             dir_value=str(applied_payload.get("dir_value", "") or ""),
             exists=bool(applied_payload.get("exists", False)),
             entry_count=len(list(applied_payload.get("entries") or [])),
             is_scanning=False,
         )
 
-    def _schedule_measurement_library_refresh(delay_s: float = 0.35, *, force: bool = False) -> None:
-        library_state["refresh_token"] = int(library_state["refresh_token"]) + 1
-        token = int(library_state["refresh_token"])
+    def schedule_measurement_library_refresh(self, delay_s: float = 0.35, *, force: bool = False) -> None:
+        self.library_state["refresh_token"] = int(self.library_state["refresh_token"]) + 1
+        token = int(self.library_state["refresh_token"])
 
         def _run() -> None:
-            if token != int(library_state["refresh_token"]):
+            if token != int(self.library_state["refresh_token"]):
                 return
             try:
-                asyncio.create_task(_refresh_measurement_library_async(token))
+                asyncio.create_task(self.refresh_measurement_library_async(token))
             except (
 
                 AttributeError,
@@ -862,33 +907,33 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
             ):
                 logger.exception("measurement library refresh task scheduling failed")
 
-        ui.timer(0.0 if force else max(float(delay_s), 0.0), _run, once=True, immediate=False)
+        self.ui.timer(0.0 if force else max(float(delay_s), 0.0), _run, once=True, immediate=False)
 
-    def _use_default_measurement_library() -> None:
-        _set_input_value(
-            measurement_library_input,
+    def use_default_measurement_library(self) -> None:
+        self.set_input_value(
+            self.measurement_library_input,
             _persist_measurement_library_dir(str(default_measurements_dir())),
         )
-        _schedule_measurement_library_refresh(0.0, force=True)
+        self.schedule_measurement_library_refresh(0.0, force=True)
 
-    def _persist_measurement_library_dir_from_ui(value: Any) -> None:
-        if measurement_library_input is None:
+    def persist_measurement_library_dir_from_ui(self, value: Any) -> None:
+        if self.measurement_library_input is None:
             return
         persisted_value = _persist_measurement_library_dir(value)
-        current_value = _normalize_local_path_value(measurement_library_input.value)
+        current_value = _normalize_local_path_value(self.measurement_library_input.value)
         if current_value != persisted_value:
-            _set_input_value(measurement_library_input, persisted_value)
-            _schedule_measurement_library_refresh(0.0, force=True)
+            self.set_input_value(self.measurement_library_input, persisted_value)
+            self.schedule_measurement_library_refresh(0.0, force=True)
 
-    def _apply_measurement_library_suggestions() -> None:
+    def apply_measurement_library_suggestions(self) -> None:
         suggestions = _suggest_measurement_library_matches_if_ready(
-            list(library_state["entries"]),
-            path_keys=_current_measurement_path_keys(),
-            is_scanning=bool(library_state["is_scanning"]),
+            list(self.library_state["entries"]),
+            path_keys=self.current_measurement_path_keys(),
+            is_scanning=bool(self.library_state["is_scanning"]),
         )
         for path_key, suggested_path in suggestions.items():
             upload_key = _MEASUREMENT_SLOT_UPLOAD_KEYS[path_key]
-            _sync_path_value(
+            self.sync_path_value(
                 path_key=path_key,
                 upload_key=upload_key,
                 current_input=None,
@@ -896,91 +941,18 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
                 clear_upload=True,
             )
 
-    def _render_uploaded_file_status(
-        *,
-        file_data: dict,
-        upload_key: str,
-        holder,
-    ) -> None:
-        upload_format = _guess_upload_format(file_data)
-        if upload_format == "Unknown":
-            upload_format = t("file_status_unknown")
-        upload_size_bytes = int(file_data.get("size_bytes") or len(file_data.get("content", b"") or b""))
-        filename = str(file_data.get("filename", "") or "")
-
-        def _clear_uploaded_file() -> None:
-            holder.set_value(None)
-            _render_measurement_slots(upload_key)
-            _refresh_target_preview()
-
-        with ui.row().classes("items-center gap-2 text-xs overflow-hidden"):
-            ui.label("●").classes("text-green-500 shrink-0")
-            ui.label(filename).classes("truncate")
-            ui.label(f"· {upload_format} · {_format_upload_size(upload_size_bytes)}").classes("text-gray-400 shrink-0")
-        ui.button(
-            t("file_status_clear"),
-            on_click=_clear_uploaded_file,
-        ).props('color="secondary" flat size="xs"').classes("shrink-0")
-
-    def _render_local_path_status(*, local_path_info: dict) -> None:
-        path_format = str(local_path_info["format"] or "Unknown")
-        if path_format == "Unknown":
-            path_format = t("file_status_unknown")
-        filename = local_path_info["filename"]
-        if local_path_info["exists"]:
-            size_text = _format_upload_size(local_path_info["size_bytes"])
-            with ui.row().classes("items-center gap-2 text-xs overflow-hidden"):
-                ui.label("●").classes("text-green-500 shrink-0")
-                ui.label(filename).classes("truncate")
-                ui.label(f"· {path_format} · {size_text}").classes("text-gray-400 shrink-0")
-                if bool(local_path_info.get("has_harmonics", False)):
-                    ui.label("· H2–H5").classes("text-green-500 shrink-0")
-                if local_path_info.get("rt60_val") is not None:
-                    ui.label(f"· RT60 {float(local_path_info['rt60_val']):.2f}s").classes("text-green-500 shrink-0")
-            return
-        with ui.row().classes("items-center gap-2 text-xs overflow-hidden"):
-            ui.label("⚠").classes("text-yellow-500 shrink-0")
-            ui.label(filename).classes("truncate text-yellow-600")
-            ui.label(f"· {t('file_status_path_missing')}").classes("text-yellow-500 shrink-0")
-
-    def _render_empty_file_status() -> None:
-        ui.label("○  " + t("file_status_not_loaded")).classes("text-xs text-gray-400")
-
-    def _render_file_status(
-        *,
-        channel_label: str,
-        holder,
-        scope_name: str,
-        path_holder,
-        upload_key: str,
-    ) -> None:
-        scope = ctrl.get_container(scope_name)
-        if scope is None:
-            return
-
-        file_data = holder.value if isinstance(holder.value, dict) else None
-        upload_loaded = bool(file_data and file_data.get("content"))
-        local_path_info = _describe_local_path(path_holder.value)
-        scope.clear()
-        with scope:
-            with ui.row().classes("w-full items-center justify-between gap-2 min-h-6"):
-                if upload_loaded:
-                    _render_uploaded_file_status(file_data=file_data or {}, upload_key=upload_key, holder=holder)
-                elif local_path_info["entered"]:
-                    _render_local_path_status(local_path_info=local_path_info)
-                else:
-                    _render_empty_file_status()
-
-    async def _handle_upload(e, *, upload_key: str) -> None:
-        file_holders[upload_key].set_value(_build_upload_payload(
+    # --- upload / slot building -------------------------------------------
+    async def handle_upload(self, e, *, upload_key: str) -> None:
+        self.file_holders[upload_key].set_value(_build_upload_payload(
             filename=e.file.name,
             content=await e.file.read(),
             mime_type=getattr(e.file, "content_type", ""),
         ))
-        _render_measurement_slots(upload_key)
-        _refresh_target_preview()
+        self.render_measurement_slots(upload_key)
+        self.refresh_target_preview()
 
-    def _build_measurement_slot(
+    def build_measurement_slot(
+        self,
         *,
         upload_key: str,
         path_key: str,
@@ -988,40 +960,40 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
         channel_label_key: str,
         path_label_key: str,
     ) -> None:
-        channel_label = t(channel_label_key)
+        channel_label = self.t(channel_label_key)
         scope_name = _file_slot_scope_name(upload_key, slot_variant)
         path_control_name = _file_slot_input_name(path_key, slot_variant)
 
-        with ui.column().classes("flex-1 gap-2"):
-            ui.label(channel_label).classes("text-sm font-medium")
-            library_select = ui.select(
+        with self.ui.column().classes("flex-1 gap-2"):
+            self.ui.label(channel_label).classes("text-sm font-medium")
+            library_select = self.ui.select(
                 {},
                 value=None,
-                label=t("measurement_library_select"),
+                label=self.t("measurement_library_select"),
             ).props("clearable").classes("w-full")
-            status_scope = ui.column().classes("w-full")
+            status_scope = self.ui.column().classes("w-full")
             ctrl.register_container(scope_name, status_scope)
-            with ui.expansion(t("file_slot_manual_expand")).classes("w-full text-xs"):
+            with self.ui.expansion(self.t("file_slot_manual_expand")).classes("w-full text-xs"):
                 async def _on_upload(
                     e,
                     *,
                     _upload_key=upload_key,
                 ) -> None:
-                    await _handle_upload(
+                    await self.handle_upload(
                         e,
                         upload_key=_upload_key,
                     )
 
-                ui.upload(
+                self.ui.upload(
                     label=channel_label,
                     on_upload=_on_upload,
                     auto_upload=True,
                 ).props('accept=".txt,.wav"').classes("w-full")
-                path_input = ui.input(label=t(path_label_key), value=path_holders[path_key].value).classes("w-full")
+                path_input = self.ui.input(label=self.t(path_label_key), value=self.path_holders[path_key].value).classes("w-full")
                 ctrl.register(path_control_name, path_input)
-        path_inputs[path_key].append(path_input)
-        library_selects[path_key].append(library_select)
-        slot_configs[upload_key].append(
+        self.path_inputs[path_key].append(path_input)
+        self.library_selects[path_key].append(library_select)
+        self.slot_configs[upload_key].append(
             {
                 "channel_label": channel_label,
                 "scope_name": scope_name,
@@ -1029,7 +1001,7 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
             }
         )
         path_input.on_value_change(
-            lambda e, _path_key=path_key, _upload_key=upload_key, _path_input=path_input: _sync_path_value(
+            lambda e, _path_key=path_key, _upload_key=upload_key, _path_input=path_input: self.sync_path_value(
                 path_key=_path_key,
                 upload_key=_upload_key,
                 current_input=_path_input,
@@ -1037,7 +1009,7 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
             )
         )
         library_select.on_value_change(
-            lambda e, _path_key=path_key, _upload_key=upload_key, _library_select=library_select: _sync_path_value(
+            lambda e, _path_key=path_key, _upload_key=upload_key, _library_select=library_select: self.sync_path_value(
                 path_key=_path_key,
                 upload_key=_upload_key,
                 current_input=_library_select,
@@ -1045,10 +1017,79 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
                 clear_upload=True,
             )
         )
-        slot_opts = library_state["slot_options"].get(path_key, library_state["options"])
-        _set_options(library_select, slot_opts)
-        _sync_library_selects(path_key)
-        _render_measurement_slots(upload_key)
+        slot_opts = self.library_state["slot_options"].get(path_key, self.library_state["options"])
+        self.set_options(library_select, slot_opts)
+        self.sync_library_selects(path_key)
+        self.render_measurement_slots(upload_key)
+
+
+def build_files_tab(*, t: Callable, get_val: Callable) -> None:
+    from nicegui import ui
+
+    mode_value = str(get_val("mode", "BASIC") or "BASIC").strip().upper()
+    if bool(get_val(CAMILLAFIR_AUTO_MODE, False)):
+        mode_value = "AUTO"
+    bass_integration_visible = bool(mode_value == "AUTO")
+    bass_integration_enabled = bool(get_val("bass_integration_enable", False))
+    bass_integration_active = bool(bass_integration_visible and bass_integration_enabled)
+    is_direct_dac = (
+        bass_integration_active
+        and str(get_val("bass_integration_mode", "") or "").strip() == "direct_dac"
+    )
+
+    # File uploads – store as {"filename": ..., "content": bytes} in holders
+    file_holders = {
+        "file_l": ctrl._ValueHolder(get_val("file_l", None)),
+        "file_r": ctrl._ValueHolder(get_val("file_r", None)),
+        "file_l_main": ctrl._ValueHolder(get_val("file_l_main", None)),
+        "file_r_main": ctrl._ValueHolder(get_val("file_r_main", None)),
+        "file_l_sub": ctrl._ValueHolder(get_val("file_l_sub", None)),
+        "file_r_sub": ctrl._ValueHolder(get_val("file_r_sub", None)),
+    }
+    for key, holder in file_holders.items():
+        ctrl.register(key, holder)
+    path_holders = {
+        "local_path_l": ctrl._ValueHolder(get_val("local_path_l", "")),
+        "local_path_r": ctrl._ValueHolder(get_val("local_path_r", "")),
+        "local_path_l_main": ctrl._ValueHolder(get_val("local_path_l_main", "")),
+        "local_path_r_main": ctrl._ValueHolder(get_val("local_path_r_main", "")),
+        "local_path_l_sub": ctrl._ValueHolder(get_val("local_path_l_sub", "")),
+        "local_path_r_sub": ctrl._ValueHolder(get_val("local_path_r_sub", "")),
+    }
+    for key, holder in path_holders.items():
+        ctrl.register(key, holder)
+
+    ctx = _FilesTabContext(
+        t=t,
+        ui=ui,
+        mode_value=mode_value,
+        bass_integration_enabled=bass_integration_enabled,
+        file_holders=file_holders,
+        path_holders=path_holders,
+        slot_configs={key: [] for key in file_holders},
+        path_inputs={key: [] for key in path_holders},
+        library_selects={key: [] for key in path_holders},
+        library_state={
+            "entries": [],
+            "options": {},
+            "slot_options": {},
+            "is_scanning": False,
+            "refresh_token": 0,
+        },
+        syncing_paths=set(),
+    )
+
+    for upload_key, holder in file_holders.items():
+        holder.on_value_change(
+            lambda _e, _upload_key=upload_key: (
+                ctx.render_measurement_slots(_upload_key),
+                ctx.refresh_target_preview(),
+            )
+        )
+
+    default_library_dir = _normalize_local_path_value(
+        get_val("measurement_library_dir", str(default_measurements_dir()))
+    ) or str(default_measurements_dir())
 
     with page_shell(title=t("tab_files"), intro=t("files_page_intro")):
         with section_card(title=t("input_files_title"), intro=t("input_files_help")):
@@ -1056,7 +1097,7 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
                 ui.label(t("measurement_library_title")).classes("text-sm font-medium")
                 ui.label(t("measurement_library_help")).classes("text-xs text-gray-400")
                 with ui.row().classes("w-full items-end gap-3"):
-                    measurement_library_input = ctrl.register(
+                    ctx.measurement_library_input = ctrl.register(
                         "measurement_library_dir",
                         ui.input(
                             label=t("measurement_library_dir"),
@@ -1065,36 +1106,36 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
                     )
                     ui.button(
                         t("measurement_library_use_default"),
-                        on_click=lambda: _use_default_measurement_library(),
+                        on_click=lambda: ctx.use_default_measurement_library(),
                     ).props("outline")
                     ui.button(
                         t("measurement_library_refresh"),
-                        on_click=lambda: _schedule_measurement_library_refresh(0.0, force=True),
+                        on_click=lambda: ctx.schedule_measurement_library_refresh(0.0, force=True),
                     ).props("outline")
                 with ui.row().classes("w-full items-center justify-between gap-3"):
-                    measurement_library_status = ui.label("").classes("text-xs text-gray-500")
-                    measurement_library_suggest_button = ui.button(
+                    ctx.measurement_library_status = ui.label("").classes("text-xs text-gray-500")
+                    ctx.measurement_library_suggest_button = ui.button(
                         t("measurement_library_suggest"),
-                        on_click=lambda: _apply_measurement_library_suggestions(),
+                        on_click=lambda: ctx.apply_measurement_library_suggestions(),
                     ).props('color="primary"')
-                measurement_library_input.on_value_change(
-                    lambda _e: _schedule_measurement_library_refresh(0.35)
+                ctx.measurement_library_input.on_value_change(
+                    lambda _e: ctx.schedule_measurement_library_refresh(0.35)
                 )
                 ctrl.on_commit(
                     "measurement_library_dir",
-                    _persist_measurement_library_dir_from_ui,
+                    ctx.persist_measurement_library_dir_from_ui,
                 )
 
             with ui.column().classes("w-full gap-4") as legacy_scope:
                 with ui.row().classes("w-full gap-4"):
-                    _build_measurement_slot(
+                    ctx.build_measurement_slot(
                         upload_key="file_l",
                         path_key="local_path_l",
                         slot_variant="legacy",
                         channel_label_key="upload_l",
                         path_label_key="path_l",
                     )
-                    _build_measurement_slot(
+                    ctx.build_measurement_slot(
                         upload_key="file_r",
                         path_key="local_path_r",
                         slot_variant="legacy",
@@ -1107,14 +1148,14 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
             with ui.column().classes("w-full gap-4") as direct_dac_scope:
                 ui.label(t("bi_direct_sub_help")).classes("text-xs text-gray-400")
                 with ui.row().classes("w-full gap-4"):
-                    _build_measurement_slot(
+                    ctx.build_measurement_slot(
                         upload_key="file_l_main",
                         path_key="local_path_l_main",
                         slot_variant="direct",
                         channel_label_key="upload_l_main",
                         path_label_key="path_l_main",
                     )
-                    _build_measurement_slot(
+                    ctx.build_measurement_slot(
                         upload_key="file_r_main",
                         path_key="local_path_r_main",
                         slot_variant="direct",
@@ -1122,14 +1163,14 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
                         path_label_key="path_r_main",
                     )
                 with ui.row().classes("w-full gap-4"):
-                    _build_measurement_slot(
+                    ctx.build_measurement_slot(
                         upload_key="file_l_sub",
                         path_key="local_path_l_sub",
                         slot_variant="direct",
                         channel_label_key="upload_l_sub",
                         path_label_key="path_l_sub",
                     )
-                    _build_measurement_slot(
+                    ctx.build_measurement_slot(
                         upload_key="file_r_sub",
                         path_key="local_path_r_sub",
                         slot_variant="direct",
@@ -1139,7 +1180,7 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - 
             ctrl.register_container("files_direct_dac_topology_scope", direct_dac_scope)
             direct_dac_scope.set_visibility(bool(bass_integration_active and is_direct_dac))
 
-            _schedule_measurement_library_refresh(0.0, force=True)
+            ctx.schedule_measurement_library_refresh(0.0, force=True)
 
         with ui.expansion(t("files_export_compact_title")).classes("w-full"):
             ui.label(t("files_export_section_intro")).classes("text-xs text-gray-400 mb-2")

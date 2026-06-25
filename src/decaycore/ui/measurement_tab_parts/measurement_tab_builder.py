@@ -14,8 +14,9 @@ import logging
 import math
 import sys
 import threading
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from .measurement_tab_helpers import (
     _build_preview_figure,
@@ -263,83 +264,131 @@ def _measurement_summary_html(
         html += f"<div><b>{t('measurement_timing_mode')}</b>: {mode_label}{corr_txt}</div>"
     return html
 
-def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C901 - tab builder stays explicit for UX wiring
-    from nicegui import ui
+def _measurement_role_value(value) -> str:
+    role = str(value or "").strip().lower()
+    if role in ("sub1", "sub2"):
+        return "sub"
+    return role if role in ("left", "right", "sub") else "left"
 
-    backend_message_state: dict[str, str | None] = {"value": None}
-    backend_message_label = {"widget": None}
 
-    def _set_backend_message(message: str | None) -> None:
+@dataclass
+class _MeasurementTabContext:
+    """Controller logic for the Measurement tab.
+
+    Holds shared config/state and the former nested closures (now methods).
+    Widget-bound rendering helpers stay nested inside ``build_measurement_tab``;
+    only the few widgets needed by controller methods are kept as attributes
+    (set during the widget tree build).
+    """
+
+    t: Callable
+    ui: Any
+    get_val: Callable
+    measurement_samplerate: int
+    input_default: Any
+    output_default: Any
+    sub_output_default: Any
+    default_role: str
+    default_use_wasapi: bool
+    backend_message_state: dict[str, str | None] = field(default_factory=lambda: {"value": None})
+    backend_message_label: dict[str, Any] = field(default_factory=lambda: {"widget": None})
+    session_preview_state: dict[str, object] = field(
+        default_factory=lambda: {"bundles": {}, "selected_key": None}
+    )
+    sub_output_channel_row: Any = None
+    upload_status: Any = None
+    clear_calibration_btn: Any = None
+
+    # --- backend message ---------------------------------------------------
+    def set_backend_message(self, message: str | None) -> None:
         text = str(message or "").strip() or None
-        backend_message_state["value"] = text
-        widget = backend_message_label["widget"]
+        self.backend_message_state["value"] = text
+        widget = self.backend_message_label["widget"]
         if widget is None:
             return
         widget.set_text(text or "")
         widget.set_visibility(bool(text))
 
-    def _refresh_backend_message() -> bool:
+    def refresh_backend_message(self) -> bool:
         message = _measurement_audio_backend_message()
-        _set_backend_message(message)
+        self.set_backend_message(message)
         return message is None
 
-    def _measurement_role_value(value) -> str:
-        role = str(value or "").strip().lower()
-        if role in ("sub1", "sub2"):
-            return "sub"
-        return role if role in ("left", "right", "sub") else "left"
-
-    measurement_samplerate = int(
-        get_val("measurement_samplerate", DEFAULT_MEASUREMENT_SAMPLE_RATE) or DEFAULT_MEASUREMENT_SAMPLE_RATE
-    )
-    input_default = get_val("measurement_input_device", get_default_input_device_index())
-    output_default = get_val("measurement_output_device", get_default_output_device_index())
-    sub_output_default = _measurement_sub_output_channel_value(
-        get_val(
-            "measurement_sub_output_channel",
-            _measurement_sub_output_channel_default(),
-        )
-    )
-    default_role = _measurement_role_value(get_val("measurement_role", "left"))
-    default_use_wasapi = _measurement_use_wasapi_value(get_val("measurement_use_wasapi", False))
-
-    def _input_device_options(*, use_wasapi: bool | None = None) -> dict[int, str]:
-        if not _refresh_backend_message():
+    # --- device options ----------------------------------------------------
+    def input_device_options(self, *, use_wasapi: bool | None = None) -> dict[int, str]:
+        if not self.refresh_backend_message():
             return {}
-        enabled = default_use_wasapi if use_wasapi is None else _measurement_use_wasapi_value(use_wasapi)
+        enabled = self.default_use_wasapi if use_wasapi is None else _measurement_use_wasapi_value(use_wasapi)
         if enabled:
-            input_devices = list_wasapi_input_devices(measurement_samplerate, channels=1)
+            input_devices = list_wasapi_input_devices(self.measurement_samplerate, channels=1)
         else:
-            input_devices = list_measurement_input_devices(measurement_samplerate, channels=1)
+            input_devices = list_measurement_input_devices(self.measurement_samplerate, channels=1)
         return {
-            int(device.index): _device_option_label(device, samplerate_hz=measurement_samplerate)
+            int(device.index): _device_option_label(device, samplerate_hz=self.measurement_samplerate)
             for device in input_devices
         }
 
-    def _output_device_options_for_role(role_value: str, *, use_wasapi: bool | None = None) -> dict[int, str]:
-        if not _refresh_backend_message():
+    def output_device_options_for_role(self, role_value: str, *, use_wasapi: bool | None = None) -> dict[int, str]:
+        if not self.refresh_backend_message():
             return {}
-        enabled = default_use_wasapi if use_wasapi is None else _measurement_use_wasapi_value(use_wasapi)
+        enabled = self.default_use_wasapi if use_wasapi is None else _measurement_use_wasapi_value(use_wasapi)
         required_channels = _measurement_required_output_channels(
             role_value,
             sub_output_channel=ctrl.value(
                 "measurement_sub_output_channel",
-                sub_output_default,
+                self.sub_output_default,
             ),
         )
         if enabled:
-            output_devices = list_wasapi_output_devices(measurement_samplerate, channels=required_channels)
+            output_devices = list_wasapi_output_devices(self.measurement_samplerate, channels=required_channels)
         else:
-            output_devices = list_measurement_output_devices(measurement_samplerate, channels=required_channels)
+            output_devices = list_measurement_output_devices(self.measurement_samplerate, channels=required_channels)
         return {
-            int(device.index): _device_option_label(device, samplerate_hz=measurement_samplerate)
+            int(device.index): _device_option_label(device, samplerate_hz=self.measurement_samplerate)
             for device in output_devices
         }
 
-    input_options = _input_device_options(use_wasapi=default_use_wasapi)
-    output_options = _output_device_options_for_role(default_role, use_wasapi=default_use_wasapi)
+    def refresh_input_device_options(self, use_wasapi: bool | None = None) -> None:
+        options = self.input_device_options(
+            use_wasapi=_measurement_use_wasapi_value(
+                ctrl.value("measurement_use_wasapi", self.default_use_wasapi)
+                if use_wasapi is None
+                else use_wasapi
+            )
+        )
+        ctrl.set_options("measurement_input_device", options)
+        current_value = _pick_measurement_device_value(
+            ctrl.value("measurement_input_device", None),
+            self.input_default,
+            options,
+        )
+        ctrl.set_value("measurement_input_device", current_value, emit=False)
 
-    def _build_request(role_override: str | None = None) -> MeasurementRequest:
+    def refresh_output_device_options(self, role_value: str | None = None, use_wasapi: bool | None = None) -> None:
+        normalized_role = _measurement_role_value(role_value or ctrl.value("measurement_role", self.default_role))
+        resolved_use_wasapi = _measurement_use_wasapi_value(
+            ctrl.value("measurement_use_wasapi", self.default_use_wasapi)
+            if use_wasapi is None
+            else use_wasapi
+        )
+        options = self.output_device_options_for_role(normalized_role, use_wasapi=resolved_use_wasapi)
+        ctrl.set_options("measurement_output_device", options)
+        current_value = _pick_measurement_device_value(
+            ctrl.value("measurement_output_device", None),
+            self.output_default,
+            options,
+        )
+        ctrl.set_value("measurement_output_device", current_value, emit=False)
+
+    def refresh_sub_output_channel_ui(self, role_value: str | None = None) -> None:
+        visible = _measurement_sub_output_channel_visible(
+            role_value or ctrl.value("measurement_role", self.default_role)
+        )
+        self.sub_output_channel_row.set_visibility(visible)
+        ctrl.set_enabled("measurement_sub_output_channel", visible)
+
+    # --- request building / capture ---------------------------------------
+    def build_request(self, role_override: str | None = None) -> MeasurementRequest:
         def _int(name: str, default: int) -> int:
             try:
                 return int(ctrl.value(name, default))
@@ -348,7 +397,7 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
 
         def _float_config(name: str, default: float) -> float:
             try:
-                return float(get_val(name, default))
+                return float(self.get_val(name, default))
             except (TypeError, ValueError, OverflowError):
                 return float(default)
 
@@ -374,7 +423,7 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
             role,
             sub_output_channel=ctrl.value(
                 "measurement_sub_output_channel",
-                sub_output_default,
+                self.sub_output_default,
             ),
         )
         session_channel_key = requested_role if requested_role in ("sub1", "sub2") else role
@@ -396,7 +445,7 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
             measurement_dither_level_db=_sanitize_measurement_dither_level_db(
                 ctrl.value(
                     "measurement_dither_level_db",
-                    get_val(
+                    self.get_val(
                         "measurement_dither_level_db",
                         DEFAULT_MEASUREMENT_DITHER_LEVEL_DB,
                     ),
@@ -413,17 +462,17 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
             session_channel_key=session_channel_key,
         )
 
-    def _run_measurement_thread() -> None:
-        request = _build_request()
-        _clear_session_preview_state()
-        measurement_state.set_busy(t("measurement_status_running"))
+    def run_measurement_thread(self) -> None:
+        request = self.build_request()
+        self.clear_session_preview_state()
+        measurement_state.set_busy(self.t("measurement_status_running"))
 
         def _run() -> None:
             try:
                 bundle = run_measurement_workflow(request)
                 measurement_state.set_result(
                     bundle,
-                    t("measurement_status_done").format(path=str(request.save_dir)),
+                    self.t("measurement_status_done").format(path=str(request.save_dir)),
                 )
                 if (
                     str(bundle.capture.request.role or "") == "left"
@@ -436,20 +485,21 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
 
         threading.Thread(target=_run, daemon=True).start()
 
-    def _run_audibility_test_thread() -> None:
-        request = _build_request()
-        measurement_state.set_busy(t("measurement_audibility_test_running"))
+    def run_audibility_test_thread(self) -> None:
+        request = self.build_request()
+        measurement_state.set_busy(self.t("measurement_audibility_test_running"))
 
         def _run() -> None:
             try:
                 run_audibility_test(request)
-                measurement_state.set_status(t("measurement_audibility_test_done"))
+                measurement_state.set_status(self.t("measurement_audibility_test_done"))
             except _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS as exc:
                 measurement_state.set_error(str(exc))
 
         threading.Thread(target=_run, daemon=True).start()
 
-    def _refresh_target_preview() -> None:
+    # --- bundle application ------------------------------------------------
+    def refresh_target_preview(self) -> None:
         try:
             from ..ng_tab_target import refresh_target_preview  # noqa: PLC0415
 
@@ -457,7 +507,7 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
         except (ImportError, AttributeError, RuntimeError, OSError):
             logger.exception("target preview refresh")
 
-    def _set_html_content(element, content: str) -> None:
+    def set_html_content(self, element, content: str) -> None:
         try:
             element.set_content(content)
         except _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS:
@@ -467,22 +517,22 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
             except _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS:
                 logger.exception("html element content set in measurement tab")
 
-    def _current_bundle():
-        bundles = dict(session_preview_state["bundles"])
+    def current_bundle(self):
+        bundles = dict(self.session_preview_state["bundles"])
         if bundles:
             selected_key = _session_preview_default_channel_key(
                 bundles,
-                preferred_channel_key=str(session_preview_state.get("selected_key", "") or ""),
+                preferred_channel_key=str(self.session_preview_state.get("selected_key", "") or ""),
             )
-            session_preview_state["selected_key"] = selected_key
+            self.session_preview_state["selected_key"] = selected_key
             if selected_key is not None:
                 return bundles.get(selected_key)
         snap = measurement_state.get_snapshot()
         bundle = snap.get("bundle", None)
         return bundle if isinstance(bundle, MeasurementBundle) else None
 
-    def _save_current_bundle() -> None:
-        bundle = _current_bundle()
+    def save_current_bundle(self) -> None:
+        bundle = self.current_bundle()
         if bundle is None:
             return
         save_dir = Path(
@@ -493,10 +543,10 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
         role = str(bundle.capture.request.role or "generic").strip().lower() or "generic"
         stem = "measurement" if role == "generic" else f"measurement_{role}"
         bundle.saved_paths = save_measurement_bundle(bundle, save_dir, stem)
-        measurement_state.set_result(bundle, t("measurement_status_saved").format(path=str(save_dir)))
+        measurement_state.set_result(bundle, self.t("measurement_status_saved").format(path=str(save_dir)))
 
-    def _apply_bundle(role: str) -> None:
-        bundle = _current_bundle()
+    def apply_bundle(self, role: str) -> None:
+        bundle = self.current_bundle()
         if bundle is None:
             return
         slot = "l" if role == "left" else "r"
@@ -505,12 +555,12 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
         ctrl.set_value(f"file_{slot}", source["upload"])
         ctrl.set_value(f"local_path_{slot}", "")
         ctrl.set_value(f"local_path_{slot}__legacy", "")
-        _refresh_target_preview()
+        self.refresh_target_preview()
         status_key = "measurement_status_applied_left" if role == "left" else "measurement_status_applied_right"
-        measurement_state.set_result(bundle, t(status_key))
+        measurement_state.set_result(bundle, self.t(status_key))
 
-    def _apply_bundle_as_sub(slot: int) -> None:
-        bundle = _current_bundle()
+    def apply_bundle_as_sub(self, slot: int) -> None:
+        bundle = self.current_bundle()
         if bundle is None:
             return
         file_key = "file_l_sub" if slot == 1 else "file_r_sub"
@@ -518,48 +568,45 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
         filename = f"measurement_sub{slot}_ir.wav"
         ctrl.set_value(file_key, bundle_to_upload_payload(bundle, filename=filename))
         ctrl.set_value(path_key, "")
-        _refresh_target_preview()
+        self.refresh_target_preview()
         status_key = "measurement_status_applied_sub1" if slot == 1 else "measurement_status_applied_sub2"
-        measurement_state.set_result(bundle, t(status_key))
+        measurement_state.set_result(bundle, self.t(status_key))
 
-    session_preview_state: dict[str, object] = {
-        "bundles": {},
-        "selected_key": None,
-    }
-
-    def _selected_session_preview_bundle() -> MeasurementBundle | None:
-        bundles = dict(session_preview_state["bundles"])
+    # --- guided session ----------------------------------------------------
+    def selected_session_preview_bundle(self) -> MeasurementBundle | None:
+        bundles = dict(self.session_preview_state["bundles"])
         selected_key = _session_preview_default_channel_key(
             bundles,
-            preferred_channel_key=str(session_preview_state.get("selected_key", "") or ""),
+            preferred_channel_key=str(self.session_preview_state.get("selected_key", "") or ""),
         )
-        session_preview_state["selected_key"] = selected_key
+        self.session_preview_state["selected_key"] = selected_key
         if selected_key is None:
             return None
         return bundles.get(selected_key)
 
-    def _set_session_preview_state(
+    def set_session_preview_state(
+        self,
         session: MeasurementSessionAggregate,
         *,
         preferred_channel_key: str | None = None,
     ) -> MeasurementBundle | None:
         bundles = _session_preview_bundles(session)
-        session_preview_state["bundles"] = bundles
-        session_preview_state["selected_key"] = _session_preview_default_channel_key(
+        self.session_preview_state["bundles"] = bundles
+        self.session_preview_state["selected_key"] = _session_preview_default_channel_key(
             bundles,
             preferred_channel_key=preferred_channel_key,
         )
-        return _selected_session_preview_bundle()
+        return self.selected_session_preview_bundle()
 
-    def _clear_session_preview_state() -> None:
-        session_preview_state["bundles"] = {}
-        session_preview_state["selected_key"] = None
+    def clear_session_preview_state(self) -> None:
+        self.session_preview_state["bundles"] = {}
+        self.session_preview_state["selected_key"] = None
 
-    def _on_session_start(status_text: str) -> None:
+    def on_session_start(self, status_text: str) -> None:
         measurement_state.set_busy(status_text)
 
-    def _on_session_complete(session: MeasurementSessionAggregate) -> None:
-        preview_bundle = _set_session_preview_state(session)
+    def on_session_complete(self, session: MeasurementSessionAggregate) -> None:
+        preview_bundle = self.set_session_preview_state(session)
         if preview_bundle is None:
             measurement_state.set_error("Guided measurement session completed without final results.")
             return
@@ -577,10 +624,10 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
         ):
             measurement_state.set_timing_reference(session.final_left_bundle.health.latency_ms)
 
-    def _on_session_error(error_text: str) -> None:
+    def on_session_error(self, error_text: str) -> None:
         measurement_state.set_error(error_text)
 
-    def _apply_session_results(session: MeasurementSessionAggregate) -> None:
+    def apply_session_results(self, session: MeasurementSessionAggregate) -> None:
         applied_roles: list[str] = []
         if session.final_left_bundle is not None:
             left_source = bundle_to_generated_source(session.final_left_bundle, role="left")
@@ -605,7 +652,7 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
             ctrl.set_value("local_path_r_sub", "")
             applied_roles.append("Sub 2")
 
-        preview_bundle = _set_session_preview_state(session)
+        preview_bundle = self.set_session_preview_state(session)
         if preview_bundle is not None:
             measurement_state.set_result(
                 preview_bundle,
@@ -617,57 +664,10 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
             and session.final_left_bundle.health.latency_reliable
         ):
             measurement_state.set_timing_reference(session.final_left_bundle.health.latency_ms)
-        _refresh_target_preview()
+        self.refresh_target_preview()
 
-    open_guided_session_dialog = build_measurement_session_dialog(
-        t=t,
-        build_request_for_role=_build_request,
-        apply_session_results=_apply_session_results,
-        on_session_start=_on_session_start,
-        on_session_complete=_on_session_complete,
-        on_session_error=_on_session_error,
-    )
-
-    def _refresh_input_device_options(use_wasapi: bool | None = None) -> None:
-        options = _input_device_options(
-            use_wasapi=_measurement_use_wasapi_value(
-                ctrl.value("measurement_use_wasapi", default_use_wasapi)
-                if use_wasapi is None
-                else use_wasapi
-            )
-        )
-        ctrl.set_options("measurement_input_device", options)
-        current_value = _pick_measurement_device_value(
-            ctrl.value("measurement_input_device", None),
-            input_default,
-            options,
-        )
-        ctrl.set_value("measurement_input_device", current_value, emit=False)
-
-    def _refresh_output_device_options(role_value: str | None = None, use_wasapi: bool | None = None) -> None:
-        normalized_role = _measurement_role_value(role_value or ctrl.value("measurement_role", default_role))
-        resolved_use_wasapi = _measurement_use_wasapi_value(
-            ctrl.value("measurement_use_wasapi", default_use_wasapi)
-            if use_wasapi is None
-            else use_wasapi
-        )
-        options = _output_device_options_for_role(normalized_role, use_wasapi=resolved_use_wasapi)
-        ctrl.set_options("measurement_output_device", options)
-        current_value = _pick_measurement_device_value(
-            ctrl.value("measurement_output_device", None),
-            output_default,
-            options,
-        )
-        ctrl.set_value("measurement_output_device", current_value, emit=False)
-
-    def _refresh_sub_output_channel_ui(role_value: str | None = None) -> None:
-        visible = _measurement_sub_output_channel_visible(
-            role_value or ctrl.value("measurement_role", default_role)
-        )
-        sub_output_channel_row.set_visibility(visible)
-        ctrl.set_enabled("measurement_sub_output_channel", visible)
-
-    async def _handle_calibration_upload(e) -> None:
+    # --- calibration upload ------------------------------------------------
+    async def handle_calibration_upload(self, e) -> None:
         payload = _build_upload_payload(
             filename=e.file.name,
             content=await e.file.read(),
@@ -677,27 +677,69 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
         filename = str(payload.get("filename", "") or "").strip()
         ctrl.set_value("measurement_mic_calibration_label", Path(filename).stem if filename else "")
 
-    def _refresh_calibration_upload_status() -> None:
+    def refresh_calibration_upload_status(self) -> None:
         payload = ctrl.value("measurement_mic_calibration_upload", None)
         if isinstance(payload, dict) and payload.get("content"):
-            upload_status.set_text(
-                t("measurement_mic_calibration_selected").format(
-                    name=str(payload.get("filename", "") or t("health_not_set"))
+            self.upload_status.set_text(
+                self.t("measurement_mic_calibration_selected").format(
+                    name=str(payload.get("filename", "") or self.t("health_not_set"))
                 )
             )
-            clear_calibration_btn.enable()
+            self.clear_calibration_btn.enable()
             return
-        upload_status.set_text(t("measurement_calibration_none"))
-        clear_calibration_btn.disable()
+        self.upload_status.set_text(self.t("measurement_calibration_none"))
+        self.clear_calibration_btn.disable()
 
-    def _clear_calibration_upload() -> None:
+    def clear_calibration_upload(self) -> None:
         ctrl.set_value("measurement_mic_calibration_upload", None)
         ctrl.set_value("measurement_mic_calibration_label", "")
 
+
+def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
+    from nicegui import ui
+
+    measurement_samplerate = int(
+        get_val("measurement_samplerate", DEFAULT_MEASUREMENT_SAMPLE_RATE) or DEFAULT_MEASUREMENT_SAMPLE_RATE
+    )
+    input_default = get_val("measurement_input_device", get_default_input_device_index())
+    output_default = get_val("measurement_output_device", get_default_output_device_index())
+    sub_output_default = _measurement_sub_output_channel_value(
+        get_val(
+            "measurement_sub_output_channel",
+            _measurement_sub_output_channel_default(),
+        )
+    )
+    default_role = _measurement_role_value(get_val("measurement_role", "left"))
+    default_use_wasapi = _measurement_use_wasapi_value(get_val("measurement_use_wasapi", False))
+
+    ctx = _MeasurementTabContext(
+        t=t,
+        ui=ui,
+        get_val=get_val,
+        measurement_samplerate=measurement_samplerate,
+        input_default=input_default,
+        output_default=output_default,
+        sub_output_default=sub_output_default,
+        default_role=default_role,
+        default_use_wasapi=default_use_wasapi,
+    )
+
+    input_options = ctx.input_device_options(use_wasapi=default_use_wasapi)
+    output_options = ctx.output_device_options_for_role(default_role, use_wasapi=default_use_wasapi)
+
+    open_guided_session_dialog = build_measurement_session_dialog(
+        t=t,
+        build_request_for_role=ctx.build_request,
+        apply_session_results=ctx.apply_session_results,
+        on_session_start=ctx.on_session_start,
+        on_session_complete=ctx.on_session_complete,
+        on_session_error=ctx.on_session_error,
+    )
+
     with page_shell(title=t("tab_measurement"), intro=t("measurement_page_intro")):
         with section_card(title=t("measurement_capture_section_title"), intro=t("measurement_intro")):
-            backend_message_label["widget"] = ui.label("").classes("w-full whitespace-pre-wrap text-sm text-red-400")
-            _set_backend_message(backend_message_state["value"])
+            ctx.backend_message_label["widget"] = ui.label("").classes("w-full whitespace-pre-wrap text-sm text-red-400")
+            ctx.set_backend_message(ctx.backend_message_state["value"])
 
             ctrl.register("generated_measurement_l", ctrl._ValueHolder(None))
             ctrl.register("generated_measurement_r", ctrl._ValueHolder(None))
@@ -769,13 +811,13 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
                 ui.button(
                     t("measurement_refresh_devices"),
                     on_click=lambda: (
-                        _refresh_input_device_options(),
-                        _refresh_output_device_options(),
+                        ctx.refresh_input_device_options(),
+                        ctx.refresh_output_device_options(),
                     ),
                 ).props('outline color="secondary"').classes("self-end")
 
-            sub_output_channel_row = ui.row().classes("w-full gap-4")
-            with sub_output_channel_row:
+            ctx.sub_output_channel_row = ui.row().classes("w-full gap-4")
+            with ctx.sub_output_channel_row:
                 ctrl.register(
                     "measurement_sub_output_channel",
                     ui.select(
@@ -805,21 +847,21 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
                 with ui.column().classes("flex-1 gap-2"):
                     ui.upload(
                         label=t("measurement_mic_calibration_upload"),
-                        on_upload=_handle_calibration_upload,
+                        on_upload=ctx.handle_calibration_upload,
                         auto_upload=True,
                     ).props('accept=".txt,.cal,.csv"').classes("w-full")
-                    upload_status = ui.label(t("measurement_calibration_none")).classes("text-xs text-gray-400")
+                    ctx.upload_status = ui.label(t("measurement_calibration_none")).classes("text-xs text-gray-400")
 
-                clear_calibration_btn = ui.button(
+                ctx.clear_calibration_btn = ui.button(
                     t("file_status_clear"),
-                    on_click=_clear_calibration_upload,
+                    on_click=ctx.clear_calibration_upload,
                 ).props('outline color="secondary"')
 
         with section_card(title=t("measurement_actions_section_title"), intro=t("measurement_actions_section_intro")):
-            start_btn = ui.button(t("measurement_start_button"), on_click=_run_measurement_thread).props('color="positive" unelevated').classes("w-full")
+            start_btn = ui.button(t("measurement_start_button"), on_click=ctx.run_measurement_thread).props('color="positive" unelevated').classes("w-full")
             audibility_test_btn = ui.button(
                 t("measurement_audibility_test_button"),
-                on_click=_run_audibility_test_thread,
+                on_click=ctx.run_audibility_test_thread,
             ).props('outline color="secondary"').classes("w-full")
             guided_session_btn = ui.button(
                 t("measurement_guided_session_button"),
@@ -832,9 +874,9 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
             summary_html = ui.html("")
             warnings_label = ui.label("").classes("whitespace-pre-wrap text-sm")
             with ui.row().classes("w-full gap-3"):
-                save_btn = ui.button(t("measurement_save_ir"), on_click=_save_current_bundle).props('outline color="secondary"')
-                apply_left_btn = ui.button(t("measurement_apply_left"), on_click=lambda: _apply_bundle("left")).props('outline color="secondary"')
-                apply_right_btn = ui.button(t("measurement_apply_right"), on_click=lambda: _apply_bundle("right")).props('outline color="secondary"')
+                save_btn = ui.button(t("measurement_save_ir"), on_click=ctx.save_current_bundle).props('outline color="secondary"')
+                apply_left_btn = ui.button(t("measurement_apply_left"), on_click=lambda: ctx.apply_bundle("left")).props('outline color="secondary"')
+                apply_right_btn = ui.button(t("measurement_apply_right"), on_click=lambda: ctx.apply_bundle("right")).props('outline color="secondary"')
                 clear_ref_btn = ui.button(t("measurement_left_ref_clear"), on_click=measurement_state.clear_timing_reference).props('outline color="secondary"')
             session_preview_selector_row = ui.row().classes("w-full gap-3 items-center")
             with session_preview_selector_row:
@@ -850,7 +892,7 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
         last_nonce = {"value": -1}
 
         def _refresh_session_preview_selector() -> None:
-            bundles = dict(session_preview_state["bundles"])
+            bundles = dict(ctx.session_preview_state["bundles"])
             options = _session_preview_channel_options(bundles, t)
             visible = len(options) > 1
             try:
@@ -860,9 +902,9 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
                 session_preview_channel.update()
             selected_key = _session_preview_default_channel_key(
                 bundles,
-                preferred_channel_key=str(session_preview_state.get("selected_key", "") or ""),
+                preferred_channel_key=str(ctx.session_preview_state.get("selected_key", "") or ""),
             )
-            session_preview_state["selected_key"] = selected_key
+            ctx.session_preview_state["selected_key"] = selected_key
             if selected_key != session_preview_channel.value:
                 try:
                     session_preview_channel.set_value(selected_key)
@@ -874,7 +916,7 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
         def _render_bundle(bundle: MeasurementBundle | None, timing_ref_latency_ms: float | None = None) -> None:
             _refresh_session_preview_selector()
             if bundle is None:
-                _set_html_content(summary_html, "")
+                ctx.set_html_content(summary_html, "")
                 warnings_label.set_text("")
                 plot_scope.clear()
                 plot_ref["widget"] = None
@@ -884,7 +926,7 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
                 clear_ref_btn.disable()
                 return
 
-            _set_html_content(summary_html, _measurement_summary_html(bundle, t, timing_ref_latency_ms))
+            ctx.set_html_content(summary_html, _measurement_summary_html(bundle, t, timing_ref_latency_ms))
             warnings = list(bundle.health.warnings)
             warnings_label.set_text("\n".join(warnings) if warnings else t("measurement_no_warnings"))
             save_btn.enable()
@@ -908,10 +950,10 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
 
         def _on_session_preview_channel_change(e) -> None:
             selected_key = str(getattr(e, "value", "") or "").strip().lower()
-            session_preview_state["selected_key"] = selected_key or None
+            ctx.session_preview_state["selected_key"] = selected_key or None
             snap = measurement_state.get_snapshot()
             ref_ms = snap.get("timing_ref_latency_ms", None)
-            _render_bundle(_selected_session_preview_bundle(), timing_ref_latency_ms=ref_ms)
+            _render_bundle(ctx.selected_session_preview_bundle(), timing_ref_latency_ms=ref_ms)
 
         session_preview_channel.on_value_change(_on_session_preview_channel_change)
 
@@ -937,31 +979,31 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:  # noqa: C
             if int(snap.get("nonce", -1) or -1) == int(last_nonce["value"]):
                 return
             last_nonce["value"] = int(snap.get("nonce", -1) or -1)
-            bundle = _current_bundle()
+            bundle = ctx.current_bundle()
             _render_bundle(bundle if isinstance(bundle, MeasurementBundle) else None, timing_ref_latency_ms=ref_ms)
 
-        ctrl.get("measurement_mic_calibration_upload").on_value_change(lambda _e: _refresh_calibration_upload_status())
+        ctrl.get("measurement_mic_calibration_upload").on_value_change(lambda _e: ctx.refresh_calibration_upload_status())
         ctrl.get("measurement_role").on_value_change(
             lambda e: (
-                _refresh_sub_output_channel_ui(e.value),
-                _refresh_output_device_options(e.value),
+                ctx.refresh_sub_output_channel_ui(e.value),
+                ctx.refresh_output_device_options(e.value),
             )
         )
         ctrl.get("measurement_use_wasapi").on_value_change(
             lambda e: (
-                _refresh_input_device_options(e.value),
-                _refresh_output_device_options(ctrl.value("measurement_role", default_role), e.value),
+                ctx.refresh_input_device_options(e.value),
+                ctx.refresh_output_device_options(ctrl.value("measurement_role", default_role), e.value),
             )
         )
         ctrl.get("measurement_sub_output_channel").on_value_change(
-            lambda e: _refresh_output_device_options(
+            lambda e: ctx.refresh_output_device_options(
                 ctrl.value("measurement_role", default_role),
             )
         )
-        _refresh_sub_output_channel_ui(default_role)
-        _refresh_input_device_options(default_use_wasapi)
-        _refresh_output_device_options(default_role, default_use_wasapi)
-        _refresh_calibration_upload_status()
+        ctx.refresh_sub_output_channel_ui(default_role)
+        ctx.refresh_input_device_options(default_use_wasapi)
+        ctx.refresh_output_device_options(default_role, default_use_wasapi)
+        ctx.refresh_calibration_upload_status()
         _refresh_session_preview_selector()
         _render_bundle(None)
         ui.timer(0.4, _refresh_view)
