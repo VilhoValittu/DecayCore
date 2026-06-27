@@ -27,6 +27,7 @@ from .export_scoring import (
 from .export_summary_text import (
     _append_acoustic_events,
     _append_dsp_effective_params,
+    _append_export_decision_summary,
     _append_realized_phase_limit,
 )
 
@@ -35,6 +36,7 @@ __all__ = [
     "save_export_bundle",
     "_append_acoustic_events",
     "_append_dsp_effective_params",
+    "_append_export_decision_summary",
     "_append_export_ranking",
     "_append_realized_phase_limit",
     "_build_export_ranking",

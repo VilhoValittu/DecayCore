@@ -43,6 +43,8 @@ def _record_measurement_matches(record: dict, measurement_identity: str | None) 
     if not measurement_identity:
         return True, "ok"
     record_msig = str(record.get("measurement_identity", record.get("measurement_sig", "")) or "")
+    if not record_msig:
+        return False, "cache measurement missing"
     if record_msig and record_msig != str(measurement_identity):
         return False, "cache measurement mismatch"
     return True, "ok"

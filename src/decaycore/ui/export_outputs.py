@@ -19,6 +19,7 @@ from .export_scoring import _append_export_ranking
 from .export_summary_text import (
     _append_acoustic_events,
     _append_dsp_effective_params,
+    _append_export_decision_summary,
     _append_lr_difference_summary,
     _append_realized_phase_limit,
     _append_leveling_summary,
@@ -461,6 +462,7 @@ def _build_summary_text(
             summary_content = f"House curve: {hc_src}\n" + summary_content
     except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
         logger.exception("house curve summary prefix")
+    summary_content = _append_export_decision_summary(summary_content, data, fs_v, l_st, r_st)
     summary_content = _append_dsp_effective_params(summary_content, data, fs_v)
     summary_content = _append_realized_phase_limit(summary_content, data, l_st, r_st)
     summary_content = _append_leveling_summary(summary_content, l_st, r_st)

@@ -237,11 +237,100 @@ def _update_signature_harmonic_hashes(h, measurements: dict) -> None:
     _update_signature_harmonic_risk_summaries(h, measurements)
 
 
+def _bass_integration_signature_enabled(measurements: dict) -> bool:
+    for key in ("bass_integration_enabled", "bass_integration_enable"):
+        if key in measurements:
+            return bool(measurements.get(key, False))
+    ui_data = measurements.get("ui_data")
+    if isinstance(ui_data, dict):
+        for key in ("bass_integration_enabled", "bass_integration_enable"):
+            if key in ui_data:
+                return bool(ui_data.get(key, False))
+    return measurements.get("bass_integration_bundle") is not None
+
+
+def _bass_integration_scalar_payload(measurements: dict, bundle) -> dict:
+    ui_data = measurements.get("ui_data")
+    ui_data = dict(ui_data or {}) if isinstance(ui_data, dict) else {}
+    meta = dict(ui_data.get("_bass_integration_meta", {}) or {}) if isinstance(ui_data.get("_bass_integration_meta", {}), dict) else {}
+    diagnostics = dict(getattr(bundle, "diagnostics", {}) or {})
+
+    def _pick(key: str, default: object = "") -> object:
+        if key in measurements:
+            return measurements.get(key)
+        if key in ui_data:
+            return ui_data.get(key)
+        return default
+
+    return {
+        "bass_integration_enabled": True,
+        "avr_crossover_hz": float(_auto_safe_float(_pick("avr_crossover_hz", float("nan")), float("nan"))),
+        "direct_dac_sub_lpf_hz": float(_auto_safe_float(_pick("direct_dac_sub_lpf_hz", float("nan")), float("nan"))),
+        "bass_integration_profile": str(_pick("bass_integration_profile", "") or ""),
+        "bass_integration_mode": "direct_dac",
+        "bass_integration_sub_combine_mode": str(_pick("bass_integration_sub_combine_mode", "") or ""),
+        "bass_integration_sub_delay_ms": float(_auto_safe_float(_pick("bass_integration_sub_delay_ms", float("nan")), float("nan"))),
+        "bass_integration_sub_array_delay_ms": float(
+            _auto_safe_float(_pick("bass_integration_sub_array_delay_ms", float("nan")), float("nan"))
+        ),
+        "bass_integration_sub1_delay_ms": float(_auto_safe_float(_pick("bass_integration_sub1_delay_ms", float("nan")), float("nan"))),
+        "bass_integration_sub2_delay_ms": float(_auto_safe_float(_pick("bass_integration_sub2_delay_ms", float("nan")), float("nan"))),
+        "bass_integration_main_l_delay_ms": float(
+            _auto_safe_float(_pick("bass_integration_main_l_delay_ms", float("nan")), float("nan"))
+        ),
+        "bass_integration_main_r_delay_ms": float(
+            _auto_safe_float(_pick("bass_integration_main_r_delay_ms", float("nan")), float("nan"))
+        ),
+        "bass_integration_sub_polarity_invert": bool(_pick("bass_integration_sub_polarity_invert", False)),
+        "bass_integration_sub_gain_trim_db": float(
+            _auto_safe_float(_pick("bass_integration_sub_gain_trim_db", float("nan")), float("nan"))
+        ),
+        "bass_integration_alignment_auto_applied": bool(_pick("bass_integration_alignment_auto_applied", False)),
+        "bass_integration_allpass_auto_enable": bool(_pick("bass_integration_allpass_auto_enable", False)),
+        "bass_integration_allpass_auto_applied": bool(_pick("bass_integration_allpass_auto_applied", False)),
+        "bass_integration_allpass_freq_hz": float(
+            _auto_safe_float(_pick("bass_integration_allpass_freq_hz", float("nan")), float("nan"))
+        ),
+        "bass_integration_allpass_q": float(_auto_safe_float(_pick("bass_integration_allpass_q", float("nan")), float("nan"))),
+        "bass_integration_sub_topology": str(meta.get("sub_topology", diagnostics.get("sub_topology", "")) or ""),
+        "recommended_crossover_hz": float(
+            _auto_safe_float(meta.get("recommended_crossover_hz", float("nan")), float("nan"))
+        ),
+        "recommended_sub_lpf_hz": float(
+            _auto_safe_float(meta.get("recommended_sub_lpf_hz", float("nan")), float("nan"))
+        ),
+        "dual_sub_preprocessing": {
+            key: diagnostics.get(key)
+            for key in (
+                "dual_sub_preprocessing_applied",
+                "dual_sub_preprocessing_version",
+                "dual_sub_combined_method",
+                "dual_sub_relative_delay_samples",
+                "dual_sub_peak_relative_delay_ms",
+                "dual_sub_relative_delay_ms",
+                "dual_sub_phase_refined",
+                "dual_sub_phase_refined_rms_deg_30_100",
+                "dual_sub_sub1_delay_ms",
+                "dual_sub_sub2_delay_ms",
+                "sub_array_delay_ms",
+                "sub1_delay_ms",
+                "sub2_delay_ms",
+                "sub_array_phase_rms_deg_30_100",
+                "predicted_sub_array_gain_db_30_100",
+                "dual_sub_original_sub_combine_mode",
+                "sub_combine_mode",
+            )
+        },
+    }
+
+
 def _update_signature_bass_integration(h, measurements: dict) -> None:
-    if not bool(measurements.get("bass_integration_enabled", False)):
+    if not _bass_integration_signature_enabled(measurements):
         return
+    h.update(b"bass-integration-v2:")
     bundle = measurements.get("bass_integration_bundle")
     for attr_name in ("l_main", "r_main", "l_sub", "r_sub"):
+        h.update(str(attr_name).encode("utf-8", "ignore"))
         comp = getattr(bundle, attr_name, None)
         freqs = getattr(comp, "freqs_hz", None)
         spec = getattr(comp, "complex_spec", None)
@@ -252,33 +341,7 @@ def _update_signature_bass_integration(h, measurements: dict) -> None:
     try:
         h.update(
             json.dumps(
-                {
-                    "avr_crossover_hz": float(_auto_safe_float(measurements.get("avr_crossover_hz", float("nan")), float("nan"))),
-                    "bass_integration_profile": str(measurements.get("bass_integration_profile", "") or ""),
-                    "bass_integration_mode": "direct_dac",
-                    "dual_sub_preprocessing": {
-                        key: dict(getattr(bundle, "diagnostics", {}) or {}).get(key)
-                        for key in (
-                            "dual_sub_preprocessing_applied",
-                            "dual_sub_preprocessing_version",
-                            "dual_sub_combined_method",
-                            "dual_sub_relative_delay_samples",
-                            "dual_sub_peak_relative_delay_ms",
-                            "dual_sub_relative_delay_ms",
-                            "dual_sub_phase_refined",
-                            "dual_sub_phase_refined_rms_deg_30_100",
-                            "dual_sub_sub1_delay_ms",
-                            "dual_sub_sub2_delay_ms",
-                            "sub_array_delay_ms",
-                            "sub1_delay_ms",
-                            "sub2_delay_ms",
-                            "sub_array_phase_rms_deg_30_100",
-                            "predicted_sub_array_gain_db_30_100",
-                            "dual_sub_original_sub_combine_mode",
-                            "sub_combine_mode",
-                        )
-                    },
-                },
+                _bass_integration_scalar_payload(measurements, bundle),
                 sort_keys=True,
             ).encode("utf-8", "ignore")
         )

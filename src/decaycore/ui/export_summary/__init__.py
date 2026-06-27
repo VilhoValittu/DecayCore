@@ -14,6 +14,7 @@ from .bass_integration import (
 )
 from .dsp_effective import (
     _append_dsp_effective_params,
+    _append_export_decision_summary,
     _append_realized_phase_limit,
 )
 from .events import (
@@ -37,6 +38,7 @@ __all__ = [
     '_append_bass_integration_allpass_auto_summary',
     '_append_bass_integration_summary',
     '_append_dsp_effective_params',
+    '_append_export_decision_summary',
     '_append_leveling_summary',
     '_append_lr_difference_summary',
     '_append_main_speaker_xo_hpf_summary',
