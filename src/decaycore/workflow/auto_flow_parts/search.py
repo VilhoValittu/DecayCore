@@ -234,6 +234,8 @@ def _auto_mode_store_search_meta(
         },
         "top": list(auto_res.get("top", []) or []),
         "winner_explanation": dict(auto_res.get("winner_explanation", {}) or {}),
+        "audit_trail": dict(auto_res.get("audit_trail", {}) or {}),
+        "residual_peak_safety_override": dict(auto_res.get("residual_peak_safety_override", {}) or {}),
     }
     best_rank_official = official_rank_score(best_metrics)
     status_cb(
@@ -372,4 +374,3 @@ __all__ = [
     '_run_auto_mode_search_if_needed',
     '_run_auto_mode_search',
 ]
-

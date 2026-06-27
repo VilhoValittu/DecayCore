@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 from ..auto_mode_profile import profiled_section
+from ..audit_trail import build_auto_mode_audit_trail
 from ..candidate_generation import _seed_auto_mode_candidate_optuna_params
 from ..rank_score import attach_official_rank_score
 from ..scoring_ranking import maybe_override_hard_failed_winner
@@ -172,6 +173,63 @@ def _return_cached_result(
         str(meta.get("reason", "") or "") != "cache_fast_finalize_skips_winner_polish"
         for meta in polish_meta
     )
+    phase4_steps = {
+        "pareto_finalize": False,
+        "winner_polish": bool(winner_polish_ran),
+        "final_validation": False,
+        "cache_save": True,
+        "cache_materialize": True,
+    }
+    winner_explanation = {
+        "summary": _cache_refine_winner_summary(
+            seed_source,
+            improved_any=bool(cached_state.get("improved_any", False)),
+        ),
+        "reasons": [],
+        "deltas": {},
+        "phase_label": str(winner_phase_label),
+        "target_name": str(cached_state.get("cache_target_name", "n/a") or "n/a"),
+    }
+    debug = _attach_cached_debug(
+        best_metrics=best_metrics,
+        residual_peak_safety_override_meta=residual_peak_safety_override_meta,
+    )
+    audit_trail = build_auto_mode_audit_trail(
+        best_metrics=best_metrics,
+        best_preset=dict(materialized.get("best_applied_preset", materialized.get("best_preset", {})) or {}),
+        winner_explanation=winner_explanation,
+        residual_peak_safety_override_meta=residual_peak_safety_override_meta,
+        optimizer_backend=str(optimizer_backend or "builtin"),
+        goal=str(goal),
+        selection_basis=str(rank_basis),
+        target_name=str(cached_state.get("cache_target_name", "n/a") or "n/a"),
+        top=[],
+        cache_info=debug,
+        polish_meta={
+            "phase_limit_winner_polish": dict(phase_limit_cache_meta or {}),
+            "mag_c_min_winner_polish": dict(mag_c_min_cache_meta or {}),
+            "low_bass_cut_winner_polish": dict(low_bass_cut_cache_meta or {}),
+            "hpf_winner_polish": dict(hpf_cache_meta or {}),
+            "excess_phase_strength_winner_polish": dict(eps_cache_meta or {}),
+            "residual_peak_winner_polish": dict(residual_peak_cache_meta or {}),
+            "tdc_strength_winner_polish": dict(tdc_strength_cache_meta or {}),
+            "stereo_policy_refine": _public_stereo_policy_refine_meta(stereo_cache_meta),
+        },
+        phase1_ok=0,
+        phase2_ok=int(executed_micro_trials_total),
+        phase1_tried=0,
+        phase2_tried=int(executed_micro_trials_total),
+        phase1_plateau_hit=False,
+        phase2_plateau_hit=bool(str(stop_reason) in ("no_improvement", "below_threshold")),
+        phase3_total=int(executed_micro_trials_total),
+        phase3_ok=int(executed_micro_trials_total),
+        phase4_steps=phase4_steps,
+        fs_v=int(fs_v),
+        taps_v=int(taps_v),
+        trials_total=int(executed_micro_trials_total),
+        trials_ok=int(executed_micro_trials_total),
+        source=str(seed_source or "exact_cache"),
+    )
     return {
         "best_result": materialized.get("best_result"),
         "best_metrics": dict(best_metrics or {}),
@@ -182,21 +240,10 @@ def _return_cached_result(
             "rank_score_components": dict(score.get("winner_components", {}) or {}),
             "rank_score_breakdown": dict(best_metrics.get("rank_score_breakdown", {}) or {}),
         },
-        "auto_mode_debug": _attach_cached_debug(
-            best_metrics=best_metrics,
-            residual_peak_safety_override_meta=residual_peak_safety_override_meta,
-        ),
+        "auto_mode_debug": dict(debug),
+        "audit_trail": dict(audit_trail),
         "residual_peak_safety_override": dict(residual_peak_safety_override_meta or {}),
-        "winner_explanation": {
-            "summary": _cache_refine_winner_summary(
-                seed_source,
-                improved_any=bool(cached_state.get("improved_any", False)),
-            ),
-            "reasons": [],
-            "deltas": {},
-            "phase_label": str(winner_phase_label),
-            "target_name": str(cached_state.get("cache_target_name", "n/a") or "n/a"),
-        },
+        "winner_explanation": dict(winner_explanation),
         "best_auto_exc_freq_hz": float(score.get("cached_best_auto_exc_hz", float("nan"))),
         "phase_limit_winner_polish": dict(phase_limit_cache_meta or {}),
         "mag_c_min_winner_polish": dict(mag_c_min_cache_meta or {}),
@@ -219,13 +266,7 @@ def _return_cached_result(
         "trials_phase3_total": int(executed_micro_trials_total),
         "trials_phase3_ok": int(executed_micro_trials_total),
         "phase4_finalize": True,
-        "phase4_steps": {
-            "pareto_finalize": False,
-            "winner_polish": bool(winner_polish_ran),
-            "final_validation": False,
-            "cache_save": True,
-            "cache_materialize": True,
-        },
+        "phase4_steps": dict(phase4_steps),
         "optuna_phase1_telemetry": {},
         "optuna_phase2_local_telemetry": [],
         "optuna_phase3_micro_telemetry": dict(cache_refine_rollup_tel or {}),
@@ -238,4 +279,3 @@ def _return_cached_result(
 
 
 __all__ = ['_materialize_cached_result', '_return_cached_result']
-

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 
+from ...auto_mode.audit_trail import build_auto_mode_audit_trail
 from ...auto_mode.rank_score import attach_official_rank_score, official_rank_score
 from ...version import VERSION
 
@@ -131,6 +132,49 @@ def _pick(stats: list[dict], keys: list[str], default: float | None = None) -> f
     if not vals:
         return default
     return float(max(vals, key=abs)) if len(vals) > 1 else float(vals[0])
+
+def _build_auto_audit_metrics(auto_meta: dict, best_metrics: dict) -> dict:
+    if not auto_meta and not best_metrics:
+        return {}
+    audit = dict(auto_meta.get("audit_trail", {}) or {}) if isinstance(auto_meta, dict) else {}
+    if not audit:
+        audit = build_auto_mode_audit_trail(
+            best_metrics=best_metrics,
+            best_preset=dict(auto_meta.get("best_preset", {}) or {}),
+            winner_explanation=dict(auto_meta.get("winner_explanation", {}) or {}),
+            residual_peak_safety_override_meta=dict(auto_meta.get("residual_peak_safety_override", {}) or {}),
+            optimizer_backend=str(auto_meta.get("optimizer_backend", "builtin") or "builtin"),
+            goal=str(auto_meta.get("auto_goal", "balanced") or "balanced"),
+            selection_basis=str(auto_meta.get("selection_basis", "rank_score") or "rank_score"),
+            top=list(auto_meta.get("top", []) or []),
+            phase1_ok=int(auto_meta.get("trials_phase1_ok", 0) or 0),
+            phase2_ok=int(auto_meta.get("trials_phase2_ok", 0) or 0),
+            phase1_tried=int(auto_meta.get("trials_phase1_total", 0) or 0),
+            phase2_tried=int(auto_meta.get("trials_phase2_total", 0) or 0),
+            phase3_total=int(auto_meta.get("trials_phase3_total", 0) or 0),
+            phase3_ok=int(auto_meta.get("trials_phase3_ok", 0) or 0),
+            phase4_steps=dict(auto_meta.get("phase4_steps", {}) or {}),
+            fs_v=int(auto_meta.get("search_fs", 0) or 0),
+            taps_v=int(auto_meta.get("search_taps", 0) or 0),
+            trials_total=int(auto_meta.get("trials_total", 0) or 0),
+            trials_ok=int(auto_meta.get("trials_ok", 0) or 0),
+            source="headless_reconstructed",
+        )
+    selection = dict(audit.get("selection", {}) or {})
+    winner = dict(audit.get("winner", {}) or {})
+    hard_gates = dict(audit.get("hard_gates", {}) or {})
+    search = dict(audit.get("search", {}) or {})
+    return {
+        "schema_version": int(audit.get("schema_version", 1) or 1),
+        "winner_summary": str(winner.get("summary", "") or ""),
+        "hard_gate_status": str(hard_gates.get("status", "passed") or "passed"),
+        "hard_gate_failures": list(hard_gates.get("hard_gate_failures", []) or []),
+        "rank_score_official": _f(winner.get("rank_score_official"), None),
+        "avg_score": _f(winner.get("avg_score"), None),
+        "trials_ok": int(search.get("trials_ok", auto_meta.get("trials_ok", 0)) or 0),
+        "trials_total": int(search.get("trials_total", auto_meta.get("trials_total", 0)) or 0),
+        "optimizer_backend": str(selection.get("optimizer_backend", auto_meta.get("optimizer_backend", "")) or ""),
+    }
 
 def _extract_rt60(rt60: dict, ctx: dict | None) -> dict[str, float]:
     out: dict[str, float] = {}
@@ -299,6 +343,7 @@ def _build_metrics(status: str, data: dict, ctx: dict | None, metadata: dict, rt
         "selected_house_curve": str(data.get("hc_mode", "") or ""),
         "metrics": {k: v for k, v in metrics.items() if v is not None},
         "bass_integration": bass,
+        "auto_audit": _build_auto_audit_metrics(auto_meta, best_metrics),
         "rt60": rt60,
         "harmonics": harmonics,
         "metadata": metadata,

@@ -16,6 +16,7 @@ import logging
 
 import numpy as np
 
+from .audit_trail import build_auto_mode_audit_trail
 from .auto_mode_profile import profiled_section
 from .cache_signature import _auto_cache_stats_snapshot
 from .rank_score import attach_official_rank_score
@@ -469,6 +470,43 @@ def _build_final_search_result(
         )
     )
     winner_components = dict(best_metrics.get("rank_score_components", {}) or {})
+    phase4_steps = {
+        "pareto_finalize": True,
+        "winner_polish": True,
+        "final_validation": True,
+        "cache_save": True,
+    }
+    cache_info = {
+        "cache_schema_version": int(AUTO_MODE_CACHE_SCHEMA_VERSION),
+        "cache_stats": _auto_cache_stats_snapshot(),
+    }
+    audit_trail = build_auto_mode_audit_trail(
+        best_metrics=best_metrics,
+        best_preset=materialized_best_preset or cached_best_preset,
+        winner_explanation=dict(search_state.winner_explanation or {}),
+        residual_peak_safety_override_meta=dict(residual_peak_safety_override_meta or {}),
+        optimizer_backend=str(optimizer_backend or "builtin"),
+        goal=str(goal),
+        selection_basis=str(rank_basis),
+        target_name=str(dict(search_state.winner_explanation or {}).get("target_name", "") or ""),
+        top=list(top or []),
+        cache_info=cache_info,
+        polish_meta=polish_meta,
+        phase1_ok=int(phase1_ok),
+        phase2_ok=int(phase2_ok),
+        phase1_tried=int(phase1_tried),
+        phase2_tried=int(phase2_tried),
+        phase1_plateau_hit=bool(phase1_plateau_hit),
+        phase2_plateau_hit=bool(phase2_plateau_hit),
+        phase3_total=int(dict(phase3_micro_optuna_tel or {}).get("n_total", 0) or 0),
+        phase3_ok=int(dict(phase3_micro_optuna_tel or {}).get("ok", 0) or 0),
+        phase4_steps=phase4_steps,
+        fs_v=int(fs_v),
+        taps_v=int(taps_v),
+        trials_total=int(phase1_tried + phase2_tried),
+        trials_ok=int(len(search_state.scored)),
+        source="search",
+    )
     return {
         "best_result": search_state.best_result,
         "best_metrics": dict(best_metrics),
@@ -481,12 +519,13 @@ def _build_final_search_result(
         },
         "auto_mode_debug": {
             "cache_schema_version": int(AUTO_MODE_CACHE_SCHEMA_VERSION),
-            "cache_stats": _auto_cache_stats_snapshot(),
+            "cache_stats": dict(cache_info.get("cache_stats", {}) or {}),
             "winning_score_breakdown": dict(best_metrics.get("rank_score_breakdown", {}) or {}),
             "top3_score_breakdowns": _build_top_score_breakdowns(top),
             "residual_peak_safety_override": dict(residual_peak_safety_override_meta or {}),
             "modal_intelligence": _build_modal_intelligence_debug(best_metrics, polish_meta),
         },
+        "audit_trail": dict(audit_trail),
         "residual_peak_safety_override": dict(residual_peak_safety_override_meta or {}),
         "winner_explanation": dict(search_state.winner_explanation or {}),
         "phase_limit_winner_polish": dict(polish_meta.get("phase_limit_winner_polish", {}) or {}),
@@ -511,12 +550,7 @@ def _build_final_search_result(
         "trials_phase3_total": int(dict(phase3_micro_optuna_tel or {}).get("n_total", 0) or 0),
         "trials_phase3_ok": int(dict(phase3_micro_optuna_tel or {}).get("ok", 0) or 0),
         "phase4_finalize": True,
-        "phase4_steps": {
-            "pareto_finalize": True,
-            "winner_polish": True,
-            "final_validation": True,
-            "cache_save": True,
-        },
+        "phase4_steps": dict(phase4_steps),
         "optuna_phase1_telemetry": dict(phase1_optuna_tel or {}),
         "optuna_phase2_local_telemetry": list(phase2_local_optuna_tels or []),
         "optuna_phase3_micro_telemetry": dict(phase3_micro_optuna_tel or {}),

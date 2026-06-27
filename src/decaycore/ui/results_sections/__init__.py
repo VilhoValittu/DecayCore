@@ -19,6 +19,7 @@ from .overview import (
     _build_auto_polish_lines,
     _append_auto_polish_to_status_log,
     _build_p6_validation_block,
+    _build_auto_audit_markdown,
     _render_auto_diagnostics,
     _update_crossover_recommendation_label,
 )
@@ -36,6 +37,7 @@ from .quality import (
 __all__ = [
     '_append_auto_polish_to_status_log',
     '_build_auto_polish_lines',
+    '_build_auto_audit_markdown',
     '_build_p6_validation_block',
     '_esc',
     '_fmt_biquad',

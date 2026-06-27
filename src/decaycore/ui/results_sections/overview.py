@@ -41,6 +41,7 @@ _PLOT_RENDER_CACHE: dict = {}
 
 from ...config.legacy_keys import is_auto_mode
 from ...resources.i8n.decaycore_i18n import t
+from ...auto_mode.audit_trail import build_auto_mode_audit_trail
 from ...auto_mode.rank_score import calibrated_auto_quality
 from .. import decaycore_plot as plots
 from .. import ui_state
@@ -646,6 +647,141 @@ def _build_p6_validation_block(best_metrics: dict) -> str | None:
 
     return "\n\n".join(lines)
 
+def _auto_audit_fmt(value: Any, *, precision: int = 3) -> str:
+    v = safe_float(value, float("nan"))
+    return f"{float(v):.{int(precision)}f}" if math.isfinite(v) else "n/a"
+
+def _audit_dict(value: Any) -> dict:
+    return dict(value or {}) if isinstance(value, dict) else {}
+
+def _audit_list(value: Any) -> list:
+    return list(value or []) if isinstance(value, (list, tuple)) else []
+
+def _audit_status_label(status: str) -> str:
+    key = {
+        "passed": "results_auto_diag_audit_status_passed",
+        "failed": "results_auto_diag_audit_status_failed",
+        "failed_fallback": "results_auto_diag_audit_status_failed_fallback",
+    }.get(str(status or "").strip().lower())
+    if key:
+        return t(key)
+    return str(status or "n/a").replace("_", " ")
+
+def _audit_override_label(applied: bool) -> str:
+    return t("results_auto_diag_audit_override_applied" if bool(applied) else "results_auto_diag_audit_override_not_applied")
+
+def _audit_reason_text(reason: Any) -> str:
+    return str(reason or "").strip().replace("_", " ")
+
+def _auto_audit_from_meta(data: dict, auto_meta: dict, bm: dict) -> dict:
+    audit = _audit_dict(auto_meta.get("audit_trail"))
+    if audit:
+        return dict(audit)
+    return build_auto_mode_audit_trail(
+        best_metrics=bm,
+        best_preset=_audit_dict(auto_meta.get("best_preset")),
+        winner_explanation=_audit_dict(auto_meta.get("winner_explanation")),
+        residual_peak_safety_override_meta=_audit_dict(auto_meta.get("residual_peak_safety_override")),
+        optimizer_backend=str(auto_meta.get("optimizer_backend", "builtin") or "builtin"),
+        goal=str(auto_meta.get("auto_goal", data.get("auto_goal", "balanced")) or "balanced"),
+        selection_basis=str(auto_meta.get("selection_basis", "rank_score") or "rank_score"),
+        target_name=str(_audit_dict(auto_meta.get("winner_explanation")).get("target_name", "") or ""),
+        target_meta=_audit_dict(data.get("_auto_target_curve_meta")),
+        top=_audit_list(auto_meta.get("top")),
+        cache_info={},
+        polish_meta=auto_meta,
+        phase1_ok=int(auto_meta.get("trials_phase1_ok", 0) or 0),
+        phase2_ok=int(auto_meta.get("trials_phase2_ok", 0) or 0),
+        phase1_tried=int(auto_meta.get("trials_phase1_total", 0) or 0),
+        phase2_tried=int(auto_meta.get("trials_phase2_total", 0) or 0),
+        phase1_plateau_hit=bool(auto_meta.get("phase1_plateau_hit", False)),
+        phase2_plateau_hit=bool(auto_meta.get("phase2_plateau_hit", False)),
+        phase3_total=int(auto_meta.get("trials_phase3_total", 0) or 0),
+        phase3_ok=int(auto_meta.get("trials_phase3_ok", 0) or 0),
+        phase4_steps=_audit_dict(auto_meta.get("phase4_steps")),
+        fs_v=int(auto_meta.get("search_fs", 0) or 0),
+        taps_v=int(auto_meta.get("search_taps", 0) or 0),
+        trials_total=int(auto_meta.get("trials_total", 0) or 0),
+        trials_ok=int(auto_meta.get("trials_ok", 0) or 0),
+        source="ui_reconstructed",
+    )
+
+def _build_auto_audit_markdown(*, data: dict, auto_meta: dict, bm: dict) -> str:
+    audit = _auto_audit_from_meta(data, auto_meta, bm)
+    if not audit:
+        return ""
+    selection = _audit_dict(audit.get("selection"))
+    winner = _audit_dict(audit.get("winner"))
+    hard_gates = _audit_dict(audit.get("hard_gates"))
+    search = _audit_dict(audit.get("search"))
+    cache = _audit_dict(audit.get("cache"))
+    target = _audit_dict(audit.get("target"))
+
+    lines = [f"**{t('results_auto_diag_audit_header')}**"]
+    lines.append(
+        t("results_auto_diag_audit_winner").format(
+            rank=_auto_audit_fmt(winner.get("rank_score_official")),
+            avg=_auto_audit_fmt(winner.get("avg_score")),
+            goal=str(selection.get("goal", auto_meta.get("auto_goal", "balanced")) or "balanced"),
+            basis=str(selection.get("basis", auto_meta.get("selection_basis", "rank_score")) or "rank_score"),
+        )
+    )
+
+    why = str(winner.get("summary", "") or "").strip()
+    if why:
+        lines.append(t("results_auto_diag_audit_why").format(summary=why))
+
+    failures = [_audit_reason_text(item) for item in _audit_list(hard_gates.get("hard_gate_failures")) if str(item or "").strip()]
+    failure_txt = f" ({', '.join(failures)})" if failures else ""
+    lines.append(
+        t("results_auto_diag_audit_safety").format(
+            status=_audit_status_label(str(hard_gates.get("status", "passed") or "passed")),
+            failures=failure_txt,
+        )
+    )
+
+    override = _audit_dict(hard_gates.get("winner_override"))
+    if override:
+        reason = _audit_reason_text(override.get("reason", ""))
+        reason_txt = f" ({reason})" if reason else ""
+        lines.append(
+            t("results_auto_diag_audit_override").format(
+                state=_audit_override_label(bool(override.get("applied", False))),
+                reason=reason_txt,
+            )
+        )
+
+    fallback_reason = _audit_reason_text(hard_gates.get("fallback_reason", ""))
+    if fallback_reason:
+        lines.append(t("results_auto_diag_audit_fallback").format(reason=fallback_reason))
+
+    phase4 = _audit_dict(search.get("phase4_steps"))
+    phase4_used = any(bool(value) for value in phase4.values())
+    phase4_txt = t("state_on").lower() if phase4_used else t("results_value_off").lower()
+    lines.append(
+        t("results_auto_diag_audit_search").format(
+            backend=str(selection.get("optimizer_backend", auto_meta.get("optimizer_backend", "builtin")) or "builtin"),
+            ok=int(search.get("trials_ok", auto_meta.get("trials_ok", 0)) or 0),
+            total=int(search.get("trials_total", auto_meta.get("trials_total", 0)) or 0),
+            phase4=phase4_txt,
+        )
+    )
+
+    target_name = str(selection.get("target_name", "") or target.get("name", "") or "").strip()
+    if target_name:
+        lines.append(t("results_auto_diag_audit_target").format(target=target_name))
+
+    cache_stats = _audit_dict(cache.get("cache_stats"))
+    if cache_stats:
+        lines.append(
+            t("results_auto_diag_audit_cache").format(
+                hits=int(cache_stats.get("entry_hits", 0) or 0),
+                misses=int(cache_stats.get("entry_misses", 0) or 0),
+                saves=int(cache_stats.get("saves", 0) or 0),
+            )
+        )
+    return "\n\n".join(lines)
+
 def _render_auto_diagnostics(*, data: dict) -> None:
     try:
         mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
@@ -691,6 +827,10 @@ def _render_auto_diagnostics(*, data: dict) -> None:
                 total=trials_total,
             )
         )
+        audit_md = _build_auto_audit_markdown(data=data, auto_meta=auto_meta, bm=bm)
+        if audit_md:
+            ui.markdown(audit_md)
+
         winner_expl = dict(auto_meta.get("winner_explanation", {}) or {})
         expl_summary = str(winner_expl.get("summary", "") or "").strip()
         expl_reasons = list(winner_expl.get("reasons", []) or [])
@@ -747,6 +887,7 @@ __all__ = [
     '_build_auto_polish_lines',
     '_append_auto_polish_to_status_log',
     '_build_p6_validation_block',
+    '_build_auto_audit_markdown',
     '_render_auto_diagnostics',
     '_update_crossover_recommendation_label',
 ]
