@@ -1,3 +1,9 @@
+---
+title: IR Export Windowing vs DSP Correction
+description: Explain how DecayCore separates FIR correction design from final impulse-response export windowing for reproducible comparisons.
+hide_page_heading: true
+---
+
 # IR Export Windowing vs DSP Correction
 
 In DecayCore, **IR export windowing** and **DSP correction** are intentionally treated as two separate stages.

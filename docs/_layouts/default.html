@@ -3,12 +3,15 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="{{ page.description | default: site.description | escape }}">
+    {% seo %}
     <meta name="google-site-verification" content="-lDppG75tnSsL-qtF1eBLBQWsv3IctR9_RKh65WTiuY">
-    <title>{% if page.title %}{{ page.title | escape }} | {% endif %}{{ site.title | escape }}</title>
+    <meta name="theme-color" content="#0f7d8b">
+    <link rel="icon" type="image/png" href="{{ '/pics/DecayCore_logo_light.png' | relative_url }}">
     <link rel="stylesheet" href="{{ '/assets/main.css' | relative_url }}">
   </head>
-  <body{% if page.hide_title %} class="is-home"{% endif %}>
+  <body class="{% if page.hide_title %}is-home {% endif %}{% if page.wide_content %}has-wide-content{% endif %}">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
     <header class="site-header">
       <div class="site-header__inner">
         <a class="brand" href="{{ '/' | relative_url }}" aria-label="{{ site.title }} home">
@@ -16,20 +19,21 @@
           <span class="brand__name">{{ site.title }}</span>
         </a>
 
-        <nav class="site-nav" aria-label="Primary navigation">
-          {% for nav_path in site.header_pages %}
-            {% assign nav_page = site.pages | where: "path", nav_path | first %}
-            {% if nav_page.title %}
-              <a href="{{ nav_page.url | relative_url }}">{{ nav_page.nav_title | default: nav_page.title }}</a>
-            {% endif %}
-          {% endfor %}
-          <a href="https://github.com/VilhoValittu/DecayCore/releases">Releases</a>
+        <nav class="site-nav site-nav--desktop" aria-label="Primary navigation">
+          {% include nav-links.md %}
         </nav>
+
+        <details class="mobile-nav">
+          <summary>Menu</summary>
+          <nav class="site-nav site-nav--mobile" aria-label="Mobile navigation">
+            {% include nav-links.md %}
+          </nav>
+        </details>
       </div>
     </header>
 
-    <main class="page-shell">
-      {% unless page.hide_title %}
+    <main class="page-shell" id="main-content" tabindex="-1">
+      {% unless page.hide_title or page.hide_page_heading %}
         {% if page.title %}
           <header class="page-heading">
             <h1>{{ page.title }}</h1>
@@ -50,6 +54,9 @@
         <span>DecayCore FIR room correction and measurement tool.</span>
         <span>
           <a href="{{ '/' | relative_url }}">Home</a>
+          <a href="{{ '/getting-started/' | relative_url }}">Getting Started</a>
+          <a href="{{ '/installation/' | relative_url }}">Installation</a>
+          <a href="{{ '/faq/' | relative_url }}">FAQ</a>
           <a href="{{ '/User_Manual.html' | relative_url }}">Manual</a>
           <a href="https://github.com/VilhoValittu/DecayCore">GitHub</a>
         </span>

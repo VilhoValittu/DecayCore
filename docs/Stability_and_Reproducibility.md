@@ -1,3 +1,9 @@
+---
+title: DecayCore Stability and Reproducibility
+description: Explain DecayCore's deterministic pipeline, bounded correction, input robustness, comparable evaluation, phase safeguards, and audit trail.
+hide_page_heading: true
+---
+
 # Stability and Reproducibility
 
 DecayCore is designed to avoid the classic failure mode:

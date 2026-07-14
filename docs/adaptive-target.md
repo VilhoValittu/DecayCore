@@ -51,9 +51,9 @@ When using external measurements (REW text exports, WAV impulse files from REW, 
 ## Related pages
 
 - [Guide: Recommended AUTO workflow](../guide/)
-- [Modes: AUTO, BASIC, ADVANCED](../Modes/)
+- [Modes: AUTO, BASIC, ADVANCED]({{ '/Modes.html' | relative_url }})
 - [Built-in Measurement](../measurement-workflow/)
-- [Official Manual — Adaptive Target section](../Official_Manual/)
+- [Official Manual — Adaptive Target section]({{ '/Official_Manual.html' | relative_url }})
 
 ---
 

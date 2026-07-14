@@ -49,7 +49,7 @@ safe — your saved measurements and exported filters are not affected.
 
 The repository includes ready-made cleanup scripts under `config_delete/` (one
 per operating system) that remove exactly these files for you. See
-[Configuration and Data Paths](paths.md#resetting-caches-and-configuration-troubleshooting)
+[Configuration and Data Paths]({{ '/paths.html#resetting-caches-and-configuration-troubleshooting' | relative_url }})
 for the full list of files and locations.
 
 ## Is DecayCore open source?

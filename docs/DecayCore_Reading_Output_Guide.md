@@ -1,3 +1,9 @@
+---
+title: Reading DecayCore Output
+description: Interpret DecayCore result files, plots, metrics, confidence indicators, target selection, and automatic-mode decision summaries.
+hide_page_heading: true
+---
+
 # Reading DecayCore Output (Current Behavior)
 
 This guide reflects the current code path in DecayCore (v4.0.x line).

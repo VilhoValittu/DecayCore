@@ -1,3 +1,9 @@
+---
+title: DecayCore Time-Domain-First FIR Room Correction
+description: Mathematical and implementation rationale for DecayCore measurement alignment, confidence weighting, correction shaping, phase control, and FIR synthesis.
+hide_page_heading: true
+---
+
 # DecayCore: Time-Domain-First FIR Room Correction
 ## Academic DSP Rationale and Mathematical Foundations
 

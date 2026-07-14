@@ -1,3 +1,9 @@
+---
+title: DecayCore Technical Manual
+description: Detailed technical reference for DecayCore measurement inputs, correction stages, FIR modes, automatic optimization, adaptive targets, and exports.
+hide_page_heading: true
+---
+
 # DecayCore - Official Manual
 
 ## 1. Overview
@@ -470,7 +476,7 @@ When hybrid IIR produces biquads, they are included in the exported CamillaDSP Y
 
 Controls are in the Advanced tab under a collapsible hybrid IIR tuning section.
 
-See also: [Hybrid IIR + FIR Room Correction](hybrid-iir-fir.html)
+See also: [Hybrid IIR + FIR Room Correction]({{ '/hybrid-iir-fir/' | relative_url }})
 
 ---
 
@@ -495,7 +501,7 @@ RT60 data is automatically available when measurements are produced by DecayCore
 
 If RT60 data is not available, `Auto: search best built-in` is generally the safer strategy.
 
-See also: [Adaptive Target](adaptive-target.html)
+See also: [Adaptive Target]({{ '/adaptive-target/' | relative_url }})
 
 ---
 

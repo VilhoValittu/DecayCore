@@ -1,3 +1,9 @@
+---
+title: Why DecayCore Works
+description: Practical explanation of DecayCore's time-domain-first alignment, confidence weighting, DSP guardrails, phase safety, and temporal decay control.
+hide_page_heading: true
+---
+
 # Why DecayCore Works
 
 DecayCore is not "magic EQ". It is a bounded DSP workflow built for real room data.

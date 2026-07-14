@@ -1,3 +1,9 @@
+---
+title: DecayCore vs Conventional EQ-Based Room Correction
+description: Compare DecayCore's bounded, phase-aware, time-domain FIR workflow with conventional magnitude-focused IIR and minimum-phase equalization.
+hide_page_heading: true
+---
+
 # DecayCore vs Conventional EQ-Based Room Correction
 
 ## Conventional approach (typical IIR / minimum-phase EQ)

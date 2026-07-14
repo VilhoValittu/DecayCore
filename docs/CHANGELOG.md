@@ -1,3 +1,9 @@
+---
+title: DecayCore Changelog
+description: Release history and user-visible changes for DecayCore room measurement, FIR correction, automatic optimization, export, and platform support.
+hide_page_heading: true
+---
+
 # Changelog
 
 All notable changes to **DecayCore** are documented in this file.

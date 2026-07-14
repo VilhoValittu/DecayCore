@@ -1,3 +1,9 @@
+---
+title: DecayCore Configuration and Data Paths
+description: Locate DecayCore configuration, automatic-mode caches, optimization journals, measurement files, logs, and exports on each supported platform.
+hide_page_heading: true
+---
+
 # DecayCore Configuration and Data Paths
 
 This document describes where DecayCore stores configuration files, Optuna optimization databases, measurements, and other data across different operating systems.
