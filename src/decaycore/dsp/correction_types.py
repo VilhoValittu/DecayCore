@@ -70,6 +70,8 @@ class BaselineComparisonTelemetry:
     target_level_db_window: float
     offset_method: str
     target_shift_db: float
+
+
 @dataclass
 class CorrectionInputs:
     """Korjausvaiheen syotepaketti, jolla pidetaan funktioraja siistina."""
@@ -232,6 +234,7 @@ class _MagPipelineInputs:
     stage_probe: Callable[..., Any]
     cfg_float_allow_zero: Callable[[Any, str, float], float]
     apply_confidence_weighted_target_pull: Callable[..., Any]
+    presolve_mode: bool = False
 
 
 @dataclass
@@ -259,6 +262,7 @@ class _MagPostProcessInputs:
     m_anal: np.ndarray
     target_mags: np.ndarray
     calc_offset_db: float
+    presolve_mode: bool = False
 
 
 @dataclass

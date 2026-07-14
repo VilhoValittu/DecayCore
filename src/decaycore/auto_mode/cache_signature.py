@@ -91,7 +91,7 @@ def _auto_cache_resolve_path(*, compat_version: str | None = None) -> str:
 
 _BASS_ALLPASS_ALGO_V = 1
 _BASS_INTEGRATION_COMBINE_ALGO_V = 2
-_BASS_INTEGRATION_ALGO_V = 3
+_BASS_INTEGRATION_ALGO_V = 5
 _DIRECT_DAC_SUB_TARGET_POLICY_V = 1
 _AUTO_LF_ROLLOFF_POLICY_V = 1
 _AUTO_TDC_DECAY_SCORING_ALGO_V = 2
@@ -584,6 +584,10 @@ def _auto_signature_payload(
             else ""
         ),
         "bass_integration_algorithm_v": int(_BASS_INTEGRATION_ALGO_V),
+        "bass_integration_robust_policy_v": 1,
+        "bass_integration_robust_gain_offsets_db": (-1.0, 0.0, 1.0),
+        "bass_integration_robust_delay_offsets_ms": (-0.5, 0.0, 0.5),
+        "bass_integration_sub_lpf_policy": "optimized_lpf_gte_main_hpf",
         "bass_integration_profile": str(base_data.get("bass_integration_profile", "") or ""),
         "bass_integration_mode": "direct_dac",
         "max_boost": float(_auto_safe_float(base_data.get("max_boost", float("nan")), float("nan"))),

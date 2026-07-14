@@ -545,8 +545,12 @@ def _prepare_target_curve_bass_integration_context(
     if bi_recommended_xo_hz is not None:
         data["sub_crossover_hz"] = float(bi_recommended_xo_hz)
         data["avr_crossover_hz"] = float(bi_recommended_xo_hz)
-        _sub_lpf_store = float(bi_recommended_sub_lpf_hz) if bi_recommended_sub_lpf_hz is not None else float(bi_recommended_xo_hz) + 20.0
-        _sub_lpf_store = max(float(bi_recommended_xo_hz) + 20.0, _sub_lpf_store)
+        _sub_lpf_store = (
+            float(bi_recommended_sub_lpf_hz)
+            if bi_recommended_sub_lpf_hz is not None
+            else float(bi_recommended_xo_hz)
+        )
+        _sub_lpf_store = max(float(bi_recommended_xo_hz), _sub_lpf_store)
         data["direct_dac_sub_lpf_hz"] = _sub_lpf_store
         if _sub_lpf_store > float(bi_recommended_xo_hz) + 0.5:
             logger.info(
@@ -566,7 +570,7 @@ def _prepare_target_curve_bass_integration_context(
         _current_main_hpf,
         positive=True,
     )
-    data["direct_dac_sub_lpf_hz"] = float(max(_current_main_hpf + 20.0, _current_sub_lpf))
+    data["direct_dac_sub_lpf_hz"] = float(max(_current_main_hpf, _current_sub_lpf))
     bi_allpass_recommendation = _build_bi_allpass_recommendation(_bi_unified)
     data["bass_integration_allpass_auto_applied"] = bool(bi_allpass_recommendation["enabled"])
     data["bass_integration_allpass_freq_hz"] = _safe_float(bi_allpass_recommendation["freq_hz"], 0.0)

@@ -10,11 +10,7 @@
 
 from __future__ import annotations
 
-import dataclasses
 import hashlib
-import json
-from collections.abc import Mapping
-from copy import deepcopy
 
 import numpy as np
 
@@ -25,12 +21,10 @@ from .phase import remove_time_of_flight
 from .smoothing import apply_adaptive_fdw, apply_smoothing_std, psychoacoustic_smoothing
 from .dsp_types import DspContext, PreprocessResult
 
-_PREPROCESS_CACHE = BoundedLruCache(16)
-
 # Caches the measurement-fixed portion of run_preprocess (everything before
-# AFDW). Key is based on object identity of the input arrays plus a lightweight
-# fingerprint so different arrays with the same id after GC are detected.
-# Trials that differ only in fdw_cycles or enable_afdw still hit this cache.
+# AFDW). Its key fingerprints the input contents, so recycled NumPy object
+# identities cannot reuse a previous measurement's result. Trials that differ
+# only in fdw_cycles or enable_afdw still hit this cache.
 _MEAS_FIXED_CACHE = BoundedLruCache(8)
 _MEAS_FIXED_STATS: dict = {"hits": 0, "misses": 0}
 
@@ -44,69 +38,7 @@ def _cache_hash_array(values, *, decimals: int = 6) -> str:
     return hashlib.blake2b(np.ascontiguousarray(rounded, dtype=np.float64).view(np.uint8), digest_size=16).hexdigest()
 
 
-def _stable_jsonable(value):
-    if dataclasses.is_dataclass(value):
-        return _stable_jsonable(dataclasses.asdict(value))
-    if isinstance(value, Mapping):
-        return {str(k): _stable_jsonable(v) for k, v in sorted(value.items(), key=lambda item: str(item[0]))}
-    if isinstance(value, (list, tuple)):
-        return [_stable_jsonable(v) for v in value]
-    if isinstance(value, (bool, str)) or value is None:
-        return value
-    if isinstance(value, (int, np.integer)):
-        return int(value)
-    if isinstance(value, (float, np.floating)):
-        v = float(value)
-        return round(v, 8) if np.isfinite(v) else str(v)
-    return str(value)
-
-
-def _stable_object_hash(value) -> str:
-    if value is None:
-        return "none"
-    try:
-        public_data = value
-        if not dataclasses.is_dataclass(value) and not isinstance(value, Mapping) and hasattr(value, "__dict__"):
-            public_data = {
-                k: v
-                for k, v in vars(value).items()
-                if not str(k).startswith("_")
-            }
-        payload = json.dumps(_stable_jsonable(public_data), sort_keys=True, separators=(",", ":"))
-    except (TypeError, ValueError, AttributeError):
-        payload = type(value).__qualname__
-    return hashlib.blake2b(payload.encode("utf-8"), digest_size=16).hexdigest()
-
-
-def _preprocess_cache_key(freqs, meas_mags, raw_phases, cfg, stereo_link_ctx, presolve_mode) -> tuple | None:
-    n = len(freqs)
-    if n < 2:
-        return None
-    try:
-        afdw_on = bool(getattr(cfg, "enable_afdw", False))
-        fdw_cyc = round(float(getattr(cfg, "fdw_cycles", 15.0)), 2) if afdw_on else 0.0
-        return (
-            n,
-            round(float(freqs[0]), 4),
-            round(float(freqs[-1]), 4),
-            _cache_hash_array(freqs),
-            _cache_hash_array(meas_mags),
-            _cache_hash_array(raw_phases),
-            int(cfg.num_taps), int(cfg.fs),
-            str(getattr(cfg, "plot_smoothing_level", "")),
-            bool(getattr(cfg, "comparison_mode", False)),
-            int(getattr(cfg, "comparison_ref_fs", 44100) or 44100),
-            int(getattr(cfg, "comparison_ref_taps", 65536) or 65536),
-            afdw_on, fdw_cyc,
-            _stable_object_hash(stereo_link_ctx),
-            bool(presolve_mode),
-        )
-    except (AttributeError, TypeError, ValueError, OverflowError):
-        return None
-
-
 def clear_preprocess_cache() -> None:
-    _PREPROCESS_CACHE.clear()
     _MEAS_FIXED_CACHE.clear()
 
 
@@ -135,71 +67,14 @@ def _meas_fixed_cache_key(
         if n < 2:
             return None
         return (
-            id(freqs),
-            id(meas_mags),
-            id(raw_phases),
             n_fft,
             int(float(fs)),
-            n,
-            round(float(freqs[0]), 4),
-            round(float(freqs[-1]), 4),
+            _cache_hash_array(freqs),
+            _cache_hash_array(meas_mags),
+            _cache_hash_array(raw_phases),
         )
     except (TypeError, ValueError, IndexError, OverflowError):
         return None
-
-
-def _copy_array(values):
-    return np.array(values, copy=True)
-
-
-def _fast_deepcopy(obj):
-    # copy.deepcopy on per-objekti-overheadiltaan kallis per-trial-kuumassa
-    # polussa; telemetria/cmp-rakenteet ovat dict/list/ndarray/skalaari-
-    # puita, jotka kopioituvat suoraan. Tuntemattomat tyypit menevat
-    # edelleen deepcopyn kautta.
-    if obj is None or isinstance(obj, (bool, int, float, complex, str, bytes)):
-        return obj
-    if isinstance(obj, np.ndarray):
-        return obj.copy()
-    if isinstance(obj, dict):
-        return {key: _fast_deepcopy(value) for key, value in obj.items()}
-    if isinstance(obj, list):
-        return [_fast_deepcopy(value) for value in obj]
-    if isinstance(obj, tuple):
-        return tuple(_fast_deepcopy(value) for value in obj)
-    return deepcopy(obj)
-
-
-def clone_preprocess_result(result: PreprocessResult) -> PreprocessResult:
-    ctx = DspContext(
-        n_fft=int(result.ctx.n_fft),
-        freq_axis=_copy_array(result.ctx.freq_axis),
-        gain_db=_copy_array(result.ctx.gain_db),
-        target_mags=_copy_array(result.ctx.target_mags),
-        st=_fast_deepcopy(dict(result.ctx.st or {})),
-    )
-    return PreprocessResult(
-        ctx=ctx,
-        f_in=_copy_array(result.f_in),
-        m_in=_copy_array(result.m_in),
-        p_in=_copy_array(result.p_in),
-        m_smooth_std=_copy_array(result.m_smooth_std),
-        p_smooth=_copy_array(result.p_smooth),
-        m_interp=_copy_array(result.m_interp),
-        p_rad_raw=_copy_array(result.p_rad_raw),
-        p_rad_interp=_copy_array(result.p_rad_interp),
-        delay_slope=float(result.delay_slope),
-        m_plot_db=None if result.m_plot_db is None else _copy_array(result.m_plot_db),
-        complex_meas=_copy_array(result.complex_meas),
-        m_anal=_copy_array(result.m_anal),
-        p_anal_rad=_copy_array(result.p_anal_rad),
-        complex_anal=_copy_array(result.complex_anal),
-        conf_mask=_copy_array(result.conf_mask),
-        reflections=_fast_deepcopy(list(result.reflections or [])),
-        cmp=None if result.cmp is None else _fast_deepcopy(dict(result.cmp)),
-        analysis_mode=str(result.analysis_mode),
-        is_psy=bool(result.is_psy),
-    )
 
 
 def analysis_smoothing_lf_to_hf(
@@ -232,42 +107,28 @@ def analysis_smoothing_lf_to_hf(
     return (1.0 - w) * m_low + w * m_high
 
 
-def _run_preprocess_cached_result(
-    freqs,
-    meas_mags,
-    raw_phases,
-    cfg,
-    stereo_link_ctx,
-    presolve_mode: bool,
-) -> tuple[tuple | None, PreprocessResult | None]:
-    cache_key = _preprocess_cache_key(freqs, meas_mags, raw_phases, cfg, stereo_link_ctx, presolve_mode)
-    if cache_key is None:
-        return None, None
-    cached = _PREPROCESS_CACHE.get(cache_key)
-    if cached is None:
-        return cache_key, None
-    return cache_key, clone_preprocess_result(cached)
-
-
 def _meas_fixed_unpack(core: dict, extras: dict) -> dict:
+    # The cached core is immutable process-local data. Return inexpensive array
+    # copies so correction stages and callers receive independent per-run state
+    # without recursively cloning large telemetry/comparison dictionaries.
     return {
-        "f_in": core["f_in"],
-        "m_in": core["m_in"],
-        "p_in": core["p_in"],
-        "freq_axis": core["freq_axis"],
-        "m_smooth_std": core["m_smooth_std"],
-        "p_smooth": core["p_smooth"],
-        "m_interp": core["m_interp"],
-        "p_rad_raw": core["p_rad_raw"],
-        "p_rad_interp": core["p_rad_interp"],
+        "f_in": np.array(core["f_in"], copy=True),
+        "m_in": np.array(core["m_in"], copy=True),
+        "p_in": np.array(core["p_in"], copy=True),
+        "freq_axis": np.array(core["freq_axis"], copy=True),
+        "m_smooth_std": np.array(core["m_smooth_std"], copy=True),
+        "p_smooth": np.array(core["p_smooth"], copy=True),
+        "m_interp": np.array(core["m_interp"], copy=True),
+        "p_rad_raw": np.array(core["p_rad_raw"], copy=True),
+        "p_rad_interp": np.array(core["p_rad_interp"], copy=True),
         "delay_slope": core["delay_slope"],
         "m_plot_db": extras["m_plot_db"],
-        "complex_meas": core["complex_meas"],
-        "m_anal": np.copy(core["m_anal_base"]),
-        "p_anal_rad": core["p_anal_rad"],
-        "complex_anal": core["complex_anal"],
-        "conf_mask": core["conf_mask"],
-        "reflections": core["reflections"],
+        "complex_meas": np.array(core["complex_meas"], copy=True),
+        "m_anal": np.array(core["m_anal_base"], copy=True),
+        "p_anal_rad": np.array(core["p_anal_rad"], copy=True),
+        "complex_anal": np.array(core["complex_anal"], copy=True),
+        "conf_mask": np.array(core["conf_mask"], copy=True),
+        "reflections": [dict(node) for node in core["reflections"]],
         "cmp": extras["cmp"],
         "analysis_mode": extras["analysis_mode"],
         "is_psy": extras["is_psy"],
@@ -516,23 +377,7 @@ def _run_preprocess_build_result(meas_data: dict, *, n_fft: int) -> PreprocessRe
     )
 
 
-def _store_preprocess_cache_result(cache_key: tuple | None, result: PreprocessResult) -> None:
-    if cache_key is None:
-        return
-    _PREPROCESS_CACHE.put(cache_key, clone_preprocess_result(result))
-
-
 def run_preprocess(freqs, meas_mags, raw_phases, cfg, *, stereo_link_ctx=None, presolve_mode: bool = False) -> PreprocessResult:
-    cache_key, cached_result = _run_preprocess_cached_result(
-        freqs,
-        meas_mags,
-        raw_phases,
-        cfg,
-        stereo_link_ctx,
-        bool(presolve_mode),
-    )
-    if cached_result is not None:
-        return cached_result
     n_fft = int(cfg.num_taps)
     meas_data = _run_preprocess_meas_fixed(
         freqs,
@@ -544,6 +389,4 @@ def run_preprocess(freqs, meas_mags, raw_phases, cfg, *, stereo_link_ctx=None, p
         stereo_link_ctx=stereo_link_ctx,
     )
     _run_preprocess_apply_afdw(cfg, meas_data)
-    result = _run_preprocess_build_result(meas_data, n_fft=n_fft)
-    _store_preprocess_cache_result(cache_key, result)
-    return result
+    return _run_preprocess_build_result(meas_data, n_fft=n_fft)

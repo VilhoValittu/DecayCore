@@ -105,7 +105,9 @@ def _run_softclip_stage(
     )
     _softclip_reasons = []
     try:
-        _softclip_changed = mask_c & (np.abs(np.asarray(tmp, dtype=float) - np.asarray(_pre_softclip, dtype=float)) > 1e-9)
+        _softclip_changed = mask_c & (
+            np.abs(np.asarray(tmp, dtype=float) - np.asarray(_pre_softclip, dtype=float)) > 1e-9
+        )
         _softclip_reduced_boost = bool(
             np.any(_softclip_changed & (_pre_softclip > 0.0) & (np.asarray(tmp, dtype=float) < _pre_softclip))
         )
@@ -231,7 +233,9 @@ def _run_slope_confpull_stage(
                 logger=logger,
                 apply_confidence_weighted_target_pull=apply_confidence_weighted_target_pull,
             )
-            _log_stage_stats("gain_db_post_confpull", gain_db, mask_c, ref=_pre, logger=logger, enabled=debug_stage_stats)
+            _log_stage_stats(
+                "gain_db_post_confpull", gain_db, mask_c, ref=_pre, logger=logger, enabled=debug_stage_stats
+            )
             append_mag_authority_stage(
                 mag_authority_trace,
                 "after_confpull",
@@ -287,7 +291,9 @@ def _run_regularization_stage(
                     smooth_value=filter_smooth,
                     mix=mix,
                 )
-                _log_stage_stats("gain_db_post_filter_smooth", gain_db, mask_c, ref=_pre, logger=logger, enabled=debug_stage_stats)
+                _log_stage_stats(
+                    "gain_db_post_filter_smooth", gain_db, mask_c, ref=_pre, logger=logger, enabled=debug_stage_stats
+                )
         append_mag_authority_stage(
             mag_authority_trace,
             "after_regularization_smooth",
@@ -330,11 +336,7 @@ def _run_excursion_protection_stage(
         gain_db,
         freq_axis,
         mask_c,
-        reason_codes=(
-            [REASON_EXCURSION_FULL_BLOCK, REASON_EXCURSION_SOFT_CAP]
-            if bool(gain_policy.exc_prot)
-            else []
-        ),
+        reason_codes=([REASON_EXCURSION_FULL_BLOCK, REASON_EXCURSION_SOFT_CAP] if bool(gain_policy.exc_prot) else []),
     )
     return gain_db
 
@@ -374,7 +376,14 @@ def _run_wav_transition_smooth_stage(
                     w[zone] = ramp[zone] * focus[zone]
                     mix = 0.55
                     gain_db = g0 + (g_sm - g0) * (mix * w)
-                    _log_stage_stats("gain_db_post_wav_transition_smooth", gain_db, mask_c, ref=_pre_wav_transition, logger=logger, enabled=debug_stage_stats)
+                    _log_stage_stats(
+                        "gain_db_post_wav_transition_smooth",
+                        gain_db,
+                        mask_c,
+                        ref=_pre_wav_transition,
+                        logger=logger,
+                        enabled=debug_stage_stats,
+                    )
                     if isinstance(st, dict):
                         st["wav_transition_smoothing"] = True
                         st["wav_transition_smoothing_zone_hz"] = [float(f_lo), float(f_hi)]
@@ -502,7 +511,14 @@ def _run_wav_final_polish_stage(
                         cut_cap_db=cut_cap_db,
                         mask=mask_c,
                     )
-                    _log_stage_stats("gain_db_post_wav_final_ripple_polish", gain_db, mask_c, ref=_pre_wav_final, logger=logger, enabled=debug_stage_stats)
+                    _log_stage_stats(
+                        "gain_db_post_wav_final_ripple_polish",
+                        gain_db,
+                        mask_c,
+                        ref=_pre_wav_final,
+                        logger=logger,
+                        enabled=debug_stage_stats,
+                    )
                     if isinstance(st, dict):
                         st["wav_final_ripple_polish"] = True
                         st["wav_final_ripple_polish_zone_hz"] = [float(f_lo), float(f_hi)]
@@ -767,7 +783,9 @@ def apply_post_limits_and_metrics(
     _filter_smooth = inputs.filter_smooth
     debug_stage_stats = inputs.debug_stage_stats
     stage_probes = dict(inputs.stage_probes)
-    mag_authority_trace: list[dict[str, object]] = []
+    # Presolve hylkaa st:n eika jalki paady mihinkaan; None poistaa
+    # vaihekohtaisen analyysin rakentamisen (append on silloin no-op).
+    mag_authority_trace: list[dict[str, object]] | None = None if bool(inputs.presolve_mode) else []
     apply_confidence_weighted_target_pull = inputs.apply_confidence_weighted_target_pull
 
     append_mag_authority_stage(
@@ -970,24 +988,26 @@ def apply_post_limits_and_metrics(
     except (TypeError, ValueError, FloatingPointError, IndexError):
         pass
 
-    gain_db, hardclamp_boost_bins, hardclamp_cut_bins, hard_over_boost, hard_over_cut, clamp_dominance_level = _run_hardclamp_stage(
-        gain_db=gain_db,
-        freq_axis=freq_axis,
-        mask_c=mask_c,
-        cfg=cfg,
-        st=st,
-        logger=logger,
-        boost_cap_db=boost_cap_db,
-        cut_cap_db=cut_cap_db,
-        max_cut_db=max_cut_db,
-        max_boost_db_base=max_boost_db_base,
-        filter_smooth=_filter_smooth,
-        debug_stage_stats=debug_stage_stats,
-        stage_probes=stage_probes,
-        stage_probe_fn=_stage_probe,
-        authority_boost_reduced_bins=authority_boost_reduced_bins,
-        authority_cut_reduced_bins=authority_cut_reduced_bins,
-        mag_authority_trace=mag_authority_trace,
+    gain_db, hardclamp_boost_bins, hardclamp_cut_bins, hard_over_boost, hard_over_cut, clamp_dominance_level = (
+        _run_hardclamp_stage(
+            gain_db=gain_db,
+            freq_axis=freq_axis,
+            mask_c=mask_c,
+            cfg=cfg,
+            st=st,
+            logger=logger,
+            boost_cap_db=boost_cap_db,
+            cut_cap_db=cut_cap_db,
+            max_cut_db=max_cut_db,
+            max_boost_db_base=max_boost_db_base,
+            filter_smooth=_filter_smooth,
+            debug_stage_stats=debug_stage_stats,
+            stage_probes=stage_probes,
+            stage_probe_fn=_stage_probe,
+            authority_boost_reduced_bins=authority_boost_reduced_bins,
+            authority_cut_reduced_bins=authority_cut_reduced_bins,
+            mag_authority_trace=mag_authority_trace,
+        )
     )
 
     gain_db = _run_wav_final_polish_stage(
@@ -1056,7 +1076,7 @@ def apply_post_limits_and_metrics(
         mask_c,
     )
     try:
-        if isinstance(st, dict):
+        if mag_authority_trace is not None and isinstance(st, dict):
             trace_summary = summarize_mag_authority_trace(mag_authority_trace)
             safe_put_many(
                 st,
@@ -1123,5 +1143,4 @@ def apply_post_limits_and_metrics(
     )
 
 
-__all__ = ['apply_post_limits_and_metrics']
-
+__all__ = ["apply_post_limits_and_metrics"]

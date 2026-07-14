@@ -26,6 +26,8 @@ This is especially important for FIR room correction because the correction proc
 5. Export WAV FIR filters.
 6. Use the filters in CamillaDSP or another convolution engine.
 
+**Note on measurement volume:** Set the listening level during measurement with volume attenuation at the end of the signal chain, such as the amplifier or an analog volume control. Avoid digital attenuation earlier in the chain: it lowers the measurement signal-to-noise ratio, while end-of-chain attenuation protects your speakers and hearing without degrading the captured sweep.
+
 ## Optional external measurement workflows
 
 DecayCore may also work with compatible external measurement data, including REW-style measurement exports. This is useful for users who already have existing measurements.

@@ -55,6 +55,7 @@ Common deployment targets:
 Recommended preparation:
 
 - use the same microphone position and measurement method for both channels
+- set the measurement listening level with volume attenuation at the end of the signal chain (amplifier or analog volume control); avoid digital attenuation earlier in the chain, as it reduces the measurement signal-to-noise ratio
 - keep the sample rate consistent through your measurement and playback chain
 - if importing REW text files, verify that the export includes phase data
 

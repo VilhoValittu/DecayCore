@@ -242,6 +242,7 @@ def _run_correction_stage(inputs: CorrectionInputs) -> CorrectionOutputs:
         stage_probe=_stage_probe,
         cfg_float_allow_zero=_cfg_float_allow_zero,
         apply_confidence_weighted_target_pull=apply_confidence_weighted_target_pull,
+        presolve_mode=presolve_mode,
     )
     with profiled_section("generate_filter.correction.mag_pipeline"):
         mag = _run_mag_correction_pipeline(mag_inputs)

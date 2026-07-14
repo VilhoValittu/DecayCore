@@ -738,6 +738,7 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
 
     with page_shell(title=t("tab_measurement"), intro=t("measurement_page_intro")):
         with section_card(title=t("measurement_capture_section_title"), intro=t("measurement_intro")):
+            ui.label(t("measurement_volume_attenuation_hint")).classes("text-xs text-gray-400")
             ctx.backend_message_label["widget"] = ui.label("").classes("w-full whitespace-pre-wrap text-sm text-red-400")
             ctx.set_backend_message(ctx.backend_message_state["value"])
 

@@ -79,10 +79,10 @@ def apply_null_guard_target(
     mag_c_max: float,
     guard_max_hz: float | None = None,
     enable: bool = True,
-    depth_db: float = 12.0,          # min dip depth to start guarding
-    max_blend: float = 0.85,         # max blend toward measured at dip center
-    max_total_relax_db: float = 12.0,# cap how much target can be relaxed downward vs original
-    smooth_oct: float = 0.18,        # gaussian smoothing width (in octaves) for the mask
+    depth_db: float = 12.0,  # min dip depth to start guarding
+    max_blend: float = 0.85,  # max blend toward measured at dip center
+    max_total_relax_db: float = 12.0,  # cap how much target can be relaxed downward vs original
+    smooth_oct: float = 0.18,  # gaussian smoothing width (in octaves) for the mask
 ) -> np.ndarray:
     """Makes target more realistic by relaxing deep, narrow cancellation nulls.
     We detect dips relative to a smoothed "envelope" of the measured response,
@@ -221,24 +221,48 @@ def _null_guard_local_recovery_mask(
     min_recovery_db = float(max(3.0, 0.35 * float(depth_db)))
 
     out = np.zeros_like(f, dtype=bool)
-    # Pipeline use caps null-guard to the low-frequency guard band, so this
-    # per-bin range check stays small while keeping the edge logic explicit.
-    for i in range(f.size):
-        if not bool(valid[i]):
-            continue
-        lo = int(np.searchsorted(lf, lf[i] - side, side="left"))
-        hi = int(np.searchsorted(lf, lf[i] + side, side="right"))
-        if lo >= i or hi <= i + 1:
-            continue
-        left = m[lo:i]
-        right = m[i + 1:hi]
-        left = left[np.isfinite(left)]
-        right = right[np.isfinite(right)]
-        if left.size == 0 or right.size == 0:
-            continue
-        recovery_db = min(float(np.max(left) - m[i]), float(np.max(right) - m[i]))
-        out[i] = bool(np.isfinite(recovery_db) and recovery_db >= min_recovery_db)
+    idx = np.arange(f.size)
+    lo = np.searchsorted(lf, lf - side, side="left")
+    hi = np.searchsorted(lf, lf + side, side="right")
+    eligible = valid & (lo < idx) & (hi > idx + 1)
+    if not bool(np.any(eligible)):
+        return out
+    # Ei-finite naapurit -inf:na: tyhja/kokonaan ei-finite puoli tuottaa
+    # -inf-maksimin -> recovery ei-finite -> False, kuten per-bin-silmukassa.
+    m_neg = np.where(np.isfinite(m), m, -np.inf)
+    lo_e = lo[eligible]
+    hi_e = hi[eligible]
+    i_e = idx[eligible]
+    left_max = _range_max_query(m_neg, lo_e, i_e)
+    right_max = _range_max_query(m_neg, i_e + 1, hi_e)
+    m_e = m[eligible]
+    recovery = np.minimum(left_max - m_e, right_max - m_e)
+    out[eligible] = np.isfinite(recovery) & (recovery >= min_recovery_db)
     return out
+
+
+def _range_max_query(values: np.ndarray, starts: np.ndarray, stops: np.ndarray) -> np.ndarray:
+    """Vektoroitu range-max: max(values[starts[j]:stops[j]]) jokaiselle kyselylle.
+
+    Vaatii 0 <= starts[j] < stops[j] <= values.size. Sparse-table-RMQ; max on
+    assosiatiivinen ja jarjestysriippumaton, joten tulos on bitti-identtinen
+    viipaleittaisen np.max:n kanssa.
+    """
+    n = int(values.size)
+    lengths = (stops - starts).astype(np.int64)
+    max_len = int(np.max(lengths))
+    k_max = int(np.frexp(float(max_len))[1]) - 1
+    levels = np.full((k_max + 1, n), -np.inf, dtype=float)
+    levels[0, :] = values
+    width = 1
+    for k in range(1, k_max + 1):
+        count = n - 2 * width + 1
+        if count > 0:
+            levels[k, :count] = np.maximum(levels[k - 1, :count], levels[k - 1, width : width + count])
+        width *= 2
+    k_q = (np.frexp(lengths.astype(float))[1] - 1).astype(np.int64)
+    pow2 = np.left_shift(np.int64(1), k_q)
+    return np.maximum(levels[k_q, starts], levels[k_q, stops - pow2])
 
 
 def _resample_or_interpolate_to_axis(
@@ -360,7 +384,8 @@ def _prepare_correction_baseline(  # noqa: C901 - baseline assembly intentionall
         current_rt60 = float(_measured_rt60_val)
         if _measured_rt60_bands:
             rt60_bands = {
-                k: v for k, v in _measured_rt60_bands.items()
+                k: v
+                for k, v in _measured_rt60_bands.items()
                 if isinstance(k, (int, float)) and float(k) > 0.0 and isinstance(v, (int, float)) and float(v) > 0.0
             }
         else:
@@ -455,11 +480,13 @@ def _prepare_correction_baseline(  # noqa: C901 - baseline assembly intentionall
         with profiled_section("generate_filter.correction.baseline.null_guard"):
             mag_c_min = _active_correction_band_min(cfg)
             mag_c_max = cfg_reader.float_allow_zero("mag_c_max", 0.0)
-            null_guard_max_hz = float(np.clip(
-                float(schroeder_hz) if schroeder_hz is not None and np.isfinite(float(schroeder_hz)) else 300.0,
-                120.0,
-                500.0,
-            ))
+            null_guard_max_hz = float(
+                np.clip(
+                    float(schroeder_hz) if schroeder_hz is not None and np.isfinite(float(schroeder_hz)) else 300.0,
+                    120.0,
+                    500.0,
+                )
+            )
             if isinstance(st, dict):
                 st["null_guard_max_hz"] = float(null_guard_max_hz)
             # use analysis magnitude (m_anal) already on freq_axis scale

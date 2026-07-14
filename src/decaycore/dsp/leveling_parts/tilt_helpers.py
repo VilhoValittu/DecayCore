@@ -9,38 +9,10 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 from __future__ import annotations
-import threading
 import numpy as np
 
 from .state_cache import _to_float
 
-
-
-
-
-
-
-
-
-
-
-
-
-_LEVELING_CACHE: dict[str, tuple[tuple[float, float, float, float, str, float, float], dict[str, object]]] = {}
-_LEVELING_CACHE_LOCK = threading.Lock()
-_LEVELING_CACHE_MAX = 128
-_LEVEL_WINDOW_CACHE: dict[str, tuple[float, float]] = {}
-_LEVEL_WINDOW_CACHE_LOCK = threading.Lock()
-_LEVEL_WINDOW_CACHE_MAX = 256
-_LEVELING_CACHE_ATTRS = (
-    "_lvl_last_error",
-    "_lvl_tilt_slope_db_per_oct",
-    "_lvl_perceptual_enabled",
-    "_lvl_perceptual_strength",
-    "_lvl_perceptual_band_hz",
-    "_lvl_perceptual_error_rms",
-    "_lvl_window_debug",
-)
 
 def _resample_series_inputs(
     freq_axis: np.ndarray,
@@ -62,6 +34,10 @@ def _resample_series_inputs(
 
 def _sort_unique_resample_series(freq: np.ndarray, series: list[np.ndarray]) -> tuple[np.ndarray, list[np.ndarray]]:
     if freq.size == 0:
+        return freq, series
+    if freq.size > 1 and bool(np.all(np.diff(freq) > 0.0)):
+        # Aidosti kasvavalle akselille stabiili argsort on identiteettipermutaatio
+        # ja uniq-maski kaikkialla True, joten lajittelu olisi pelkka kopio.
         return freq, series
     order = np.argsort(freq, kind="mergesort")
     freq_sorted = freq[order]
@@ -95,6 +71,28 @@ def _log_resample_axis(
     return np.geomspace(f_lo, f_hi, n_points)
 
 
+def _is_identity_log_grid(
+    freq_axis: np.ndarray,
+    *,
+    points_per_octave: float = 48.0,
+    min_points: int = 32,
+) -> bool:
+    """True jos freq_axis on tasan _log_resample_axis-hila omista paatepisteistaan.
+
+    Talloin _resample_log_axis samalle akselille (finiteilla sarjoilla) on
+    bitti-identtinen identiteetti, ja kutsuja voi valittaa skip_resample=True
+    alavirran sovituksiin.
+    """
+    try:
+        f = np.asarray(freq_axis, dtype=float).reshape(-1)
+        if f.size < 2 or not bool(np.all(np.isfinite(f))) or float(f[0]) <= 0.0:
+            return False
+        expected = _log_resample_axis(f, points_per_octave=points_per_octave, min_points=min_points)
+        return expected is not None and bool(np.array_equal(expected, f))
+    except (TypeError, ValueError, FloatingPointError, OverflowError):
+        return False
+
+
 def _resample_log_axis(
     freq_axis: np.ndarray,
     *series: np.ndarray,
@@ -125,8 +123,19 @@ def _resample_log_axis(
         prepared = tuple(np.asarray(s, dtype=float).reshape(-1) for s in series)
         return f, prepared
 
-def _log_median(freq_axis: np.ndarray, values: np.ndarray) -> float:
+
+def _log_median(freq_axis: np.ndarray, values: np.ndarray, *, skip_resample: bool = False) -> float:
     try:
+        if skip_resample:
+            # Kutsuja takaa etta freq_axis on tuore _log_resample_axis-hila
+            # (ks. _is_identity_log_grid); talloin resample on identiteetti.
+            v = np.asarray(values, dtype=float).reshape(-1)
+            if (
+                v.size > 0
+                and v.size == np.asarray(freq_axis, dtype=float).reshape(-1).size
+                and bool(np.all(np.isfinite(v)))
+            ):
+                return float(np.median(v))
         _f_log, (v_log,) = _resample_log_axis(freq_axis, values)
         if v_log.size == 0:
             return 0.0
@@ -136,6 +145,7 @@ def _log_median(freq_axis: np.ndarray, values: np.ndarray) -> float:
             return float(np.median(values))
         except (TypeError, ValueError, FloatingPointError):
             return 0.0
+
 
 def _lower_tail_robust_std_db(values: np.ndarray, *, clip_below_db: float = 6.0) -> float:
     try:
@@ -163,6 +173,7 @@ def _lower_tail_robust_std_db(values: np.ndarray, *, clip_below_db: float = 6.0)
         except (TypeError, ValueError, FloatingPointError):
             return 0.0
 
+
 def _centered_rms(values: np.ndarray) -> float:
     try:
         y = np.asarray(values, dtype=float)
@@ -173,6 +184,7 @@ def _centered_rms(values: np.ndarray) -> float:
         return float(np.sqrt(np.mean(y * y)))
     except (TypeError, ValueError, FloatingPointError):
         return float("inf")
+
 
 def _tilt_fit_linear_log_axis(
     log_freq: np.ndarray,
@@ -220,6 +232,7 @@ def _tilt_fit_linear_log_axis(
         except (TypeError, ValueError, FloatingPointError):
             return 0.0, 0.0
 
+
 def _smooth_tilt_fit_series(y: np.ndarray, *, sigma_bins: float) -> np.ndarray:
     try:
         arr = np.asarray(y, dtype=float).reshape(-1)
@@ -245,6 +258,7 @@ def _smooth_tilt_fit_series(y: np.ndarray, *, sigma_bins: float) -> np.ndarray:
             return np.asarray(y, dtype=float).copy()
         except (TypeError, ValueError):
             return np.asarray([], dtype=float)
+
 
 def _tilt_fit_lf_piecewise_prepare(
     log_freq: np.ndarray,
@@ -337,6 +351,7 @@ def _tilt_fit_lf_piecewise_evaluate(
     slope_eq = float(np.clip(slope_eq, -max_db_per_oct, +max_db_per_oct))
     return float(off_piecewise), float(slope_eq)
 
+
 def _tilt_fit_lf_piecewise_log_axis(
     log_freq: np.ndarray,
     diff_db: np.ndarray,
@@ -368,6 +383,7 @@ def _tilt_fit_lf_piecewise_log_axis(
     except (TypeError, ValueError, FloatingPointError, IndexError):
         return None
 
+
 def _window_offset_consistency_score(
     freq_axis: np.ndarray,
     measured_db: np.ndarray,
@@ -375,6 +391,7 @@ def _window_offset_consistency_score(
     *,
     tilt_comp: bool = True,
     tilt_max_db_per_oct: float = 2.0,
+    assume_log_grid: bool = False,
 ) -> tuple[float, float, float]:
     """Arvioi kuinka luotettava level-offset on ikkunan sisalla.
 
@@ -388,14 +405,18 @@ def _window_offset_consistency_score(
         if f.size < 24 or diff.size < 24:
             return float("inf"), float("inf"), float("inf")
 
+        # Identiteettiohitus vain jos valid-maski ei pudottanut yhtaan binia,
+        # muuten f ei ole enaa kutsujan takaama tuore log-hila.
+        skip = bool(assume_log_grid) and f.size == int(np.size(freq_axis))
         if tilt_comp:
             off_full, slope_full = _tilt_fit_offset_and_slope_db_per_oct(
                 f,
                 diff,
                 max_db_per_oct=float(tilt_max_db_per_oct),
+                skip_resample=skip,
             )
         else:
-            off_full = _log_median(f, diff)
+            off_full = _log_median(f, diff, skip_resample=skip)
             slope_full = 0.0
 
         x = np.log2(np.clip(f, 1e-9, None))
@@ -481,6 +502,7 @@ def _window_offset_candidates(
             offsets.append(float(off_sub))
     return offsets
 
+
 def _tilt_aware_offset_db(
     freq_axis: np.ndarray,
     diff_db: np.ndarray,
@@ -527,16 +549,31 @@ def _tilt_aware_offset_db(
         except (TypeError, ValueError, FloatingPointError):
             return 0.0
 
+
 def _tilt_fit_offset_and_slope_db_per_oct(
     freq_axis: np.ndarray,
     diff_db: np.ndarray,
     *,
     max_db_per_oct: float = 2.0,
     prefer_lf_piecewise_tilt: bool = False,
+    skip_resample: bool = False,
 ):
-    """Sisainen apufunktio: tilt fit offset and slope db per oct."""
+    """Sisainen apufunktio: tilt fit offset and slope db per oct.
+
+    skip_resample: kutsuja takaa etta freq_axis on tuore _log_resample_axis-hila
+    (ks. _is_identity_log_grid), jolloin sisainen resample olisi bitti-identtinen
+    identiteetti ja voidaan ohittaa. Guardin failaus palauttaa taydelle polulle.
+    """
     try:
-        f, (y,) = _resample_log_axis(freq_axis, diff_db)
+        f = None
+        y = None
+        if skip_resample:
+            f_in = np.asarray(freq_axis, dtype=float).reshape(-1)
+            y_in = np.asarray(diff_db, dtype=float).reshape(-1)
+            if f_in.size == y_in.size and bool(np.all(np.isfinite(y_in))):
+                f, y = f_in, y_in
+        if f is None:
+            f, (y,) = _resample_log_axis(freq_axis, diff_db)
         if f.size != y.size or f.size < 20:
             off = float(np.median(y)) if y.size else 0.0
             return off, 0.0
@@ -562,15 +599,15 @@ def _tilt_fit_offset_and_slope_db_per_oct(
 
 
 __all__ = [
-    '_resample_log_axis',
-    '_log_median',
-    '_lower_tail_robust_std_db',
-    '_centered_rms',
-    '_tilt_fit_linear_log_axis',
-    '_smooth_tilt_fit_series',
-    '_tilt_fit_lf_piecewise_log_axis',
-    '_window_offset_consistency_score',
-    '_tilt_aware_offset_db',
-    '_tilt_fit_offset_and_slope_db_per_oct',
+    "_is_identity_log_grid",
+    "_resample_log_axis",
+    "_log_median",
+    "_lower_tail_robust_std_db",
+    "_centered_rms",
+    "_tilt_fit_linear_log_axis",
+    "_smooth_tilt_fit_series",
+    "_tilt_fit_lf_piecewise_log_axis",
+    "_window_offset_consistency_score",
+    "_tilt_aware_offset_db",
+    "_tilt_fit_offset_and_slope_db_per_oct",
 ]
-

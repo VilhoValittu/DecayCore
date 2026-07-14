@@ -55,14 +55,16 @@ CUT_LIMIT_REASONS = {
 
 
 def _finite_array(value: Any) -> np.ndarray:
+    """Palauttaa taatusti finite-arvoisen taulukon; tulos on vain-luku-kayttoon."""
     try:
         arr = np.asarray(value, dtype=float).reshape(-1)
     except (TypeError, ValueError):
         return np.zeros(0, dtype=float)
     # nan_to_num tekee useita läpikäyntejä ja väliallokaatioita; data on
     # lähes aina jo finite, joten tarkistus ensin on selvästi halvempi.
+    # Kopio jätetään pois: build_mag_authority_stage vain lukee tuloksen.
     if np.isfinite(arr).all():
-        return arr.copy()
+        return arr
     return np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
 
 
@@ -103,8 +105,9 @@ def build_mag_authority_stage(
     restored_allowed_correction: bool = False,
     changed_eps_db: float = 1e-9,
 ) -> dict[str, Any]:
+    identical = after_db is before_db
     before = _finite_array(before_db)
-    after = _finite_array(after_db)
+    after = before if identical else _finite_array(after_db)
     freq = _finite_array(freq_axis)
     try:
         m = np.asarray(mask, dtype=bool).reshape(-1)
@@ -131,23 +134,26 @@ def build_mag_authority_stage(
         }
 
     before = before[:n]
-    after = after[:n]
+    after = after[:n] if not identical else before
     freq = freq[:n]
     m = m[:n]
-    valid = m & np.isfinite(before) & np.isfinite(after) & np.isfinite(freq)
+    # _finite_array takaa finite-arvot, joten isfinite(before/after/freq)-maskit
+    # olisivat kaikkialla True: valid == m, ja fallback == all-True.
+    valid = m
     if not np.any(valid):
-        valid = np.isfinite(before) & np.isfinite(after)
+        valid = np.ones(n, dtype=bool)
     delta = after - before
+    abs_delta = np.abs(delta)
     d = delta[valid]
-    changed = valid & (np.abs(delta) > float(changed_eps_db))
+    changed = valid & (abs_delta > float(changed_eps_db))
     changed_bins = int(np.count_nonzero(changed))
     active_reasons = _compact_reason_codes(reason_codes, active=changed_bins > 0)
 
-    before_v = before[valid] if np.any(valid) else before
-    after_v = after[valid] if np.any(valid) else after
+    before_v = before[valid]
+    after_v = after[valid] if not identical else before_v
     d_v = d[np.isfinite(d)]
     bass = changed & (freq >= 20.0) & (freq <= 200.0)
-    bass_delta = np.abs(delta[bass])
+    bass_delta = abs_delta[bass]
     authority_only_reduced = False
     if changed_bins > 0:
         dd = delta[changed]
@@ -171,7 +177,7 @@ def build_mag_authority_stage(
 
 
 def append_mag_authority_stage(
-    trace: list[dict[str, Any]],
+    trace: list[dict[str, Any]] | None,
     stage: str,
     before_db: Any,
     after_db: Any,
@@ -181,6 +187,10 @@ def append_mag_authority_stage(
     reason_codes: Any = (),
     restored_allowed_correction: bool = False,
 ) -> None:
+    if trace is None:
+        # Presolve-ajo: jälki ei päädy mihinkään (st hylätään), joten
+        # vaihekohtaista analyysia ei rakenneta lainkaan.
+        return
     trace.append(
         build_mag_authority_stage(
             stage,

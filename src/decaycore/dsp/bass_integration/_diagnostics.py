@@ -262,6 +262,11 @@ def compute_bass_integration_metric_payload(
     sub_allpass_q: float | None = None,
     guard_lo_ratio: float = AUTO_MODE_BASS_INTEGRATION_GUARD_LO_RATIO,
     guard_hi_ratio: float = AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO,
+    l_fir: Any | None = None,
+    r_fir: Any | None = None,
+    sub_fir: Any | None = None,
+    fir_sample_rate: int | None = None,
+    robust: bool | None = None,
 ) -> dict[str, Any]:
     from ._final_metrics import compute_final_bass_integration_metrics
     metrics = compute_final_bass_integration_metrics(
@@ -282,5 +287,10 @@ def compute_bass_integration_metric_payload(
         sub_allpass_q=sub_allpass_q,
         guard_lo_ratio=float(guard_lo_ratio),
         guard_hi_ratio=float(guard_hi_ratio),
+        l_fir=l_fir,
+        r_fir=r_fir,
+        sub_fir=sub_fir,
+        fir_sample_rate=fir_sample_rate,
+        robust=robust,
     )
     return {key: value for key, value in metrics.items() if isinstance(key, str) and key.startswith("bass_")}

@@ -54,18 +54,21 @@ def finalize_score_result_metrics(
     rank_score: float,
     rank_components: dict,
 ) -> dict:
-    direct_dac_canonical_bi = bool(
-        str(metrics_out.get("bass_integration_mode", "") or "").strip().lower() == "direct_dac"
-        or str(metrics_out.get("bass_direct_dac_export_model", "") or "").strip().lower() == "camilladsp_yaml_compatible"
-    )
+    bass_reject_reasons = list(metrics_out.get("bass_direct_dac_reject_reasons", []) or [])
     bass_failed = bool(
         bool(dict(base_data or {}).get("bass_integration_enable", False))
-        and not direct_dac_canonical_bi
-        and str(metrics_out.get("bass_feasibility_class", "") or "").strip().lower() == "infeasible"
+        and (
+            str(metrics_out.get("bass_feasibility_class", "") or "").strip().lower() == "infeasible"
+            or bool(bass_reject_reasons)
+        )
     )
     bass_reason = ""
     if bass_failed:
-        bass_reason = str(metrics_out.get("bass_feasibility_reason", "") or "bass integration feasibility is infeasible")
+        bass_reason = str(
+            metrics_out.get("bass_feasibility_reason", "")
+            or ", ".join(str(reason) for reason in bass_reject_reasons)
+            or "bass integration feasibility is infeasible"
+        )
 
     metrics_out["bass_integration_hard_gate_failed"] = bool(bass_failed)
     metrics_out["bass_integration_hard_gate_reason"] = str(bass_reason)

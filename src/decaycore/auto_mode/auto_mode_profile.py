@@ -38,6 +38,7 @@ class AutoModeProfiler:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._sections: dict[str, list] = {}  # name -> [total_s, count]
+        self._started_at = time.perf_counter()
 
     @contextmanager
     def section(self, name: str):
@@ -63,27 +64,28 @@ class AutoModeProfiler:
 
         return _timed
 
-    # Top-level stage names whose times should not be double-counted in total.
-    _TOP_LEVEL_SECTIONS = frozenset({"search_refine_stages", "finalize"})
-
     def log_summary(self, logger=None, *, label: str = "auto-mode") -> None:
         with self._lock:
             sections = dict(self._sections)
         if not sections:
             return
 
-        # Wall time = sum of top-level (non-nested) sections only.
-        top_s = {k: v for k, v in sections.items() if k in self._TOP_LEVEL_SECTIONS}
-        wall_s = sum(v[0] for v in top_s.values()) if top_s else sum(v[0] for v in sections.values())
-        lines = [f"[PROFILE] [{label}] wall={wall_s:.3f}s"]
+        # Section totals may overlap through nesting and are accumulated across
+        # worker threads. Only elapsed time since profiler creation is wall time.
+        wall_s = max(0.0, time.perf_counter() - self._started_at)
+        accumulated_s = sum(float(values[0]) for values in sections.values())
+        lines = [
+            f"[PROFILE] [{label}] wall={wall_s:.3f}s "
+            f"accumulated_sections={accumulated_s:.3f}s"
+        ]
         for name, (s, n) in sorted(sections.items(), key=lambda x: -x[1][0]):
             pct = 100.0 * s / wall_s if wall_s > 0 else 0.0
             per = s / n if n > 0 else 0.0
             if n == 1:
-                lines.append(f"  {name}: {s:.3f}s ({pct:.1f}%)")
+                lines.append(f"  {name}: {s:.3f}s ({pct:.1f}% wall)")
             else:
                 lines.append(
-                    f"  {name}: {s:.3f}s ({pct:.1f}%) n={n} avg={per*1000:.1f}ms"
+                    f"  {name}: {s:.3f}s ({pct:.1f}% wall) n={n} avg={per*1000:.1f}ms"
                 )
         print("\n".join(lines), flush=True)
 
@@ -118,4 +120,3 @@ def profiled_section(name: str):
         return
     with profiler.section(name):
         yield
-

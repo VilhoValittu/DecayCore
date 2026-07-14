@@ -271,10 +271,21 @@ def _recommend_direct_dac_prepare_builtin_core(
     )
     optimized_snap = _final_metric_snapshot(optimized_metrics)
     improvement_score = float(align_result.get("improvement_score", 0.0) or 0.0)
+    optimized_reject_reasons = list(
+        optimized_metrics.get("bass_direct_dac_reject_reasons", []) or []
+    )
+    optimized_feasibility = str(
+        optimized_metrics.get("bass_feasibility_class", "infeasible") or "infeasible"
+    ).strip().lower()
+    applied = bool(
+        applied
+        and not optimized_reject_reasons
+        and optimized_feasibility != "infeasible"
+    )
 
     allpass = _direct_dac_prepare_allpass_postpass(
         bundle,
-        enabled=allpass_auto_enable,
+        enabled=bool(allpass_auto_enable and applied),
         callbacks=callbacks,
         fc_hz=best_fc,
         profile=profile,
@@ -306,4 +317,6 @@ def _recommend_direct_dac_prepare_builtin_core(
         improvement_score=improvement_score,
         reason=str(align_result.get("reason", "") or "Builtin fallback."),
         study_trials=0,
+        reject_reasons=optimized_reject_reasons,
+        worst_channel=str(optimized_metrics.get("bass_direct_dac_worst_channel", "unknown") or "unknown"),
     )

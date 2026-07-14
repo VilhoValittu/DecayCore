@@ -46,6 +46,8 @@ def _metrics_cache_key(
     sub_allpass_q: float | None,
     guard_lo_ratio: float,
     guard_hi_ratio: float,
+    realized_fir_signature: tuple | None = None,
+    robust: bool = False,
 ) -> tuple:
     return (
         round(float(fc_hz), 4),
@@ -64,6 +66,8 @@ def _metrics_cache_key(
         round(float(sub_allpass_q), 5) if sub_allpass_q is not None else None,
         round(float(guard_lo_ratio), 4),
         round(float(guard_hi_ratio), 4),
+        tuple(realized_fir_signature or ()),
+        bool(robust),
     )
 
 

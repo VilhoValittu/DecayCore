@@ -49,6 +49,11 @@ from ._export_filter_model import (
     camilladsp_export_crossover_response,
 )
 from ._final_metrics import compute_final_bass_integration_metrics
+from ._realized_response import (
+    ROBUST_PERTURBATION_POLICY_VERSION,
+    build_realized_bass_integration_bundle,
+    realized_fir_signature,
+)
 from ._gd_feasibility import (
     compute_direct_dac_bass_integration_analysis,
     compute_direct_dac_bass_integration_diagnostics,
@@ -138,6 +143,9 @@ __all__ = [
     "apply_direct_dac_export_branch_model",
     "camilladsp_export_crossover_response",
     "compute_final_bass_integration_metrics",
+    "build_realized_bass_integration_bundle",
+    "realized_fir_signature",
+    "ROBUST_PERTURBATION_POLICY_VERSION",
     "recommend_direct_dac_alignment",
     "recommend_direct_dac_crossover",
     "recommend_direct_dac_allpass",

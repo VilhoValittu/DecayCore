@@ -881,6 +881,14 @@ def _direct_dac_finalize_prepare_result(
     reject_reasons = list(
         optimized_metrics.get("bass_direct_dac_reject_reasons", []) or []
     )
+    optimized_feasibility = (
+        str(
+            optimized_metrics.get("bass_feasibility_class", "infeasible")
+            or "infeasible"
+        )
+        .strip()
+        .lower()
+    )
     worst_channel = str(
         optimized_metrics.get(
             "bass_direct_dac_worst_channel",
@@ -923,10 +931,12 @@ def _direct_dac_finalize_prepare_result(
         and improvement_score > 0.03
         and not cancel_worsened
         and not ripple_worsened
+        and not reject_reasons
+        and optimized_feasibility != "infeasible"
     )
 
     if not applied:
-        reason = "Optuna search found no meaningful improvement over baseline."
+        reason = "Optuna search found no feasible meaningful improvement over baseline."
         best_fc = 80.0
         best_ratio = 1.0
         best_delay = 0.0
@@ -940,7 +950,7 @@ def _direct_dac_finalize_prepare_result(
 
     allpass = _direct_dac_prepare_allpass_postpass(
         bundle,
-        enabled=allpass_auto_enable,
+        enabled=bool(allpass_auto_enable and applied),
         callbacks=callbacks,
         fc_hz=best_fc,
         profile=profile,
@@ -1007,7 +1017,7 @@ def recommend_direct_dac_prepare_optuna(
     allpass_auto_enable: bool = False,
     trials: int = 2048,
     startup_trials: int = 12,
-    local_trials: int = 12,
+    local_trials: int = 48,
     callbacks=None,
 ) -> dict[str, Any]:
     """Unified Optuna-based Direct-DAC bass integration prepare.

@@ -169,6 +169,13 @@ def _build_materialize_bass_integration_metrics(
     ctx: AutoModeMaterializeContext,
     result: Any,
 ) -> dict | None:
+    existing_metrics = getattr(result, "metrics", None)
+    if isinstance(existing_metrics, dict) and bool(existing_metrics.get("bass_realized_response", False)):
+        return {
+            key: value
+            for key, value in existing_metrics.items()
+            if isinstance(key, str) and key.startswith("bass_")
+        }
     if not bool(final_measurements.get("bass_integration_enabled", False)):
         return None
     bundle = final_measurements.get("bass_integration_bundle")
@@ -238,6 +245,11 @@ def _build_materialize_bass_integration_metrics(
             final_data.get("bass_integration_guard_hi_ratio", AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO),
             AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO,
         ),
+        l_fir=getattr(result, "l_ir", None),
+        r_fir=getattr(result, "r_ir", None),
+        sub_fir=getattr(result, "sub_ir", None),
+        fir_sample_rate=int(getattr(result, "fs", 0) or 0),
+        robust=True,
     )
 
 def _collect_residual_shortlist(
@@ -793,4 +805,3 @@ def build_materialize_helpers(ctx: AutoModeMaterializeContext):  # noqa: C901 - 
 
 
 __all__ = ['AutoModeMaterializeContext', '_sync_auto_hpf_runtime_fields', 'build_materialize_helpers']
-

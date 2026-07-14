@@ -210,6 +210,56 @@ def _stable_level_window_cache_key(
     )
     return h.hexdigest()
 
+def _shared_stereo_level_window_cache_key(
+    freq_axis_l: np.ndarray,
+    magnitudes_l: np.ndarray,
+    target_mags_l: np.ndarray,
+    freq_axis_r: np.ndarray,
+    magnitudes_r: np.ndarray,
+    target_mags_r: np.ndarray,
+    *,
+    f_min,
+    f_max,
+    window_size_octaves,
+    hpf_freq,
+    tilt_comp,
+    tilt_max_db_per_oct,
+    perceptual_weighting,
+    perceptual_strength,
+    perceptual_min_hz,
+    perceptual_max_hz,
+    perceptual_tie_only,
+) -> str:
+    h = hashlib.md5()
+    h.update(b"shared-stereo-window")
+    for values in (
+        freq_axis_l,
+        magnitudes_l,
+        target_mags_l,
+        freq_axis_r,
+        magnitudes_r,
+        target_mags_r,
+    ):
+        _hash_leveling_array(h, values)
+    h.update(
+        repr(
+            _normalize_level_window_params(
+                f_min=f_min,
+                f_max=f_max,
+                window_size_octaves=window_size_octaves,
+                hpf_freq=hpf_freq,
+                tilt_comp=tilt_comp,
+                tilt_max_db_per_oct=tilt_max_db_per_oct,
+                perceptual_weighting=perceptual_weighting,
+                perceptual_strength=perceptual_strength,
+                perceptual_min_hz=perceptual_min_hz,
+                perceptual_max_hz=perceptual_max_hz,
+                perceptual_tie_only=perceptual_tie_only,
+            )
+        ).encode("utf-8")
+    )
+    return h.hexdigest()
+
 def _leveling_cache_key(
     cfg,
     freq_axis: np.ndarray,
@@ -288,6 +338,7 @@ __all__ = [
     '_normalize_level_window_params',
     '_hash_leveling_array',
     '_stable_level_window_cache_key',
+    '_shared_stereo_level_window_cache_key',
     '_leveling_cache_key',
     '_capture_leveling_state',
     '_restore_leveling_state',

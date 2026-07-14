@@ -202,6 +202,9 @@ def _refine_eval_apply_trial_tuning(cfg_trial, trial_data: dict) -> None:
 
 def _refine_eval_apply_bass_integration_metrics(result, trial_data: dict, trial_measurements: dict) -> None:
     try:
+        existing_metrics = getattr(result, "metrics", None)
+        if isinstance(existing_metrics, dict) and bool(existing_metrics.get("bass_realized_response", False)):
+            return
         if bool(trial_measurements.get("bass_integration_enabled", False)):
             bundle = trial_measurements.get("bass_integration_bundle")
             if bundle is not None:
@@ -257,6 +260,11 @@ def _refine_eval_apply_bass_integration_metrics(result, trial_data: dict, trial_
                         trial_data.get("bass_integration_guard_hi_ratio", AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO),
                         AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO,
                     ),
+                    l_fir=getattr(result, "l_ir", None),
+                    r_fir=getattr(result, "r_ir", None),
+                    sub_fir=getattr(result, "sub_ir", None),
+                    fir_sample_rate=int(getattr(result, "fs", 0) or 0),
+                    robust=True,
                 )
                 metrics_obj = getattr(result, "metrics", None)
                 if isinstance(metrics_obj, dict):
@@ -1079,4 +1087,3 @@ __all__ = [
     '_consume_phase_result',
     'run_candidate_phase',
 ]
-

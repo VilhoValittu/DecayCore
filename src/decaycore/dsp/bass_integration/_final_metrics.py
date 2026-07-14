@@ -18,7 +18,6 @@ from ...auto_mode.shared import (
     AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO,
     AUTO_MODE_BASS_INTEGRATION_GUARD_LO_RATIO,
     _auto_bass_integration_profile_norm,
-    _auto_bass_integration_profile_weights,
 )
 from ...io.measurement_bundle import BassIntegrationBundle
 from ..bass_cache import (
@@ -28,8 +27,8 @@ from ..bass_cache import (
     increment_metrics_cache_miss,
 )
 from ._candidate import DirectDacCandidate
-from ._constants import BASS_INTEGRATION_FEASIBILITY_OBJECTIVE_PENALTY
 from ._evaluate_direct_dac import evaluate_direct_dac_candidate
+from ._realized_response import realized_fir_signature
 from ._utils import _safe_float, normalize_sub_combine_mode
 
 
@@ -40,8 +39,14 @@ def _direct_dac_eval_to_legacy_metrics(eval_result, *, profile: str, mode_norm: 
     right = eval_result.right
     dominant = str(eval_result.dominant_channel)
     metrics = {
-        "bass_cancellation_risk": _safe_float(s.get("cancellation_risk", float("nan")), float("nan")),
-        "bass_overlap_ripple": _safe_float(s.get("overlap_ripple_db", float("nan")), float("nan")),
+        "bass_cancellation_risk": _safe_float(
+            s.get("robust_cancellation_risk_p90", s.get("cancellation_risk", float("nan"))),
+            float("nan"),
+        ),
+        "bass_overlap_ripple": _safe_float(
+            s.get("robust_overlap_ripple_db_p90", s.get("overlap_ripple_db", float("nan"))),
+            float("nan"),
+        ),
         "bass_sub_dominance": _safe_float(s.get("sub_dominance_db", float("nan")), float("nan")),
         "bass_null_severity": _safe_float(s.get("null_severity", float("nan")), float("nan")),
         "bass_predicted_sum_flatness_db": _safe_float(s.get("predicted_sum_flatness_db", float("nan")), float("nan")),
@@ -102,6 +107,24 @@ def _direct_dac_eval_to_legacy_metrics(eval_result, *, profile: str, mode_norm: 
         "bass_direct_dac_right_score": float(right.score),
         "bass_direct_dac_worst_channel": str(dominant),
         "bass_direct_dac_export_model": "camilladsp_yaml_compatible",
+        "bass_realized_response": bool(s.get("realized_response", False)),
+        "bass_export_verification_match": bool(s.get("export_verification_match", False)),
+        "bass_robust_perturbation_policy": str(s.get("robust_perturbation_policy", "nominal_only")),
+        "bass_robust_perturbation_policy_v": int(s.get("robust_perturbation_policy_v", 0) or 0),
+        "bass_robust_scenario_count": int(s.get("robust_scenario_count", 1) or 1),
+        "bass_robust_nominal_score": _safe_float(s.get("robust_nominal_score", eval_result.score), eval_result.score),
+        "bass_robust_p90_score": _safe_float(s.get("robust_p90_score", eval_result.score), eval_result.score),
+        "bass_robust_score": _safe_float(s.get("robust_score", eval_result.score), eval_result.score),
+        "bass_robust_cancellation_risk_worst": _safe_float(
+            s.get("robust_cancellation_risk_worst", s.get("cancellation_risk", float("nan"))),
+            float("nan"),
+        ),
+        "bass_robust_overlap_ripple_db_worst": _safe_float(
+            s.get("robust_overlap_ripple_db_worst", s.get("overlap_ripple_db", float("nan"))),
+            float("nan"),
+        ),
+        "bass_sub_scaling_assumption": str(s.get("sub_scaling_assumption", "single_bus_average_normalized")),
+        "bass_sub_coherence_assumption": str(s.get("sub_coherence_assumption", "measured_complex_nominal")),
     }
     metrics["objective"] = float(eval_result.objective)
     diag = dict(s)
@@ -114,71 +137,6 @@ def _direct_dac_eval_to_legacy_metrics(eval_result, *, profile: str, mode_norm: 
     metrics["gd_continuity"] = gd_cont
     metrics["snapshot"] = _final_metric_snapshot(metrics)
     return metrics
-
-
-def _score_final_bass_metrics(metrics: dict[str, Any], *, profile: str) -> float:
-    weights = _auto_bass_integration_profile_weights(profile)
-    penalty = 0.0
-
-    def _add(metric_key: str, *, weight: float, scale: float = 1.0) -> None:
-        nonlocal penalty
-        value = _safe_float(metrics.get(metric_key, float("nan")), float("nan"))
-        if np.isfinite(value):
-            penalty += float(weight) * max(0.0, float(value)) / float(max(scale, 1e-9))
-
-    _add("bass_cancellation_risk", weight=float(weights.get("cancellation", 8.0)), scale=1.0)
-    _add("bass_overlap_ripple", weight=float(weights.get("overlap_ripple", 1.8)), scale=10.0)
-    _add("bass_sub_dominance", weight=float(weights.get("sub_dominance", 0.9)), scale=8.0)
-    _add("bass_null_severity", weight=0.55 * float(weights.get("cancellation", 8.0)), scale=6.0)
-    _add("bass_xo_gd_rms_mismatch_ms", weight=float(weights.get("xo_gd_continuity", 0.8)), scale=3.0)
-    _add("bass_xo_gd_max_mismatch_ms", weight=0.35 * float(weights.get("xo_gd_continuity", 0.8)), scale=6.0)
-    _add("bass_predicted_sum_flatness_db", weight=0.35 * float(weights.get("overlap_ripple", 1.8)), scale=8.0)
-    _add("bass_predicted_sum_dip_depth_db", weight=0.40 * float(weights.get("cancellation", 8.0)), scale=6.0)
-    _add("bass_predicted_sum_peak_excess_db", weight=0.25 * float(weights.get("overlap_ripple", 1.8)), scale=6.0)
-    _add(
-        "bass_overlap_extension_flatness_db",
-        weight=0.20 * float(weights.get("overlap_ripple", 1.8)),
-        scale=8.0,
-    )
-    _add(
-        "bass_overlap_extension_cancellation_risk",
-        weight=0.20 * float(weights.get("cancellation", 8.0)),
-        scale=1.0,
-    )
-    _add(
-        "bass_overlap_extension_peak_excess_db",
-        weight=0.15 * float(weights.get("overlap_ripple", 1.8)),
-        scale=6.0,
-    )
-    _add(
-        "bass_overlap_ripple_delta_db",
-        weight=0.55 * float(weights.get("overlap_ripple", 1.8)),
-        scale=4.0,
-    )
-    _add(
-        "bass_sub_dominance_delta_db",
-        weight=0.75 * float(weights.get("sub_dominance", 0.9)),
-        scale=4.0,
-    )
-    _add(
-        "bass_xo_gd_mismatch_delta_ms",
-        weight=0.75 * float(weights.get("xo_gd_continuity", 0.8)),
-        scale=10.0,
-    )
-    overlap_extension_sub_dominance_db = _safe_float(
-        metrics.get("bass_overlap_extension_sub_dominance_db", float("nan")),
-        float("nan"),
-    )
-    if np.isfinite(overlap_extension_sub_dominance_db):
-        penalty += (
-            0.12
-            * float(weights.get("sub_dominance", 0.9))
-            * max(0.0, float(overlap_extension_sub_dominance_db) - 12.0)
-            / 6.0
-        )
-    feasibility_class = str(metrics.get("bass_feasibility_class", "good") or "good").strip().lower()
-    penalty += float(BASS_INTEGRATION_FEASIBILITY_OBJECTIVE_PENALTY.get(feasibility_class, 0.0))
-    return float(-penalty)
 
 
 def _final_metric_snapshot(metrics: dict[str, Any]) -> dict[str, float | bool | str]:
@@ -257,11 +215,24 @@ def compute_final_bass_integration_metrics(
     sub_allpass_q: float | None = None,
     guard_lo_ratio: float = AUTO_MODE_BASS_INTEGRATION_GUARD_LO_RATIO,
     guard_hi_ratio: float = AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO,
+    l_fir: Any | None = None,
+    r_fir: Any | None = None,
+    sub_fir: Any | None = None,
+    fir_sample_rate: int | None = None,
+    robust: bool | None = None,
 ) -> dict[str, Any]:
     """Compute Bass Integration metrics through the canonical Direct-DAC evaluator."""
     mode_norm = "direct_dac"
     combine_mode_norm = normalize_sub_combine_mode(sub_combine_mode)
     fc = _safe_float(fc_hz, 80.0)
+    has_realized_firs = any(value is not None for value in (l_fir, r_fir, sub_fir))
+    fs = int(fir_sample_rate or bundle.l_main.sample_rate)
+    fir_sig = (
+        realized_fir_signature(l_fir, r_fir, sub_fir, sample_rate=fs)
+        if has_realized_firs
+        else ()
+    )
+    robust_enabled = bool(has_realized_firs if robust is None else robust)
 
     # --- session-scope cache ---
     _cache = _get_metrics_cache(bundle)
@@ -282,6 +253,8 @@ def compute_final_bass_integration_metrics(
         sub_allpass_q=sub_allpass_q,
         guard_lo_ratio=float(guard_lo_ratio),
         guard_hi_ratio=float(guard_hi_ratio),
+        realized_fir_signature=fir_sig,
+        robust=robust_enabled,
     )
     if _key in _cache:
         increment_metrics_cache_hit(bundle)
@@ -315,6 +288,11 @@ def compute_final_bass_integration_metrics(
         sub_combine_mode=combine_mode_norm,
         guard_lo_ratio=float(guard_lo_ratio),
         guard_hi_ratio=float(guard_hi_ratio),
+        l_fir=l_fir,
+        r_fir=r_fir,
+        sub_fir=sub_fir,
+        fir_sample_rate=fs,
+        robust=robust_enabled,
     )
     metrics = _direct_dac_eval_to_legacy_metrics(
         eval_result,

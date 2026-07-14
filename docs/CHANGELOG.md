@@ -6,6 +6,66 @@ All notable changes to **DecayCore** are documented in this file.
 
 ## DecayCore
 
+## [1.1.8] - 14-7-2026
+
+### Measurement guidance
+
+Added guidance for adjusting the volume level during measurement.
+
+### Faster and more reliable automatic mode
+
+- Automatic mode is now approximately 52% faster on the Linux test machine.
+- The automatic worker count now defaults to one, while explicit worker settings remain unchanged. Optuna pruning on the serial execution path was also fixed.
+- Stereo presolve now computes only the baseline phase. The final impulse responses remain bit-identical to those produced by the previous presolve implementation.
+- Expensive copying of preprocessing results was removed. The measurement core is cached while run-specific state remains independent.
+- The stereo-level window now has a cache that covers both channels and all relevant parameters.
+- The measurement-fixed cache now uses a content hash of the measurement data instead of `id()` values. Reused NumPy object identifiers can therefore no longer return DSP precomputation from the wrong measurement.
+- The leveling cache now has a single canonical owner in `state_cache.py`. The API accesses it directly, and redundant copy fields were removed.
+
+### Cleaner DSP logging during optimization
+
+- The `quiet_dsp_info_logging()` context uses a thread-local counter and a `logging.Filter` installed once on the `DecayCore.dsp` logger. INFO and DEBUG messages are suppressed only in the muted thread, while WARNING and higher-severity messages always pass through.
+- `run_pipeline` now suppresses DSP logs when `include_response_arrays=False`, which covers score-only trials in search, polish stages, and the refine cache. Winner materialization with `include_response_arrays=True` continues to write complete entries to `run.log`. Because each trial's entire pipeline runs in one thread, the setting covers the full DSP chain.
+
+### Bass Integration
+
+- Canonical evaluation now uses the measured response, the generated left, right, and subwoofer FIR filters, and exactly the same CamillaDSP IIR model as the export path.
+- Every FIR-based candidate is evaluated across nine perturbation scenarios using ±1 dB gain and ±0.5 ms timing offsets. Ranking combines the nominal score with the p90 score.
+- A rejected or infeasible final candidate is blocked by a hard gate, and the subwoofer output is removed from the exported result.
+- The optimized subwoofer LPF value is no longer modified afterward by the +20 Hz rule.
+- Dual-subwoofer behavior is modeled as the normalized average of a single bus, without an unrealizable SUB2 delay.
+- The cache signature and Bass Integration algorithm version were updated.
+
+---
+
+### Mittausohjeistus
+
+Lisätty ohjeistus äänenvoimakkuuden säätämiseen mittauksen aikana.
+
+### Nopeampi ja luotettavampi automaattitila
+
+- Automaattitila on nyt Linux-testikoneella noin 52 % nopeampi.
+- Automaattinen worker-määrä on nyt oletuksena yksi, mutta erikseen määritetyt asetukset säilyvät ennallaan. Samalla korjattiin Optuna-pruning sarjapolussa.
+- Stereopresolve laskee nyt vain baseline-vaiheen. Lopulliset impulssivasteet vastaavat bittitarkasti aiemman presolve-toteutuksen tuloksia.
+- Raskas esikäsittelytulosten kopiointi poistettiin. Mittausydin tallennetaan välimuistiin, mutta ajokohtainen tila pysyy itsenäisenä.
+- Stereotason ikkunalle lisättiin välimuisti, joka huomioi molemmat kanavat ja kaikki olennaiset parametrit.
+- Measurement-fixed-välimuisti käyttää nyt mittausdatan sisältötiivistettä `id()`-arvojen sijaan. Uudelleenkäytetty NumPy-objektitunniste ei voi enää palauttaa väärän mittauksen DSP-esilaskentaa.
+- Leveling-välimuistilla on nyt yksi kanoninen omistaja `state_cache.py`-tiedostossa. API käyttää sitä suoraan, ja tarpeettomat kopiokentät poistettiin.
+
+### Selkeämpi DSP-lokitus optimoinnin aikana
+
+- `quiet_dsp_info_logging()`-konteksti käyttää säiekohtaista laskuria ja `DecayCore.dsp`-loggeriin kerran asennettavaa `logging.Filter`-suodatinta. INFO- ja DEBUG-viestit vaimennetaan vain kyseisessä säikeessä, mutta WARNING- ja sitä vakavammat viestit päästetään aina läpi.
+- `run_pipeline` vaimentaa DSP-lokit, kun `include_response_arrays=False`. Tämä kattaa score-only-trialit haussa, polish-vaiheissa ja refine-välimuistissa. Voittajan materialisointi asetuksella `include_response_arrays=True` kirjoittaa täydet tiedot `run.log`-tiedostoon kuten ennenkin. Koska trialin koko putki suoritetaan yhdessä säikeessä, asetus kattaa koko DSP-ketjun.
+
+### Bass Integration
+
+- Kanoninen arviointi käyttää nyt mitattua vastetta, generoituja vasemman ja oikean kanavan sekä subwooferin FIR-suodattimia ja täsmälleen samaa CamillaDSP:n IIR-mallia kuin vientipolku.
+- Jokainen FIR-pohjainen ehdokas arvioidaan yhdeksässä perturbointitilanteessa käyttäen ±1 dB:n tasoeroja ja ±0,5 ms:n ajoituseroja. Sijoitus yhdistää nimellispisteen ja p90-pisteen.
+- Hylätty tai toteuttamiskelvoton lopullinen ehdokas estetään hard gatella, ja subwoofer-ulostulo poistetaan vietävästä tuloksesta.
+- Optimoitua subwooferin LPF-arvoa ei enää muuteta jälkikäteen +20 Hz:n säännöllä.
+- Kahden subwooferin toiminta mallinnetaan yhden väylän normalisoituna keskiarvona ilman käytännössä toteuttamatonta SUB2-viivettä.
+- Välimuistin allekirjoitus ja Bass Integrationin algoritmiversio päivitettiin.
+
 ## [1.1.7] - 24-6-2026
 
 ### Automatic mode: bass correction restored for every filter type

@@ -10,12 +10,62 @@
 
 from __future__ import annotations
 
+import logging
+import threading
+from contextlib import contextmanager
 from typing import Any
 
 import numpy as np
 
 from .correction_types import BaselineComparisonTelemetry, BaselineNativeTelemetry
 from .phase_ir_types import ResidualTelemetry
+
+_DSP_LOGGER_NAME = "DecayCore.dsp"
+_QUIET_DSP_LOG_STATE = threading.local()
+_QUIET_FILTER_LOCK = threading.Lock()
+_QUIET_FILTER_INSTALLED = False
+
+
+class _QuietInfoLogFilter(logging.Filter):
+    """Pudottaa INFO/DEBUG-rivit saikeissa joissa quiet_dsp_info_logging on paalla.
+
+    WARNING ja sita vakavammat menevat aina lapi.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.levelno >= logging.WARNING:
+            return True
+        return int(getattr(_QUIET_DSP_LOG_STATE, "depth", 0) or 0) <= 0
+
+
+def _ensure_quiet_filter_installed() -> None:
+    global _QUIET_FILTER_INSTALLED
+    if _QUIET_FILTER_INSTALLED:
+        return
+    with _QUIET_FILTER_LOCK:
+        if not _QUIET_FILTER_INSTALLED:
+            logging.getLogger(_DSP_LOGGER_NAME).addFilter(_QuietInfoLogFilter())
+            _QUIET_FILTER_INSTALLED = True
+
+
+@contextmanager
+def quiet_dsp_info_logging(*, enabled: bool = True):
+    """Vaimentaa DecayCore.dsp-loggerin INFO/DEBUG-rivit nykyisessa saikeessa.
+
+    Tarkoitettu auto-moden score-only-trialeille: per-trial-stagelokitus on
+    merkittava osa mag_post-ajasta eika trialien run.log-rivit paady mihinkaan
+    raporttiin. Saiekohtainen (thread-local), joten rinnakkainen voittajan
+    materialisointi lokittaa normaalisti. WARNING+ menee aina lapi.
+    """
+    if not enabled:
+        yield
+        return
+    _ensure_quiet_filter_installed()
+    _QUIET_DSP_LOG_STATE.depth = int(getattr(_QUIET_DSP_LOG_STATE, "depth", 0) or 0) + 1
+    try:
+        yield
+    finally:
+        _QUIET_DSP_LOG_STATE.depth = int(getattr(_QUIET_DSP_LOG_STATE, "depth", 1) or 1) - 1
 
 
 def telemetry_list(value: Any) -> list[Any] | None:
@@ -138,9 +188,7 @@ def apply_residual_telemetry(*, st: Any, telemetry: ResidualTelemetry | None) ->
             "residual_band_bins": int(telemetry.residual_band_bins),
             "residual_lf_guard_bins": int(telemetry.residual_lf_guard_bins),
             "residual_lf_boost_blocked_bins": int(telemetry.residual_lf_boost_blocked_bins),
-            "residual_right_transition_fade_skipped": bool(
-                telemetry.residual_right_transition_fade_skipped
-            ),
+            "residual_right_transition_fade_skipped": bool(telemetry.residual_right_transition_fade_skipped),
             "residual_authority_boost_cap_mean_db": float(telemetry.residual_authority_boost_cap_mean_db),
             "residual_authority_boost_cap_min_db": float(telemetry.residual_authority_boost_cap_min_db),
             "residual_authority_boost_cap_max_db": float(telemetry.residual_authority_boost_cap_max_db),

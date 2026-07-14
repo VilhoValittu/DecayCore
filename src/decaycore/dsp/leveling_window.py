@@ -35,10 +35,7 @@ def _prepare_level_window_search(
             safe_f_min = float(f_min)
 
         mask = (
-            np.isfinite(freq_arr)
-            & np.isfinite(mag_arr)
-            & (freq_arr >= float(safe_f_min))
-            & (freq_arr <= float(f_max))
+            np.isfinite(freq_arr) & np.isfinite(mag_arr) & (freq_arr >= float(safe_f_min)) & (freq_arr <= float(f_max))
         )
 
         target_search = None
@@ -81,6 +78,7 @@ def _evaluate_level_window_candidate(
     lower_tail_robust_std_db_fn: Callable[..., float],
     window_offset_consistency_score_fn: Callable[..., tuple[float, float, float]],
     perceptual_shape_score_fn: Callable[..., float],
+    is_identity_log_grid_fn: Callable[..., bool] | None = None,
 ):
     try:
         f_w = np.asarray(freq_axis, dtype=float).reshape(-1)
@@ -100,6 +98,10 @@ def _evaluate_level_window_candidate(
 
         if f_eval.size < 20 or y.size < 20:
             return None
+
+        # Yksi hilatarkistus per kandidaatti; True sallii alavirran sovitusten
+        # ohittaa bitti-identtiset uudelleenresamplaukset (f_eval on jo log-hila).
+        assume_log_grid = bool(is_identity_log_grid_fn(f_eval)) if is_identity_log_grid_fn is not None else False
 
         channel_offset = _level_window_channel_offset(y=y, t_eval=t_eval)
 
@@ -126,6 +128,7 @@ def _evaluate_level_window_candidate(
             perceptual_min_hz=float(perceptual_min_hz),
             perceptual_max_hz=float(perceptual_max_hz),
             window_offset_consistency_score_fn=window_offset_consistency_score_fn,
+            assume_log_grid=assume_log_grid,
         )
 
         score = _level_window_apply_score_adjustments(
@@ -185,6 +188,7 @@ def _level_window_target_terms(
     perceptual_min_hz: float,
     perceptual_max_hz: float,
     window_offset_consistency_score_fn: Callable[..., tuple[float, float, float]],
+    assume_log_grid: bool = False,
 ) -> tuple[float, float, float, float]:
     target_rms = float("inf")
     offset_spread = float("inf")
@@ -198,6 +202,7 @@ def _level_window_target_terms(
                 t_eval,
                 tilt_comp=bool(tilt_comp),
                 tilt_max_db_per_oct=float(tilt_max_db_per_oct),
+                assume_log_grid=bool(assume_log_grid),
             )
             if perceptual_weighting:
                 perceptual_rms = perceptual_shape_score_fn(
@@ -208,6 +213,7 @@ def _level_window_target_terms(
                     tilt_max_db_per_oct=float(tilt_max_db_per_oct),
                     min_hz=float(perceptual_min_hz),
                     max_hz=float(perceptual_max_hz),
+                    skip_resample=bool(assume_log_grid),
                 )
         else:
             offset_spread, _shape_rms, tilt_abs = window_offset_consistency_score_fn(
@@ -216,6 +222,7 @@ def _level_window_target_terms(
                 None,
                 tilt_comp=bool(tilt_comp),
                 tilt_max_db_per_oct=float(tilt_max_db_per_oct),
+                assume_log_grid=bool(assume_log_grid),
             )
     except (TypeError, ValueError, FloatingPointError, IndexError):
         pass
@@ -255,7 +262,7 @@ def _level_window_ranges(freq_axis: np.ndarray, safe_f_min: float, f_max: float,
         if safe <= 0.0 or hi <= safe or width <= 0.0:
             return []
         step = 2.0 ** (1.0 / 12.0)
-        ratio = 2.0 ** width
+        ratio = 2.0**width
         max_start = hi / ratio
         if max_start < safe:
             return []
@@ -298,9 +305,7 @@ def _level_window_ranges_with_counts(
     else:
         counts = np.asarray(
             [
-                int(np.count_nonzero(mask))
-                if mask is not None
-                else max(0, int(hi_idx) - int(lo_idx))
+                int(np.count_nonzero(mask)) if mask is not None else max(0, int(hi_idx) - int(lo_idx))
                 for _s, _e, lo_idx, hi_idx, mask in ranges
             ],
             dtype=int,
@@ -313,7 +318,7 @@ def _slice_level_window(arr: np.ndarray | None, lo_idx: int, hi_idx: int, mask) 
         return None
     a = np.asarray(arr, dtype=float)
     if mask is None:
-        return a[int(lo_idx):int(hi_idx)]
+        return a[int(lo_idx) : int(hi_idx)]
     return np.asarray(a[mask], dtype=float)
 
 
@@ -339,6 +344,7 @@ def find_stable_level_window_impl(
     lower_tail_robust_std_db_fn: Callable[..., float],
     window_offset_consistency_score_fn: Callable[..., tuple[float, float, float]],
     perceptual_shape_score_fn: Callable[..., float],
+    is_identity_log_grid_fn: Callable[..., bool] | None = None,
 ):
     try:
         f_min = to_float_fn(f_min, 0.0)
@@ -397,6 +403,7 @@ def find_stable_level_window_impl(
                     lower_tail_robust_std_db_fn=lower_tail_robust_std_db_fn,
                     window_offset_consistency_score_fn=window_offset_consistency_score_fn,
                     perceptual_shape_score_fn=perceptual_shape_score_fn,
+                    is_identity_log_grid_fn=is_identity_log_grid_fn,
                 )
                 if metrics is not None:
                     score = float(metrics["score"])
@@ -465,6 +472,7 @@ def find_shared_stereo_level_window_impl(
     lower_tail_robust_std_db_fn: Callable[..., float],
     window_offset_consistency_score_fn: Callable[..., tuple[float, float, float]],
     perceptual_shape_score_fn: Callable[..., float],
+    is_identity_log_grid_fn: Callable[..., bool] | None = None,
 ):
     try:
         f_min = to_float_fn(f_min, 0.0)
@@ -479,8 +487,12 @@ def find_shared_stereo_level_window_impl(
         if f_min <= 0 or f_max <= 0 or f_min >= f_max:
             return float(f_min), float(f_max)
 
-        prep_l = _prepare_level_window_search(freq_axis_l, magnitudes_l, target_mags_l, f_min=float(f_min), f_max=float(f_max), hpf_freq=float(hpf_freq))
-        prep_r = _prepare_level_window_search(freq_axis_r, magnitudes_r, target_mags_r, f_min=float(f_min), f_max=float(f_max), hpf_freq=float(hpf_freq))
+        prep_l = _prepare_level_window_search(
+            freq_axis_l, magnitudes_l, target_mags_l, f_min=float(f_min), f_max=float(f_max), hpf_freq=float(hpf_freq)
+        )
+        prep_r = _prepare_level_window_search(
+            freq_axis_r, magnitudes_r, target_mags_r, f_min=float(f_min), f_max=float(f_max), hpf_freq=float(hpf_freq)
+        )
         if prep_l is None or prep_r is None:
             return float(f_min), float(f_max)
 
@@ -513,25 +525,35 @@ def find_shared_stereo_level_window_impl(
                     _slice_level_window(f_l, lo_l, hi_l, mask_l),
                     _slice_level_window(m_l, lo_l, hi_l, mask_l),
                     _slice_level_window(t_l, lo_l, hi_l, mask_l),
-                    tilt_comp=bool(tilt_comp), tilt_max_db_per_oct=float(tilt_max_db_per_oct),
-                    perceptual_weighting=bool(perceptual_weighting), perceptual_strength=float(perceptual_strength),
-                    perceptual_min_hz=float(perceptual_min_hz), perceptual_max_hz=float(perceptual_max_hz),
-                    perceptual_tie_only=bool(perceptual_tie_only), resample_log_axis_fn=resample_log_axis_fn,
+                    tilt_comp=bool(tilt_comp),
+                    tilt_max_db_per_oct=float(tilt_max_db_per_oct),
+                    perceptual_weighting=bool(perceptual_weighting),
+                    perceptual_strength=float(perceptual_strength),
+                    perceptual_min_hz=float(perceptual_min_hz),
+                    perceptual_max_hz=float(perceptual_max_hz),
+                    perceptual_tie_only=bool(perceptual_tie_only),
+                    resample_log_axis_fn=resample_log_axis_fn,
                     lower_tail_robust_std_db_fn=lower_tail_robust_std_db_fn,
                     window_offset_consistency_score_fn=window_offset_consistency_score_fn,
                     perceptual_shape_score_fn=perceptual_shape_score_fn,
+                    is_identity_log_grid_fn=is_identity_log_grid_fn,
                 )
                 metrics_r = _evaluate_level_window_candidate(
                     _slice_level_window(f_r, lo_r, hi_r, mask_r),
                     _slice_level_window(m_r, lo_r, hi_r, mask_r),
                     _slice_level_window(t_r, lo_r, hi_r, mask_r),
-                    tilt_comp=bool(tilt_comp), tilt_max_db_per_oct=float(tilt_max_db_per_oct),
-                    perceptual_weighting=bool(perceptual_weighting), perceptual_strength=float(perceptual_strength),
-                    perceptual_min_hz=float(perceptual_min_hz), perceptual_max_hz=float(perceptual_max_hz),
-                    perceptual_tie_only=bool(perceptual_tie_only), resample_log_axis_fn=resample_log_axis_fn,
+                    tilt_comp=bool(tilt_comp),
+                    tilt_max_db_per_oct=float(tilt_max_db_per_oct),
+                    perceptual_weighting=bool(perceptual_weighting),
+                    perceptual_strength=float(perceptual_strength),
+                    perceptual_min_hz=float(perceptual_min_hz),
+                    perceptual_max_hz=float(perceptual_max_hz),
+                    perceptual_tie_only=bool(perceptual_tie_only),
+                    resample_log_axis_fn=resample_log_axis_fn,
                     lower_tail_robust_std_db_fn=lower_tail_robust_std_db_fn,
                     window_offset_consistency_score_fn=window_offset_consistency_score_fn,
                     perceptual_shape_score_fn=perceptual_shape_score_fn,
+                    is_identity_log_grid_fn=is_identity_log_grid_fn,
                 )
                 if metrics_l is not None and metrics_r is not None:
                     score_l = float(metrics_l["score"])

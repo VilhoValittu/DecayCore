@@ -427,7 +427,10 @@ def _auto_trial_workers(base_data: dict | None, n_trials: int) -> int:
     if env_raw:
         req = _auto_safe_int(env_raw, req)
     if req <= 0:
-        req = int(cpu_n)
+        # Keep the facade behavior identical to shared_parts.backend: the
+        # current evaluator is thread-based, and automatic CPU-count sizing
+        # increases contention in the DSP hot path.
+        req = 1
     hard_max = int(max(0, _auto_safe_int(AUTO_MODE_PARALLEL_MAX_WORKERS, 0)))
     if hard_max > 0:
         req = min(req, hard_max)

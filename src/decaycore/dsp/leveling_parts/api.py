@@ -9,7 +9,6 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 from __future__ import annotations
-import threading
 import numpy as np
 
 from ..leveling_compute import compute_leveling_impl
@@ -20,16 +19,24 @@ from ..leveling_window import (
 
 from .state_cache import (
     StereoLinkContext,
+    _LEVELING_CACHE,
+    _LEVELING_CACHE_LOCK,
+    _LEVELING_CACHE_MAX,
+    _LEVEL_WINDOW_CACHE,
+    _LEVEL_WINDOW_CACHE_LOCK,
+    _LEVEL_WINDOW_CACHE_MAX,
     _capture_leveling_state,
     _leveling_cache_key,
     _remember_leveling_error,
     _restore_leveling_state,
     _safe_setattr,
     _stable_level_window_cache_key,
+    _shared_stereo_level_window_cache_key,
     _to_bool,
     _to_float,
 )
 from .tilt_helpers import (
+    _is_identity_log_grid,
     _log_median,
     _lower_tail_robust_std_db,
     _resample_log_axis,
@@ -38,32 +45,6 @@ from .tilt_helpers import (
 )
 from .window_scoring import _perceptual_shape_score
 
-
-
-
-
-
-
-
-
-
-
-
-_LEVELING_CACHE: dict[str, tuple[tuple[float, float, float, float, str, float, float], dict[str, object]]] = {}
-_LEVELING_CACHE_LOCK = threading.Lock()
-_LEVELING_CACHE_MAX = 128
-_LEVEL_WINDOW_CACHE: dict[str, tuple[float, float]] = {}
-_LEVEL_WINDOW_CACHE_LOCK = threading.Lock()
-_LEVEL_WINDOW_CACHE_MAX = 256
-_LEVELING_CACHE_ATTRS = (
-    "_lvl_last_error",
-    "_lvl_tilt_slope_db_per_oct",
-    "_lvl_perceptual_enabled",
-    "_lvl_perceptual_strength",
-    "_lvl_perceptual_band_hz",
-    "_lvl_perceptual_error_rms",
-    "_lvl_window_debug",
-)
 
 def find_stable_level_window(
     freq_axis: np.ndarray,
@@ -129,6 +110,7 @@ def find_stable_level_window(
         lower_tail_robust_std_db_fn=_lower_tail_robust_std_db,
         window_offset_consistency_score_fn=_window_offset_consistency_score,
         perceptual_shape_score_fn=_perceptual_shape_score,
+        is_identity_log_grid_fn=_is_identity_log_grid,
     )
     cached_result = (float(result[0]), float(result[1]))
     if cache_key is not None:
@@ -137,6 +119,7 @@ def find_stable_level_window(
                 _LEVEL_WINDOW_CACHE.pop(next(iter(_LEVEL_WINDOW_CACHE)))
             _LEVEL_WINDOW_CACHE[cache_key] = cached_result
     return cached_result
+
 
 def find_shared_stereo_level_window(
     freq_axis_l: np.ndarray,
@@ -157,7 +140,37 @@ def find_shared_stereo_level_window(
     perceptual_max_hz: float = 4000.0,
     perceptual_tie_only: bool = False,
 ) -> tuple[float, float]:
-    return find_shared_stereo_level_window_impl(
+    cache_key = None
+    try:
+        cache_key = _shared_stereo_level_window_cache_key(
+            freq_axis_l,
+            magnitudes_l,
+            target_mags_l,
+            freq_axis_r,
+            magnitudes_r,
+            target_mags_r,
+            f_min=f_min,
+            f_max=f_max,
+            window_size_octaves=window_size_octaves,
+            hpf_freq=hpf_freq,
+            tilt_comp=tilt_comp,
+            tilt_max_db_per_oct=tilt_max_db_per_oct,
+            perceptual_weighting=perceptual_weighting,
+            perceptual_strength=perceptual_strength,
+            perceptual_min_hz=perceptual_min_hz,
+            perceptual_max_hz=perceptual_max_hz,
+            perceptual_tie_only=perceptual_tie_only,
+        )
+    except (AttributeError, TypeError, ValueError, FloatingPointError, OverflowError):
+        cache_key = None
+
+    if cache_key is not None:
+        with _LEVEL_WINDOW_CACHE_LOCK:
+            cached = _LEVEL_WINDOW_CACHE.get(cache_key)
+        if cached is not None:
+            return cached
+
+    result = find_shared_stereo_level_window_impl(
         freq_axis_l,
         magnitudes_l,
         target_mags_l,
@@ -181,7 +194,16 @@ def find_shared_stereo_level_window(
         lower_tail_robust_std_db_fn=_lower_tail_robust_std_db,
         window_offset_consistency_score_fn=_window_offset_consistency_score,
         perceptual_shape_score_fn=_perceptual_shape_score,
+        is_identity_log_grid_fn=_is_identity_log_grid,
     )
+    cached_result = (float(result[0]), float(result[1]))
+    if cache_key is not None:
+        with _LEVEL_WINDOW_CACHE_LOCK:
+            if cache_key not in _LEVEL_WINDOW_CACHE and len(_LEVEL_WINDOW_CACHE) >= _LEVEL_WINDOW_CACHE_MAX:
+                _LEVEL_WINDOW_CACHE.pop(next(iter(_LEVEL_WINDOW_CACHE)))
+            _LEVEL_WINDOW_CACHE[cache_key] = cached_result
+    return cached_result
+
 
 def compute_leveling(
     cfg,
@@ -238,11 +260,10 @@ def compute_leveling(
 
 
 __all__ = [
-    'find_stable_level_window',
-    'find_shared_stereo_level_window',
-    'compute_leveling',
-    'compute_leveling_impl',
-    'find_shared_stereo_level_window_impl',
-    'find_stable_level_window_impl',
+    "find_stable_level_window",
+    "find_shared_stereo_level_window",
+    "compute_leveling",
+    "compute_leveling_impl",
+    "find_shared_stereo_level_window_impl",
+    "find_stable_level_window_impl",
 ]
-

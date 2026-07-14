@@ -9,7 +9,6 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 from __future__ import annotations
-import threading
 import numpy as np
 
 from .state_cache import _to_float
@@ -21,33 +20,6 @@ from .tilt_helpers import (
     _window_offset_consistency_score,
 )
 
-
-
-
-
-
-
-
-
-
-
-
-
-_LEVELING_CACHE: dict[str, tuple[tuple[float, float, float, float, str, float, float], dict[str, object]]] = {}
-_LEVELING_CACHE_LOCK = threading.Lock()
-_LEVELING_CACHE_MAX = 128
-_LEVEL_WINDOW_CACHE: dict[str, tuple[float, float]] = {}
-_LEVEL_WINDOW_CACHE_LOCK = threading.Lock()
-_LEVEL_WINDOW_CACHE_MAX = 256
-_LEVELING_CACHE_ATTRS = (
-    "_lvl_last_error",
-    "_lvl_tilt_slope_db_per_oct",
-    "_lvl_perceptual_enabled",
-    "_lvl_perceptual_strength",
-    "_lvl_perceptual_band_hz",
-    "_lvl_perceptual_error_rms",
-    "_lvl_window_debug",
-)
 
 def _hz_to_erb_number(freq_hz):
     try:
@@ -63,6 +35,7 @@ def _hz_to_erb_number(freq_hz):
             return float(21.4 * np.log10(1.0 + 4.37e-3 * f))
         except (TypeError, ValueError, FloatingPointError, OverflowError):
             return 0.0
+
 
 def _perceptual_importance_weights(
     freq_axis,
@@ -126,6 +99,7 @@ def _perceptual_importance_weights(
         except (TypeError, ValueError):
             return np.asarray([], dtype=float)
 
+
 def _weighted_centered_rms(values, weights):
     try:
         y = np.asarray(values, dtype=float).reshape(-1)
@@ -149,6 +123,7 @@ def _weighted_centered_rms(values, weights):
     except (TypeError, ValueError, FloatingPointError):
         return float("inf")
 
+
 def _perceptual_shape_score(
     freq_axis,
     measured_db,
@@ -158,8 +133,11 @@ def _perceptual_shape_score(
     tilt_max_db_per_oct=2.0,
     min_hz=250.0,
     max_hz=4000.0,
+    skip_resample=False,
 ):
     # This is a lightweight perceptual-weighting surrogate, not ANSI S3.4 loudness.
+    # skip_resample: kutsuja takaa etta freq_axis on tuore _log_resample_axis-hila
+    # (ks. _is_identity_log_grid); talloin maskaus ja resample ovat identiteetteja.
     try:
         f = np.asarray(freq_axis, dtype=float).reshape(-1)
         m = np.asarray(measured_db, dtype=float).reshape(-1)
@@ -171,10 +149,12 @@ def _perceptual_shape_score(
         if int(np.count_nonzero(valid)) < 12:
             return float("inf")
 
-        f = f[valid]
-        m = m[valid]
-        t = t[valid]
-        f, (m, t) = _resample_log_axis(f, m, t)
+        skip = bool(skip_resample) and bool(np.all(valid))
+        if not skip:
+            f = f[valid]
+            m = m[valid]
+            t = t[valid]
+            f, (m, t) = _resample_log_axis(f, m, t)
         if f.size < 12 or m.size != f.size or t.size != f.size:
             return float("inf")
 
@@ -184,9 +164,10 @@ def _perceptual_shape_score(
                 f,
                 diff,
                 max_db_per_oct=float(tilt_max_db_per_oct),
+                skip_resample=skip,
             )
         else:
-            off = _log_median(f, diff)
+            off = _log_median(f, diff, skip_resample=skip)
             slope = 0.0
 
         x = np.log2(np.clip(f, 1e-9, None))
@@ -201,6 +182,7 @@ def _perceptual_shape_score(
         return _weighted_centered_rms(resid, weights)
     except (TypeError, ValueError, FloatingPointError, IndexError):
         return float("inf")
+
 
 def _prepare_level_window_search(
     freq_axis: np.ndarray,
@@ -222,10 +204,7 @@ def _prepare_level_window_search(
             safe_f_min = float(f_min)
 
         mask = (
-            np.isfinite(freq_arr)
-            & np.isfinite(mag_arr)
-            & (freq_arr >= float(safe_f_min))
-            & (freq_arr <= float(f_max))
+            np.isfinite(freq_arr) & np.isfinite(mag_arr) & (freq_arr >= float(safe_f_min)) & (freq_arr <= float(f_max))
         )
 
         target_search = None
@@ -254,6 +233,7 @@ def _prepare_level_window_search(
         return out
     except (TypeError, ValueError, FloatingPointError, IndexError):
         return None
+
 
 def _evaluate_level_window_candidate(
     freq_axis: np.ndarray,
@@ -414,11 +394,10 @@ def _window_apply_score_adjustments(
 
 
 __all__ = [
-    '_hz_to_erb_number',
-    '_perceptual_importance_weights',
-    '_weighted_centered_rms',
-    '_perceptual_shape_score',
-    '_prepare_level_window_search',
-    '_evaluate_level_window_candidate',
+    "_hz_to_erb_number",
+    "_perceptual_importance_weights",
+    "_weighted_centered_rms",
+    "_perceptual_shape_score",
+    "_prepare_level_window_search",
+    "_evaluate_level_window_candidate",
 ]
-

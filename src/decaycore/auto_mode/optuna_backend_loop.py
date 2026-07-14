@@ -264,19 +264,7 @@ def _run_optuna_serial_trials(
         _maybe_set_pruning_hook(pruner=pruner, make_pruning_hook=make_pruning_hook, trial_obj=trial_obj)
         try:
             out = eval_one(int(idx), dict(preset))
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ) as exc:
+        except _optuna_parallel_recoverable_exc_types(trial_pruned_cls=trial_pruned_cls) as exc:
             prune_state = _handle_serial_pruned_trial(
                 idx=int(idx),
                 exc=exc,

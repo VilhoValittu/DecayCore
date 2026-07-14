@@ -20,6 +20,7 @@ from ..dsp.bass_integration import (
     evaluate_direct_dac_candidate,
     write_direct_dac_candidate_to_data,
 )
+from ..dsp.bass_integration._final_metrics import _direct_dac_eval_to_legacy_metrics
 
 logger = logging.getLogger("DecayCore")
 
@@ -52,7 +53,56 @@ def apply_direct_dac_bass_integration_result(
             candidate,
             profile=str(getattr(cfg, "bass_integration_profile", getattr(bundle, "profile", "safe")) or "safe"),
             sub_combine_mode=str(getattr(cfg, "bass_integration_sub_combine_mode", "average") or "average"),
+            l_fir=np.asarray(l_imp, dtype=float),
+            r_fir=np.asarray(r_imp, dtype=float),
+            sub_fir=np.asarray(sub_ir, dtype=float),
+            fir_sample_rate=int(getattr(cfg, "fs", getattr(bundle.l_main, "sample_rate", 0)) or 0),
+            robust=True,
         )
+        profile = str(
+            getattr(cfg, "bass_integration_profile", getattr(bundle, "profile", "safe")) or "safe"
+        )
+        combine_mode = str(getattr(cfg, "bass_integration_sub_combine_mode", "average") or "average")
+        metric_payload = {
+            key: value
+            for key, value in _direct_dac_eval_to_legacy_metrics(
+                metrics,
+                profile=profile,
+                mode_norm="direct_dac",
+                combine_mode_norm=combine_mode,
+                allpass_enabled=bool(candidate.sub_allpass_enabled),
+                ap_freq_hz=float(candidate.sub_allpass_freq_hz),
+                ap_q=float(candidate.sub_allpass_q),
+            ).items()
+            if isinstance(key, str) and key.startswith("bass_")
+        }
+        if not bool(metrics.feasible) or bool(metrics.reject_reasons):
+            reason = ", ".join(metrics.reject_reasons) or "robust_candidate_infeasible"
+            data["bass_integration_enable"] = False
+            data["bass_integration_alignment_auto_applied"] = False
+            data["bass_integration_alignment_reason"] = (
+                "Direct-DAC final realized-response verification rejected the candidate: " + reason
+            )
+            try:
+                cfg.bass_integration_enable = False
+            except (AttributeError, TypeError, ValueError):
+                logger.debug("FilterConfig bass integration flag is not writable")
+            logger.warning(
+                "Direct-DAC Bass Integration disabled by final realized-response verification: %s",
+                reason,
+            )
+            return {
+                "enabled": False,
+                "rejected": True,
+                "reject_reason": reason,
+                "reject_reasons": list(metrics.reject_reasons),
+                "score": float(metrics.score),
+                "objective": float(metrics.objective),
+                "robust_nominal_score": float(metrics.summary.get("robust_nominal_score", metrics.score)),
+                "robust_p90_score": float(metrics.summary.get("robust_p90_score", metrics.score)),
+                "robust_score": float(metrics.summary.get("robust_score", metrics.score)),
+                "_bass_metric_payload": metric_payload,
+            }
         write_direct_dac_candidate_to_data(data, candidate, metrics, reason="Direct-DAC final candidate verification.")
         result_dict = {
             "enabled": True,
@@ -78,6 +128,21 @@ def apply_direct_dac_bass_integration_result(
             "cancellation_risk": float(metrics.summary.get("cancellation_risk", float("nan"))),
             "feasibility_class": str(metrics.summary.get("feasibility_class", "")),
             "magnitude_ripple_db": float(metrics.summary.get("overlap_ripple_db", float("nan"))),
+            "robust_nominal_score": float(metrics.summary.get("robust_nominal_score", metrics.score)),
+            "robust_p90_score": float(metrics.summary.get("robust_p90_score", metrics.score)),
+            "robust_score": float(metrics.summary.get("robust_score", metrics.score)),
+            "robust_cancellation_risk_worst": float(
+                metrics.summary.get("robust_cancellation_risk_worst", float("nan"))
+            ),
+            "robust_overlap_ripple_db_worst": float(
+                metrics.summary.get("robust_overlap_ripple_db_worst", float("nan"))
+            ),
+            "perturbation_policy": str(metrics.summary.get("robust_perturbation_policy", "nominal_only")),
+            "sub_scaling_assumption": str(
+                metrics.summary.get("sub_scaling_assumption", "single_bus_average_normalized")
+            ),
+            "export_verification_match": bool(metrics.summary.get("export_verification_match", False)),
+            "_bass_metric_payload": metric_payload,
         }
         data["bass_integration_alignment_auto_applied"] = True
         data["bass_integration_alignment_reason"] = "Direct DAC final candidate verified with canonical evaluator."

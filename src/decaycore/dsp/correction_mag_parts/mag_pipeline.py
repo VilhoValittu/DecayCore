@@ -37,12 +37,14 @@ from .bass_smoothing import (
     _select_bass_adaptive_conf_mask,
 )
 
+
 def _run_mag_raw_stage(inputs: _MagPipelineInputs) -> _MagRawStageOutputs:
     return run_mag_raw_stage(
         inputs,
         apply_peak_priority_error_shaping=_apply_peak_priority_error_shaping,
         apply_smoothing=_apply_smoothing,
     )
+
 
 def _run_mag_bassfirst_afdw_conf_stage(
     inputs: _MagPipelineInputs,
@@ -55,12 +57,14 @@ def _run_mag_bassfirst_afdw_conf_stage(
         apply_confidence_adaptive_bass_smoothing=_apply_confidence_adaptive_bass_smoothing,
     )
 
+
 def _run_mag_core_stage(inputs: _MagPipelineInputs) -> _MagCoreOutputs:
     return run_mag_core_stage(
         inputs,
         run_mag_raw_stage_fn=_run_mag_raw_stage,
         run_mag_bassfirst_afdw_conf_stage_fn=_run_mag_bassfirst_afdw_conf_stage,
     )
+
 
 def _run_mag_correction_pipeline(inputs: _MagPipelineInputs) -> _MagCorrectionContext:
     cfg = inputs.cfg
@@ -123,9 +127,7 @@ def _run_mag_correction_pipeline(inputs: _MagPipelineInputs) -> _MagCorrectionCo
                     raw_g=raw_g,
                     final_g=final_g,
                     pre_bass_adapt_g=(
-                        None
-                        if core.pre_bass_adapt_g is None
-                        else np.asarray(core.pre_bass_adapt_g, dtype=float)
+                        None if core.pre_bass_adapt_g is None else np.asarray(core.pre_bass_adapt_g, dtype=float)
                     ),
                     raw_safe_ref=core.raw_safe_ref,
                     conf_mask=conf_mask,
@@ -136,6 +138,7 @@ def _run_mag_correction_pipeline(inputs: _MagPipelineInputs) -> _MagCorrectionCo
                     m_anal=np.asarray(inputs.m_anal, dtype=float),
                     target_mags=np.asarray(inputs.target_mags, dtype=float),
                     calc_offset_db=float(inputs.calc_offset_db),
+                    presolve_mode=bool(inputs.presolve_mode),
                 )
             )
         gain_db = post.gain_db
@@ -193,9 +196,8 @@ def _run_mag_correction_pipeline(inputs: _MagPipelineInputs) -> _MagCorrectionCo
 
 
 __all__ = [
-    '_run_mag_raw_stage',
-    '_run_mag_bassfirst_afdw_conf_stage',
-    '_run_mag_core_stage',
-    '_run_mag_correction_pipeline',
+    "_run_mag_raw_stage",
+    "_run_mag_bassfirst_afdw_conf_stage",
+    "_run_mag_core_stage",
+    "_run_mag_correction_pipeline",
 ]
-

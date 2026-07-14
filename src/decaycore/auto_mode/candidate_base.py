@@ -34,7 +34,6 @@ _BASS_FIRST_MODE_MAX_HZ = 220.0
 _CONF_PULL_MAX_MIN_HZ = 80.0
 _CONF_PULL_MAX_MAX_HZ = 220.0
 
-from decaycore.dsp.bass_integration import MIN_DIRECT_DAC_OVERLAP_RATIO
 from decaycore.common.measurement_features import estimate_schroeder_hz
 
 from .shared import (
@@ -319,7 +318,7 @@ def _build_bi_random_params(base_data: dict, rng) -> dict:
         "bass_integration_sub_polarity_invert": bool(polarity),
         "bass_integration_sub_gain_trim_db": float(gain),
     }
-    lpf_min = round(float(xo * MIN_DIRECT_DAC_OVERLAP_RATIO), 1)
+    lpf_min = round(float(xo), 1)
     lpf_seed = float(np.clip(_auto_safe_float(base_data.get("direct_dac_sub_lpf_hz", lpf_min), lpf_min), lpf_min, 200.0))
     lpf = round(float(np.clip(rng.normal(loc=lpf_seed, scale=12.0), lpf_min, 200.0)), 1)
     out["direct_dac_sub_lpf_hz"] = float(lpf)
@@ -368,7 +367,7 @@ def _suggest_bi_optuna_params(base_data: dict, trial, *, coarse: bool = True, ce
         "bass_integration_sub_polarity_invert": bool(polarity),
         "bass_integration_sub_gain_trim_db": float(gain),
     }
-    lpf_min = round(float(xo * MIN_DIRECT_DAC_OVERLAP_RATIO), 1)
+    lpf_min = round(float(xo), 1)
     lpf_seed = float(np.clip(_auto_safe_float(c.get("direct_dac_sub_lpf_hz", lpf_min), lpf_min), lpf_min, 200.0))
     lpf_lo = lpf_min
     lpf_hi = float(np.clip(lpf_seed + (20.0 if coarse else 8.0), lpf_min, 200.0))

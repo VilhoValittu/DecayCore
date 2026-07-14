@@ -174,14 +174,12 @@ def _append_residual_peak_gate_reason(reasons: list[str], metrics: dict, *, goal
 
 def _append_bass_integration_gate_reason(reasons: list[str], metrics: dict) -> None:
     bass_gate_explicit = bool(metrics.get("bass_integration_hard_gate_failed", False))
-    direct_dac_canonical_bi = bool(
-        str(metrics.get("bass_integration_mode", "") or "").strip().lower() == "direct_dac"
-        or str(metrics.get("bass_direct_dac_export_model", "") or "").strip().lower() == "camilladsp_yaml_compatible"
-    )
     bass_gate_from_metrics = bool(
         bool(metrics.get("bass_integration_enable", False))
-        and not direct_dac_canonical_bi
-        and str(metrics.get("bass_feasibility_class", "") or "").strip().lower() == "infeasible"
+        and (
+            str(metrics.get("bass_feasibility_class", "") or "").strip().lower() == "infeasible"
+            or bool(metrics.get("bass_direct_dac_reject_reasons", []) or [])
+        )
     )
     if bass_gate_explicit or bass_gate_from_metrics:
         reasons.append("bass_integration_infeasible_hard_gate")

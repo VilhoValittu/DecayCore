@@ -17,6 +17,7 @@ from decaycore.auto_mode.auto_mode_profile import profiled_section
 from decaycore.config.models import FilterConfig
 
 from ._pruning import get_pruning_hook as _get_pruning_hook
+from .correction_baseline import _prepare_correction_baseline
 from .decaycore_leveling import StereoLinkContext
 from .dsp_correction import run_correction_stage
 from .dsp_ops import (
@@ -34,8 +35,6 @@ from .hpf_policy import HPF_IIR_TAP_THRESHOLD, filter_config_should_use_iir_hpf
 from .hybrid_iir import HybridIIRPolicy, design_hybrid_iir, peaking_eq_response
 from .modal_analysis import detect_room_modes
 from .phase import remove_time_of_flight
-from .phase_ir_autogain import compute_auto_gain_and_headroom
-from .phase_ir_residual import apply_residual_pass_if_enabled
 
 logger = logging.getLogger("DecayCore.dsp")
 
@@ -457,70 +456,56 @@ def _run_generate_filter_stereo_link_presolve(
     stereo_link_ctx: StereoLinkContext | None = None,
 ) -> dict:
     with profiled_section("generate_filter.stereo_link_presolve"):
-        state = _run_generate_filter_pre_correction(
-            freqs,
-            meas_mags,
-            raw_phases,
-            cfg,
-            stereo_link_ctx=stereo_link_ctx,
-            presolve_mode=True,
-        )
+        with profiled_section("generate_filter.preprocess"):
+            prep = run_preprocess(
+                freqs,
+                meas_mags,
+                raw_phases,
+                cfg,
+                stereo_link_ctx=stereo_link_ctx,
+                presolve_mode=True,
+            )
+        with profiled_section("generate_filter.correction.baseline"):
+            baseline = _prepare_correction_baseline(
+                cfg=cfg,
+                freq_axis=prep.ctx.freq_axis,
+                f_in=prep.f_in,
+                m_in=prep.m_in,
+                reflections=prep.reflections,
+                st=prep.ctx.st,
+                m_anal=prep.m_anal,
+                m_plot_db=prep.m_plot_db,
+                is_psy=prep.is_psy,
+                cmp=prep.cmp,
+                analysis_mode=prep.analysis_mode,
+                gain_db=prep.ctx.gain_db,
+                logger=logger,
+                interpolate_response=interpolate_response,
+                _cfg_float_allow_zero=_cfg_float_allow_zero,
+                stereo_link_ctx=stereo_link_ctx,
+                presolve_mode=True,
+            )
 
-        freq_axis = np.asarray(state["freq_axis"], dtype=float)
-        gain_db = np.asarray(state["gain_db"], dtype=float).copy()
-        hs = getattr(cfg, "hpf_settings", None)
-        if isinstance(hs, dict) and hs.get("enabled") and not filter_config_should_use_iir_hpf(cfg):
-            hpf_f = float(hs.get("freq", 0.0) or 0.0)
-            hpf_order = int(hs.get("order", 0) or 0)
-            if hpf_f > 0 and hpf_order > 0:
-                hpf_db = apply_hpf_to_mags(freq_axis, np.zeros_like(freq_axis), hpf_f, hpf_order)
-                gain_db = gain_db + hpf_db
-                hpf_guard_mask = np.isfinite(freq_axis) & (freq_axis <= float(hpf_f)) & (gain_db > hpf_db)
-                if int(np.count_nonzero(hpf_guard_mask)) > 0:
-                    gain_db[hpf_guard_mask] = hpf_db[hpf_guard_mask]
-
-        gain_db, _residual_telemetry = apply_residual_pass_if_enabled(
-            cfg=cfg,
-            freq_axis=freq_axis,
-            gain_db=gain_db,
-            conf_mask=state["conf_mask"],
-            m_anal=np.asarray(state["m_anal"], dtype=float),
-            calc_offset_db=float(state["calc_offset_db"]),
-            target_mags=np.asarray(state["target_mags"], dtype=float),
-            st=state["st"],
-            mask_c=np.asarray(state["mask_c"], dtype=bool),
-            base_sigma=state["base_sigma"],
-            filter_smooth=state["filter_smooth"],
-            df_mode=bool(state["df_mode"]),
-            raw_g=state["raw_g"],
-            final_g=state["final_g"],
-            logger=logger,
-            cfg_float_allow_zero_fn=_cfg_float_allow_zero,
-        )
-        ag = compute_auto_gain_and_headroom(
-            cfg=cfg,
-            gain_db=gain_db,
-            mask_c=np.asarray(state["mask_c"], dtype=bool),
-            logger=logger,
-        )
-
+    # Preserve the private result shape without running magnitude correction,
+    # residual correction, or auto-gain. Pair generation only consumes the
+    # baseline fields; the final per-channel pass produces real gain telemetry.
     return {
-        "freq_axis": state["freq_axis"],
-        "target_mags": state["target_mags"],
-        "m_anal": state["m_anal"],
-        "analysis_mode": state["analysis_mode"],
-        "target_level_db": state["target_level_db"],
-        "calc_offset_db": state["calc_offset_db"],
-        "meas_level_db_window": state["meas_level_db_window"],
-        "target_level_db_window": state["target_level_db_window"],
-        "offset_method": state["offset_method"],
-        "s_min": state["s_min"],
-        "s_max": state["s_max"],
-        "target_shift_db": state["target_shift_db"],
-        "current_peak_gain": float(ag["current_peak_gain"]),
-        "gain_margin_db": float(ag["gain_margin_db"]),
-        "auto_global_gain_db": float(ag["auto_global_gain_db"]),
-        "auto_headroom_db": float(ag["auto_headroom_db"]),
+        "freq_axis": prep.ctx.freq_axis,
+        "target_mags": baseline.target_mags,
+        "m_anal": prep.m_anal,
+        "analysis_mode": baseline.analysis_mode,
+        "target_level_db": baseline.target_level_db,
+        "calc_offset_db": baseline.calc_offset_db,
+        "meas_level_db_window": baseline.meas_level_db_window,
+        "target_level_db_window": baseline.target_level_db_window,
+        "offset_method": baseline.offset_method,
+        "s_min": baseline.s_min,
+        "s_max": baseline.s_max,
+        "target_shift_db": baseline.target_shift_db,
+        "current_peak_gain": 0.0,
+        "gain_margin_db": 0.0,
+        "auto_global_gain_db": 0.0,
+        "auto_headroom_db": 0.0,
     }
 
 

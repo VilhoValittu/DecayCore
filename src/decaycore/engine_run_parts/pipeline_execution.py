@@ -34,6 +34,7 @@ from ..config.models import FilterConfig
 from ..config.results import FilterResult
 from ..dsp import decaycore_dsp as dsp
 from ..dsp._measurement_ctx_local import clear_measurement_ctx, set_measurement_ctx
+from ..dsp.dsp_telemetry import quiet_dsp_info_logging
 from ..dsp.bass_integration import (
     apply_direct_dac_export_branch_model,
     build_bundle_combined_sub_transfer,
@@ -58,6 +59,7 @@ from .measurement_response_helpers import (
 
 logger = logging.getLogger("DecayCore")
 
+
 def _call_generate_filter(freqs, mags, phases, cfg, *, include_response_arrays: bool):
     try:
         return dsp.generate_filter(
@@ -71,6 +73,7 @@ def _call_generate_filter(freqs, mags, phases, cfg, *, include_response_arrays: 
         if "include_response_arrays" not in str(exc):
             raise
         return dsp.generate_filter(freqs, mags, phases, cfg)
+
 
 def _call_generate_filter_pair(f_l, m_l, p_l, f_r, m_r, p_r, cfg, *, include_response_arrays: bool):
     try:
@@ -89,19 +92,54 @@ def _call_generate_filter_pair(f_l, m_l, p_l, f_r, m_r, p_r, cfg, *, include_res
             raise
         return dsp.generate_filter_pair(f_l, m_l, p_l, f_r, m_r, p_r, cfg)
 
+
 def _stats_level_comp_factor(st: dict | None) -> float:
     try:
         ag_db = float((st or {}).get("auto_global_gain_db", 0.0) or 0.0)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         ag_db = 0.0
     try:
         ah_db = float((st or {}).get("auto_headroom_db", 0.0) or 0.0)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         ah_db = 0.0
     try:
         return float(np.power(10.0, -0.05 * (float(ag_db) + float(ah_db))))
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         return 1.0
+
 
 def _iir_response_on_axis(st: dict | None, f_axis: np.ndarray, fs: int) -> np.ndarray:
     """Combined IIR complex response from stored biquad stats, on f_axis."""
@@ -110,7 +148,18 @@ def _iir_response_on_axis(st: dict | None, f_axis: np.ndarray, fs: int) -> np.nd
     for b in biquads or []:
         try:
             h *= _peaking_eq_response(f_axis, float(fs), float(b["freq"]), float(b["q"]), float(b["gain"]))
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        except (
+            RuntimeError,
+            OSError,
+            ImportError,
+            TypeError,
+            ValueError,
+            AttributeError,
+            KeyError,
+            IndexError,
+            OverflowError,
+            FloatingPointError,
+        ):
             pass
     return h
 
@@ -199,28 +248,44 @@ def _inject_direct_dac_summed_prediction_for_plot(
 
         total_measured = main_meas + sub_meas
         st["direct_dac_sum_measured_mags"] = (
-            20.0 * np.log10(np.maximum(np.abs(total_measured), 1e-12))
-        ).astype(float).tolist()
+            (20.0 * np.log10(np.maximum(np.abs(total_measured), 1e-12))).astype(float).tolist()
+        )
 
         total_export = main_meas * (main_h * main_iir) + sub_meas * (sub_h * sub_iir)
         st["direct_dac_sum_predicted_mags"] = (
-            20.0 * np.log10(np.maximum(np.abs(total_export), 1e-12))
-        ).astype(float).tolist()
+            (20.0 * np.log10(np.maximum(np.abs(total_export), 1e-12))).astype(float).tolist()
+        )
 
         main_comp = float(_stats_level_comp_factor(st))
         sub_comp = float(_stats_level_comp_factor(sub_st))
         total_comp = main_meas * (main_h * main_comp * main_iir) + sub_meas * (sub_h * sub_comp * sub_iir)
         st["direct_dac_sum_predicted_mags_comp"] = (
-            20.0 * np.log10(np.maximum(np.abs(total_comp), 1e-12))
-        ).astype(float).tolist()
+            (20.0 * np.log10(np.maximum(np.abs(total_comp), 1e-12))).astype(float).tolist()
+        )
 
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         logger.debug("Direct-DAC summed plot prediction injection failed", exc_info=True)
+
 
 def _generate_main_filters(
     cfg,
-    f_l, m_l, p_l,
-    f_r, m_r, p_r,
+    f_l,
+    m_l,
+    p_l,
+    f_r,
+    m_r,
+    p_r,
     _mctx_l,
     _mctx_r,
     *,
@@ -231,7 +296,13 @@ def _generate_main_filters(
             set_measurement_ctx(_mctx_l)
             try:
                 l_imp, l_st, r_imp, r_st = _call_generate_filter_pair(
-                    f_l, m_l, p_l, f_r, m_r, p_r, cfg,
+                    f_l,
+                    m_l,
+                    p_l,
+                    f_r,
+                    m_r,
+                    p_r,
+                    cfg,
                     include_response_arrays=bool(include_response_arrays),
                 )
             finally:
@@ -240,7 +311,10 @@ def _generate_main_filters(
             set_measurement_ctx(_mctx_l)
             try:
                 l_imp, l_st = _call_generate_filter(
-                    f_l, m_l, p_l, cfg,
+                    f_l,
+                    m_l,
+                    p_l,
+                    cfg,
                     include_response_arrays=bool(include_response_arrays),
                 )
             finally:
@@ -248,7 +322,10 @@ def _generate_main_filters(
             set_measurement_ctx(_mctx_r)
             try:
                 r_imp, r_st = _call_generate_filter(
-                    f_r, m_r, p_r, cfg,
+                    f_r,
+                    m_r,
+                    p_r,
+                    cfg,
                     include_response_arrays=bool(include_response_arrays),
                 )
             finally:
@@ -260,8 +337,12 @@ def _generate_sub_ir(  # noqa: C901 - sub path setup preserves the direct-DAC an
     cfg,
     measurements,
     data,
-    f_l, m_l, p_l,
-    f_r, m_r, p_r,
+    f_l,
+    m_l,
+    p_l,
+    f_r,
+    m_r,
+    p_r,
     warnings: list,
     *,
     is_direct_dac_bi: bool,
@@ -274,8 +355,7 @@ def _generate_sub_ir(  # noqa: C901 - sub path setup preserves the direct-DAC an
     sub_st: dict | None = None
     sub_target_meta: dict[str, Any] = {}
 
-    if not (bool(getattr(cfg, "sub_integration_enable", False)) and
-            bool(getattr(cfg, "sub_generate_ir", False))):
+    if not (bool(getattr(cfg, "sub_integration_enable", False)) and bool(getattr(cfg, "sub_generate_ir", False))):
         return sub_ir, sub_f, sub_m, sub_p, sub_st, sub_target_meta
 
     try:
@@ -293,7 +373,18 @@ def _generate_sub_ir(  # noqa: C901 - sub path setup preserves the direct-DAC an
         sub_xo_order = int(getattr(cfg, "sub_crossover_order", 4))
         try:
             sub_lpf_hz = float(getattr(cfg, "direct_dac_sub_lpf_hz", sub_xo_hz) or sub_xo_hz)
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        except (
+            RuntimeError,
+            OSError,
+            ImportError,
+            TypeError,
+            ValueError,
+            AttributeError,
+            KeyError,
+            IndexError,
+            OverflowError,
+            FloatingPointError,
+        ):
             sub_lpf_hz = sub_xo_hz
         if not np.isfinite(sub_lpf_hz) or sub_lpf_hz <= 0.0:
             sub_lpf_hz = sub_xo_hz
@@ -336,8 +427,7 @@ def _generate_sub_ir(  # noqa: C901 - sub path setup preserves the direct-DAC an
                 cfg,
                 lpf_settings={"enabled": True, "freq": sub_lpf_hz, "order": sub_xo_order},
                 hpf_settings={"enabled": True, "freq": sub_hpf_freq, "order": sub_hpf_order},
-                crossovers=[{"freq": sub_lpf_hz, "order": sub_xo_order,
-                             "slope": sub_xo_order * 6, "idx": 0}],
+                crossovers=[{"freq": sub_lpf_hz, "order": sub_xo_order, "slope": sub_xo_order * 6, "idx": 0}],
                 mag_c_min=max(5.0, float(sub_hpf_freq)),
                 mag_c_max=sub_lpf_hz,
                 lvl_min=20.0,
@@ -380,7 +470,18 @@ def _generate_sub_ir(  # noqa: C901 - sub path setup preserves the direct-DAC an
                 f"Sub pass: xo={sub_xo_hz:.0f} Hz (order {sub_xo_order}), "
                 f"HPF={sub_hpf_freq:.0f} Hz (order {sub_hpf_order})"
             )
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ) as exc:
         warnings.append(f"sub_pass_failed: {exc}")
         logger.warning(f"Sub DSP pass failed: {exc}")
         sub_ir = None
@@ -423,30 +524,56 @@ def _apply_rt60_and_alignment_checks(  # noqa: C901 - measurement quality and al
     if _raw_ir_l is not None and _raw_ir_r is not None and _raw_ir_fs_l > 0 and _raw_ir_fs_r > 0:
         try:
             from ..dsp.ir_alignment_check import run_ir_alignment_check  # noqa: PLC0415
+
             _xo_lr = float(data.get("avr_crossover_hz", 80.0) or 80.0)
             if not (10.0 <= _xo_lr <= 500.0):
                 _xo_lr = 80.0
             _ir_align_lr = run_ir_alignment_check(
-                np.asarray(_raw_ir_l, dtype=float), _raw_ir_fs_l,
-                np.asarray(_raw_ir_r, dtype=float), _raw_ir_fs_r,
+                np.asarray(_raw_ir_l, dtype=float),
+                _raw_ir_fs_l,
+                np.asarray(_raw_ir_r, dtype=float),
+                _raw_ir_fs_r,
                 xo_hz=_xo_lr,
             )
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        except (
+            RuntimeError,
+            OSError,
+            ImportError,
+            TypeError,
+            ValueError,
+            AttributeError,
+            KeyError,
+            IndexError,
+            OverflowError,
+            FloatingPointError,
+        ):
             logger.debug("IR alignment check L/R failed", exc_info=True)
     if _raw_ir_l is not None and _raw_ir_sub is not None and _raw_ir_fs_l > 0 and _raw_ir_fs_sub > 0:
         try:
             from ..dsp.ir_alignment_check import run_ir_alignment_check  # noqa: PLC0415
-            _xo_sub = float(
-                data.get("avr_crossover_hz") or data.get("sub_crossover_hz", 80.0) or 80.0
-            )
+
+            _xo_sub = float(data.get("avr_crossover_hz") or data.get("sub_crossover_hz", 80.0) or 80.0)
             if not (10.0 <= _xo_sub <= 500.0):
                 _xo_sub = 80.0
             _ir_align_sub = run_ir_alignment_check(
-                np.asarray(_raw_ir_l, dtype=float), _raw_ir_fs_l,
-                np.asarray(_raw_ir_sub, dtype=float), _raw_ir_fs_sub,
+                np.asarray(_raw_ir_l, dtype=float),
+                _raw_ir_fs_l,
+                np.asarray(_raw_ir_sub, dtype=float),
+                _raw_ir_fs_sub,
                 xo_hz=_xo_sub,
             )
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        except (
+            RuntimeError,
+            OSError,
+            ImportError,
+            TypeError,
+            ValueError,
+            AttributeError,
+            KeyError,
+            IndexError,
+            OverflowError,
+            FloatingPointError,
+        ):
             logger.debug("IR alignment check main/sub failed", exc_info=True)
     if isinstance(l_st, dict):
         if _ir_align_lr:
@@ -472,7 +599,18 @@ def _align_lr_and_sub(  # noqa: C901 - alignment policy keeps LR and sub timing 
             dr = r_st.get("delay_samples", None) if isinstance(r_st, dict) else None
             if dl is not None and dr is not None:
                 d_delay = int(round(float(dr))) - int(round(float(dl)))
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        except (
+            RuntimeError,
+            OSError,
+            ImportError,
+            TypeError,
+            ValueError,
+            AttributeError,
+            KeyError,
+            IndexError,
+            OverflowError,
+            FloatingPointError,
+        ):
             d_delay = None
 
         if d_delay is None:
@@ -490,7 +628,18 @@ def _align_lr_and_sub(  # noqa: C901 - alignment policy keeps LR and sub timing 
                         f"Alignment guard: delay_samples={int(d_delay)} vs peak={int(d_peak)} "
                         f"(>{guard_samples} samp) -> using peak"
                     )
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+            except (
+                RuntimeError,
+                OSError,
+                ImportError,
+                TypeError,
+                ValueError,
+                AttributeError,
+                KeyError,
+                IndexError,
+                OverflowError,
+                FloatingPointError,
+            ):
                 logger.exception("alignment guard comparison")
 
         if d_s > 0:
@@ -507,7 +656,8 @@ def _align_lr_and_sub(  # noqa: C901 - alignment policy keeps LR and sub timing 
                 # Always use peak-based alignment for the subwoofer IR.
                 main_peak_ref = int(
                     round(
-                        0.5 * (
+                        0.5
+                        * (
                             int(np.argmax(np.abs(np.asarray(l_imp, dtype=float))))
                             + int(np.argmax(np.abs(np.asarray(r_imp, dtype=float))))
                         )
@@ -515,7 +665,18 @@ def _align_lr_and_sub(  # noqa: C901 - alignment policy keeps LR and sub timing 
                 )
                 sub_peak = int(np.argmax(np.abs(sub_imp)))
                 d_sub = int(main_peak_ref - sub_peak)
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+            except (
+                RuntimeError,
+                OSError,
+                ImportError,
+                TypeError,
+                ValueError,
+                AttributeError,
+                KeyError,
+                IndexError,
+                OverflowError,
+                FloatingPointError,
+            ):
                 d_sub = None
             if is_direct_dac_bi:
                 bi_meta = data.setdefault("_bass_integration_meta", {})
@@ -541,7 +702,18 @@ def _detect_wav_like_grid(f_l: np.ndarray) -> bool:
             df = float(np.median(np.diff(fx[: min(int(fx.size), 4096)])))
             if np.isfinite(df) and (0.0 < df < 2.0):
                 return True
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         pass
     return False
 
@@ -576,14 +748,36 @@ def _apply_wav_postpolish(
                 f"(zone approx {max(mc_min, mc_max - 0.95 * tr_w):.0f}-{mc_max + 1.45 * tr_w:.0f} Hz, "
                 f"is_wav={bool(is_wav)}, wav_like_fft_grid={bool(wav_like_fft_grid)})"
             )
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
+        except (
+            RuntimeError,
+            OSError,
+            ImportError,
+            TypeError,
+            ValueError,
+            AttributeError,
+            KeyError,
+            IndexError,
+            OverflowError,
+            FloatingPointError,
+        ) as exc:
             warnings.append(f"wav_postpolish_failed: {exc}")
             logger.warning(f"WAV final IR polish failed: {exc}")
     return l_imp, r_imp
 
 
 def _build_response_arrays(
-    l_st, r_st, l_imp, r_imp, sub_ir, sub_st, f_l, f_r, cfg, measurements, data, *,
+    l_st,
+    r_st,
+    l_imp,
+    r_imp,
+    sub_ir,
+    sub_st,
+    f_l,
+    f_r,
+    cfg,
+    measurements,
+    data,
+    *,
     include_response_arrays: bool,
 ):
     if not bool(include_response_arrays):
@@ -623,7 +817,9 @@ def _build_response_arrays(
                         gain_trim_db=float(candidate.sub_gain_trim_db),
                         delay_ms=float(candidate.sub_delay_ms),
                         polarity_invert=bool(candidate.sub_polarity_invert),
-                        allpass_freq_hz=(float(candidate.sub_allpass_freq_hz) if candidate.sub_allpass_enabled else None),
+                        allpass_freq_hz=(
+                            float(candidate.sub_allpass_freq_hz) if candidate.sub_allpass_enabled else None
+                        ),
                         allpass_q=(float(candidate.sub_allpass_q) if candidate.sub_allpass_enabled else None),
                         label="Direct-DAC final sub branch for plot",
                     )
@@ -655,7 +851,18 @@ def _build_response_arrays(
                         sub_st=sub_st,
                         fs=int(cfg.fs),
                     )
-                except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+                except (
+                    RuntimeError,
+                    OSError,
+                    ImportError,
+                    TypeError,
+                    ValueError,
+                    AttributeError,
+                    KeyError,
+                    IndexError,
+                    OverflowError,
+                    FloatingPointError,
+                ):
                     logger.debug("Direct-DAC summed prediction build failed", exc_info=True)
 
         l_mode = str((l_st or {}).get("analysis_mode", "native")).lower()
@@ -679,7 +886,7 @@ def _build_response_arrays(
     return freq_axis, l_mag, r_mag, l_phase, r_phase
 
 
-def run_pipeline(  # noqa: C901 - pipeline orchestration is intentionally centralized
+def run_pipeline(
     cfg: FilterConfig,
     measurements: dict,
     *,
@@ -690,7 +897,29 @@ def run_pipeline(  # noqa: C901 - pipeline orchestration is intentionally centra
 
     `measurements` must contain L/R frequency, magnitude and phase arrays:
     `f_l,m_l,p_l,f_r,m_r,p_r`.
+
+    Score-only runs (include_response_arrays=False, i.e. auto-mode search
+    trials) suppress DecayCore.dsp INFO/DEBUG log lines for this thread:
+    the per-trial stage logging is a measurable share of the hot path and
+    the lines never reach any report. WARNING+ always passes; the winner
+    materialization (arrays on) logs in full.
     """
+    with quiet_dsp_info_logging(enabled=not bool(include_response_arrays)):
+        return _run_pipeline_impl(
+            cfg,
+            measurements,
+            debug=debug,
+            include_response_arrays=include_response_arrays,
+        )
+
+
+def _run_pipeline_impl(  # noqa: C901 - pipeline orchestration is intentionally centralized
+    cfg: FilterConfig,
+    measurements: dict,
+    *,
+    debug: bool = False,
+    include_response_arrays: bool = True,
+) -> FilterResult:
     if not isinstance(measurements, dict):
         raise TypeError("measurements must be a dict")
 
@@ -711,7 +940,15 @@ def run_pipeline(  # noqa: C901 - pipeline orchestration is intentionally centra
     _mctx_r = _build_measurement_side_ctx(measurements, "r")
 
     l_imp, l_st, r_imp, r_st = _generate_main_filters(
-        cfg, f_l, m_l, p_l, f_r, m_r, p_r, _mctx_l, _mctx_r,
+        cfg,
+        f_l,
+        m_l,
+        p_l,
+        f_r,
+        m_r,
+        p_r,
+        _mctx_l,
+        _mctx_r,
         include_response_arrays=bool(include_response_arrays),
     )
 
@@ -720,7 +957,16 @@ def run_pipeline(  # noqa: C901 - pipeline orchestration is intentionally centra
         and str(getattr(cfg, "bass_integration_mode", "") or "").strip().lower() == "direct_dac"
     )
     sub_ir, sub_f, sub_m, sub_p, sub_st, sub_target_meta = _generate_sub_ir(
-        cfg, measurements, data, f_l, m_l, p_l, f_r, m_r, p_r, warnings,
+        cfg,
+        measurements,
+        data,
+        f_l,
+        m_l,
+        p_l,
+        f_r,
+        m_r,
+        p_r,
+        warnings,
         is_direct_dac_bi=is_direct_dac_bi,
         include_response_arrays=bool(include_response_arrays),
     )
@@ -737,19 +983,41 @@ def run_pipeline(  # noqa: C901 - pipeline orchestration is intentionally centra
             try:
                 l_st = _make_comparison_stats(l_st, int(cfg.fs), int(cfg.num_taps))
                 r_st = _make_comparison_stats(r_st, int(cfg.fs), int(cfg.num_taps))
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as exc:
+            except (
+                RuntimeError,
+                OSError,
+                ImportError,
+                TypeError,
+                ValueError,
+                AttributeError,
+                KeyError,
+                IndexError,
+                OverflowError,
+                FloatingPointError,
+            ) as exc:
                 warnings.append(f"comparison_stats_failed: {exc}")
                 logger.warning(f"Comparison-mode stats failed: {exc}")
 
     l_imp, r_imp, sub_ir, d_s, d_peak, d_delay, align_method = _align_lr_and_sub(
-        l_imp, r_imp, sub_ir, l_st, r_st, data, cfg,
+        l_imp,
+        r_imp,
+        sub_ir,
+        l_st,
+        r_st,
+        data,
+        cfg,
         is_direct_dac_bi=is_direct_dac_bi,
     )
 
     wav_like_fft_grid = _detect_wav_like_grid(f_l)
     l_imp, r_imp = _apply_wav_postpolish(
-        l_imp, r_imp, cfg, data, warnings,
-        is_wav=is_wav, wav_like_fft_grid=wav_like_fft_grid,
+        l_imp,
+        r_imp,
+        cfg,
+        data,
+        warnings,
+        is_wav=is_wav,
+        wav_like_fft_grid=wav_like_fft_grid,
     )
 
     if isinstance(l_st, dict) and isinstance(r_st, dict):
@@ -763,7 +1031,18 @@ def run_pipeline(  # noqa: C901 - pipeline orchestration is intentionally centra
                 "gain_diff_db": gain_diff,
                 "method": str(align_method),
             }
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        except (
+            RuntimeError,
+            OSError,
+            ImportError,
+            TypeError,
+            ValueError,
+            AttributeError,
+            KeyError,
+            IndexError,
+            OverflowError,
+            FloatingPointError,
+        ):
             logger.exception("auto_align stats inject")
 
     with profiled_section("run_pipeline.inject_filter_gd_stats"):
@@ -781,9 +1060,30 @@ def run_pipeline(  # noqa: C901 - pipeline orchestration is intentionally centra
         r_st=r_st,
         sub_st=sub_st if isinstance(sub_st, dict) else None,
     )
+    bass_metric_payload = dict(direct_dac_result_dict.pop("_bass_metric_payload", {}) or {})
+    if bool(direct_dac_result_dict.get("rejected", False)) and not bool(direct_dac_result_dict.get("enabled", False)):
+        sub_ir = None
+        sub_st = None
+        data["sub_integration_enable"] = False
+        data["sub_generate_ir"] = False
+        try:
+            cfg.sub_integration_enable = False
+            cfg.sub_generate_ir = False
+        except (AttributeError, TypeError, ValueError):
+            logger.debug("FilterConfig sub output flags are not writable")
 
     freq_axis, l_mag, r_mag, l_phase, r_phase = _build_response_arrays(
-        l_st, r_st, l_imp, r_imp, sub_ir, sub_st, f_l, f_r, cfg, measurements, data,
+        l_st,
+        r_st,
+        l_imp,
+        r_imp,
+        sub_ir,
+        sub_st,
+        f_l,
+        f_r,
+        cfg,
+        measurements,
+        data,
         include_response_arrays=bool(include_response_arrays),
     )
 
@@ -804,16 +1104,23 @@ def run_pipeline(  # noqa: C901 - pipeline orchestration is intentionally centra
         "wav_like_fft_grid": bool(wav_like_fft_grid),
         "comparison_mode": bool(comparison_mode),
         "ir_export_window_tag": _irwin_tag(getattr(cfg, "ir_export_window_mode", "auto")),
-        "l_max_boost_db_effective": _as_float((l_st or {}).get("max_boost_db_effective", (l_st or {}).get("max_boost_db", 0.0)), 0.0),
-        "r_max_boost_db_effective": _as_float((r_st or {}).get("max_boost_db_effective", (r_st or {}).get("max_boost_db", 0.0)), 0.0),
+        "l_max_boost_db_effective": _as_float(
+            (l_st or {}).get("max_boost_db_effective", (l_st or {}).get("max_boost_db", 0.0)), 0.0
+        ),
+        "r_max_boost_db_effective": _as_float(
+            (r_st or {}).get("max_boost_db_effective", (r_st or {}).get("max_boost_db", 0.0)), 0.0
+        ),
         "l_max_cut_db": _as_float((l_st or {}).get("max_cut_db", 0.0), 0.0),
         "r_max_cut_db": _as_float((r_st or {}).get("max_cut_db", 0.0), 0.0),
         "direct_dac_bass_integration": dict(direct_dac_result_dict),
         "bass_integration_crossover_hz": _as_float(direct_dac_result_dict.get("main_hpf_hz"), 0.0),
         "bass_integration_delay_ms": _as_float(direct_dac_result_dict.get("sub_delay_ms"), 0.0),
         "bass_integration_gain_db": _as_float(direct_dac_result_dict.get("sub_gain_db"), 0.0),
-        "bass_integration_polarity": "invert" if bool(direct_dac_result_dict.get("sub_polarity_invert", False)) else "normal",
+        "bass_integration_polarity": (
+            "invert" if bool(direct_dac_result_dict.get("sub_polarity_invert", False)) else "normal"
+        ),
         "bass_integration_cancellation_risk": _as_float(direct_dac_result_dict.get("cancellation_risk"), 0.0),
+        **bass_metric_payload,
         **({f"bass_integration_{k}": v for k, v in sub_target_meta.items()} if sub_target_meta else {}),
     }
 
@@ -838,11 +1145,15 @@ def run_pipeline(  # noqa: C901 - pipeline orchestration is intentionally centra
             "f_r": np.asarray(f_r, dtype=float),
             "m_r": np.asarray(m_r, dtype=float),
             "p_r": np.asarray(p_r, dtype=float),
-            **({
-                "f_sub": np.asarray(sub_f, dtype=float),
-                "m_sub": np.asarray(sub_m, dtype=float),
-                "p_sub": np.asarray(sub_p, dtype=float),
-            } if sub_f is not None else {}),
+            **(
+                {
+                    "f_sub": np.asarray(sub_f, dtype=float),
+                    "m_sub": np.asarray(sub_m, dtype=float),
+                    "p_sub": np.asarray(sub_p, dtype=float),
+                }
+                if sub_f is not None
+                else {}
+            ),
         },
         cfg=cfg,
         sub_ir=sub_ir,
@@ -854,11 +1165,11 @@ def run_pipeline(  # noqa: C901 - pipeline orchestration is intentionally centra
 
 
 __all__ = [
-    '_call_generate_filter',
-    '_call_generate_filter_pair',
-    '_stats_level_comp_factor',
-    '_apply_measured_rt60_override',
-    '_inject_direct_dac_summed_prediction_for_plot',
-    'dsp',
-    'run_pipeline',
+    "_call_generate_filter",
+    "_call_generate_filter_pair",
+    "_stats_level_comp_factor",
+    "_apply_measured_rt60_override",
+    "_inject_direct_dac_summed_prediction_for_plot",
+    "dsp",
+    "run_pipeline",
 ]

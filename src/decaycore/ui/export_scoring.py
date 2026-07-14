@@ -8,10 +8,7 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-import logging
 from typing import Any
-
-logger = logging.getLogger("DecayCore")
 
 from . import decaycore_plot as plots
 from ..config.results import FilterResult
@@ -21,12 +18,14 @@ from ..auto_mode.rank_score import (
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
+    if value is None:
+        return float(default)
     try:
         x = float(value)
         if x == x and abs(x) != float("inf"):
             return x
-    except Exception:
-        logger.exception("safe float parse in export scoring")
+    except (TypeError, ValueError):
+        pass
     return float(default)
 
 
@@ -250,5 +249,4 @@ def _append_export_ranking(summary_content: str, fs_v: int, ranking_context: dic
             f"{_safe_float(e.get('lr_delta_score'), 0.0):<10.3f}\n"
         )
     return summary_content
-
 

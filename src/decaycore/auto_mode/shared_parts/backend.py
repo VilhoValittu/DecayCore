@@ -68,7 +68,10 @@ def _auto_trial_workers(base_data: dict | None, n_trials: int) -> int:
     if env_raw:
         req = _auto_safe_int(env_raw, req)
     if req <= 0:
-        req = int(cpu_n)
+        # The current Optuna evaluator uses Python threads. DSP trials contend
+        # on the GIL and large shared caches, so CPU-count auto sizing is slower
+        # than the deterministic sequential path on representative workloads.
+        req = 1
     hard_max = int(max(0, _auto_safe_int(AUTO_MODE_PARALLEL_MAX_WORKERS, 0)))
     if hard_max > 0:
         req = min(req, hard_max)
@@ -84,4 +87,3 @@ def _auto_trial_chunk_size(workers: int) -> int:
 
 
 __all__ = ['_auto_optimizer_backend', '_auto_optuna_sampler_kwargs', '_auto_trial_workers', '_auto_trial_chunk_size']
-
