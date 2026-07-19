@@ -19,7 +19,7 @@ from .cache_signature import (
     _auto_compat_version,
     get_or_build_synth_target,
 )
-from .cache_measurement_sig import _auto_get_measurement_signature, _auto_target_study_sig
+from .cache_measurement_sig import _auto_search_measurement_identity, _auto_target_study_sig
 from .runtime_context import coerce_orchestrator_runtime
 from .rank_score import official_rank_score
 from .scoring_ranking import (
@@ -102,7 +102,7 @@ def _prepare_target_selection_setup(
         str(goal),
         str(rank_basis),
     )
-    measurement_identity = _auto_get_measurement_signature(measurements)
+    measurement_identity = _auto_search_measurement_identity(measurements)
     target_study_sig = _auto_target_study_sig(measurement_identity, goal, filter_key,)
     seed_target = int(str(target_study_sig)[:16], 16) % (2**31 - 1)
     _auto_apply_seed(seed_target)

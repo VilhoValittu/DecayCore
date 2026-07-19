@@ -16,6 +16,9 @@ from .. import shared
 from ..rank_score import attach_official_rank_score, calibrated_auto_quality
 
 AUTO_MODE_PREFER_BASS_RESIDUAL_PEAK_HARD_GATE_MAX_DB = 12.0
+_RESIDUAL_PEAK_SAFETY_MARGIN_DB = 0.25
+_RESIDUAL_PEAK_CORRECTABLE_CONFIDENCE_MIN = 0.55
+_RESIDUAL_PEAK_CORRECTABLE_SAFE_CUT_MIN_DB = 1.0
 
 
 def _bass_boost_support_db(metrics: dict | None) -> float:
@@ -42,6 +45,41 @@ def _effective_residual_peak_hard_gate_db(
     if float(bass_boost) < 3.0:
         return float(gate)
     return float(min(AUTO_MODE_PREFER_BASS_RESIDUAL_PEAK_HARD_GATE_MAX_DB, float(gate) + float(bass_boost)))
+
+
+def _correctable_residual_peak_near_gate(
+    metrics: dict,
+    *,
+    base_data: dict | None,
+    gate_value_db: float,
+    gate_db: float,
+    gate_source: str,
+) -> bool:
+    """Reject knife-edge residual peaks that the measurement says are safely cuttable."""
+    if not bool(dict(base_data or {}).get("mag_correct", True)):
+        return False
+    if str(gate_source) != "raw_db" or not (np.isfinite(gate_value_db) and np.isfinite(gate_db)):
+        return False
+    if float(gate_value_db) <= float(gate_db) - float(_RESIDUAL_PEAK_SAFETY_MARGIN_DB):
+        return False
+    for candidate in list(metrics.get("residual_peak_candidates", []) or []):
+        candidate = dict(candidate or {})
+        if not bool(candidate.get("inside_correction_band", False)):
+            continue
+        residual_db = shared._auto_safe_float(candidate.get("residual_db", float("nan")), float("nan"))
+        confidence = max(
+            shared._auto_safe_float(candidate.get("confidence_mean", 0.0), 0.0),
+            shared._auto_safe_float(candidate.get("modal_confidence", 0.0), 0.0),
+        )
+        safe_cut_db = shared._auto_safe_float(candidate.get("modal_safe_cut_db", 0.0), 0.0)
+        if (
+            np.isfinite(residual_db)
+            and float(residual_db) > float(gate_db) - float(_RESIDUAL_PEAK_SAFETY_MARGIN_DB)
+            and float(confidence) >= float(_RESIDUAL_PEAK_CORRECTABLE_CONFIDENCE_MIN)
+            and float(safe_cut_db) >= float(_RESIDUAL_PEAK_CORRECTABLE_SAFE_CUT_MIN_DB)
+        ):
+            return True
+    return False
 
 
 def finalize_score_result_metrics(
@@ -91,6 +129,17 @@ def finalize_score_result_metrics(
             rp_gate_source = "severity"
     if np.isfinite(rp_gate_value) and np.isfinite(rp_gate) and float(rp_gate_value) > float(rp_gate):
         hard_gate_failures.append("residual_peak_hard_gate" if rp_gate_source == "raw_db" else "residual_peak_severity_gate")
+    safety_margin_failed = _correctable_residual_peak_near_gate(
+        metrics_out,
+        base_data=base_data,
+        gate_value_db=float(rp_gate_value),
+        gate_db=float(rp_gate),
+        gate_source=str(rp_gate_source),
+    )
+    metrics_out["residual_peak_safety_margin_db"] = float(_RESIDUAL_PEAK_SAFETY_MARGIN_DB)
+    metrics_out["residual_peak_safety_margin_gate_failed"] = bool(safety_margin_failed)
+    if safety_margin_failed:
+        hard_gate_failures.append("residual_peak_correctable_safety_margin")
     if bass_failed:
         hard_gate_failures.append("bass_integration_infeasible_hard_gate")
     if bool(stereo_policy_gate_failed):

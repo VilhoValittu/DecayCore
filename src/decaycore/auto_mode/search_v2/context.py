@@ -20,7 +20,10 @@ import numpy as np
 
 from .. import api as auto_api
 from ..auto_mode_profile import AutoModeProfiler, auto_mode_profile_enabled
-from ..cache_measurement_sig import _auto_get_measurement_signature, _auto_optuna_stable_study_sig
+from ..cache_measurement_sig import (
+    _auto_optuna_stable_study_sig,
+    _auto_search_measurement_identity,
+)
 from ..cache_signature import _auto_seed_from_signature
 from ..materialize import AutoModeMaterializeContext, build_materialize_helpers
 from .runtime import _runtime
@@ -303,7 +306,7 @@ def build_execution_context(
     compat_version = auto_api._auto_compat_version(search_base_data)
     goal = auto_api._auto_goal(search_base_data)
     filter_key = auto_api._auto_filter_cache_key(search_base_data)
-    measurement_sig = _auto_get_measurement_signature(measurements)
+    search_measurement_identity = _auto_search_measurement_identity(measurements)
     logger.info(
         "Automatic mode filter selected: %s (filter_key=%s)",
         str(search_base_data.get("filter_type", "") or ""),
@@ -311,8 +314,8 @@ def build_execution_context(
     )
     cache_base_data["_optuna_filter_key"] = str(filter_key)
     search_base_data["_optuna_filter_key"] = str(filter_key)
-    cache_base_data["_optuna_measurement_sig"] = str(measurement_sig)
-    search_base_data["_optuna_measurement_sig"] = str(measurement_sig)
+    cache_base_data["_optuna_measurement_sig"] = str(search_measurement_identity)
+    search_base_data["_optuna_measurement_sig"] = str(search_measurement_identity)
     cache_base_data["_optuna_journal_kind"] = "filter"
     search_base_data["_optuna_journal_kind"] = "filter"
     if str(canonical_signature or "").strip():
@@ -378,7 +381,7 @@ def build_execution_context(
         include_hc_mode=True,
     )
     optuna_search_sig = _auto_optuna_stable_study_sig(
-        measurement_identity=str(measurement_sig),
+        measurement_identity=str(search_measurement_identity),
         filter_key=str(filter_key),
     )
     context = AutoSearchExecutionContext(

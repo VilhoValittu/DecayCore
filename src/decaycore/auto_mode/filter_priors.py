@@ -64,8 +64,8 @@ def _measurement_signature(
     if not isinstance(measurements, dict):
         return ""
     try:
-        from .cache_signature import _auto_get_measurement_signature
-        return str(_auto_get_measurement_signature(measurements)).strip()
+        from .cache_measurement_sig import _auto_search_measurement_identity
+        return str(_auto_search_measurement_identity(measurements)).strip()
     except (
 
         AttributeError,

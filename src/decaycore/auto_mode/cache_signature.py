@@ -45,7 +45,8 @@ from .cache_lastused import (
 from .cache_measurement_sig import (
     _auto_get_measurement_signature,
     _auto_measurement_metadata_identity,
-    _auto_measurement_signature,
+    _auto_measurement_signature as _auto_measurement_signature,
+    _auto_search_measurement_identity,
 )
 from .cache_paths import (
     _auto_cache_compat_token as _auto_cache_compat_token,
@@ -95,7 +96,7 @@ _BASS_INTEGRATION_ALGO_V = 5
 _DIRECT_DAC_SUB_TARGET_POLICY_V = 1
 _AUTO_LF_ROLLOFF_POLICY_V = 1
 _AUTO_TDC_DECAY_SCORING_ALGO_V = 2
-_AUTO_BROAD_RESIDUAL_PEAK_SCORING_ALGO_V = 2
+_AUTO_BROAD_RESIDUAL_PEAK_SCORING_ALGO_V = 3
 _AUTO_CORRECTION_SHARPNESS_SCORING_ALGO_V = 1
 _AUTO_DIP_FILL_RISK_SCORING_ALGO_V = 1
 _AUTO_CHANNEL_OVERFIT_SCORING_ALGO_V = 1
@@ -638,7 +639,7 @@ def _auto_seed_from_signature(
     include_hc_mode: bool = True,
 ) -> int:
     try:
-        sig = _auto_signature(
+        payload = _auto_signature_payload(
             base_data=base_data,
             measurements=measurements,
             fs_v=int(fs_v),
@@ -648,6 +649,11 @@ def _auto_seed_from_signature(
             hc_mode=hc_mode,
             include_hc_mode=bool(include_hc_mode),
         )
+        stable_measurement_identity = _auto_search_measurement_identity(measurements or {})
+        payload["measurement_sig"] = str(stable_measurement_identity)
+        sig = hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+        ).hexdigest()
         if not sig:
             raise ValueError("empty signature")
         return int(str(sig)[:8], 16) & 0xFFFFFFFF
@@ -665,7 +671,7 @@ def _auto_seed_from_signature(
         NameError,
     ):
         try:
-            msig = _auto_measurement_signature(measurements or {})
+            msig = _auto_search_measurement_identity(measurements or {})
             return int(str(msig)[:8], 16) & 0xFFFFFFFF if msig else 0
         except (
 

@@ -712,12 +712,6 @@ def _run_search_refine_phase2_local_core(
                 _auto_safe_float(before.get("rank_score"), 0.0),
                 _auto_safe_float((search_state.best_metrics or {}).get("rank_score"), 0.0),
             )
-        elif ci == 1 and len(phase1.phase1_top) > 1:
-            logger.info(
-                "Automatic mode: skipping remaining %d local refine center(s) — center #1 made no improvement",
-                int(len(phase1.phase1_top)) - 1,
-            )
-            break
     return phase2
 
 

@@ -36,7 +36,7 @@ from .cache_signature import (
     _auto_seed_from_signature,
 )
 from .compute_context import AutoRunComputeContext
-from .cache_measurement_sig import _auto_get_measurement_signature
+from .cache_measurement_sig import _auto_get_measurement_signature, _auto_search_measurement_identity
 from .candidate_generation import _build_auto_mode_candidates
 from .search_v2.candidates import deduplicate_presets
 from .shared import (
@@ -331,7 +331,7 @@ def _dispatch_target_trial_eval(*, dispatch: _TargetTrialDispatch, idx: int, pre
 def _run_target_trials_optuna(*, dispatch: _TargetTrialDispatch) -> list[dict]:
     out_by_idx: dict[int, dict] = {}
     base_tc_optuna = dict(dispatch.base_tc or {})
-    base_tc_optuna["_optuna_measurement_sig"] = _auto_get_measurement_signature(dispatch.measurements)
+    base_tc_optuna["_optuna_measurement_sig"] = _auto_search_measurement_identity(dispatch.measurements)
     base_tc_optuna["_optuna_journal_kind"] = "target"
     base_tc_optuna["_optuna_filter_key"] = str(dispatch.filter_key or "")
     raw_scope = f"target-{dispatch.target_name!s}-{dispatch.phase_tag!s}"

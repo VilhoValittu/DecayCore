@@ -19,7 +19,7 @@ import numpy as np
 from .cache_signature import (
     _auto_signature,
 )
-from .cache_measurement_sig import _auto_get_measurement_signature
+from .cache_measurement_sig import _auto_search_measurement_identity
 from .shared import (
     AUTO_MODE_CACHE_ENABLED,
     AUTO_MODE_SYNTH_TARGET_NAME,
@@ -542,7 +542,7 @@ def _cached_target_state_from_optuna_study(
         return None
     try:
         storage_base_data = dict(base_data or {})
-        storage_base_data["_optuna_measurement_sig"] = _auto_get_measurement_signature(measurements or {})
+        storage_base_data["_optuna_measurement_sig"] = _auto_search_measurement_identity(measurements or {})
         storage_base_data["_optuna_journal_kind"] = "target"
         storage_base_data["_optuna_filter_key"] = str(setup.filter_key or "")
         storage = setup.runtime.auto_optuna_create_storage(

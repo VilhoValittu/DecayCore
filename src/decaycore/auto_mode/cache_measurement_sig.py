@@ -19,7 +19,7 @@ import json
 import numpy as np
 
 from .cache_io import _AUTO_CACHE_LOCK
-from .shared import _auto_hash_array_full, _auto_safe_float
+from .shared import _auto_hash_array, _auto_hash_array_full, _auto_safe_float
 
 logger = logging.getLogger("DecayCore")
 
@@ -373,6 +373,56 @@ def _auto_measurement_signature(measurements: dict) -> str:
     _update_signature_rt60_bands(h, measurements)
     _update_signature_harmonic_hashes(h, measurements)
     _update_signature_bass_integration(h, measurements)
+    return h.hexdigest()
+
+
+def _auto_search_measurement_identity(measurements: dict) -> str:
+    """Return a platform-stable measurement identity for search randomness.
+
+    Cache correctness intentionally uses :func:`_auto_measurement_signature`,
+    which hashes the exact derived FFT arrays.  Those arrays can differ by a
+    few floating-point ULPs between NumPy/SciPy Windows and Linux builds even
+    when the source WAV bytes are identical.  Search seeds and Optuna journal
+    names must not inherit that implementation detail.
+
+    Raw IR samples are preferred because WAV decoding produces the same
+    canonical float32 samples on supported platforms.  Array-only callers
+    fall back to an acoustically fine-grained, rounded response fingerprint;
+    this fallback is only a randomness namespace, never a cache key.
+    """
+    m = dict(measurements or {})
+    h = hashlib.sha256()
+    h.update(b"auto-search-measurement-v1:")
+    for channel in ("l", "r"):
+        raw_key = f"raw_ir_{channel}"
+        raw = m.get(raw_key)
+        raw_arr = np.asarray(raw) if raw is not None else np.asarray([])
+        if raw_arr.size > 0:
+            h.update(raw_key.encode("ascii"))
+            h.update(_auto_hash_array_full(raw_arr).encode("ascii", "ignore"))
+            fs_value = int(round(_auto_safe_float(m.get(f"raw_ir_fs_{channel}", 0), 0.0)))
+            h.update(f":fs={fs_value}".encode("ascii"))
+            continue
+        for key in (f"f_{channel}", f"m_{channel}", f"p_{channel}"):
+            value = m.get(key)
+            if value is None:
+                continue
+            h.update(str(key).encode("ascii"))
+            h.update(
+                _auto_hash_array(
+                    np.asarray(value, dtype=float),
+                    decimals=3,
+                    max_len=2048,
+                ).encode("ascii", "ignore")
+            )
+    raw_sub = m.get("raw_ir_sub")
+    raw_sub_arr = np.asarray(raw_sub) if raw_sub is not None else np.asarray([])
+    if raw_sub_arr.size > 0:
+        h.update(b"raw_ir_sub")
+        h.update(_auto_hash_array_full(raw_sub_arr).encode("ascii", "ignore"))
+        fs_sub = int(round(_auto_safe_float(m.get("raw_ir_fs_sub", 0), 0.0)))
+        h.update(f":fs={fs_sub}".encode("ascii"))
+    h.update(_auto_measurement_metadata_identity(m).encode("ascii", "ignore"))
     return h.hexdigest()
 
 
