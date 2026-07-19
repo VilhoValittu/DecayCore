@@ -35,8 +35,6 @@ from .candidate_base import (
     _BASS_FIRST_MODE_MAX_HZ,
     _CONF_PULL_MAX_MIN_HZ,
     _CONF_PULL_MAX_MAX_HZ,
-    AUTO_MODE_MAG_C_MIN_MIN_HZ,
-    AUTO_MODE_MAG_C_MIN_MAX_HZ,
     AUTO_MODE_LOW_BASS_MIN_HZ,
     AUTO_MODE_LOW_BASS_MAX_HZ,
     _auto_optuna_project_to_unit,
@@ -101,12 +99,12 @@ def _suggest_auto_mode_candidate_optuna(
         mag_c_min = _auto_optuna_snap_to_step(
             trial.suggest_float(
                 "mag_c_min",
-                float(AUTO_MODE_MAG_C_MIN_MIN_HZ),
-                float(AUTO_MODE_MAG_C_MIN_MAX_HZ),
+                float(_mag_c_min_lo),
+                float(_mag_c_min_hi),
                 log=True,
             ),
-            lo=float(AUTO_MODE_MAG_C_MIN_MIN_HZ),
-            hi=float(AUTO_MODE_MAG_C_MIN_MAX_HZ),
+            lo=float(_mag_c_min_lo),
+            hi=float(_mag_c_min_hi),
             step=0.1,
         )
         low_bass_cut_hz = _auto_optuna_snap_to_step(

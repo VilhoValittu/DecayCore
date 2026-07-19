@@ -20,8 +20,6 @@ from .shared import (
     AUTO_MODE_LOCAL_REFINE_SHRINK,
     AUTO_MODE_LOW_BASS_MAX_HZ,
     AUTO_MODE_LOW_BASS_MIN_HZ,
-    AUTO_MODE_MAG_C_MIN_MAX_HZ,
-    AUTO_MODE_MAG_C_MIN_MIN_HZ,
     AUTO_MODE_PHASE_LIMIT_LOCAL_SIGMA_HZ,
     AUTO_MODE_PHASE_LIMIT_MAX_HZ,
     AUTO_MODE_PHASE_LIMIT_MIN_HZ,
@@ -29,6 +27,7 @@ from .shared import (
     _auto_goal,
     _auto_goal_is_flat_family,
     _auto_mag_c_min_center,
+    _auto_mag_c_min_search_bounds,
     _auto_output_tilt_bounds,
     _auto_phase_limit_center,
     _auto_safe_float,
@@ -85,7 +84,17 @@ def _suggest_auto_mode_candidate_local_optuna(
     keep_tdc = bool(c.get("enable_tdc", True))
     keep_afdw = bool(c.get("enable_afdw", True))
     keep_bass_first = bool(c.get("bass_first_ai", True))
-    mag_c_min_center = float(round(_auto_mag_c_min_center(c, default=25.0), 1))
+    mag_c_min_lo, mag_c_min_hi = _auto_mag_c_min_search_bounds(base)
+    mag_c_min_center = float(
+        round(
+            np.clip(
+                _auto_mag_c_min_center(c, default=25.0),
+                float(mag_c_min_lo),
+                float(mag_c_min_hi),
+            ),
+            1,
+        )
+    )
     low_bass_cut_center = float(
         round(
             _clip(
@@ -109,8 +118,8 @@ def _suggest_auto_mode_candidate_local_optuna(
                 "mag_c_min",
                 float(mag_c_min_center),
                 max(0.4, 3.2 * s),
-                float(AUTO_MODE_MAG_C_MIN_MIN_HZ),
-                float(AUTO_MODE_MAG_C_MIN_MAX_HZ),
+                float(mag_c_min_lo),
+                float(mag_c_min_hi),
             ),
             1,
         )
@@ -326,7 +335,17 @@ def _seed_auto_mode_candidate_local_optuna_params(
         )
     )
     phase_center = _auto_phase_limit_center(c.get("phase_limit", base.get("phase_limit")))
-    mag_c_min_center = float(round(_auto_mag_c_min_center(c, default=25.0), 1))
+    mag_c_min_lo, mag_c_min_hi = _auto_mag_c_min_search_bounds(base)
+    mag_c_min_center = float(
+        round(
+            np.clip(
+                _auto_mag_c_min_center(c, default=25.0),
+                float(mag_c_min_lo),
+                float(mag_c_min_hi),
+            ),
+            1,
+        )
+    )
     low_bass_cut_center = float(
         round(
             _clip(
@@ -458,8 +477,8 @@ def _seed_auto_mode_candidate_local_optuna_params(
             "mag_c_min",
             float(mag_c_min_center),
             max(0.4, 3.2 * s),
-            float(AUTO_MODE_MAG_C_MIN_MIN_HZ),
-            float(AUTO_MODE_MAG_C_MIN_MAX_HZ),
+            float(mag_c_min_lo),
+            float(mag_c_min_hi),
             float(mag_c_min_center),
         )
         out["low_bass_cut_hz_u"] = _windowed_unit(

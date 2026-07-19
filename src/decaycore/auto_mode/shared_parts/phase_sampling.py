@@ -73,6 +73,26 @@ def _auto_mag_c_min_center(base_data: dict | None, *, default: float = 25.0) -> 
         )
     )
 
+def _auto_mag_c_min_search_bounds(base_data: dict | None) -> tuple[float, float]:
+    """Keep automatic search close to the measured low-frequency capability.
+
+    The protection seed is the smoothed -6 dB extension estimate. Searching far
+    above it lets the optimizer improve unrelated metrics by abandoning bass
+    correction. Downward exploration remains open because cuts below the seed
+    are safe; upward exploration is limited to the same small allowance used by
+    winner polish.
+    """
+    lo = float(AUTO_MODE_MAG_C_MIN_MIN_HZ)
+    hi = float(AUTO_MODE_MAG_C_MIN_MAX_HZ)
+    center = _auto_mag_c_min_center(base_data, default=float("nan"))
+    if np.isfinite(center):
+        max_up_hz = max(
+            0.0,
+            _auto_safe_float(AUTO_MODE_MAG_C_MIN_SEARCH_MAX_UP_HZ, 4.0),
+        )
+        hi = min(hi, float(center) + float(max_up_hz))
+    return float(lo), float(max(lo, hi))
+
 def _auto_phase_limit_prior_penalty(
     phase_limit_hz: float, *, filter_key: str | None
 ) -> float:
@@ -146,14 +166,23 @@ def _auto_sample_mag_low_pair(
     low_center: float,
     mag_sigma: float,
     low_sigma: float,
+    mag_lo: float | None = None,
+    mag_hi: float | None = None,
 ) -> tuple[float, float]:
+    mag_lo_eff = float(
+        AUTO_MODE_MAG_C_MIN_MIN_HZ if mag_lo is None else mag_lo
+    )
+    mag_hi_eff = float(
+        AUTO_MODE_MAG_C_MIN_MAX_HZ if mag_hi is None else mag_hi
+    )
+    mag_hi_eff = max(float(mag_lo_eff), float(mag_hi_eff))
     mag = float(
         _jitter(
             rng,
             mag_center,
             mag_sigma,
-            float(AUTO_MODE_MAG_C_MIN_MIN_HZ),
-            float(AUTO_MODE_MAG_C_MIN_MAX_HZ),
+            float(mag_lo_eff),
+            float(mag_hi_eff),
             default=mag_center,
         )
     )
@@ -170,8 +199,8 @@ def _auto_sample_mag_low_pair(
     mag = float(
         _clip(
             mag,
-            float(AUTO_MODE_MAG_C_MIN_MIN_HZ),
-            float(AUTO_MODE_MAG_C_MIN_MAX_HZ),
+            float(mag_lo_eff),
+            float(mag_hi_eff),
         )
     )
     low = float(
@@ -189,8 +218,8 @@ __all__ = [
     '_auto_phase_limit_clip',
     '_auto_phase_limit_center',
     '_auto_mag_c_min_center',
+    '_auto_mag_c_min_search_bounds',
     '_auto_phase_limit_prior_penalty',
     '_jitter',
     '_auto_sample_mag_low_pair',
 ]
-

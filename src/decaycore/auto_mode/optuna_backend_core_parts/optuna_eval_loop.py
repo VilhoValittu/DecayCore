@@ -33,6 +33,7 @@ from ..shared import (
     AUTO_MODE_OPTUNA_TELEMETRY_LOG_SUMMARY,
     AUTO_MODE_OPTUNA_USER_ATTR_OUT,
     AutoModeConfig,
+    _auto_mag_c_min_search_bounds,
     _auto_safe_bool,
     _auto_safe_float,
     _auto_safe_int,
@@ -78,6 +79,21 @@ from ..optuna_backend_loop import (
 )
 
 logger = logging.getLogger("DecayCore")
+
+
+def _auto_optuna_constrain_seed_preset(
+    preset: dict | None,
+    *,
+    base_data: dict | None,
+) -> dict:
+    """Apply acoustic search bounds to presets evaluated before Optuna sampling."""
+    out = dict(preset or {})
+    if "mag_c_min" not in out:
+        return out
+    lo, hi = _auto_mag_c_min_search_bounds(base_data)
+    value = _auto_safe_float(out.get("mag_c_min"), float(lo))
+    out["mag_c_min"] = float(np.clip(value, float(lo), float(hi)))
+    return out
 
 
 @dataclass
@@ -887,7 +903,10 @@ def _auto_run_optuna_eval_loop_core(
         reserved_signatures=reserved_signatures,
     )
 
-    seed_items = list(seed_presets or [])[: int(total)]
+    seed_items = [
+        _auto_optuna_constrain_seed_preset(preset, base_data=base_data)
+        for preset in list(seed_presets or [])[: int(total)]
+    ]
     seed_items = _auto_optuna_filter_and_enqueue_seed_items(
         context=context,
         seed_items=list(seed_items or []),
@@ -995,4 +1014,3 @@ def _auto_run_optuna_eval_loop_core(
 
 
 __all__ = ['_auto_run_optuna_eval_loop_core']
-

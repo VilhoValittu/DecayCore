@@ -24,11 +24,10 @@ from .shared import (
     AUTO_MODE_LOW_BASS_MAX_HZ,
     AUTO_MODE_LOW_BASS_MIN_HZ,
     AUTO_MODE_MAG_C_MAX_MIN_HZ,
-    AUTO_MODE_MAG_C_MIN_MAX_HZ,
-    AUTO_MODE_MAG_C_MIN_MIN_HZ,
     AUTO_MODE_OPTUNA_USER_ATTR_OUT,
     AUTO_MODE_PHASE_LIMIT_MAX_HZ,
     AUTO_MODE_PHASE_LIMIT_MIN_HZ,
+    _auto_mag_c_min_search_bounds,
     _auto_safe_float,
 )
 from .candidate_base import _PHASE1_FULL_MAX_BOOST_DB, _TDC_MAX_REDUCTION_MAX_DB, _auto_phase1_max_boost_hi
@@ -316,19 +315,13 @@ def _auto_optuna_adaptive_freq_bounds(base_data: dict | None) -> tuple[float, fl
         for f in (*freq_l, *freq_r)
         if isinstance(f, (int, float)) and np.isfinite(float(f)) and 10.0 < float(f) < 350.0
     )
-    mag_lo = float(AUTO_MODE_MAG_C_MIN_MIN_HZ)
-    mag_hi = float(AUTO_MODE_MAG_C_MIN_MAX_HZ)
+    mag_lo, mag_hi = _auto_mag_c_min_search_bounds(data)
     low_lo = float(AUTO_MODE_LOW_BASS_MIN_HZ)
     low_hi = float(AUTO_MODE_LOW_BASS_MAX_HZ)
     if len(all_freqs) < 2:
         return mag_lo, mag_hi, low_lo, low_hi
 
     modal_floor = float(all_freqs[0])
-    modal_ceiling = float(all_freqs[-1])
-    cand_mag_lo = max(mag_lo, modal_floor * 0.5)
-    cand_mag_hi = min(mag_hi, modal_ceiling * 0.7)
-    if cand_mag_hi - cand_mag_lo >= min_window:
-        mag_lo, mag_hi = round(cand_mag_lo, 2), round(cand_mag_hi, 2)
     cand_low_lo = max(low_lo, modal_floor * 0.4)
     cand_low_hi = min(low_hi, modal_floor * 1.2)
     if cand_low_hi - cand_low_lo >= min_window:
@@ -341,9 +334,10 @@ def _auto_optuna_sanitize_enqueued_params(params: dict | None, *, base_data: dic
     if not out:
         return out
     adaptive = _derive_adaptive_freq_bounds(dict(base_data or {}))
+    mag_lo, mag_c_min_hi = _auto_mag_c_min_search_bounds(base_data)
     mag_hi = float(adaptive.get("mag_c_max_hi", 400.0))
     for key, lo, hi in (
-        ("mag_c_min", float(AUTO_MODE_MAG_C_MIN_MIN_HZ), float(AUTO_MODE_MAG_C_MIN_MAX_HZ)),
+        ("mag_c_min", float(mag_lo), float(mag_c_min_hi)),
         ("mag_c_max", float(AUTO_MODE_MAG_C_MAX_MIN_HZ), float(mag_hi)),
         ("low_bass_cut_hz", float(AUTO_MODE_LOW_BASS_MIN_HZ), float(AUTO_MODE_LOW_BASS_MAX_HZ)),
     ):
@@ -353,14 +347,19 @@ def _auto_optuna_sanitize_enqueued_params(params: dict | None, *, base_data: dic
         out[key] = float(np.clip(value, float(lo), float(hi)))
     return out
 
-def _auto_optuna_trial_float_ranges(max_boost_hi: float) -> dict[str, tuple[float, float, float]]:
+def _auto_optuna_trial_float_ranges(
+    max_boost_hi: float,
+    *,
+    base_data: dict | None,
+) -> dict[str, tuple[float, float, float]]:
+    mag_c_min_lo, mag_c_min_hi = _auto_mag_c_min_search_bounds(base_data)
     return {
         "fdw_cycles": (5.0, 16.0, 0.1),
         "tdc_strength": (5.0, 75.0, 0.1),
         "tdc_max_reduction_db": (0.0, float(_TDC_MAX_REDUCTION_MAX_DB), 0.1),
         "reg_strength": (15.0, 45.0, 0.1),
         "max_boost": (0.1, float(max_boost_hi), 0.1),
-        "mag_c_min": (float(AUTO_MODE_MAG_C_MIN_MIN_HZ), float(AUTO_MODE_MAG_C_MIN_MAX_HZ), 0.1),
+        "mag_c_min": (float(mag_c_min_lo), float(mag_c_min_hi), 0.1),
         "mag_c_max": (float(AUTO_MODE_MAG_C_MAX_MIN_HZ), 400.0, 0.1),
         "trans_width": (70.0, 150.0, 0.1),
         "bass_first_mode_max_hz": (40.0, 220.0, 0.1),
@@ -441,7 +440,10 @@ def _auto_optuna_trial_distributions(optuna_mod, *, params: dict | None, base_da
         if np.isfinite(requested_max_boost):
             max_boost_hi = max(max_boost_hi, float(np.clip(requested_max_boost, 0.1, _PHASE1_FULL_MAX_BOOST_DB)))
 
-    float_ranges = _auto_optuna_trial_float_ranges(float(max_boost_hi))
+    float_ranges = _auto_optuna_trial_float_ranges(
+        float(max_boost_hi),
+        base_data=base_data,
+    )
     # Parameters sampled on a log scale in _suggest_auto_mode_candidate_optuna;
     # distributions must match or enqueue_trial / add_trial will fail.
     log_params = {"mag_c_min", "low_bass_cut_hz", "phase_limit"}

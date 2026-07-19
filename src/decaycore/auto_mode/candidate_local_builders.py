@@ -28,6 +28,7 @@ from .shared import (
     _auto_goal,
     _auto_goal_is_flat_family,
     _auto_mag_c_min_center,
+    _auto_mag_c_min_search_bounds,
     _auto_phase_limit_center,
     _auto_safe_float,
     _auto_sample_mag_low_pair,
@@ -72,7 +73,17 @@ def _build_auto_mode_candidates_local(
     keep_tdc = bool(c.get("enable_tdc", True))
     keep_afdw = bool(c.get("enable_afdw", True))
     keep_bass_first = bool(c.get("bass_first_ai", True))
-    mag_c_min_center = round(_auto_mag_c_min_center(c, default=25.0), 1)
+    mag_c_min_lo, mag_c_min_hi = _auto_mag_c_min_search_bounds(base)
+    mag_c_min_center = round(
+        float(
+            np.clip(
+                _auto_mag_c_min_center(c, default=25.0),
+                float(mag_c_min_lo),
+                float(mag_c_min_hi),
+            )
+        ),
+        1,
+    )
     low_bass_cut_center = round(
         _clip(
             c.get("low_bass_cut_hz", base.get("low_bass_cut_hz", 40.0)),
@@ -111,6 +122,8 @@ def _build_auto_mode_candidates_local(
                 low_center=_auto_safe_float(c.get("low_bass_cut_hz", base.get("low_bass_cut_hz", low_bass_cut_center)), low_bass_cut_center),
                 mag_sigma=max(0.4, 3.2 * s),
                 low_sigma=max(0.6, 4.0 * s),
+                mag_lo=float(mag_c_min_lo),
+                mag_hi=float(mag_c_min_hi),
             )
         else:
             mag_c_min_cand = float(mag_c_min_center)

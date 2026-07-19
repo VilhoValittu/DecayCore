@@ -53,6 +53,7 @@ from .shared import (
     _auto_filter_cache_key,
     _auto_filter_type_for_key,
     _auto_mag_c_min_center,
+    _auto_mag_c_min_search_bounds,
     _auto_optuna_sampler_kwargs,
     _auto_phase_limit_center,
     _auto_safe_float,
@@ -228,6 +229,12 @@ def _derive_adaptive_freq_bounds(base_data: dict) -> dict:
     # Returns a bounds dict with adaptive lo/hi values; empty dict means fall back to constants.
     # Minimum window guard: skip adaptive bound if it would collapse below _MIN_ADAPTIVE_WINDOW Hz.
     _MIN_ADAPTIVE_WINDOW = 5.0
+    mag_c_min_lo, mag_c_min_hi = _auto_mag_c_min_search_bounds(base_data)
+    bounds: dict = {
+        "mag_c_min_lo": round(float(mag_c_min_lo), 2),
+        "mag_c_min_hi": round(float(mag_c_min_hi), 2),
+    }
+
     _raw_l = base_data.get("harmonic_freq_hz_l")
     _raw_r = base_data.get("harmonic_freq_hz_r")
     freq_l = list(_raw_l) if _raw_l is not None and len(_raw_l) > 0 else []
@@ -237,18 +244,10 @@ def _derive_adaptive_freq_bounds(base_data: dict) -> dict:
         if isinstance(f, (int, float)) and np.isfinite(float(f)) and 10.0 < float(f) < 350.0
     )
     if len(all_freqs) < 2:
-        return {}
+        return bounds
 
     modal_floor = all_freqs[0]
     modal_ceiling = all_freqs[-1]
-
-    bounds: dict = {}
-
-    mag_c_min_lo = max(float(AUTO_MODE_MAG_C_MIN_MIN_HZ), modal_floor * 0.5)
-    mag_c_min_hi = min(float(AUTO_MODE_MAG_C_MIN_MAX_HZ), modal_ceiling * 0.7)
-    if mag_c_min_hi - mag_c_min_lo >= _MIN_ADAPTIVE_WINDOW:
-        bounds["mag_c_min_lo"] = round(mag_c_min_lo, 2)
-        bounds["mag_c_min_hi"] = round(mag_c_min_hi, 2)
 
     low_bass_lo = max(float(AUTO_MODE_LOW_BASS_MIN_HZ), modal_floor * 0.4)
     low_bass_hi = min(float(AUTO_MODE_LOW_BASS_MAX_HZ), modal_floor * 1.2)
@@ -494,6 +493,8 @@ def _build_auto_mode_candidates(
                 low_center=float(low_bass_cut_seed),
                 mag_sigma=2.6,
                 low_sigma=3.2,
+                mag_lo=float(_r_mag_c_min_lo),
+                mag_hi=float(_r_mag_c_min_hi),
             )
         else:
             mag_c_min_cand = float(round(mag_c_min_seed, 1))
