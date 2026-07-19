@@ -8,22 +8,27 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-from .target_tab_builder import (
+from .preview_fig import _build_target_preview_fig
+from .preview_metadata import (
     _normalize_harmonic_plot_source,
     _build_target_preview_metadata_payload,
     _build_target_decay_hint_payload,
     _build_target_preview_rt60_fig,
     _build_target_preview_harmonics_fig,
     _build_target_preview_harmonic_risk_fig,
+    _render_target_decay_hint,
     _render_target_preview_metadata,
-    _step_manual_target,
-    _step_manual_target_tilt,
-    build_target_tab,
+)
+from .preview_refresh import (
     refresh_target_preview,
     _mount_target_preview_plot,
     _schedule_target_preview_refresh,
     _on_target_preview_relayout,
-    _build_target_preview_fig,
+)
+from .target_tab_builder import (
+    _step_manual_target,
+    _step_manual_target_tilt,
+    build_target_tab,
     ctrl,
 )
 
@@ -37,6 +42,7 @@ __all__ = [
     '_mount_target_preview_plot',
     '_normalize_harmonic_plot_source',
     '_on_target_preview_relayout',
+    '_render_target_decay_hint',
     '_render_target_preview_metadata',
     '_schedule_target_preview_refresh',
     '_step_manual_target',
