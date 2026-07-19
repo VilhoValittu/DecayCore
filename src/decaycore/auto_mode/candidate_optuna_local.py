@@ -17,7 +17,6 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 from .shared import (
-    AUTO_MODE_GOAL_FLAT,
     AUTO_MODE_LOCAL_REFINE_SHRINK,
     AUTO_MODE_LOW_BASS_MAX_HZ,
     AUTO_MODE_LOW_BASS_MIN_HZ,
@@ -28,6 +27,7 @@ from .shared import (
     AUTO_MODE_PHASE_LIMIT_MIN_HZ,
     _auto_is_phase_search_filter,
     _auto_goal,
+    _auto_goal_is_flat_family,
     _auto_mag_c_min_center,
     _auto_output_tilt_bounds,
     _auto_phase_limit_center,
@@ -65,7 +65,7 @@ def _suggest_auto_mode_candidate_local_optuna(
     base = _auto_filter_normalized_base_data(base_data)
     c = dict(base)
     c.update(dict(center or {}))
-    prefer_bass = bool(_auto_goal(base) == AUTO_MODE_GOAL_FLAT)
+    prefer_bass = bool(_auto_goal_is_flat_family(_auto_goal(base)))
 
     s = float(np.clip(_auto_safe_float(shrink, AUTO_MODE_LOCAL_REFINE_SHRINK), 0.05, 1.50))
     tune_mag_low = bool(optimize_mag_low)
@@ -312,7 +312,7 @@ def _seed_auto_mode_candidate_local_optuna_params(
     c.update(dict(center or {}))
     p = dict(c)
     p.update(dict(preset or {}))
-    prefer_bass = bool(_auto_goal(base) == AUTO_MODE_GOAL_FLAT)
+    prefer_bass = bool(_auto_goal_is_flat_family(_auto_goal(base)))
     s = float(np.clip(_auto_safe_float(shrink, AUTO_MODE_LOCAL_REFINE_SHRINK), 0.05, 1.50))
     ft = str(c.get("filter_type", base.get("filter_type", "")) or "").strip().lower()
     is_mixed = "mixed" in ft

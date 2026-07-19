@@ -16,7 +16,7 @@ import typing
 import numpy as np
 
 from ...auto_mode.api import (
-    AUTO_MODE_GOAL_FLAT,
+    _auto_goal_is_flat_family,
     AUTO_MODE_COMPAT_VERSION,
     AUTO_MODE_EXC_FROM_F6_ADD_HZ,
     AUTO_MODE_EXC_MAX_HZ,
@@ -420,7 +420,7 @@ def _seed_phases_prepare_preview_state(
     auto_goal: str,
     auto_mode_preview: bool,
 ) -> tuple[tuple[float, float] | None, bool]:
-    if auto_mode_preview and str(auto_goal) == AUTO_MODE_GOAL_FLAT:
+    if auto_mode_preview and _auto_goal_is_flat_family(auto_goal):
         data["unsafe_raw_dsp"] = True
 
     forced_level_window = _auto_goal_forced_level_window(auto_goal) if auto_mode_preview else None

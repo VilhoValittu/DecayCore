@@ -16,9 +16,8 @@ import numpy as np
 
 from ..shared import (
     AUTO_MODE_GOAL_DEFAULT,
-    AUTO_MODE_GOAL_FLAT,
     AUTO_MODE_MAX_AVG_SCORE_LOSS_FOR_SAFETY_OVERRIDE,
-    _auto_goal_norm,
+    _auto_goal_is_flat_family,
     _auto_safe_float,
 )
 
@@ -123,7 +122,7 @@ def get_residual_peak_hard_gate_effective_db(
     peak_hz = _auto_safe_float(metrics.get("worst_residual_peak_hz", float("nan")), float("nan"))
     gate = _residual_peak_freq_zone_gate_db(gate, peak_hz)
 
-    if _auto_goal_norm(goal) != AUTO_MODE_GOAL_FLAT:
+    if not _auto_goal_is_flat_family(goal):
         return float(gate)
     bass_boost = _auto_bass_boost_support_db(metrics)
     if float(bass_boost) < 3.0:
@@ -247,8 +246,7 @@ def _auto_hard_gate_reasons(
 
     _append_bass_integration_gate_reason(reasons, m)
 
-    g = _auto_goal_norm(goal)
-    if g == AUTO_MODE_GOAL_FLAT:
+    if _auto_goal_is_flat_family(goal):
         _append_flat_goal_safety_reasons(reasons, m, st_l=st_l, st_r=st_r)
 
     return list(dict.fromkeys(reasons))

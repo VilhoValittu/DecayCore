@@ -36,7 +36,7 @@ def _effective_residual_peak_hard_gate_db(
     gate = shared._auto_safe_float(default_gate, float("nan"))
     if not np.isfinite(gate):
         return float("nan")
-    if shared._auto_goal(base_data) != shared.AUTO_MODE_GOAL_FLAT:
+    if not shared._auto_goal_is_flat_family(shared._auto_goal(base_data)):
         return float(gate)
     bass_boost = _bass_boost_support_db(metrics)
     if float(bass_boost) < 3.0:

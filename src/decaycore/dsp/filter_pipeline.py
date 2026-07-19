@@ -176,6 +176,15 @@ def _apply_hybrid_iir_preconditioning(
             "hybrid_iir_enabled": False,
             "hybrid_iir_policy_version": int(policy.to_signature_dict()["policy_v"]),
         }
+    # Modal cuts are only physically justified below the room's Schroeder
+    # frequency; narrow the search band to the per-room estimate when available.
+    # Shrink-only: the configured max_freq_hz always remains the upper cap.
+    try:
+        _schroeder_est = float(st.get("schroeder_hz_estimate", float("nan")))
+    except (TypeError, ValueError):
+        _schroeder_est = float("nan")
+    if np.isfinite(_schroeder_est) and _schroeder_est > float(policy.min_freq_hz):
+        policy = replace(policy, max_freq_hz=float(min(policy.max_freq_hz, _schroeder_est)))
     gd = _array_from_stats(st, "group_delay_ms", "gd_ms", "gd_curve_ms")
     gd_source = "stats"
     if gd.size != np.asarray(freq_axis).size:
@@ -254,6 +263,7 @@ def _apply_hybrid_iir_preconditioning(
     stats["hybrid_iir_modal_event_count"] = int(getattr(modal, "mode_count", 0) or 0)
     stats["hybrid_iir_gd_source"] = str(gd_source)
     stats["hybrid_iir_min_gd_excess_ms_effective"] = float(policy.min_gd_excess_ms)
+    stats["hybrid_iir_max_freq_hz_effective"] = float(policy.max_freq_hz)
     stats["hybrid_iir_modal_analysis_taps"] = int(HYBRID_IIR_MODAL_ANALYSIS_TAPS)
     stats["hybrid_iir_modal_analysis_axis_source"] = str(modal_axis_source)
     stats["hybrid_iir_modal_analysis_bin_count"] = int(np.asarray(modal_freq).size)

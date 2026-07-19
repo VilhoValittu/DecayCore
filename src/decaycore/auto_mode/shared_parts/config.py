@@ -729,7 +729,6 @@ class AutoModeConfig:
             AUTO_MODE_GOAL_ROOM_SAFE,
             AUTO_MODE_GOAL_LOW_RIPPLE,
             AUTO_MODE_GOAL_SUBWOOFERS,
-            AUTO_MODE_GOAL_ACOUSTIC,
             AUTO_MODE_GOAL_HYBRID,
         ):
             hint = int(

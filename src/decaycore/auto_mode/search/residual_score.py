@@ -25,6 +25,7 @@ from .modal_intelligence import (
     _modal_residual_fallback_metrics,
     compute_modal_intelligence_metrics,
 )
+from .metrics_common import _auto_scoring_lo_hz
 from .residual_metrics import _auto_merge_residual_peak_metrics, _auto_residual_peak_metrics_from_stats
 
 # Asymmetric (low-latency) filter cannot fully realize deep-bass correction with its
@@ -42,19 +43,8 @@ def score_residual_peaks(l_st, r_st, *, base_data) -> dict:
     _is_asym = "asym" in _ft
     bass_dampen_hz = float(_ASYM_BASS_RESIDUAL_DAMPEN_HZ) if _is_asym else 0.0
     bass_dampen_factor = float(_ASYM_BASS_RESIDUAL_DAMPEN_FACTOR) if _is_asym else 1.0
-    # Residual-peak window low bound is the frequency below which correction is
-    # legitimately not expected — the HPF cutoff, plus the sub crossover when bass
-    # management is active. It must NOT track the optimizer-chosen mag_c_min: doing
-    # so let the optimizer hide an uncorrected room mode simply by raising mag_c_min
-    # above it (residual is measured only inside [peak_lo, peak_hi]), which made auto
-    # mode abandon bass correction (mag_c_min climbed to ~120-140 Hz). Decoupling it
-    # keeps uncorrected bass modes penalized regardless of mag_c_min, for every filter.
-    peak_lo = 20.0
-    if shared._auto_safe_bool(bd_for_peaks.get("hpf_enable", False), False):
-        peak_lo = max(peak_lo, shared._auto_safe_float(bd_for_peaks.get("hpf_freq", 0.0), 0.0))
-    if shared._auto_safe_bool(bd_for_peaks.get("bass_integration_enabled", False), False):
-        peak_lo = max(peak_lo, shared._auto_safe_float(bd_for_peaks.get("avr_crossover_hz", 0.0), 0.0))
-    peak_lo = float(peak_lo)
+    # Low bound deliberately independent of mag_c_min; see _auto_scoring_lo_hz.
+    peak_lo = _auto_scoring_lo_hz(bd_for_peaks)
     peak_hi_raw = shared._auto_safe_float(
         bd_for_peaks.get("mag_c_max", bd_for_peaks.get("mag_c_max_hz", shared.AUTO_MODE_RESIDUAL_PEAK_MAX_HZ)),
         shared.AUTO_MODE_RESIDUAL_PEAK_MAX_HZ,

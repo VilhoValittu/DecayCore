@@ -16,10 +16,9 @@ import numpy as np
 
 from ..shared import (
     AUTO_MODE_GOAL_DEFAULT,
-    AUTO_MODE_GOAL_LOW_RIPPLE,
     AUTO_MODE_HYBRID_MIXED_FREQ_SOFT_DEN_HZ,
     AUTO_MODE_HYBRID_MIXED_FREQ_SOFT_MAX_HZ,
-    _auto_goal_norm,
+    _auto_goal_is_low_ripple_family,
     _auto_safe_float,
     _m,
 )
@@ -210,7 +209,7 @@ def _auto_hybrid_mixed_freq_penalty(
     base_data: dict | None = None,
     goal: str = AUTO_MODE_GOAL_DEFAULT,
 ) -> float:
-    if _auto_goal_norm(goal) != AUTO_MODE_GOAL_LOW_RIPPLE:
+    if not _auto_goal_is_low_ripple_family(goal):
         return 0.0
 
     p = dict(base_data or {})

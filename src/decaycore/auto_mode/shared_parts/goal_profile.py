@@ -21,10 +21,9 @@ def _auto_goal_norm(goal: str | None) -> str:
     goal_norm = str(goal or AUTO_MODE_GOAL_DEFAULT).strip().lower()
     goal_aliases = {
         "c": AUTO_MODE_GOAL_FLAT,
-        "acoustic": AUTO_MODE_GOAL_FLAT,
-        "bass": AUTO_MODE_GOAL_FLAT,
-        "hybrid": AUTO_MODE_GOAL_LOW_RIPPLE,
-        "prefer bass": AUTO_MODE_GOAL_FLAT,
+        "bass": AUTO_MODE_GOAL_PREFER_BASS,
+        "prefer bass": AUTO_MODE_GOAL_PREFER_BASS,
+        "prefer_bass": AUTO_MODE_GOAL_PREFER_BASS,
         "room_safe": AUTO_MODE_GOAL_ROOM_SAFE,
         "roomsafe": AUTO_MODE_GOAL_ROOM_SAFE,
         "low_ripple": AUTO_MODE_GOAL_LOW_RIPPLE,
@@ -39,9 +38,33 @@ def _auto_goal_norm(goal: str | None) -> str:
         AUTO_MODE_GOAL_LOW_RIPPLE,
         AUTO_MODE_GOAL_FLAT,
         AUTO_MODE_GOAL_SUBWOOFERS,
+        AUTO_MODE_GOAL_ACOUSTIC,
+        AUTO_MODE_GOAL_HYBRID,
+        AUTO_MODE_GOAL_PREFER_BASS,
     ):
         goal_norm = AUTO_MODE_GOAL_DEFAULT
     return str(goal_norm)
+
+
+def _auto_goal_is_flat_family(goal: str | None) -> bool:
+    """True for goals that share the flat objective's semantics (weights, gates,
+    prefer-bass behavior). prefer-bass and acoustic historically normalized to
+    flat; they stay in the family so canonicalizing them changes only the
+    goal-specific rank-key dispatch, nothing else."""
+    return _auto_goal_norm(goal) in (
+        AUTO_MODE_GOAL_FLAT,
+        AUTO_MODE_GOAL_PREFER_BASS,
+        AUTO_MODE_GOAL_ACOUSTIC,
+    )
+
+
+def _auto_goal_is_low_ripple_family(goal: str | None) -> bool:
+    """True for goals that share the low-ripple objective's semantics. hybrid
+    historically normalized to low-ripple; it stays in the family."""
+    return _auto_goal_norm(goal) in (
+        AUTO_MODE_GOAL_LOW_RIPPLE,
+        AUTO_MODE_GOAL_HYBRID,
+    )
 
 
 def _auto_bass_integration_profile_norm(profile: str | None) -> str:

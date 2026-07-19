@@ -40,6 +40,7 @@ from ._constants import (
     AUTO_MODE_GOAL_DEFAULT,
     AUTO_MODE_GOAL_FLAT,
     AUTO_MODE_GOAL_HYBRID,
+    AUTO_MODE_GOAL_PREFER_BASS,
     AUTO_MODE_GOAL_LOW_RIPPLE,
     AUTO_MODE_GOAL_ROOM_SAFE,
     AUTO_MODE_GOAL_SUBWOOFERS,
@@ -222,6 +223,8 @@ from .cache_hash import (
 from .config import AutoModeConfig
 from .goal_profile import (
     _auto_goal_norm,
+    _auto_goal_is_flat_family,
+    _auto_goal_is_low_ripple_family,
     _auto_bass_integration_profile_norm,
     _auto_bass_integration_profile_weights,
     _auto_goal_forced_level_window,
@@ -282,6 +285,7 @@ __all__ = [
     'AUTO_MODE_GOAL_HYBRID',
     'AUTO_MODE_GOAL_LOW_RIPPLE',
     'AUTO_MODE_GOAL_ROOM_SAFE',
+    'AUTO_MODE_GOAL_PREFER_BASS',
     'AUTO_MODE_GOAL_SUBWOOFERS',
     'AUTO_MODE_HPF_ALLOWED_SLOPES_DB_OCT',
     'AUTO_MODE_HPF_AUTO_ENABLE_MIN_CONF',
@@ -456,6 +460,8 @@ __all__ = [
     '_auto_goal_basis_text',
     '_auto_goal_forced_level_window',
     '_auto_goal_norm',
+    '_auto_goal_is_flat_family',
+    '_auto_goal_is_low_ripple_family',
     '_auto_hash_array',
     '_auto_hash_array_full',
     '_auto_is_phase_search_filter',

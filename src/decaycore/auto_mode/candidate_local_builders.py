@@ -17,7 +17,6 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 from .shared import (
-    AUTO_MODE_GOAL_FLAT,
     AUTO_MODE_LOCAL_REFINE_SHRINK,
     AUTO_MODE_LOW_BASS_MAX_HZ,
     AUTO_MODE_LOW_BASS_MIN_HZ,
@@ -27,6 +26,7 @@ from .shared import (
     AUTO_MODE_PHASE3_MICRO_TRIALS,
     _auto_is_phase_search_filter,
     _auto_goal,
+    _auto_goal_is_flat_family,
     _auto_mag_c_min_center,
     _auto_phase_limit_center,
     _auto_safe_float,
@@ -64,7 +64,7 @@ def _build_auto_mode_candidates_local(
     c.update(dict(center or {}))
 
     ft = str(c.get("filter_type", base.get("filter_type", "")) or "").strip().lower()
-    prefer_bass = bool(_auto_goal(base) == AUTO_MODE_GOAL_FLAT)
+    prefer_bass = bool(_auto_goal_is_flat_family(_auto_goal(base)))
     is_mixed = "mixed" in ft
     is_phase_search = _auto_is_phase_search_filter(ft)
     phase_center = _auto_phase_limit_center(c.get("phase_limit", base.get("phase_limit")))

@@ -103,6 +103,8 @@ from .shared import (
     _auto_filter_type_for_key as _auto_filter_type_for_key,
     _auto_goal as _auto_goal,
     _auto_goal_basis_text as _auto_goal_basis_text,
+    _auto_goal_is_flat_family as _auto_goal_is_flat_family,
+    _auto_goal_is_low_ripple_family as _auto_goal_is_low_ripple_family,
     _auto_goal_norm as _auto_goal_norm,
     _auto_optimizer_backend as _auto_optimizer_backend,
     _auto_optuna_sampler_kwargs as _auto_optuna_sampler_kwargs,
@@ -145,6 +147,7 @@ AUTO_MODE_GOAL_FLAT = "flat"
 # Legacy names kept for backward compatibility (cache/config from older versions).
 AUTO_MODE_GOAL_ACOUSTIC = "acoustic"
 AUTO_MODE_GOAL_HYBRID = "hybrid"
+AUTO_MODE_GOAL_PREFER_BASS = "prefer-bass"
 
 # --------------------------------------------------------------------
 # Auto-mode cache + signature

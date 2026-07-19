@@ -50,7 +50,7 @@ def score_bass_integration(result, l_st, r_st, *, base_data, net_boost_max, peak
             net_boost_max_db=net_boost_max,
         )
 
-    goal_norm = shared._auto_goal(base_data)
+    goal_is_flat_family = shared._auto_goal_is_flat_family(shared._auto_goal(base_data))
     with profiled_section("bass_score.target_tracking"):
         target_tracking_l = _auto_target_tracking_metrics_from_stats(l_st)
         target_tracking_r = _auto_target_tracking_metrics_from_stats(r_st)
@@ -61,7 +61,7 @@ def score_bass_integration(result, l_st, r_st, *, base_data, net_boost_max, peak
         bass_under_target_r = _auto_bass_under_target_metrics_from_stats(r_st)
     bass_under_target_metrics = _auto_merge_bass_under_target_metrics(bass_under_target_l, bass_under_target_r)
     bass_under_target_penalty = 0.0
-    if goal_norm == shared.AUTO_MODE_GOAL_FLAT:
+    if goal_is_flat_family:
         bass_under_target_penalty = float(
             np.clip(
                 shared._auto_safe_float(
@@ -92,7 +92,7 @@ def score_bass_integration(result, l_st, r_st, *, base_data, net_boost_max, peak
         bass_integration_penalty=bass_integration_penalty,
         bass_feasibility_penalty=bass_feasibility_penalty,
     )
-    if goal_norm == shared.AUTO_MODE_GOAL_FLAT:
+    if goal_is_flat_family:
         bass_preference_bonus = float(np.clip(bass_preference_bonus * 2.5, 0.0, 7.5))
     with profiled_section("bass_score.sharpness"):
         sharpness_l = _auto_correction_sharpness_metrics_from_stats(l_st, lo_hz=float(peak_lo), hi_hz=float(peak_hi))

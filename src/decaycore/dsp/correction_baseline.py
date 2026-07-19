@@ -522,6 +522,11 @@ def _prepare_correction_baseline(  # noqa: C901 - baseline assembly intentionall
             if not np.isfinite(tdc_band_max) or tdc_band_max <= 0.0:
                 tdc_band_max = 300.0
             tdc_max_hz = float(min(300.0, max(80.0, tdc_band_max)))
+            # TDC targets modal decay; above the room's Schroeder frequency the field
+            # is statistical and decay-driven cuts lose their physical basis. Narrow
+            # the band to the per-room estimate — never widen past the 300 Hz cap.
+            if schroeder_hz is not None and np.isfinite(float(schroeder_hz)):
+                tdc_max_hz = float(min(tdc_max_hz, max(80.0, float(schroeder_hz))))
             target_mags = apply_smart_tdc(
                 freq_axis,
                 target_mags,

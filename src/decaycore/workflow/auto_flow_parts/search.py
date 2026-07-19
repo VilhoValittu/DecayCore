@@ -16,7 +16,7 @@ import typing
 import numpy as np
 
 from ...auto_mode.api import (
-    AUTO_MODE_GOAL_FLAT,
+    _auto_goal_is_flat_family,
     AUTO_MODE_COMPAT_VERSION,
     AUTO_MODE_EXC_MAX_HZ,
     AUTO_MODE_EXC_MIN_HZ,
@@ -91,14 +91,14 @@ def _auto_mode_apply_best_preset(
             ctx["data"] = resolved_config.resolved_data
             ctx["auto_applied_preset"] = dict(resolved_config.auto_applied_preset)
             data = resolved_config.resolved_data
-            if str(auto_goal) == AUTO_MODE_GOAL_FLAT:
+            if _auto_goal_is_flat_family(auto_goal):
                 data["unsafe_raw_dsp"] = True
             measurements = resolved_config.measurements
             ctx["measurements"] = measurements
         else:
             data = dict(data)
             data.update(best_applied_preset)
-            if str(auto_goal) == AUTO_MODE_GOAL_FLAT:
+            if _auto_goal_is_flat_family(auto_goal):
                 data["unsafe_raw_dsp"] = True
             data["program_version"] = support.version
             data["auto_mode_compat_version"] = AUTO_MODE_COMPAT_VERSION
@@ -287,7 +287,7 @@ def _run_auto_mode_search_if_needed(
     hc_m = ctx["hc_m"]
     taps_base = int(ctx["taps_base"])
     auto_goal = str(ctx["auto_goal"])
-    if str(auto_goal) == AUTO_MODE_GOAL_FLAT:
+    if _auto_goal_is_flat_family(auto_goal):
         data["unsafe_raw_dsp"] = True
     auto_basis = str(ctx["auto_basis"])
     auto_status = _get_auto_status_callback(ctx, callbacks=callbacks, support=support)

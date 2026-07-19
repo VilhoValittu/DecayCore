@@ -29,6 +29,7 @@ from ...config.decaycore_pipeline import (
     filter_type_short,
 )
 from ...io.generated_measurement_source import generated_source_matches_upload, parse_generated_source
+from ...dsp.decaycore_analysis import calculate_rt60, calculate_rt60_bands
 from ...io.measurements_loader import (
     _try_load_harmonic_sidecar,
     _try_load_rt60_sidecar,
@@ -36,6 +37,11 @@ from ...io.measurements_loader import (
     load_measurements_lr,
     load_raw_irs_lr,
     load_raw_ir_sub,
+)
+from ...measurement.rt60 import (
+    _measurement_rt60_analysis_ir,
+    normalize_rt60_bands,
+    normalize_rt60_value,
 )
 from ...resources.i8n.decaycore_i18n import t
 from ..bridge_types import ProcessRunCallbacks
@@ -216,6 +222,37 @@ def _prepare_measurement_sidecar_metadata(
     )
 
 
+def _compute_rt60_from_raw_ir(
+    raw_ir,
+    raw_ir_fs,
+) -> tuple[float | None, dict[float, float] | None]:
+    """RT60 from a raw impulse response, with the same peak-anchored bounded
+    window as built-in measurement metadata (measurement.rt60)."""
+    ir_arr = np.asarray(raw_ir if raw_ir is not None else [], dtype=float).reshape(-1)
+    fs_i = int(raw_ir_fs or 0)
+    if ir_arr.size == 0 or fs_i <= 0:
+        return None, None
+    try:
+        analysis_ir = _measurement_rt60_analysis_ir(ir_arr, fs_i, -1)
+        rt60_val = normalize_rt60_value(calculate_rt60(analysis_ir, fs_i))
+        rt60_bands = normalize_rt60_bands(calculate_rt60_bands(analysis_ir, fs_i))
+        return rt60_val, rt60_bands
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+        ImportError,
+        ModuleNotFoundError,
+        NameError,
+    ):
+        logger.exception("RT60 computation from imported IR failed")
+        return None, None
+
+
 def _prepare_measurement_read_bundle(
     data: dict,
     *,
@@ -305,6 +342,29 @@ def _prepare_measurement_read_bundle(
         raw_ir_sub, raw_ir_fs_sub = load_raw_ir_sub(data, logger=logger)
     else:
         raw_ir_sub, raw_ir_fs_sub = None, 0
+
+    # External imports carry no RT60 metadata or sidecar; without it the adaptive
+    # target, decay hints and TDC severity silently fall back to generic constants
+    # even though the imported IR holds the real decay. Compute it here so the
+    # measurement context carries measured RT60 for every source that has an IR.
+    if (measured_rt60_l is None or measured_rt60_bands_l is None) and raw_ir_l is not None:
+        computed_val, computed_bands = _compute_rt60_from_raw_ir(raw_ir_l, raw_ir_fs_l)
+        if measured_rt60_l is None:
+            measured_rt60_l = computed_val
+        if measured_rt60_bands_l is None:
+            measured_rt60_bands_l = computed_bands
+        if computed_val is not None or computed_bands is not None:
+            data["rt60_source_l"] = "computed_from_imported_ir"
+            logger.info(f"RT60 (L) computed from imported IR: {measured_rt60_l}")
+    if (measured_rt60_r is None or measured_rt60_bands_r is None) and raw_ir_r is not None:
+        computed_val, computed_bands = _compute_rt60_from_raw_ir(raw_ir_r, raw_ir_fs_r)
+        if measured_rt60_r is None:
+            measured_rt60_r = computed_val
+        if measured_rt60_bands_r is None:
+            measured_rt60_bands_r = computed_bands
+        if computed_val is not None or computed_bands is not None:
+            data["rt60_source_r"] = "computed_from_imported_ir"
+            logger.info(f"RT60 (R) computed from imported IR: {measured_rt60_r}")
 
     return (
         bass_integration_bundle,

@@ -16,12 +16,11 @@ import numpy as np
 
 from ..shared import (
     AUTO_MODE_GOAL_DEFAULT,
-    AUTO_MODE_GOAL_FLAT,
     AUTO_MODE_MAG_C_MAX_MIN_HZ,
     AUTO_MODE_PHASE2_PARETO_ACOUSTIC_DROP,
     AUTO_MODE_TARGET_BASS_FORWARD_MAX_RANK_DROP,
     AUTO_MODE_TARGET_BEST_RANK_TIE_EPS,
-    _auto_goal_norm,
+    _auto_goal_is_flat_family,
     _auto_safe_float,
 )
 
@@ -174,8 +173,7 @@ def _auto_select_best_scored(scored: list[dict], *, goal: str = AUTO_MODE_GOAL_D
 
 
 def _auto_reject(metrics: dict, st_l: dict | None, st_r: dict | None, goal: str) -> bool:
-    g = _auto_goal_norm(goal)
-    if g != AUTO_MODE_GOAL_FLAT:
+    if not _auto_goal_is_flat_family(goal):
         return False
     return bool(_auto_hard_gate_reasons(metrics, st_l, st_r, goal=goal))
 

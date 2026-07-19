@@ -24,7 +24,7 @@ from .config.decaycore_pipeline import (
 from .config.mode_policy import apply_mode_to_cfg
 from .config.models import FilterConfig, StereoResolvedAutoPolicies
 from .config.schema import FilterConfigProjection, RunConfigSnapshot
-from .auto_mode.shared import AUTO_MODE_GOAL_FLAT, _auto_goal_norm
+from .auto_mode.shared import _auto_goal_is_flat_family, _auto_goal_norm
 
 logger = logging.getLogger("DecayCore")
 
@@ -193,7 +193,7 @@ def _build_config_safe_auto_goal(data: dict) -> str:
 
 def _build_config_apply_unsafe_raw(cfg: FilterConfig, data: dict, *, mode_u: str, auto_goal: str, max_safe_boost: float) -> None:
     unsafe_raw_req = bool(data.get("unsafe_raw_dsp", False))
-    unsafe_raw_auto = bool(mode_u == "AUTO" and auto_goal == AUTO_MODE_GOAL_FLAT)
+    unsafe_raw_auto = bool(mode_u == "AUTO" and _auto_goal_is_flat_family(auto_goal))
     unsafe_raw = bool(unsafe_raw_req and (mode_u == "ADVANCED" or unsafe_raw_auto))
     try:
         cfg.unsafe_raw_dsp = bool(unsafe_raw)

@@ -125,6 +125,23 @@ def _calc_ai_summary_from_stats_auto(stats: dict, scoring_range: tuple[float, fl
     return func(stats)
 
 
+def _auto_scoring_lo_hz(base_data: dict | None, *, floor_hz: float = 20.0) -> float:
+    """Scoring/residual window low bound: the frequency below which correction is
+    legitimately not expected — the HPF cutoff, plus the sub crossover when bass
+    management is active, on top of ``floor_hz``. It must NOT track the
+    optimizer-chosen mag_c_min: doing so lets the optimizer hide an uncorrected
+    room mode simply by raising mag_c_min above it (the region drops out of the
+    scored band), which made auto mode abandon bass correction (mag_c_min climbed
+    to ~120-140 Hz)."""
+    bd = dict(base_data or {})
+    lo = float(floor_hz)
+    if shared._auto_safe_bool(bd.get("hpf_enable", False), False):
+        lo = max(lo, shared._auto_safe_float(bd.get("hpf_freq", 0.0), 0.0))
+    if shared._auto_safe_bool(bd.get("bass_integration_enabled", False), False):
+        lo = max(lo, shared._auto_safe_float(bd.get("avr_crossover_hz", 0.0), 0.0))
+    return float(lo)
+
+
 def _get_auto_scoring_range(
     st_l: dict,
     st_r: dict,
@@ -135,21 +152,25 @@ def _get_auto_scoring_range(
     sources = [st_l, st_r, base_data or {}]
 
     def _pick(key: str, fallback: float) -> float:
-        if key == "mag_c_min":
-            for s in sources:
-                v_seed = shared._auto_safe_float((s or {}).get("_auto_mag_c_min_hz", float("nan")), float("nan"))
-                if np.isfinite(v_seed) and v_seed > 0.0:
-                    return float(v_seed)
         for s in sources:
             v = shared._auto_safe_float((s or {}).get(key, float("nan")), float("nan"))
             if np.isfinite(v) and v > 0.0:
                 return float(v)
         return float(fallback)
 
-    mag_c_min = _pick("mag_c_min", 20.0)
     mag_c_max = _pick("mag_c_max", 300.0)
     trans_w = _pick("trans_width", 100.0)
-    lo = float(mag_c_min)
+    # Low bound: acoustic capability seed (protection-seed -6 dB estimate, fixed per
+    # run and not optimizer-controlled) raised by the HPF/crossover floor. Never the
+    # candidate's own mag_c_min — that would let the optimizer shrink the scored band
+    # and hide uncorrected bass (see _auto_scoring_lo_hz).
+    lo_floor = 20.0
+    for s in sources:
+        v_seed = shared._auto_safe_float((s or {}).get("_auto_mag_c_min_hz", float("nan")), float("nan"))
+        if np.isfinite(v_seed) and v_seed > 0.0:
+            lo_floor = float(v_seed)
+            break
+    lo = _auto_scoring_lo_hz(base_data, floor_hz=lo_floor)
     hi = max(float(mag_c_max) + float(trans_w), 1500.0)
     return (lo, hi)
 
@@ -195,4 +216,4 @@ def _ai_score_with_fallback(st: dict, ai: dict, *, scoring_range) -> float:
 
 
 
-__all__ = ["calc_ai_summary_from_stats", "_auto_stats_pick_arr", "_auto_stats_band_n", "_finite_json_float", "_calc_ai_summary_from_stats_auto", "_get_auto_scoring_range", "_ai_score_with_fallback"]
+__all__ = ["calc_ai_summary_from_stats", "_auto_stats_pick_arr", "_auto_stats_band_n", "_finite_json_float", "_calc_ai_summary_from_stats_auto", "_auto_scoring_lo_hz", "_get_auto_scoring_range", "_ai_score_with_fallback"]

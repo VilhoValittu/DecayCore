@@ -119,8 +119,7 @@ def score_safety_limits(l_st, r_st, *, auto_exc_freq_hz, base_data, net_boost_ma
         exc_penalty_waived = False
         exc_penalty = 0.0
 
-    goal_norm = shared._auto_goal(base_data)
-    if goal_norm == shared.AUTO_MODE_GOAL_FLAT:
+    if shared._auto_goal_is_flat_family(shared._auto_goal(base_data)):
         boost_pen = min(8.0, 0.15 * max(0.0, float(net_boost_max) - 5.0))
     else:
         boost_pen = min(8.0, 0.40 * max(0.0, float(net_boost_max) - 6.0))

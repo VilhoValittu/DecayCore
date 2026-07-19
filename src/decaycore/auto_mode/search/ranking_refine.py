@@ -18,9 +18,12 @@ from ..shared import (
     AUTO_MODE_ADAPTIVE_SHRINK_ENABLED,
     AUTO_MODE_ADAPTIVE_SHRINK_MAX,
     AUTO_MODE_ADAPTIVE_SHRINK_MIN,
+    AUTO_MODE_GOAL_ACOUSTIC,
     AUTO_MODE_GOAL_DEFAULT,
     AUTO_MODE_GOAL_FLAT,
+    AUTO_MODE_GOAL_HYBRID,
     AUTO_MODE_GOAL_LOW_RIPPLE,
+    AUTO_MODE_GOAL_PREFER_BASS,
     AUTO_MODE_GOAL_ROOM_SAFE,
     AUTO_MODE_GOAL_SUBWOOFERS,
     AUTO_MODE_REFINE_MODE_BOOST_GUARD_MIN_RIPPLE_GAIN_DB,
@@ -143,19 +146,21 @@ def _auto_goal_uses_local_refine(goal: str | None) -> bool:
             AUTO_MODE_GOAL_LOW_RIPPLE,
             AUTO_MODE_GOAL_SUBWOOFERS,
             AUTO_MODE_GOAL_FLAT,
+            AUTO_MODE_GOAL_ACOUSTIC,
+            AUTO_MODE_GOAL_HYBRID,
+            AUTO_MODE_GOAL_PREFER_BASS,
         )
     )
 
 
 def _auto_rank_key_goal(metrics: dict, goal: str = AUTO_MODE_GOAL_DEFAULT) -> tuple:
-    raw_goal = str(goal or "").strip().lower().replace("_", "-")
-    if raw_goal == "acoustic":
-        return _auto_rank_key_acoustic(metrics)
-    if raw_goal == "hybrid":
-        return _auto_rank_key_hybrid(metrics)
-    if raw_goal in ("prefer bass", "prefer-bass", "bass"):
-        return _auto_rank_key_prefer_bass(metrics)
     g = _auto_goal_norm(goal)
+    if g == AUTO_MODE_GOAL_ACOUSTIC:
+        return _auto_rank_key_acoustic(metrics)
+    if g == AUTO_MODE_GOAL_HYBRID:
+        return _auto_rank_key_hybrid(metrics)
+    if g == AUTO_MODE_GOAL_PREFER_BASS:
+        return _auto_rank_key_prefer_bass(metrics)
     if g == AUTO_MODE_GOAL_FLAT:
         return _auto_rank_key_flat(metrics)
     if g == AUTO_MODE_GOAL_ROOM_SAFE:

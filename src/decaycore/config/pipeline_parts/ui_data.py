@@ -14,7 +14,7 @@ from typing import Any
 import logging
 import math
 
-from ...auto_mode.shared import AUTO_MODE_GOAL_FLAT, _auto_bass_integration_profile_norm, _auto_goal_norm
+from ...auto_mode.shared import _auto_bass_integration_profile_norm, _auto_goal_is_flat_family
 from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from ...config.schema import (
     AUTO_MODE_DEFAULT_CFG_TO_UI,
@@ -496,7 +496,7 @@ def collect_ui_data(pin) -> dict[str, Any]:
 
     auto_prefer_bass = bool(
         is_auto_mode
-        and _auto_goal_norm(str(data.get("auto_goal", "balanced") or "balanced")) == AUTO_MODE_GOAL_FLAT
+        and _auto_goal_is_flat_family(str(data.get("auto_goal", "balanced") or "balanced"))
     )
     if auto_prefer_bass:
         data["auto_target_mode"] = "selected"

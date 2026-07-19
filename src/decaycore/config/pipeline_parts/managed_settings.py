@@ -18,9 +18,8 @@ from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from ...config.schema import AUTO_MODE_DEFAULT_CFG_TO_UI
 from ...auto_mode.filter_priors import get_auto_mode_filter_auto_defaults
 from ...auto_mode.shared import (
-    AUTO_MODE_GOAL_FLAT,
     _auto_filter_type_for_key,
-    _auto_goal_norm,
+    _auto_goal_is_flat_family,
 )
 from ...config.mode_policy import MODE_DEFAULTS
 from ...ui_i18n import (
@@ -272,7 +271,7 @@ def _apply_auto_mode_managed_settings(data: dict[str, Any]) -> None:
 
     for key, value in forced.items():
         data[key] = value
-    if _auto_goal_norm(str(data.get("auto_goal", "balanced") or "balanced")) == AUTO_MODE_GOAL_FLAT:
+    if _auto_goal_is_flat_family(str(data.get("auto_goal", "balanced") or "balanced")):
         data["unsafe_raw_dsp"] = True
 
 

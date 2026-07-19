@@ -37,7 +37,6 @@ _CONF_PULL_MAX_MAX_HZ = 220.0
 from decaycore.common.measurement_features import estimate_schroeder_hz
 
 from .shared import (
-    AUTO_MODE_GOAL_FLAT,
     AUTO_MODE_LOW_BASS_MAX_HZ,
     AUTO_MODE_LOW_BASS_MIN_HZ,
     AUTO_MODE_MAG_C_MAX_MIN_HZ,
@@ -50,6 +49,7 @@ from .shared import (
     AUTO_MODE_PHASE_LIMIT_PRIOR_CENTER_HZ,
     _auto_is_phase_search_filter,
     _auto_goal,
+    _auto_goal_is_flat_family,
     _auto_filter_cache_key,
     _auto_filter_type_for_key,
     _auto_mag_c_min_center,
@@ -435,7 +435,7 @@ def _build_auto_mode_candidates(
     keep_tdc = bool(base_data.get("enable_tdc", True))
     keep_afdw = bool(base_data.get("enable_afdw", True))
     keep_bass_first = bool(base_data.get("bass_first_ai", True))
-    prefer_bass = bool(_auto_goal(base_data) == AUTO_MODE_GOAL_FLAT)
+    prefer_bass = bool(_auto_goal_is_flat_family(_auto_goal(base_data)))
     bool_search = bool(_auto_phase1_bool_search_enabled(base_data))
     max_boost_hi = float(_auto_phase1_max_boost_hi(base_data))
     ft = str(base_data.get("filter_type", "") or "").strip().lower()

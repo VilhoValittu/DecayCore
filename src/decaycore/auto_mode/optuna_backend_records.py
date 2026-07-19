@@ -17,9 +17,8 @@ import logging
 import numpy as np
 
 from .shared import (
-    AUTO_MODE_GOAL_FLAT,
     AUTO_MODE_OPTUNA_USER_ATTR_OUT,
-    _auto_goal_norm,
+    _auto_goal_is_flat_family,
     _auto_safe_float,
     _auto_optuna_sampler_kwargs,
 )
@@ -358,7 +357,7 @@ def _auto_optuna_objective_value(metrics: dict | None, *, use_refine_tiebreak: b
         value = _auto_safe_float(met.get("rank_score", float("nan")), float("nan"))
     if np.isfinite(value):
         bass_bonus = _auto_optuna_bass_preference_bonus(met)
-        if _auto_goal_norm(goal) == AUTO_MODE_GOAL_FLAT:
+        if _auto_goal_is_flat_family(goal):
             bass_bonus = float(np.clip(bass_bonus * 3.0, 0.0, _AUTO_OPTUNA_BASS_PREFERENCE_MAX_BONUS * 3.0))
         return float(value + bass_bonus)
     return 0.0
