@@ -28,13 +28,29 @@ Phase authority now uses true log-frequency octave smoothing and stays cleanly a
 
 RT60 smoothing now uses an O(n) prefix-sum implementation. A new 32-entry LRU cache with BLAKE2b content keys, single-flight computation, copied results, and safe generation-based clearing makes repeated analysis faster without allowing stale or shared mutable results to leak between runs.
 
-A measured RT60 value always takes priority over fallback cache data. The content-based RT60 cache can be reused across runs, but is never written to disk. Cache identities now cover phase authority, P6, and raw impulse-response data; the cache schema was updated to version 26 and AUTO compatibility to `am40`.
+A measured RT60 value always takes priority over fallback cache data. The content-based RT60 cache can be reused across runs, but is never written to disk. Cache identities now cover phase authority, P6, and raw impulse-response data; the cache schema was updated to version 27 and AUTO compatibility to `am42`.
 
 ### More robust measurement sessions and wider stereo
 
 RT60 analysis now uses a peak-anchored 1 s + 6 s window without modifying the raw impulse response. Guided sessions save up to two channels in parallel, but only after all captures at a position are complete.
 
 Stereo linking has also been fixed, delivering a wider stereo image.
+
+### Bass can no longer drop out of AUTO scoring
+
+The lower bound of the AUTO fit score no longer follows the candidate's own correction band. It is now anchored to the estimated −6 dB point of the speakers, raised by the HPF cutoff and the subwoofer crossover where applicable. Uncorrected bass modes therefore always count against a candidate, and the optimizer can no longer improve its score by shrinking the correction band away from the bass — for every filter type. The residual-peak scoring uses the same shared logic.
+
+### Optimization goals keep their intent
+
+The goals "bass" / "prefer bass", "acoustic", and "hybrid" are no longer collapsed into the flat and low-ripple objectives. Each now keeps its own identity through the entire search, so the dedicated ranking logic for these goals is actually applied. All safety gates and correction behavior remain exactly as before.
+
+### Room-adaptive correction bands
+
+Temporal Decay Control and hybrid IIR cuts now narrow their frequency bands to the room's estimated Schroeder frequency, where modal correction is physically justified. The bands only narrow — they never extend beyond the previous 300 Hz and 200 Hz caps.
+
+### Real decay data for imported measurements
+
+When a WAV impulse response is imported without RT60 metadata or a sidecar file, DecayCore now computes RT60 and its frequency bands directly from the imported impulse response, using the same peak-anchored analysis window as built-in measurements. The adaptive target, decay hints, and Temporal Decay Control now use real measured decay for imports instead of falling back to generic constants.
 
 ---
 
@@ -52,13 +68,29 @@ Vaiheauktoriteetti käyttää nyt aitoa log-taajuista oktaavitasoitusta ja pysyy
 
 RT60-tasoitus käyttää nyt O(n)-aikaista prefix sum -laskentaa. Uusi 32 alkion LRU-välimuisti, BLAKE2b-sisältöavaimet, single-flight-laskenta, kopioidut tulokset ja turvallinen sukupolvipohjainen tyhjennys nopeuttavat toistuvaa analyysia ilman vanhentuneen tai jaetun muokattavan datan vuotamista ajojen välillä.
 
-Mitattu RT60-arvo ohittaa aina fallback-välimuistin tiedot. Sisältöpohjaista RT60-välimuistia voidaan hyödyntää ajojen välillä, mutta sitä ei koskaan kirjoiteta levylle. Välimuistin tunniste huomioi nyt vaiheauktoriteetin, P6:n ja raa'an impulssivasteen tiedot; välimuistiskeema päivitettiin versioon 26 ja AUTO-yhteensopivuus versioon `am40`.
+Mitattu RT60-arvo ohittaa aina fallback-välimuistin tiedot. Sisältöpohjaista RT60-välimuistia voidaan hyödyntää ajojen välillä, mutta sitä ei koskaan kirjoiteta levylle. Välimuistin tunniste huomioi nyt vaiheauktoriteetin, P6:n ja raa'an impulssivasteen tiedot; välimuistiskeema päivitettiin versioon 27 ja AUTO-yhteensopivuus versioon `am42`.
 
 ### Varmemmat mittaussessiot ja avarampi stereo
 
 RT60-analyysi käyttää nyt impulssihuippuun ankkuroitua 1 s + 6 s analyysi-ikkunaa muuttamatta raakaa impulssivastetta. Ohjattu sessio tallentaa enintään kaksi kanavaa rinnakkain, mutta vasta kun kaikki mittauspaikan kaappaukset ovat valmiit.
 
 Stereo link -toiminto on lisäksi korjattu, ja lopputuloksena on aiempaa avarampi stereokuva.
+
+### Basso ei voi enää pudota AUTO-pisteytyksestä
+
+AUTO-tilan sovituspisteen alaraja ei enää seuraa ehdokkaan omaa korjauskaistaa. Se ankkuroituu nyt kaiuttimien estimoituun −6 dB -pisteeseen, jota HPF-rajataajuus ja subwoofer-jakotaajuus tarvittaessa nostavat. Korjaamattomat bassomoodit lasketaan siten aina ehdokasta vastaan, eikä optimoija voi enää parantaa pistettään kutistamalla korjauskaistaa basson yläpuolelle — millään suodatintyypillä. Residuaalipiikkien pisteytys käyttää samaa jaettua logiikkaa.
+
+### Optimointitavoitteet säilyttävät tarkoituksensa
+
+Tavoitteita "bass" / "prefer bass", "acoustic" ja "hybrid" ei enää litistetä flat- ja low-ripple-tavoitteisiin. Jokainen säilyttää nyt oman identiteettinsä koko haun läpi, joten näiden tavoitteiden oma sijoituslogiikka on oikeasti käytössä. Kaikki turvarajat ja korjauskäyttäytyminen säilyvät täsmälleen ennallaan.
+
+### Huoneeseen mukautuvat korjauskaistat
+
+Temporal Decay Control ja hybridi-IIR-leikkaukset kaventavat nyt taajuuskaistansa huoneen estimoituun Schroeder-taajuuteen, jossa modaalinen korjaus on fysikaalisesti perusteltua. Kaistat vain kapenevat — ne eivät koskaan ylitä aiempia 300 Hz:n ja 200 Hz:n ylärajoja.
+
+### Aitoa jälkikaiuntadataa importatuille mittauksille
+
+Kun WAV-impulssivaste tuodaan ilman RT60-metadataa tai sidecar-tiedostoa, DecayCore laskee RT60:n ja sen taajuuskaistat nyt suoraan tuodusta impulssivasteesta samalla huippuun ankkuroidulla analyysi-ikkunalla kuin sisäänrakennetuissa mittauksissa. Adaptiivinen target, decay-vihjeet ja Temporal Decay Control käyttävät importeille nyt aitoa mitattua jälkikaiuntaa geneeristen vakioiden sijaan.
 
 ---
 
