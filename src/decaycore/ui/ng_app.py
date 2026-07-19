@@ -19,9 +19,7 @@ Public API:
 """
 from __future__ import annotations
 
-import base64
 import importlib
-import importlib.resources as pkgres
 import logging
 import sys
 from pathlib import Path
@@ -39,6 +37,8 @@ PROGRAM_NAME = "DecayCore"
 VERSION = ""
 MAX_SAFE_BOOST = 12.0
 _STATIC_ASSETS_REGISTERED = False
+_BRAND_LOGO_DARK_URL = "/static/DecayCore_logo.svg"
+_BRAND_LOGO_LIGHT_URL = "/static/DecayCore_logo_light.svg"
 
 
 def _register_static_assets() -> None:
@@ -323,31 +323,9 @@ def _build_brand_header(*, version: str, dark_mode, initial_theme_dark: bool) ->
     ui.add_head_html(_external_link_head_html())
     manual_text = _load_user_manual_text()
 
-    def _load_logo_b64(filename: str) -> str:
-        try:
-            with pkgres.files("decaycore.ui.assets").joinpath(filename).open("rb") as f:
-                return base64.b64encode(f.read()).decode()
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            return ""
-
-    logo_dark_b64 = _load_logo_b64("DecayCore_logo.png")
-    logo_light_b64 = _load_logo_b64("DecayCore_logo_light.png")
-
     logo_img_style = "display:block; width:100%; height:100%; object-fit:cover; border-radius:inherit;"
-    logo_dark_src = f"data:image/png;base64,{logo_dark_b64}" if logo_dark_b64 else ""
-    logo_light_src = f"data:image/png;base64,{logo_light_b64}" if logo_light_b64 else ""
+    logo_dark_src = _BRAND_LOGO_DARK_URL
+    logo_light_src = _BRAND_LOGO_LIGHT_URL
 
     with ui.column().classes("cf-brand-hero w-full"):
         with ui.row().classes("items-start gap-6 w-full justify-between no-wrap"):

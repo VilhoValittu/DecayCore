@@ -52,3 +52,16 @@ and provenance notices must be preserved.
 
 Removal or alteration of third-party notices is prohibited unless permitted by
 the applicable license or by written permission from the relevant rights holder.
+
+6. Silkscreen Font
+
+DecayCore bundles the Silkscreen Regular and Bold fonts by Jason Kottke and the
+Silkscreen Project Authors for display headings and navigation. The font files
+were obtained from the Google Fonts repository and are distributed under the
+SIL Open Font License, Version 1.1.
+
+The complete font license is included at:
+
+src/decaycore/ui/assets/Silkscreen-OFL.txt
+
+Source: https://github.com/google/fonts/tree/main/ofl/silkscreen

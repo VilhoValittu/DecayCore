@@ -45,9 +45,11 @@ REW-style measurement data may also be used in compatible workflows, but DecayCo
 
 ![Advanced tab — refine correction shaping, bass protection, and confidence controls](docs/pics/ui_5.png)
 
-![Start / Results tab — run correction and review generated results](docs/pics/ui_8.png)
+![IR Window & Decay Control tab — control export windowing and temporal processing](docs/pics/ui_6.png)
 
-![Final graph — generated correction analysis plot from the results view](docs/pics/ui_9.png)
+![XO tab — define crossover filters between bands](docs/pics/ui_7.png)
+
+![Start / Results tab — launch correction and follow its progress](docs/pics/ui_8.png)
 
 ## Documentation
 

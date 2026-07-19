@@ -52,6 +52,10 @@ Temporal Decay Control and hybrid IIR cuts now narrow their frequency bands to t
 
 When a WAV impulse response is imported without RT60 metadata or a sidecar file, DecayCore now computes RT60 and its frequency bands directly from the imported impulse response, using the same peak-anchored analysis window as built-in measurements. The adaptive target, decay hints, and Temporal Decay Control now use real measured decay for imports instead of falling back to generic constants.
 
+### UI
+
+New retro-theme. C64 inspirated.
+
 ---
 
 ### Älykkäämpi loppuvalidointi parantaa AUTO-tuloksia
@@ -91,6 +95,10 @@ Temporal Decay Control ja hybridi-IIR-leikkaukset kaventavat nyt taajuuskaistans
 ### Aitoa jälkikaiuntadataa importatuille mittauksille
 
 Kun WAV-impulssivaste tuodaan ilman RT60-metadataa tai sidecar-tiedostoa, DecayCore laskee RT60:n ja sen taajuuskaistat nyt suoraan tuodusta impulssivasteesta samalla huippuun ankkuroidulla analyysi-ikkunalla kuin sisäänrakennetuissa mittauksissa. Adaptiivinen target, decay-vihjeet ja Temporal Decay Control käyttävät importeille nyt aitoa mitattua jälkikaiuntaa geneeristen vakioiden sijaan.
+
+### UI
+
+Uusi retro-teema. C64 on ollut aina lähellä sydäntä.
 
 ---
 

@@ -1,26 +1,29 @@
 ---
-title: DecayCore - FIR Room Correction and Measurement Tool
-description: DecayCore is a free FIR room correction and acoustic measurement tool with bounded correction, phase-aware processing, and inspectable performance evidence.
+title: DecayCore — Measure the room. Reveal the music.
+description: Measure the room. Reveal the music. DecayCore turns acoustic measurements into bounded, phase-aware FIR correction for a more truthful listening experience.
 permalink: /
 hide_title: true
 wide_content: true
-image: https://vilhovalittu.github.io/DecayCore/performance/source/SPL_15-250.jpg
+image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
 ---
 
 <section class="hero">
-  <div>
-    <p class="hero__eyebrow">Measurement-led FIR correction</p>
-    <h1>FIR room correction with measurable, bounded behavior</h1>
-    <p class="hero__copy">DecayCore measures loudspeaker and room behavior, generates convolution-ready WAV filters, and keeps magnitude, phase, timing, and low-frequency correction inside explicit safety limits.</p>
-    <p class="hero__copy">It supports CamillaDSP, Roon convolution, Equalizer APO, MiniDSP, and other FIR-capable DSP engines. DecayCore was formerly known as CamillaFIR.</p>
+  <div class="hero__content">
+    <p class="hero__eyebrow">DecayCore · Measurement-led FIR correction</p>
+    <h1>Measure the room.<br><span>Reveal the music.</span></h1>
+    <p class="hero__copy hero__copy--lead">DecayCore listens to how your loudspeakers and room behave, then builds bounded, phase-aware FIR correction that lets the recording come through.</p>
+    <p class="hero__copy">Magnitude, phase, timing, and low-frequency decay stay inside explicit acoustic guardrails. Export convolution-ready WAV filters for CamillaDSP, Roon, Equalizer APO, MiniDSP, and other FIR-capable DSP engines.</p>
     <div class="action-row">
-      <a class="button button--primary" href="{{ '/performance/' | relative_url }}">View measured performance</a>
-      <a class="button" href="https://github.com/VilhoValittu/DecayCore/releases/latest">Download latest release</a>
+      <a class="button button--primary" href="https://github.com/VilhoValittu/DecayCore/releases/latest">Download DecayCore</a>
+      <a class="button" href="{{ '/performance/' | relative_url }}">Explore measured performance</a>
       <a class="action-link" href="{{ '/getting-started/' | relative_url }}">Getting started <span aria-hidden="true">→</span></a>
     </div>
   </div>
   <div class="hero__visual">
-    <img class="hero__logo" src="{{ '/pics/DecayCore_logo_light.png' | relative_url }}" alt="DecayCore logo" width="250" height="250">
+    <div class="hero__logo-frame">
+      <img class="hero__logo" src="{{ '/pics/DecayCore_logo.svg' | relative_url }}" alt="DecayCore Resonance Disk logo" width="256" height="256">
+    </div>
+    <p class="hero__signal" aria-hidden="true"><span></span><i></i><span></span></p>
   </div>
 </section>
 
@@ -76,15 +79,15 @@ image: https://vilhovalittu.github.io/DecayCore/performance/source/SPL_15-250.jp
   </figure>
   <figure class="screenshot-item">
     <a href="{{ '/pics/ui_8.png' | relative_url }}">
-      <img src="{{ '/pics/ui_8.png' | relative_url }}" alt="Start and Results tab showing correction progress and generated outputs" width="1536" height="960" loading="lazy">
+      <img src="{{ '/pics/ui_8.png' | relative_url }}" alt="Start and Results tab ready to launch correction with the left and right measurements loaded" width="1536" height="960" loading="lazy">
     </a>
-    <figcaption class="screenshot-item__caption">Start / Results — run correction and review generated outputs</figcaption>
+    <figcaption class="screenshot-item__caption">Start / Results — launch correction and follow its progress</figcaption>
   </figure>
   <figure class="screenshot-item">
-    <a href="{{ '/pics/ui_9.png' | relative_url }}">
-      <img src="{{ '/pics/ui_9.png' | relative_url }}" alt="Final DecayCore correction analysis graph from the results view" width="1232" height="1521" loading="lazy">
+    <a href="{{ '/pics/ui_4.png' | relative_url }}">
+      <img src="{{ '/pics/ui_4.png' | relative_url }}" alt="Target tab showing the measured speaker responses and target curve preview" width="1536" height="960" loading="lazy">
     </a>
-    <figcaption class="screenshot-item__caption">Final Graph — inspect the generated correction analysis</figcaption>
+    <figcaption class="screenshot-item__caption">Target — shape correction against the measured response</figcaption>
   </figure>
 </div>
 

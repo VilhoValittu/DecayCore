@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+DecayCore
+Copyright (c) 2026 Vilho Valittu.
+SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">DecayCore Resonance Disk logo</title>
+  <desc id="desc">Pixel-stepped concentric response rings crossed by an audio waveform.</desc>
+  <rect width="256" height="256" fill="#0d0a2b"/>
+
+  <g fill="none" stroke="#cbb8ff" stroke-width="8" stroke-linecap="square" stroke-linejoin="miter">
+    <path d="M120 36H96V44H76V52H60V64H48V80H40V100H32V120"/>
+    <path d="M32 136V156H40V176H48V192H60V204H76V212H96V220H120"/>
+    <path d="M120 64H100V72H84V84H72V100H64V120"/>
+    <path d="M64 136V156H72V172H84V184H100V192H120"/>
+    <path d="M120 92H108V100H100V108H92V120"/>
+    <path d="M92 136V148H100V156H108V164H120"/>
+  </g>
+
+  <g fill="none" stroke="#65d7de" stroke-width="8" stroke-linecap="square" stroke-linejoin="miter">
+    <path d="M136 36H160V44H180V52H196V64H208V80H216V100H224V120"/>
+    <path d="M224 136V156H216V176H208V192H196V204H180V212H160V220H136"/>
+    <path d="M136 64H156V72H172V84H184V100H192V120"/>
+    <path d="M192 136V156H184V172H172V184H156V192H136"/>
+    <path d="M136 92H148V100H156V108H164V120"/>
+    <path d="M164 136V148H156V156H148V164H136"/>
+  </g>
+
+  <g fill="none" stroke="#65d7de" stroke-width="4" stroke-linecap="square" stroke-linejoin="miter">
+    <path d="M4 128H16V122H22V134H28V112H34V144H40V120H46V136H52V128H80"/>
+    <path d="M176 128H204V136H210V120H216V144H222V112H228V134H234V122H240V128H252"/>
+  </g>
+
+  <path d="M128 116L140 128L128 140L116 128Z" fill="#8be8ec"/>
+</svg>

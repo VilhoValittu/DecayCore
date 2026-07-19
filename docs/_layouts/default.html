@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     {% seo %}
     <meta name="google-site-verification" content="-lDppG75tnSsL-qtF1eBLBQWsv3IctR9_RKh65WTiuY">
-    <meta name="theme-color" content="#0f7d8b">
-    <link rel="icon" type="image/png" href="{{ '/pics/DecayCore_logo_light.png' | relative_url }}">
+    <meta name="theme-color" content="#17133f">
+    <link rel="icon" type="image/svg+xml" href="{{ '/pics/DecayCore_logo.svg' | relative_url }}">
     <link rel="stylesheet" href="{{ '/assets/main.css' | relative_url }}">
   </head>
   <body class="{% if page.hide_title %}is-home {% endif %}{% if page.wide_content %}has-wide-content{% endif %}">
@@ -15,8 +15,11 @@
     <header class="site-header">
       <div class="site-header__inner">
         <a class="brand" href="{{ '/' | relative_url }}" aria-label="{{ site.title }} home">
-          <img class="brand__mark" src="{{ '/pics/DecayCore_logo_light.png' | relative_url }}" alt="" width="48" height="48">
-          <span class="brand__name">{{ site.title }}</span>
+          <img class="brand__mark" src="{{ '/pics/DecayCore_logo.svg' | relative_url }}" alt="" width="52" height="52">
+          <span class="brand__copy">
+            <span class="brand__name">{{ site.title }}</span>
+            <span class="brand__tagline">Measure the room. Reveal the music.</span>
+          </span>
         </a>
 
         <nav class="site-nav site-nav--desktop" aria-label="Primary navigation">
@@ -51,7 +54,7 @@
 
     <footer class="site-footer">
       <div class="site-footer__inner">
-        <span>DecayCore FIR room correction and measurement tool.</span>
+        <span class="site-footer__brand">Measure the room. Reveal the music.</span>
         <span>
           <a href="{{ '/' | relative_url }}">Home</a>
           <a href="{{ '/getting-started/' | relative_url }}">Getting Started</a>

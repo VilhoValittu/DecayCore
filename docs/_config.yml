@@ -1,8 +1,8 @@
 title: DecayCore
-description: "Free FIR room correction and acoustic measurement tool for CamillaDSP, convolution WAV filters, phase-aware correction and temporal decay control."
+description: "Measure the room. Reveal the music. DecayCore is a bounded, phase-aware FIR room correction and acoustic measurement tool."
 url: "https://vilhovalittu.github.io"
 baseurl: "/DecayCore"
-logo: "https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png"
+logo: "https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo.svg"
 repository: VilhoValittu/DecayCore
 
 # GitHub Pages supported theme
