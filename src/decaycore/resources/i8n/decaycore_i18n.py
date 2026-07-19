@@ -9,7 +9,6 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 import json
-import locale
 import os
 import sys
 from pathlib import Path
@@ -62,12 +61,9 @@ def _reload_translations_in_place() -> None:
 
 def t(key: str) -> str:
     """Funktio: t."""
-    lang = locale.getlocale()[0]
-    lang = "fi" if lang and "fi" in lang.lower() else "en"
-
     if key == "zoom_hint":
-        return "(Vinkki: Voit zoomata hiirellä kuvaajaa)" if lang == "fi" else "(Hint: Use mouse to zoom)"
-    catalog = TRANSLATIONS.get(lang, TRANSLATIONS.get("en", {}))
+        return "(Hint: Use mouse to zoom)"
+    catalog = TRANSLATIONS.get("en", {})
     translated = catalog.get(key, None)
     if translated is not None:
         return translated
@@ -75,5 +71,5 @@ def t(key: str) -> str:
     # Hot-reload or partial module reload can update UI code before this module,
     # so retry once from disk when a key is missing.
     _reload_translations_in_place()
-    catalog = TRANSLATIONS.get(lang, TRANSLATIONS.get("en", {}))
+    catalog = TRANSLATIONS.get("en", {})
     return catalog.get(key, key)

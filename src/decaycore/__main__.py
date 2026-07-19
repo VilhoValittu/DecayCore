@@ -71,6 +71,7 @@ def main():
         show=True,
         dark=True,
         favicon=FAVICON_PATH,
+        language="en-US",
         reload=False,
         title=PROGRAM_NAME,
     )
