@@ -261,7 +261,7 @@
     "mode_label": "Mode",
     "auto_goal_label": "Automatic mode goal",
     "auto_goal_room_safe": "room-safe",
-    "auto_goal_balanced": "balanced (recommended)",
+    "auto_goal_balanced": "balanced",
     "auto_goal_subwoofers": "subwoofers (Smart Scan 20-200 Hz)",
     "auto_goal_low_ripple": "low-ripple",
     "auto_goal_flat": "prefer bass",
