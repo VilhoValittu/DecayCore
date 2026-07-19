@@ -23,13 +23,18 @@ echo   Filter priors:    "%DATA_DIR%\auto_mode_filter_priors.json"
 echo   Config file:      "%DATA_DIR%\config.json"
 echo.
 
-if "%ASSUME_YES%"=="0" (
-    set /p "REPLY=Delete these files? [y/N] "
-    if /i not "%REPLY%"=="y" if /i not "%REPLY%"=="yes" (
-        echo Aborted.
-        exit /b 1
-    )
-)
+if "%ASSUME_YES%"=="1" goto confirmed
+
+rem Keep the prompt outside a parenthesized block so REPLY is expanded only
+rem after set /p has read it.
+set "REPLY="
+set /p "REPLY=Delete these files? [y/N] "
+if /i "%REPLY%"=="y" goto confirmed
+if /i "%REPLY%"=="yes" goto confirmed
+echo Aborted.
+exit /b 1
+
+:confirmed
 
 rem del does not fail the script if files are missing; quote each pattern.
 del /q "%DATA_DIR%\decaycore*optuna*.log" 2>nul && echo Deleted Optuna cache in "%DATA_DIR%"
