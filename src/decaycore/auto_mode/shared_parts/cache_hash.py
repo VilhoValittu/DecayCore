@@ -39,7 +39,7 @@ def _auto_filter_cache_key(
         return "minimum"
     if "linear" in ft:
         return "linear"
-    return "mixed"
+    return "asym"
 
 
 def _auto_filter_type_for_key(filter_key: str | None) -> str:

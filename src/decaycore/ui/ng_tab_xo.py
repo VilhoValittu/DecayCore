@@ -33,7 +33,7 @@ def build_xo_tab(*, t: Callable, get_val: Callable) -> None:
     bass_integration_visible = bool(
         mode_value == "AUTO" and bool(get_val("bass_integration_enable", False))
     )
-    xo_enabled = bool(filter_type_supports_xo_phase_model(get_val("filter_type", "Mixed")))
+    xo_enabled = bool(filter_type_supports_xo_phase_model(get_val("filter_type", "Asymmetric")))
 
     with page_shell(title=t("tab_xo"), intro=t("tab_xo_help")):
         with ui.column().classes("w-full gap-0") as xo_content:

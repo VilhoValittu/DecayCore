@@ -219,11 +219,11 @@ def _auto_mode_filter_type_or_default(value: Any) -> str:
         or "linear" in low
     ):
         return str(raw)
-    return str(_auto_filter_type_for_key("mixed"))
+    return str(_auto_filter_type_for_key("asym"))
 
 def _apply_auto_mode_managed_settings(data: dict[str, Any]) -> None:
     """Force AUTO mode to use program-managed settings except allowed user choices."""
-    filter_type = _auto_mode_filter_type_or_default(data.get("filter_type", "Mixed"))
+    filter_type = _auto_mode_filter_type_or_default(data.get("filter_type", "Asymmetric"))
 
     merged_defaults = dict(MODE_DEFAULTS.get("AUTO", {}) or {})
     merged_defaults.update(dict(get_auto_mode_filter_auto_defaults(filter_type) or {}))

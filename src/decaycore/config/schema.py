@@ -109,7 +109,7 @@ DEFAULT_CONFIG_ITEMS: tuple[tuple[str, Any], ...] = (
     ("auto_mode_optuna_constant_liar", True),
     ("auto_mode_optuna_persistent_study", True),
     ("auto_mode_optuna_avoid_duplicates", True),
-    ("filter_type", "Mixed"),
+    ("filter_type", "Asymmetric"),
     ("gain", 0.0),
     ("hc_mode", "Harman6"),
     ("mag_correct", True),
@@ -460,7 +460,7 @@ REQUEST_RUNTIME_DEFAULTS = {
 
 MODE_DEFAULTS_BASE: dict[str, dict[str, Any]] = {
     "BASIC": {
-        "filter_type_str": "Mixed Phase",
+        "filter_type_str": "Asymmetric",
         "global_gain_db": 0.0,
         "enable_mag_correction": True,
         "unsafe_raw_dsp": False,
@@ -505,7 +505,7 @@ MODE_DEFAULTS_BASE: dict[str, dict[str, Any]] = {
         "low_bass_cut_enable": True,
     },
     "ADVANCED": {
-        "filter_type_str": "Mixed Phase",
+        "filter_type_str": "Asymmetric",
         "global_gain_db": 0.0,
         "enable_mag_correction": True,
         "unsafe_raw_dsp": False,
@@ -758,7 +758,7 @@ def normalize_filter_type(value: Any) -> str:
         return "Minimum"
     if "linear" in ft_l:
         return "Linear"
-    return "Mixed"
+    return "Asymmetric"
 
 
 def coerce_bool(value: Any, default: bool = False) -> bool:

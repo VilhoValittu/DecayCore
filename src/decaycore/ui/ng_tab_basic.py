@@ -35,7 +35,7 @@ def _normalize_filter_type_value(value) -> str:
         return "Minimum"
     if "lin" in raw:
         return "Linear"
-    return "Mixed"
+    return "Asymmetric"
 
 
 def _auto_goal_is_prefer_bass(value) -> bool:
@@ -179,7 +179,7 @@ def build_basic_tab(*, t: Callable, get_val: Callable, max_safe_boost: float) ->
                     "filter_type",
                     ui.select(
                         ftype_opts,
-                        value=_normalize_filter_type_value(get_val("filter_type", "Mixed")),
+                        value=_normalize_filter_type_value(get_val("filter_type", "Asymmetric")),
                         label=t("filter_type"),
                     ).props("dense outlined").classes("flex-1"),
                 )

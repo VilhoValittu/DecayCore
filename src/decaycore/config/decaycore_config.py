@@ -195,7 +195,7 @@ def _normalize_saved_filter_type(saved: dict, default_conf: dict) -> None:
             saved.get("filter_type", default_conf.get("filter_type"))
         )
     except _RECOVERABLE_CONFIG_EXCEPTIONS:
-        saved["filter_type"] = str(default_conf.get("filter_type", "Mixed"))
+        saved["filter_type"] = str(default_conf.get("filter_type", "Asymmetric"))
 
 
 def _load_and_merge_saved_config(default_conf: dict) -> bool:
@@ -293,7 +293,7 @@ def save_config_snapshot(snapshot: AppConfigSnapshot) -> None:
         if "ui_theme_dark" not in clean_data and "ui_theme_dark" in saved_existing:
             clean_data["ui_theme_dark"] = bool(saved_existing["ui_theme_dark"])
         clean_data["filter_type"] = _normalize_filter_type(
-            clean_data.get("filter_type", "Mixed")
+            clean_data.get("filter_type", "Asymmetric")
         )
         _normalize_saved_choice_fields(clean_data, _make_default_config())
         clean_data["layout"] = normalize_layout_value(clean_data.get("layout", LAYOUT_MONO))
