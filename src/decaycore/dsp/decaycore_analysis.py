@@ -99,6 +99,27 @@ def _distance_bins_from_hz(freq_axis, distance_hz: float, fallback_bins: int = 1
 _RT60_FIT_MAX_POINTS = 256
 
 
+def _moving_average_same(values: np.ndarray, window_size: int) -> np.ndarray:
+    """Return an O(n) moving average matching ``np.convolve(..., 'same')``.
+
+    The asymmetric one-sample padding for even windows intentionally mirrors
+    NumPy's centering convention.  RT60 inputs always exceed the smoothing
+    window; retain NumPy's legacy behavior for other internal callers.
+    """
+    arr = np.asarray(values, dtype=float).reshape(-1)
+    win = int(window_size)
+    if arr.size == 0 or win <= 1:
+        return arr.copy()
+    if win > arr.size:
+        return np.convolve(arr, np.ones(win, dtype=float) / float(win), mode="same")
+
+    padded = np.pad(arr, (win // 2, (win - 1) // 2), mode="constant")
+    prefix = np.empty(padded.size + 1, dtype=float)
+    prefix[0] = 0.0
+    np.cumsum(padded, dtype=float, out=prefix[1:])
+    return (prefix[win:] - prefix[:-win]) / float(win)
+
+
 def _fit_rt60_window(t_u: np.ndarray, d_u: np.ndarray, lo_db: float, hi_db: float, *, min_points: int = 12):
     mask = (d_u <= lo_db) & (d_u >= hi_db)
     if np.count_nonzero(mask) < int(min_points):
@@ -272,8 +293,7 @@ def calculate_rt60(impulse, fs, policy: Rt60WindowPolicy | None = None):
         smooth_ms = 10.0
         win = max(1, int((smooth_ms / 1000.0) * fs))
         if win > 1:
-            kernel = np.ones(win) / win
-            edc_db = np.convolve(edc_db, kernel, mode="same")
+            edc_db = _moving_average_same(edc_db, win)
 
         t_u = t[:stop_idx + 1]
         d_u = edc_db[:stop_idx + 1]

@@ -30,6 +30,7 @@ from ..dsp.correction_types import MeasurementSideContext
 
 logger = logging.getLogger("DecayCore")
 
+
 def _build_measurement_side_ctx(measurements: dict, side: str) -> MeasurementSideContext:
     """Build a MeasurementSideContext for one channel from the measurements dict."""
     rt60_val = normalize_rt60_value(measurements.get(f"measured_rt60_{side}"))
@@ -60,7 +61,6 @@ def _build_measurement_side_ctx(measurements: dict, side: str) -> MeasurementSid
                 fundamental_mag_db=measurements.get(m_key),
             )
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -83,7 +83,9 @@ def _build_measurement_side_ctx(measurements: dict, side: str) -> MeasurementSid
         harmonic_risk_freq_hz=risk_freq,
         harmonic_risk_curve=risk_curve,
         harmonic_risk_summary=risk_summary,
+        side=str(side).strip().lower() or None,
     )
+
 
 def _phase_from_ir(ir: np.ndarray, fs: int, freq_axis: np.ndarray) -> np.ndarray:
     x = np.asarray(ir, dtype=float).ravel()
@@ -96,11 +98,13 @@ def _phase_from_ir(ir: np.ndarray, fs: int, freq_axis: np.ndarray) -> np.ndarray
     f_q = np.clip(f_axis, float(np.min(f_fft)), float(np.max(f_fft)))
     return np.interp(f_q, f_fft, p_deg).astype(float)
 
+
 def _to_axis(arr: Any, fallback: np.ndarray) -> np.ndarray:
     out = np.asarray(arr if arr is not None else [], dtype=float).ravel()
     if out.size > 1:
         return out
     return np.asarray(fallback if fallback is not None else [], dtype=float).ravel()
+
 
 def _extract_lr_measurement_axes(measurements: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     empty = np.asarray([], dtype=float)
@@ -112,6 +116,7 @@ def _extract_lr_measurement_axes(measurements: dict) -> tuple[np.ndarray, np.nda
         _to_axis(measurements.get("m_r"), empty),
         _to_axis(measurements.get("p_r"), empty),
     )
+
 
 def _resample_to_axis(values: Any, f_src: np.ndarray, f_dst: np.ndarray) -> np.ndarray:
     v = np.asarray(values if values is not None else [], dtype=float).ravel()
@@ -264,4 +269,3 @@ __all__ = [
     '_interp_complex_to_axis',
     '_ir_fft_on_axis',
 ]
-

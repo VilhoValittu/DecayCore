@@ -13,8 +13,10 @@
 from __future__ import annotations
 
 import logging
+import math
 
 import numpy as np
+import scipy.signal
 
 from .audit_trail import build_auto_mode_audit_trail
 from .auto_mode_profile import profiled_section
@@ -233,17 +235,87 @@ def _p6_validation_candidates(search_state, n_check: int) -> list[dict]:
         list(search_state.scored or []),
         key=lambda x: _auto_rank_key(dict((x or {}).get("metrics", {}) or {})),
     )
-    return list(ranked[:n_check])
+    best_preset = dict(search_state.best_preset or {})
+    best_match = next(
+        (
+            item
+            for item in ranked
+            if all(repr(best_preset.get(key)) == repr(value) for key, value in dict(item.get("preset", {}) or {}).items())
+        ),
+        None,
+    )
+    if best_match is None:
+        best_match = {
+            "preset": best_preset,
+            "metrics": dict(search_state.best_metrics or {}),
+            "_p6_current_winner": True,
+        }
+    ordered = [best_match, *(item for item in ranked if item is not best_match)]
+    return list(ordered[:n_check])
 
-def _p6_materialize_candidate_result(search_state, cand: dict, index: int, _materialize_preset_result):
+
+def _p6_prepare_measured_ir(
+    raw_ir,
+    source_fs,
+    target_fs: int,
+) -> np.ndarray | None:
+    """Validate and, when needed, resample a measurement IR for P6."""
+    try:
+        arr = np.asarray(raw_ir, dtype=float).reshape(-1)
+        src_fs = int(source_fs)
+        dst_fs = int(target_fs)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if arr.size < 4 or src_fs <= 0 or dst_fs <= 0 or not np.any(np.isfinite(arr)):
+        return None
+    arr = np.nan_to_num(arr, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
+    if src_fs == dst_fs:
+        return arr
+    divisor = math.gcd(src_fs, dst_fs)
+    try:
+        resampled = scipy.signal.resample_poly(
+            arr,
+            up=dst_fs // divisor,
+            down=src_fs // divisor,
+        )
+    except (TypeError, ValueError, OverflowError, MemoryError):
+        return None
+    resampled = np.asarray(resampled, dtype=float).reshape(-1)
+    if resampled.size < 4 or not np.all(np.isfinite(resampled)):
+        return None
+    return resampled
+
+
+def _p6_prepare_measured_irs(measurements: dict | None, target_fs: int) -> tuple:
+    data = dict(measurements or {})
+    raw_l = data.get("raw_ir_l")
+    raw_r = data.get("raw_ir_r")
+    ir_l = _p6_prepare_measured_ir(raw_l, data.get("raw_ir_fs_l", target_fs), target_fs)
+    ir_r = _p6_prepare_measured_ir(raw_r, data.get("raw_ir_fs_r", target_fs), target_fs)
+    if ir_l is not None and (raw_r is None or ir_r is not None):
+        source = "measured_ir_convolution"
+    elif ir_l is not None or ir_r is not None:
+        source = "mixed_measured_ir_fir_only"
+    else:
+        source = "fir_only"
+    return ir_l, ir_r, source
+
+def _p6_materialize_candidate_result(
+    search_state,
+    cand: dict,
+    index: int,
+    _materialize_preset_result,
+    materialize_base_data: dict | None,
+):
     if index == 0 and search_state.best_result is not None:
-        return search_state.best_result
-    result_obj, _, _ = _materialize_preset_result(
+        return search_state.best_result, dict(search_state.best_preset or {})
+    result_obj, _, materialized_preset = _materialize_preset_result(
         dict(cand.get("preset", {}) or {}),
         include_response_arrays=True,
         summarize=False,
+        base_data_override=materialize_base_data,
     )
-    return result_obj
+    return result_obj, dict(materialized_preset or cand.get("preset", {}) or {})
 
 def _p6_validate_candidate(
     *,
@@ -253,15 +325,27 @@ def _p6_validate_candidate(
     index: int,
     validate_final_fir_against_ir,
     _materialize_preset_result,
+    measured_ir_l,
+    measured_ir_r,
+    analysis_source: str,
+    materialize_base_data: dict | None,
 ):
     try:
-        result_obj = _p6_materialize_candidate_result(search_state, cand, index, _materialize_preset_result)
+        result_obj, materialized_preset = _p6_materialize_candidate_result(
+            search_state,
+            cand,
+            index,
+            _materialize_preset_result,
+            materialize_base_data,
+        )
         fir_l, fir_r, st_l, st_r = _p6_extract_fir_and_stats(result_obj)
         fs = int(getattr(cfg, "fs", 48000) or 48000)
         mag_l, mag_source_l = _p6_filter_mag_arr(st_l)
         mag_r, mag_source_r = _p6_filter_mag_arr(st_r)
         validation_result = validate_final_fir_against_ir(
             sample_rate=fs,
+            measured_ir_l=measured_ir_l,
+            measured_ir_r=measured_ir_r,
             fir_l=fir_l,
             fir_r=fir_r,
             freq_axis=_p6_active_stat_arr(st_l, "freq_axis"),
@@ -281,7 +365,20 @@ def _p6_validate_candidate(
     except _RECOVERABLE_P6_EXCEPTIONS as exc:
         logger.debug("P6 validation failed for candidate %d: %s: %s", index, type(exc).__name__, exc)
         return None
-    return (index, cand, validation_result, result_obj, mag_source_l, mag_source_r)
+    metrics = dict((cand or {}).get("metrics", {}) or {})
+    if index == 0:
+        metrics.update(dict(search_state.best_metrics or {}))
+    return {
+        "index": int(index),
+        "candidate": cand,
+        "validation": validation_result,
+        "result": result_obj,
+        "materialized_preset": materialized_preset,
+        "mag_source_l": str(mag_source_l),
+        "mag_source_r": str(mag_source_r),
+        "analysis_source": str(analysis_source),
+        "metrics": metrics,
+    }
 
 def _p6_collect_validation_results(
     *,
@@ -290,8 +387,12 @@ def _p6_collect_validation_results(
     candidates: list[dict],
     validate_final_fir_against_ir,
     _materialize_preset_result,
-) -> list[tuple[int, object, object, object, str, str]]:
-    results: list[tuple[int, object, object, object, str, str]] = []
+    measured_ir_l,
+    measured_ir_r,
+    analysis_source: str,
+    materialize_base_data: dict | None,
+) -> list[dict]:
+    results: list[dict] = []
     for index, cand in enumerate(candidates):
         row = _p6_validate_candidate(
             search_state=search_state,
@@ -300,44 +401,72 @@ def _p6_collect_validation_results(
             index=index,
             validate_final_fir_against_ir=validate_final_fir_against_ir,
             _materialize_preset_result=_materialize_preset_result,
+            measured_ir_l=measured_ir_l,
+            measured_ir_r=measured_ir_r,
+            analysis_source=analysis_source,
+            materialize_base_data=materialize_base_data,
         )
         if row is not None:
             results.append(row)
     return results
 
-def _p6_pick_winner_result(
-    *,
-    results: list[tuple[int, object, object, object, str, str]],
-    mode: str,
-    search_state,
-) -> tuple[int, object, object, object, str, str]:
-    winner_idx, winner_cand, winner_vr, winner_result_obj, winner_mag_source_l, winner_mag_source_r = results[0]
-    if mode != "reject":
-        return winner_idx, winner_cand, winner_vr, winner_result_obj, winner_mag_source_l, winner_mag_source_r
-    non_rejected = [(idx, c, r, ro, sl, sr) for idx, c, r, ro, sl, sr in results if r.severity != "reject"]
-    if not non_rejected:
-        logger.warning("Final IR validation: all %d checked candidate(s) rejected; keeping least-bad.", len(results))
-        return winner_idx, winner_cand, winner_vr, winner_result_obj, winner_mag_source_l, winner_mag_source_r
-    new_idx, new_cand, winner_vr, winner_result_obj, winner_mag_source_l, winner_mag_source_r = non_rejected[0]
-    if new_idx != 0:
-        logger.info(
-            "Final IR validation: candidate #1 rejected (severity=%s), selected candidate #%d.",
-            str(results[0][2].severity),
-            int(new_idx) + 1,
+def _p6_result_is_usable(row: dict) -> bool:
+    validation = row.get("validation")
+    reasons = tuple(getattr(validation, "reasons", ()) or ())
+    penalty = _auto_safe_float(getattr(validation, "score_penalty", float("nan")), float("nan"))
+    metrics = dict(row.get("metrics", {}) or {})
+    rank_score = _auto_safe_float(
+        metrics.get("rank_score", metrics.get("rank_score_official", 0.0)),
+        0.0,
+    )
+    return (
+        validation is not None
+        and "missing_final_ir_validation_inputs" not in reasons
+        and np.isfinite(penalty)
+        and np.isfinite(rank_score)
+    )
+
+
+def _p6_metrics_hard_failed(metrics: dict) -> bool:
+    failures = list(metrics.get("hard_gate_failures", metrics.get("hard_gate_reasons", [])) or [])
+    return bool(metrics.get("hard_gate_failed", False) or failures)
+
+
+def _p6_pick_winner_result(*, results: list[dict], mode: str, score_weight: float) -> dict:
+    usable = [dict(row) for row in results if _p6_result_is_usable(row)]
+    for row in usable:
+        metrics = dict(row.get("metrics", {}) or {})
+        base_rank = _auto_safe_float(
+            metrics.get("rank_score", metrics.get("rank_score_official", 0.0)),
+            0.0,
         )
-        search_state.best_result = winner_result_obj
-        search_state.best_preset = dict((new_cand or {}).get("preset", {}) or {})
-        search_state.best_metrics = dict(
-            attach_official_rank_score(dict((new_cand or {}).get("metrics", {}) or {}))
-        )
-    return new_idx, new_cand, winner_vr, winner_result_obj, winner_mag_source_l, winner_mag_source_r
+        raw_penalty = float(row["validation"].score_penalty)
+        weighted_penalty = float(score_weight) * raw_penalty
+        row["base_rank_score"] = base_rank
+        row["raw_penalty"] = raw_penalty
+        row["weighted_penalty"] = weighted_penalty
+        row["adjusted_rank_score"] = base_rank - weighted_penalty
+
+    safe_rows = [row for row in usable if not _p6_metrics_hard_failed(row["metrics"])]
+    pool = safe_rows or usable
+    if mode == "reject":
+        accepted = [row for row in pool if str(row["validation"].severity) != "reject"]
+        if accepted:
+            pool = accepted
+        else:
+            logger.warning(
+                "Final IR validation: all %d eligible candidate(s) rejected; selecting least total risk.",
+                len(pool),
+            )
+    return max(pool, key=lambda row: (float(row["adjusted_rank_score"]), -int(row["index"])))
 
 def _p6_apply_winner_validation_stats(
     *,
     search_state,
     winner_vr,
     mode: str,
-    score_weight: float,
+    winner_row: dict,
+    candidate_count: int,
     winner_mag_source_l: str,
     winner_mag_source_r: str,
     final_ir_validation_to_stats,
@@ -346,15 +475,43 @@ def _p6_apply_winner_validation_stats(
     vr_stats["final_ir_validation_mode"] = str(mode)
     vr_stats["final_ir_validation_filter_mag_source_l"] = str(winner_mag_source_l)
     vr_stats["final_ir_validation_filter_mag_source_r"] = str(winner_mag_source_r)
+    vr_stats.update(
+        {
+            "final_ir_validation_raw_score_penalty": float(winner_row["raw_penalty"]),
+            "final_ir_validation_weighted_penalty": float(winner_row["weighted_penalty"]),
+            # Preserve the existing field as the selection penalty after weighting.
+            "final_ir_validation_score_penalty": float(winner_row["weighted_penalty"]),
+            "final_ir_validation_base_rank_score": float(winner_row["base_rank_score"]),
+            "final_ir_validation_adjusted_rank_score": float(winner_row["adjusted_rank_score"]),
+            "final_ir_validation_candidate_index": int(winner_row["index"]) + 1,
+            "final_ir_validation_candidate_count": int(candidate_count),
+            "final_ir_validation_reranked": bool(int(winner_row["index"]) != 0),
+            "final_ir_validation_analysis_source": str(winner_row["analysis_source"]),
+            "final_ir_validation_fallback_reason": "",
+        }
+    )
     if isinstance(search_state.best_metrics, dict):
         search_state.best_metrics.update(vr_stats)
-        if winner_vr.score_penalty > 0.0:
-            existing_penalty = float(
-                search_state.best_metrics.get("final_ir_validation_score_penalty", 0.0) or 0.0
-            )
-            search_state.best_metrics["final_ir_validation_score_penalty"] = float(
-                existing_penalty * float(score_weight)
-            )
+
+
+def _p6_record_fallback(search_state, *, reason: str, candidate_count: int, analysis_source: str) -> None:
+    logger.warning("Final IR validation fallback: %s; preserving the original winner.", str(reason))
+    if not isinstance(search_state.best_metrics, dict):
+        return
+    base_rank = _auto_safe_float(search_state.best_metrics.get("rank_score"), float("nan"))
+    search_state.best_metrics.update(
+        {
+            "final_ir_validation_candidate_index": 1,
+            "final_ir_validation_candidate_count": int(candidate_count),
+            "final_ir_validation_reranked": False,
+            "final_ir_validation_analysis_source": str(analysis_source),
+            "final_ir_validation_fallback_reason": str(reason),
+            "final_ir_validation_base_rank_score": float(base_rank),
+            "final_ir_validation_adjusted_rank_score": float(base_rank),
+            "final_ir_validation_raw_score_penalty": 0.0,
+            "final_ir_validation_weighted_penalty": 0.0,
+        }
+    )
 
 def _p6_log_winner_validation(winner_vr, winner_mag_source_l: str, winner_mag_source_r: str) -> None:
     import numpy as _np
@@ -380,51 +537,119 @@ def _run_p6_final_validation(
     cfg,
     *,
     _materialize_preset_result,
+    measurements: dict | None = None,
+    materialize_base_data: dict | None = None,
 ) -> None:
     """Run P6 final IR validation; attach stats to search_state.best_metrics. No-op on errors."""
     imports = _p6_import_validation_dependencies()
     if imports is None:
+        if bool(getattr(cfg, "final_ir_validation_enable", True)):
+            fs = int(getattr(cfg, "fs", 48000) or 48000)
+            _, _, analysis_source = _p6_prepare_measured_irs(measurements, fs)
+            _p6_record_fallback(
+                search_state,
+                reason="validation_dependencies_unavailable",
+                candidate_count=0,
+                analysis_source=analysis_source,
+            )
         return
     validate_final_fir_against_ir, final_ir_validation_to_stats, CfgReader = imports
 
+    candidate_count = 0
+    analysis_source = "fir_only"
     try:
         cr = CfgReader(cfg)
         if not cr.bool("final_ir_validation_enable", True):
             return
 
-        mode = cr.enum_string("final_ir_validation_mode", "warn")
-        n_check = max(1, int(round(float(cr.float_allow_zero("final_ir_validation_candidate_count", 3)))))
-        score_weight = cr.float("final_ir_validation_score_weight", 1.0)
+        mode_raw = cr.enum_string("final_ir_validation_mode", "warn").strip().lower()
+        mode = mode_raw if mode_raw in ("warn", "reject") else "warn"
+        n_check = int(np.clip(round(cr.float_allow_zero("final_ir_validation_candidate_count", 3)), 1, 5))
+        score_weight = max(0.0, cr.float_allow_zero("final_ir_validation_score_weight", 1.0))
         candidates = _p6_validation_candidates(search_state, int(n_check))
+        candidate_count = len(candidates)
+        fs = int(getattr(cfg, "fs", 48000) or 48000)
+        measured_ir_l, measured_ir_r, analysis_source = _p6_prepare_measured_irs(measurements, fs)
         results = _p6_collect_validation_results(
             search_state=search_state,
             cfg=cfg,
             candidates=candidates,
             validate_final_fir_against_ir=validate_final_fir_against_ir,
             _materialize_preset_result=_materialize_preset_result,
+            measured_ir_l=measured_ir_l,
+            measured_ir_r=measured_ir_r,
+            analysis_source=analysis_source,
+            materialize_base_data=materialize_base_data,
         )
         if not results:
+            _p6_record_fallback(
+                search_state,
+                reason="no_candidates_validated",
+                candidate_count=len(candidates),
+                analysis_source=analysis_source,
+            )
+            return
+        original_row = next((row for row in results if int(row["index"]) == 0), None)
+        if original_row is None or not _p6_result_is_usable(original_row):
+            reason = "original_candidate_validation_failed"
+            if original_row is not None:
+                reason = "original_candidate_missing_validation_inputs"
+            _p6_record_fallback(
+                search_state,
+                reason=reason,
+                candidate_count=len(candidates),
+                analysis_source=analysis_source,
+            )
             return
 
-        _winner_idx, _winner_cand, winner_vr, _winner_result_obj, winner_mag_source_l, winner_mag_source_r = (
-            _p6_pick_winner_result(results=results, mode=str(mode), search_state=search_state)
+        winner_row = _p6_pick_winner_result(
+            results=results,
+            mode=str(mode),
+            score_weight=float(score_weight),
         )
+        winner_idx = int(winner_row["index"])
+        winner_cand = winner_row["candidate"]
+        winner_vr = winner_row["validation"]
+        if winner_idx != 0:
+            search_state.best_result = winner_row["result"]
+            search_state.best_preset = dict(winner_row["materialized_preset"] or {})
+            search_state.best_metrics = dict(
+                attach_official_rank_score(dict((winner_cand or {}).get("metrics", {}) or {}))
+            )
         _p6_apply_winner_validation_stats(
             search_state=search_state,
             winner_vr=winner_vr,
             mode=str(mode),
-            score_weight=float(score_weight),
-            winner_mag_source_l=str(winner_mag_source_l),
-            winner_mag_source_r=str(winner_mag_source_r),
+            winner_row=winner_row,
+            candidate_count=len(candidates),
+            winner_mag_source_l=str(winner_row["mag_source_l"]),
+            winner_mag_source_r=str(winner_row["mag_source_r"]),
             final_ir_validation_to_stats=final_ir_validation_to_stats,
+        )
+        search_state.final_ir_validation_result = winner_vr
+        logger.info(
+            "Final IR validation ranking: selected candidate #%d/%d base=%.3f penalty=%.3f adjusted=%.3f reranked=%s source=%s",
+            winner_idx + 1,
+            len(candidates),
+            float(winner_row["base_rank_score"]),
+            float(winner_row["weighted_penalty"]),
+            float(winner_row["adjusted_rank_score"]),
+            bool(winner_idx != 0),
+            str(winner_row["analysis_source"]),
         )
         _p6_log_winner_validation(
             winner_vr=winner_vr,
-            winner_mag_source_l=str(winner_mag_source_l),
-            winner_mag_source_r=str(winner_mag_source_r),
+            winner_mag_source_l=str(winner_row["mag_source_l"]),
+            winner_mag_source_r=str(winner_row["mag_source_r"]),
         )
     except _RECOVERABLE_P6_EXCEPTIONS as exc:
         logger.debug("P6 final IR validation raised: %s: %s", type(exc).__name__, exc)
+        _p6_record_fallback(
+            search_state,
+            reason=f"validation_exception:{type(exc).__name__}",
+            candidate_count=candidate_count,
+            analysis_source=analysis_source,
+        )
 
 
 def _build_top_score_breakdowns(top: list[dict] | None) -> list[dict]:

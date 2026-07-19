@@ -24,6 +24,8 @@ Usage:
 from __future__ import annotations
 
 import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 from .correction_types import MeasurementSideContext
 
@@ -40,3 +42,14 @@ def get_measurement_ctx() -> MeasurementSideContext | None:
 
 def clear_measurement_ctx() -> None:
     _local.ctx = None
+
+
+@contextmanager
+def measurement_ctx_scope(ctx: MeasurementSideContext | None) -> Iterator[None]:
+    """Temporarily install one channel's measurement context and restore the caller state."""
+    previous = get_measurement_ctx()
+    set_measurement_ctx(ctx)
+    try:
+        yield
+    finally:
+        set_measurement_ctx(previous)

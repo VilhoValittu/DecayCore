@@ -394,7 +394,12 @@ def finalize_search_result(
         search_state,
         cfg,
         _materialize_preset_result=_materialize_preset_result,
+        measurements=measurements,
+        materialize_base_data=search_materialize_base_data,
     )
+    if bool(dict(search_state.best_metrics or {}).get("final_ir_validation_reranked", False)):
+        materialized_best_preset = dict(search_state.best_preset or {})
+        final_best_preset = dict(search_state.best_preset or {})
 
     top = sorted(
         search_state.scored,

@@ -8,10 +8,11 @@ logger = logging.getLogger("DecayCore")
 
 
 def reset_runtime_caches() -> None:
-    """Clear process-local runtime caches before a new run starts.
+    """Clear run-scoped runtime caches before a new run starts.
 
-    This resets in-memory helper caches only. It does not remove on-disk
-    auto-mode cache files or ``__pycache__`` bytecode folders.
+    This resets selected in-memory helper caches only. It does not remove on-disk
+    auto-mode cache files or ``__pycache__`` bytecode folders. The bounded,
+    content-addressed fallback RT60 cache intentionally survives across runs.
     """
     import gc
 
@@ -25,7 +26,6 @@ def reset_runtime_caches() -> None:
         bass_integration,
         decaycore_analysis,
         decaycore_leveling,
-        correction_baseline,
         dsp_preprocess,
         smoothing,
     )
@@ -40,7 +40,6 @@ def reset_runtime_caches() -> None:
         ("bass_integration", bass_integration.clear_bass_integration_caches),
         ("leveling", decaycore_leveling._clear_leveling_cache),
         ("level_window", decaycore_leveling._clear_level_window_cache),
-        ("rt60", correction_baseline._clear_rt60_cache),
         ("smoothing", smoothing.clear_smoothing_cache),
         ("preprocess", dsp_preprocess.clear_preprocess_cache),
         ("plot_render_cache", clear_plot_render_cache),

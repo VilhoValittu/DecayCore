@@ -77,7 +77,7 @@ def _auto_measurement_metadata_identity(measurements: dict) -> str:
     """
     m = dict(measurements or {})
     h = hashlib.sha256()
-    h.update(b"measurement-metadata-v1:")
+    h.update(b"measurement-metadata-v2:")
 
     scalar_keys = (
         "measured_rt60_l",
@@ -94,6 +94,8 @@ def _auto_measurement_metadata_identity(measurements: dict) -> str:
         "drift_ratio_r",
         "reference_latency_s_l",
         "reference_latency_s_r",
+        "raw_ir_fs_l",
+        "raw_ir_fs_r",
     )
     dict_keys = (
         "rt60_summary_l",
@@ -120,6 +122,8 @@ def _auto_measurement_metadata_identity(measurements: dict) -> str:
         "harmonic_risk_freq_hz_r",
         "harmonic_risk_curve_l",
         "harmonic_risk_curve_r",
+        "raw_ir_l",
+        "raw_ir_r",
     )
 
     payload: dict[str, object] = {}

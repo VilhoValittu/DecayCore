@@ -24,10 +24,9 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-import scipy.ndimage
-import scipy.signal
 
 from .dsp_telemetry import safe_put_many
+from .smoothing import smooth_gain_fractional_octave
 
 
 def build_phase_authority_gain(
@@ -115,6 +114,10 @@ def build_phase_authority_gain(
     # --- optional smoothing ------------------------------------------------
     if smooth_oct is not None and smooth_oct > 0.0 and len(f) > 1:
         phase_gain = _smooth_gain(f, phase_gain, smooth_oct)
+
+    # Fractional-octave smoothing must not leak phase authority back above the
+    # explicit correction ceiling.
+    phase_gain = np.where(f >= float(disable_above_hz), 0.0, phase_gain)
 
     return np.clip(phase_gain, 0.0, 1.0)
 
@@ -249,31 +252,15 @@ def _safe_interp(f: np.ndarray, arr) -> np.ndarray | None:
 
 
 def _smooth_gain(f: np.ndarray, gain: np.ndarray, smooth_oct: float) -> np.ndarray:
-    """Light Gaussian smoothing — approximate fractional-octave smoothing.
-
-    Uses log-frequency spacing to map a fractional-octave width to sigma in
-    bins.  Falls back silently on any error.
-    """
+    """Smooth a phase-authority curve by a true fractional-octave width."""
     try:
-        f_pos = f[f > 0.0]
-        if len(f_pos) < 2:
+        width_oct = float(smooth_oct)
+        if not np.isfinite(width_oct) or width_oct <= 0.0:
             return gain
-        log_span = np.log2(f_pos[-1] / f_pos[0])
-        bins_per_oct = len(f_pos) / max(log_span, 1e-6)
-        sigma = max(bins_per_oct * smooth_oct, 0.5)
-        # Lineaarisella FFT-akselilla sigma voi olla satoja binejä, jolloin
-        # suora konvoluutio on O(n*8*sigma). FFT-konvoluutio samalla
-        # katkaistulla kernelillä ja nearest-reunalla on sama tulos
-        # liukulukutarkkuudella, mutta murto-osa ajasta.
-        if sigma > 32.0 and gain.size >= 64 and np.isfinite(gain).all():
-            radius = int(4.0 * sigma + 0.5)
-            x = np.arange(-radius, radius + 1, dtype=float)
-            kernel = np.exp(-0.5 * (x / sigma) ** 2)
-            kernel /= kernel.sum()
-            padded = np.concatenate(
-                (np.full(radius, float(gain[0])), np.asarray(gain, dtype=float), np.full(radius, float(gain[-1])))
-            )
-            return scipy.signal.fftconvolve(padded, kernel, mode="same")[radius:-radius]
-        return scipy.ndimage.gaussian_filter1d(gain, sigma=sigma, mode="nearest")
-    except (ValueError, ZeroDivisionError):
+        filter_smooth = 1.0 / width_oct
+        return np.asarray(
+            smooth_gain_fractional_octave(f, gain, filter_smooth),
+            dtype=float,
+        )
+    except (TypeError, ValueError, ZeroDivisionError, FloatingPointError):
         return gain

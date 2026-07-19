@@ -33,7 +33,7 @@ from ..common.result_postprocess import (
 from ..config.models import FilterConfig
 from ..config.results import FilterResult
 from ..dsp import decaycore_dsp as dsp
-from ..dsp._measurement_ctx_local import clear_measurement_ctx, set_measurement_ctx
+from ..dsp._measurement_ctx_local import measurement_ctx_scope
 from ..dsp.dsp_telemetry import quiet_dsp_info_logging
 from ..dsp.bass_integration import (
     apply_direct_dac_export_branch_model,
@@ -75,7 +75,19 @@ def _call_generate_filter(freqs, mags, phases, cfg, *, include_response_arrays: 
         return dsp.generate_filter(freqs, mags, phases, cfg)
 
 
-def _call_generate_filter_pair(f_l, m_l, p_l, f_r, m_r, p_r, cfg, *, include_response_arrays: bool):
+def _call_generate_filter_pair(
+    f_l,
+    m_l,
+    p_l,
+    f_r,
+    m_r,
+    p_r,
+    cfg,
+    *,
+    measurement_ctx_l,
+    measurement_ctx_r,
+    include_response_arrays: bool,
+):
     try:
         return dsp.generate_filter_pair(
             f_l,
@@ -85,12 +97,24 @@ def _call_generate_filter_pair(f_l, m_l, p_l, f_r, m_r, p_r, cfg, *, include_res
             m_r,
             p_r,
             cfg,
+            measurement_ctx_l=measurement_ctx_l,
+            measurement_ctx_r=measurement_ctx_r,
             include_response_arrays=bool(include_response_arrays),
         )
     except TypeError as exc:
         if "include_response_arrays" not in str(exc):
             raise
-        return dsp.generate_filter_pair(f_l, m_l, p_l, f_r, m_r, p_r, cfg)
+        return dsp.generate_filter_pair(
+            f_l,
+            m_l,
+            p_l,
+            f_r,
+            m_r,
+            p_r,
+            cfg,
+            measurement_ctx_l=measurement_ctx_l,
+            measurement_ctx_r=measurement_ctx_r,
+        )
 
 
 def _stats_level_comp_factor(st: dict | None) -> float:
@@ -293,23 +317,20 @@ def _generate_main_filters(
 ):
     with profiled_section("run_pipeline.generate_filters"):
         if bool(getattr(cfg, "stereo_link", False)):
-            set_measurement_ctx(_mctx_l)
-            try:
-                l_imp, l_st, r_imp, r_st = _call_generate_filter_pair(
-                    f_l,
-                    m_l,
-                    p_l,
-                    f_r,
-                    m_r,
-                    p_r,
-                    cfg,
-                    include_response_arrays=bool(include_response_arrays),
-                )
-            finally:
-                clear_measurement_ctx()
+            l_imp, l_st, r_imp, r_st = _call_generate_filter_pair(
+                f_l,
+                m_l,
+                p_l,
+                f_r,
+                m_r,
+                p_r,
+                cfg,
+                measurement_ctx_l=_mctx_l,
+                measurement_ctx_r=_mctx_r,
+                include_response_arrays=bool(include_response_arrays),
+            )
         else:
-            set_measurement_ctx(_mctx_l)
-            try:
+            with measurement_ctx_scope(_mctx_l):
                 l_imp, l_st = _call_generate_filter(
                     f_l,
                     m_l,
@@ -317,10 +338,7 @@ def _generate_main_filters(
                     cfg,
                     include_response_arrays=bool(include_response_arrays),
                 )
-            finally:
-                clear_measurement_ctx()
-            set_measurement_ctx(_mctx_r)
-            try:
+            with measurement_ctx_scope(_mctx_r):
                 r_imp, r_st = _call_generate_filter(
                     f_r,
                     m_r,
@@ -328,8 +346,6 @@ def _generate_main_filters(
                     cfg,
                     include_response_arrays=bool(include_response_arrays),
                 )
-            finally:
-                clear_measurement_ctx()
     return l_imp, l_st, r_imp, r_st
 
 

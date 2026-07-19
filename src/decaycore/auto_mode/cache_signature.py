@@ -104,8 +104,9 @@ _AUTO_RESIDUAL_PEAK_WINNER_POLISH_POLICY_V = 2
 _AUTO_GAIN_AUTHORITY_POLICY_V = 3
 _AUTO_CONFIDENCE_MODEL_POLICY_V = 2
 _AUTO_BASS_INTEGRATION_FEASIBILITY_POLICY_V = 1
-_AUTO_PHASE_GD_GUARD_POLICY_V = 4
-_AUTO_MEASUREMENT_METADATA_IDENTITY_V = 1
+_AUTO_PHASE_GD_GUARD_POLICY_V = 5
+_AUTO_FINAL_IR_VALIDATION_POLICY_V = 1
+_AUTO_MEASUREMENT_METADATA_IDENTITY_V = 2
 _AUTO_HYBRID_IIR_POLICY_V = HYBRID_IIR_POLICY_VERSION
 _AUTO_HPF_IIR_ROUTING_POLICY_V = 1
 
@@ -274,6 +275,7 @@ def _auto_signature_payload(
             "bass_integration_feasibility_policy_v": int(_AUTO_BASS_INTEGRATION_FEASIBILITY_POLICY_V),
             "lf_rolloff_policy_v": int(_AUTO_LF_ROLLOFF_POLICY_V),
             "phase_gd_guard_policy_v": int(_AUTO_PHASE_GD_GUARD_POLICY_V),
+            "final_ir_validation_policy_v": int(_AUTO_FINAL_IR_VALIDATION_POLICY_V),
             "measurement_metadata_identity_v": int(_AUTO_MEASUREMENT_METADATA_IDENTITY_V),
             "hybrid_iir_policy_v": int(_AUTO_HYBRID_IIR_POLICY_V),
             "hpf_iir_routing_policy_v": int(_AUTO_HPF_IIR_ROUTING_POLICY_V),
@@ -413,6 +415,33 @@ def _auto_signature_payload(
             ),
             "max_excess_delay_cycles": float(
                 _auto_safe_float(base_data.get("max_excess_delay_cycles", 1.0), 1.0)
+            ),
+            "phase_authority_enable": bool(base_data.get("phase_authority_enable", True)),
+            "phase_authority_gamma": float(
+                _auto_safe_float(base_data.get("phase_authority_gamma", 1.20), 1.20)
+            ),
+            "phase_authority_min_gain": float(
+                _auto_safe_float(base_data.get("phase_authority_min_gain", 0.0), 0.0)
+            ),
+            "phase_authority_soft_floor": float(
+                _auto_safe_float(base_data.get("phase_authority_soft_floor", 0.20), 0.20)
+            ),
+            "phase_authority_smooth_oct": float(
+                _auto_safe_float(base_data.get("phase_authority_smooth_oct", 1.0 / 6.0), 1.0 / 6.0)
+            ),
+            "phase_authority_disable_above_hz": float(
+                _auto_safe_float(base_data.get("phase_authority_disable_above_hz", 1200.0), 1200.0)
+            ),
+        },
+        "final_ir_validation": {
+            "policy_v": int(_AUTO_FINAL_IR_VALIDATION_POLICY_V),
+            "enable": bool(base_data.get("final_ir_validation_enable", True)),
+            "mode": str(base_data.get("final_ir_validation_mode", "warn") or "warn").strip().lower(),
+            "score_weight": float(
+                _auto_safe_float(base_data.get("final_ir_validation_score_weight", 1.0), 1.0)
+            ),
+            "candidate_count": int(
+                _auto_safe_float(base_data.get("final_ir_validation_candidate_count", 3), 3)
             ),
         },
         "enable_tdc": bool(base_data.get("enable_tdc", True)),

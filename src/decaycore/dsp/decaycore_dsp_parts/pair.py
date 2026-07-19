@@ -13,17 +13,25 @@ from .single_channel import (
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-import numpy as np
 import copy
 import logging
-logger = logging.getLogger("DecayCore.dsp")
+from contextlib import nullcontext
+
+import numpy as np
+
 from decaycore.config.models import FilterConfig
+
+from .._measurement_ctx_local import measurement_ctx_scope
+from ..correction_types import MeasurementSideContext
 from ..decaycore_leveling import StereoLinkContext, find_shared_stereo_level_window
 from ..dsp_utils import safe_range as _safe_range
+
+logger = logging.getLogger("DecayCore.dsp")
 
 _GUARD_OFFSET_DIFF_DB = 1.5
 _GUARD_TILT_DIFF_DB_PER_OCT = 0.7
 _GUARD_TILT_ABS_MAX_DB_PER_OCT = 2.0
+
 
 def _channel_hpf_replacement(cfg: FilterConfig, channel: str) -> dict:
     xo_hz = getattr(cfg, f"avr_crossover_hz_{channel}", None)
@@ -112,6 +120,17 @@ def _maybe_per_channel_cfg(cfg: FilterConfig, channel: str) -> FilterConfig:
         return cfg
     return _dc.replace(cfg, **replacements)
 
+
+def _side_measurement_scope(
+    ctx: MeasurementSideContext | None,
+    *,
+    explicit_contexts: bool,
+):
+    if not explicit_contexts:
+        return nullcontext()
+    return measurement_ctx_scope(ctx)
+
+
 def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel decision tree explicit
     f_l,
     m_l,
@@ -121,11 +140,14 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
     p_r,
     cfg: FilterConfig,
     *,
+    measurement_ctx_l: MeasurementSideContext | None = None,
+    measurement_ctx_r: MeasurementSideContext | None = None,
     include_response_arrays: bool = True,
 ):
     """Generoi vasemman ja oikean kanavan FIR-suodattimet.
 
-    Jos `stereo_link` ei ole paalla, kanavat lasketaan itsenaisesti.
+    Kanavakohtaiset mittauskontekstit ovat valinnaisia vanhojen kutsujen
+    yhteensopivuuden vuoksi. Jos `stereo_link` ei ole paalla, kanavat lasketaan itsenaisesti.
     Jos `stereo_link` on paalla, toteutus tekee kaksivaiheisen ajon:
     1) alustava ajo molemmille kanaville (ikkuna + offset-arviot)
     2) yhteisen offsetin ja mahdollisen auto-gain-overriden laskenta
@@ -138,26 +160,31 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
     """
     cfg_l = _maybe_per_channel_cfg(cfg, "l")
     cfg_r = _maybe_per_channel_cfg(cfg, "r")
+    explicit_contexts = measurement_ctx_l is not None or measurement_ctx_r is not None
 
     if not bool(getattr(cfg, "stereo_link", False)):
-        l_imp, l_st = generate_filter(
-            f_l,
-            m_l,
-            p_l,
-            cfg_l,
-            include_response_arrays=bool(include_response_arrays),
-        )
-        r_imp, r_st = generate_filter(
-            f_r,
-            m_r,
-            p_r,
-            cfg_r,
-            include_response_arrays=bool(include_response_arrays),
-        )
+        with _side_measurement_scope(measurement_ctx_l, explicit_contexts=explicit_contexts):
+            l_imp, l_st = generate_filter(
+                f_l,
+                m_l,
+                p_l,
+                cfg_l,
+                include_response_arrays=bool(include_response_arrays),
+            )
+        with _side_measurement_scope(measurement_ctx_r, explicit_contexts=explicit_contexts):
+            r_imp, r_st = generate_filter(
+                f_r,
+                m_r,
+                p_r,
+                cfg_r,
+                include_response_arrays=bool(include_response_arrays),
+            )
         return l_imp, l_st, r_imp, r_st
 
-    l_st1 = _run_generate_filter_stereo_link_presolve_stats(f_l, m_l, p_l, cfg_l)
-    r_st1 = _run_generate_filter_stereo_link_presolve_stats(f_r, m_r, p_r, cfg_r)
+    with _side_measurement_scope(measurement_ctx_l, explicit_contexts=explicit_contexts):
+        l_st1 = _run_generate_filter_stereo_link_presolve_stats(f_l, m_l, p_l, cfg_l)
+    with _side_measurement_scope(measurement_ctx_r, explicit_contexts=explicit_contexts):
+        r_st1 = _run_generate_filter_stereo_link_presolve_stats(f_r, m_r, p_r, cfg_r)
 
     lvl_min = float(getattr(cfg, "lvl_min", 200.0) or 200.0)
     lvl_max = float(getattr(cfg, "lvl_max", 3000.0) or 3000.0)
@@ -361,22 +388,24 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
         stereo_ctx_l = stereo_ctx
         stereo_ctx_r = stereo_ctx
 
-    l_imp2, l_st2 = generate_filter(
-        f_l,
-        m_l,
-        p_l,
-        cfg2_l,
-        stereo_link_ctx=stereo_ctx_l,
-        include_response_arrays=bool(include_response_arrays),
-    )
-    r_imp2, r_st2 = generate_filter(
-        f_r,
-        m_r,
-        p_r,
-        cfg2_r,
-        stereo_link_ctx=stereo_ctx_r,
-        include_response_arrays=bool(include_response_arrays),
-    )
+    with _side_measurement_scope(measurement_ctx_l, explicit_contexts=explicit_contexts):
+        l_imp2, l_st2 = generate_filter(
+            f_l,
+            m_l,
+            p_l,
+            cfg2_l,
+            stereo_link_ctx=stereo_ctx_l,
+            include_response_arrays=bool(include_response_arrays),
+        )
+    with _side_measurement_scope(measurement_ctx_r, explicit_contexts=explicit_contexts):
+        r_imp2, r_st2 = generate_filter(
+            f_r,
+            m_r,
+            p_r,
+            cfg2_r,
+            stereo_link_ctx=stereo_ctx_r,
+            include_response_arrays=bool(include_response_arrays),
+        )
 
     try:
         if isinstance(l_st2, dict):
@@ -425,5 +454,4 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
     return l_imp2, l_st2, r_imp2, r_st2
 
 
-__all__ = ['_maybe_per_channel_cfg', 'generate_filter_pair']
-
+__all__ = ["_maybe_per_channel_cfg", "generate_filter_pair"]

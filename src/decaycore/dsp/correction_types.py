@@ -33,6 +33,7 @@ class MeasurementSideContext:
     harmonic_risk_freq_hz: np.ndarray | None = None
     harmonic_risk_curve: np.ndarray | None = None
     harmonic_risk_summary: dict = field(default_factory=dict)
+    side: str | None = None
 
 
 @dataclass

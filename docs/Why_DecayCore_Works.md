@@ -86,7 +86,7 @@ A "good" filter that clips is still a bad filter.
 DecayCore uses an auto-headroom model:
 - output attenuation follows realized max boost plus margin
 - normalization remains optional as extra safety
-- stereo-link can force shared attenuation behavior between channels
+- stereo-link shares the leveling anchor and, in shared mode, the window; hybrid mode can retain channel-specific windows, while final auto-gain remains channel-specific
 
 So output level handling is integrated into correction quality, not left as an afterthought.
 

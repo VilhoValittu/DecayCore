@@ -408,6 +408,7 @@ Use it when:
 ### 9.5 Stereo Link
 
 Stereo Link helps preserve left/right balance and phantom center stability.
+It shares the leveling anchor and, in shared mode, the window between channels. Hybrid mode can retain channel-specific windows, while final automatic gain is still calculated separately for each channel.
 
 Keep it enabled unless you have a specific reason to let each channel behave more independently.
 

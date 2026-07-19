@@ -32,7 +32,7 @@ Many room-correction workflows:
 | Reflection handling | may invert combing dips | confidence-weighted correction + smoothing + A-FDW |
 | Correction bounds | tool-dependent | explicit limits for boost/cut/slope/phase band and low-bass safety |
 | Headroom handling | manual gain staging | auto-headroom gain model with configurable margin |
-| Stereo consistency | often per-channel behavior | stereo-link options and shared gain behavior |
+| Stereo consistency | often per-channel behavior | stereo-link options with a shared leveling anchor, shared or hybrid windowing, and channel-specific final auto-gain |
 | Reproducible A/B | harder across fs/taps | optional **comparison mode** with fixed analysis grid |
 | Multi-rate output | uncommon | native multi-rate FIR export |
 | Runtime diagnostics | often limited | Summary version stamp, timing breakdown, and System Health checks |

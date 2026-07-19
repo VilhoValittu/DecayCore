@@ -209,13 +209,7 @@ def _fir_to_mag_db(
 def _skip_pre_ringing(fir: np.ndarray, ir_anchor_mode: str | None) -> bool:
     """Return True when pre-ringing check is not meaningful for this filter type."""
     mode = str(ir_anchor_mode or "").strip().lower()
-    if "min_causal" in mode or "minimum" in mode:
-        return True
-    peak_i = int(np.argmax(np.abs(fir)))
-    center = fir.size / 2.0
-    if abs(peak_i - center) / max(fir.size, 1) < 0.15:
-        return True
-    return False
+    return "min_causal" in mode or "minimum" in mode
 
 def _is_minimum_phase(ir_anchor_mode: str | None) -> bool:
     mode = str(ir_anchor_mode or "").strip().lower()
@@ -320,4 +314,3 @@ __all__ = [
     '_magnitude_metrics',
     '_stereo_metrics',
 ]
-

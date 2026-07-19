@@ -488,6 +488,12 @@ class FilterConfig:
     linear_excess_strength: float = 0.9
     phase_conf_gain_floor: float = 0.20
     phase_conf_gain_power: float = 1.0
+    phase_authority_enable: bool = True
+    phase_authority_gamma: float = 1.20
+    phase_authority_min_gain: float = 0.0
+    phase_authority_soft_floor: float = 0.20
+    phase_authority_smooth_oct: float = 1.0 / 6.0
+    phase_authority_disable_above_hz: float = 1200.0
     phase_corr_clamp_lf_deg: float = 540.0
     phase_corr_clamp_hf_deg: float = 90.0
     max_excess_delay_cycles: float = 1.0
@@ -505,6 +511,10 @@ class FilterConfig:
     max_pre_ringing_db: float = -35.0
     max_excess_delay_ms: float = 2.5
     gd_grad_limit_ms_per_oct: float = 30.0
+    final_ir_validation_enable: bool = True
+    final_ir_validation_mode: str = "warn"
+    final_ir_validation_score_weight: float = 1.0
+    final_ir_validation_candidate_count: int = 3
     bass_first_ai: bool = False
     bass_first_mode_max_hz: float = 200.0
     bass_first_smooth_floor_lo: float = 0.75

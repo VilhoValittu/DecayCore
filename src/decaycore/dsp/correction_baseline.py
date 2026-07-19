@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import threading
+from concurrent.futures import Future
 from typing import Any, Callable
 
 import numpy as np
@@ -20,6 +21,7 @@ from decaycore.auto_mode.auto_mode_profile import profiled_section
 from decaycore.common.measurement_features import estimate_schroeder_hz, median_rt60_mid_band
 
 from ._measurement_ctx_local import get_measurement_ctx
+from .cache_utils import BoundedLruCache
 from .correction_types import (
     BaselineComparisonTelemetry,
     BaselineNativeTelemetry,
@@ -35,27 +37,92 @@ from .phase import get_min_phase_impulse
 from .tdc import apply_smart_tdc
 
 # ---- RT60 computation cache ------------------------------------------------
-# Keyed by MD5 hex digest of (f_in bytes | m_in bytes | fs | num_taps).
-# Value: (current_rt60: float, rt60_bands: dict, band_avg: float).
-# Populated once per unique measurement+grid combination; shared across all
-# Optuna trials in a session. Thread-safe via _RT60_CACHE_LOCK.
-_RT60_CACHE: dict[str, tuple[float, dict, float]] = {}
-_RT60_CACHE_LOCK = threading.Lock()
+# This cache contains only magnitude-derived fallback estimates. Measured RT60
+# metadata remains source-of-truth data and never enters this cache.
+_RT60_CACHE_MAX_ITEMS = 32
+_RT60_CACHE_KEY_VERSION = b"decaycore-rt60-fallback-v1"
+_RT60_CACHE_MISS = object()
+_Rt60CacheValue = tuple[float, dict, float]
+_RT60_CACHE = BoundedLruCache(_RT60_CACHE_MAX_ITEMS)
+_RT60_SINGLEFLIGHT_LOCK = threading.Lock()
+_RT60_INFLIGHT: dict[tuple[int, str], Future[_Rt60CacheValue]] = {}
+_RT60_CACHE_GENERATION = 0
 
 
 def _rt60_cache_key(f_in: np.ndarray, m_in: np.ndarray, fs: int, num_taps: int | None = None) -> str:
+    """Build an exact, framed key for the fixed fallback RT60 pipeline.
+
+    ``num_taps`` remains in the internal compatibility signature but is not
+    acoustically relevant: fallback RT60 reconstruction uses a fixed grid and
+    FFT length independent of the exported FIR length.
+    """
     _ = num_taps
-    h = hashlib.md5()
-    h.update(np.asarray(f_in, dtype=float).tobytes())
-    h.update(np.asarray(m_in, dtype=float).tobytes())
-    h.update(int(fs).to_bytes(8, "little"))
+    h = hashlib.blake2b(digest_size=16)
+    h.update(_RT60_CACHE_KEY_VERSION)
+    for label, values in ((b"freq", f_in), (b"mag", m_in)):
+        arr = np.ascontiguousarray(np.asarray(values, dtype="<f8").reshape(-1))
+        h.update(label)
+        h.update(int(arr.size).to_bytes(8, "little", signed=False))
+        h.update(memoryview(arr).cast("B"))
+    h.update(b"fs")
+    h.update(int(fs).to_bytes(8, "little", signed=True))
     return h.hexdigest()
 
 
 def _clear_rt60_cache() -> None:
-    """Tyhjentää RT60-välimuistin. Vain testeille."""
-    with _RT60_CACHE_LOCK:
+    """Explicitly clear fallback RT60 results without racing in-flight work."""
+    global _RT60_CACHE_GENERATION
+    with _RT60_SINGLEFLIGHT_LOCK:
+        _RT60_CACHE_GENERATION += 1
         _RT60_CACHE.clear()
+
+
+def _copy_rt60_cache_value(value: _Rt60CacheValue) -> _Rt60CacheValue:
+    current_rt60, rt60_bands, band_avg = value
+    return float(current_rt60), dict(rt60_bands), float(band_avg)
+
+
+def _rt60_cache_get_or_compute(
+    key: str,
+    compute: Callable[[], _Rt60CacheValue],
+) -> _Rt60CacheValue:
+    """Return one cached result per key while allowing different keys in parallel."""
+    cached = _RT60_CACHE.get(key, _RT60_CACHE_MISS)
+    if cached is not _RT60_CACHE_MISS:
+        return _copy_rt60_cache_value(cached)
+
+    with _RT60_SINGLEFLIGHT_LOCK:
+        cached = _RT60_CACHE.get(key, _RT60_CACHE_MISS)
+        if cached is not _RT60_CACHE_MISS:
+            return _copy_rt60_cache_value(cached)
+
+        generation = int(_RT60_CACHE_GENERATION)
+        flight_key = (generation, key)
+        future = _RT60_INFLIGHT.get(flight_key)
+        is_leader = future is None
+        if future is None:
+            future = Future()
+            _RT60_INFLIGHT[flight_key] = future
+
+    if not is_leader:
+        return _copy_rt60_cache_value(future.result())
+
+    try:
+        value = _copy_rt60_cache_value(compute())
+    except BaseException as exc:
+        with _RT60_SINGLEFLIGHT_LOCK:
+            if _RT60_INFLIGHT.get(flight_key) is future:
+                _RT60_INFLIGHT.pop(flight_key, None)
+        future.set_exception(exc)
+        raise
+
+    with _RT60_SINGLEFLIGHT_LOCK:
+        if generation == _RT60_CACHE_GENERATION:
+            _RT60_CACHE.put(key, value)
+        if _RT60_INFLIGHT.get(flight_key) is future:
+            _RT60_INFLIGHT.pop(flight_key, None)
+    future.set_result(value)
+    return _copy_rt60_cache_value(value)
 
 
 def _smooth_with_edge_padding(values: np.ndarray, kernel: np.ndarray) -> np.ndarray:
@@ -375,10 +442,6 @@ def _prepare_correction_baseline(  # noqa: C901 - baseline assembly intentionall
         if isinstance(_mctx.measured_rt60_bands, dict) and _mctx.measured_rt60_bands:
             _measured_rt60_bands = dict(_mctx.measured_rt60_bands)
 
-    _rt60_key = _rt60_cache_key(f_in, m_in, int(cfg.fs))
-    with _RT60_CACHE_LOCK:
-        _rt60_hit = _RT60_CACHE.get(_rt60_key)
-
     if _measured_rt60_val is not None:
         # Measured RT60 is the source of truth; skip expensive estimation.
         current_rt60 = float(_measured_rt60_val)
@@ -390,23 +453,39 @@ def _prepare_correction_baseline(  # noqa: C901 - baseline assembly intentionall
             }
         else:
             rt60_bands = {}
-        band_avg = 0.0
         band_avg = median_rt60_mid_band(rt60_bands)
-        # Populate cache so Optuna re-trials that share the same measurement
-        # also benefit from the early-exit path.
-        with _RT60_CACHE_LOCK:
-            _RT60_CACHE[_rt60_key] = (float(current_rt60), dict(rt60_bands), float(band_avg))
-    elif _rt60_hit is not None:
-        current_rt60, rt60_bands, band_avg = _rt60_hit
     else:
-        with profiled_section("generate_filter.correction.baseline.rt60"):
-            m_rt_lin = _resample_or_interpolate_to_axis(freq_axis, m_interp_for_rt, np.linspace(0, cfg.fs / 2, 65537))
-            rt_ir = get_min_phase_impulse(m_rt_lin, 131072)
-            current_rt60 = calculate_rt60(rt_ir, cfg.fs)
-            rt60_bands = calculate_rt60_bands(rt_ir, cfg.fs, f_min=31.5, f_max=8000.0, order=4)
-            band_avg = median_rt60_mid_band(rt60_bands)
-        with _RT60_CACHE_LOCK:
-            _RT60_CACHE[_rt60_key] = (float(current_rt60), dict(rt60_bands), float(band_avg))
+        _rt60_key = _rt60_cache_key(f_in, m_in, int(cfg.fs))
+
+        def _compute_fallback_rt60() -> _Rt60CacheValue:
+            with profiled_section("generate_filter.correction.baseline.rt60"):
+                m_rt_lin = _resample_or_interpolate_to_axis(
+                    freq_axis,
+                    m_interp_for_rt,
+                    np.linspace(0, cfg.fs / 2, 65537),
+                )
+                rt_ir = get_min_phase_impulse(m_rt_lin, 131072)
+                fallback_rt60 = calculate_rt60(rt_ir, cfg.fs)
+                fallback_bands = calculate_rt60_bands(
+                    rt_ir,
+                    cfg.fs,
+                    f_min=31.5,
+                    f_max=8000.0,
+                    order=4,
+                )
+                fallback_band_avg = median_rt60_mid_band(fallback_bands)
+            return float(fallback_rt60), dict(fallback_bands), float(fallback_band_avg)
+
+        current_rt60, rt60_bands, band_avg = _rt60_cache_get_or_compute(
+            _rt60_key,
+            _compute_fallback_rt60,
+        )
+
+    if isinstance(st, dict):
+        st["dsp_rt60_val_used"] = float(current_rt60)
+        st["dsp_rt60_source"] = "measurement_context" if _measured_rt60_val is not None else "estimated_fallback"
+        if _mctx is not None and str(getattr(_mctx, "side", "") or "").strip():
+            st["measurement_context_side"] = str(_mctx.side).strip().lower()
 
     schroeder_hz = estimate_schroeder_hz(
         current_rt60,

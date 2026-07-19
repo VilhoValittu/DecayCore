@@ -12,6 +12,56 @@ All notable changes to **DecayCore** are documented in this file.
 
 ## DecayCore
 
+## [1.1.9]
+
+### Smarter final validation for better AUTO results
+
+DecayCore 1.1.9 gives AUTO mode a more dependable final say. P6 now validates the three strongest candidates using their actually realised FIR filters, then performs a weighted reranking based on the result. The raw impulse response is resampled only once, keeping the added validation efficient. A warning can promote a better candidate, while a rejected result gives way to an accepted one. The existing hard DSP safety gates always remain the highest priority.
+
+If P6 changes the winner, the exact materialised preset is now stored in the cache. Linear-phase FIR filters also receive a dedicated pre-ringing check; minimum-phase and minimum-causal filters skip it where the check is not applicable.
+
+### More precise and consistent phase correction
+
+Phase authority now uses true log-frequency octave smoothing and stays cleanly at zero above its upper limit. Phase authority and P6 settings also travel through `FilterConfig`, keeping the selected correction policy consistent from optimization to the finished filter.
+
+### Faster, more trustworthy caching and RT60 analysis
+
+RT60 smoothing now uses an O(n) prefix-sum implementation. A new 32-entry LRU cache with BLAKE2b content keys, single-flight computation, copied results, and safe generation-based clearing makes repeated analysis faster without allowing stale or shared mutable results to leak between runs.
+
+A measured RT60 value always takes priority over fallback cache data. The content-based RT60 cache can be reused across runs, but is never written to disk. Cache identities now cover phase authority, P6, and raw impulse-response data; the cache schema was updated to version 26 and AUTO compatibility to `am40`.
+
+### More robust measurement sessions and wider stereo
+
+RT60 analysis now uses a peak-anchored 1 s + 6 s window without modifying the raw impulse response. Guided sessions save up to two channels in parallel, but only after all captures at a position are complete.
+
+Stereo linking has also been fixed, delivering a wider stereo image.
+
+---
+
+### Älykkäämpi loppuvalidointi parantaa AUTO-tuloksia
+
+DecayCore 1.1.9 tekee AUTO-tilan lopullisesta valinnasta entistä luotettavamman. P6 validoi nyt kolme vahvinta ehdokasta niiden oikeasti toteutuneilla FIR-suodattimilla ja tekee tulosten perusteella painotetun uudelleensijoituksen. Raaka impulssivaste näytteistetään uudelleen vain kerran, joten lisävalidointi pysyy tehokkaana. Varoitus voi nostaa paremman ehdokkaan voittajaksi, kun taas hylätty tulos väistyy hyväksytyn tieltä. DSP:n ehdottomat turvarajat säilyvät aina tärkeimpinä.
+
+Jos P6 vaihtaa voittajaa, täsmälleen sama toteutunut asetuspaketti tallentuu nyt myös välimuistiin. Lineaarivaiheiset FIR-suodattimet saavat lisäksi oman pre-ringing-tarkastuksen; minimum phase- ja minimum causal -suodattimilla tarkastus ohitetaan silloin, kun se ei ole sovellettavissa.
+
+### Tarkempi ja johdonmukaisempi vaiheenkorjaus
+
+Vaiheauktoriteetti käyttää nyt aitoa log-taajuista oktaavitasoitusta ja pysyy ylärajansa jälkeen puhtaasti nollassa. Vaiheauktoriteetin ja P6:n asetukset kulkevat myös `FilterConfigin` kautta, joten valittu korjauspolitiikka säilyy samana optimoinnista valmiiseen suodattimeen asti.
+
+### Nopeampi ja luotettavampi välimuisti sekä RT60-analyysi
+
+RT60-tasoitus käyttää nyt O(n)-aikaista prefix sum -laskentaa. Uusi 32 alkion LRU-välimuisti, BLAKE2b-sisältöavaimet, single-flight-laskenta, kopioidut tulokset ja turvallinen sukupolvipohjainen tyhjennys nopeuttavat toistuvaa analyysia ilman vanhentuneen tai jaetun muokattavan datan vuotamista ajojen välillä.
+
+Mitattu RT60-arvo ohittaa aina fallback-välimuistin tiedot. Sisältöpohjaista RT60-välimuistia voidaan hyödyntää ajojen välillä, mutta sitä ei koskaan kirjoiteta levylle. Välimuistin tunniste huomioi nyt vaiheauktoriteetin, P6:n ja raa'an impulssivasteen tiedot; välimuistiskeema päivitettiin versioon 26 ja AUTO-yhteensopivuus versioon `am40`.
+
+### Varmemmat mittaussessiot ja avarampi stereo
+
+RT60-analyysi käyttää nyt impulssihuippuun ankkuroitua 1 s + 6 s analyysi-ikkunaa muuttamatta raakaa impulssivastetta. Ohjattu sessio tallentaa enintään kaksi kanavaa rinnakkain, mutta vasta kun kaikki mittauspaikan kaappaukset ovat valmiit.
+
+Stereo link -toiminto on lisäksi korjattu, ja lopputuloksena on aiempaa avarampi stereokuva.
+
+---
+
 ## [1.1.8] - 14-7-2026
 
 ### Measurement guidance
