@@ -11,8 +11,10 @@
 // Smoothing core — mirrors smoothing.py::_smooth_mag_core
 
 use numpy::{PyArray1, PyReadonlyArray1};
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyNotImplementedError, PyValueError};
 use pyo3::prelude::*;
+
+const GIL_RELEASE_MIN_LEN: usize = 256;
 
 // ---------------------------------------------------------------------------
 // smooth_mag_core_rs: Core log-grid smoothing kernel
@@ -54,6 +56,27 @@ pub fn smooth_mag_core_rs<'py>(
         return Ok(PyArray1::from_vec_bound(py, mags.to_vec()));
     }
 
+    let release_gil = freqs.len().max(log_freqs.len()) >= GIL_RELEASE_MIN_LEN;
+    let result = if release_gil {
+        let freqs = freqs.to_vec();
+        let mags = mags.to_vec();
+        let log_freqs = log_freqs.to_vec();
+        let window = window.to_vec();
+        py.allow_threads(move || smooth_mag_core(&freqs, &mags, &log_freqs, &window, pad_len))
+    } else {
+        smooth_mag_core(freqs, mags, log_freqs, window, pad_len)
+    };
+
+    Ok(PyArray1::from_vec_bound(py, result))
+}
+
+fn smooth_mag_core(
+    freqs: &[f64],
+    mags: &[f64],
+    log_freqs: &[f64],
+    window: &[f64],
+    pad_len: usize,
+) -> Vec<f64> {
     // Step 1: Interpolate magnitudes onto log frequency grid
     let mut log_mags = vec![0.0; log_freqs.len()];
     for (i, &lf) in log_freqs.iter().enumerate() {
@@ -92,7 +115,7 @@ pub fn smooth_mag_core_rs<'py>(
         result[j] = interp1_linear(log_freqs, &sm, f);
     }
 
-    Ok(PyArray1::from_vec_bound(py, result))
+    result
 }
 
 // Simple 1D linear interpolation helper (no extrapolation)
@@ -134,14 +157,32 @@ fn interp1_linear(x: &[f64], y: &[f64], xi: f64) -> f64 {
     y_lo + (xi - x_lo) * (y_hi - y_lo) / (x_hi - x_lo)
 }
 
-// Placeholder function (Phase 2/3)
+/// Reserved A-FDW entry point.
+///
+/// This function remains exported for compatibility, but fails explicitly
+/// until the Rust implementation can preserve the Python A-FDW semantics.
 #[pyfunction]
 pub fn apply_afdw_stack_rs<'py>(
-    py: Python<'py>,
-    freqs: PyReadonlyArray1<f64>,
-    mags: PyReadonlyArray1<f64>,
+    _py: Python<'py>,
+    _freqs: PyReadonlyArray1<f64>,
+    _mags: PyReadonlyArray1<f64>,
 ) -> PyResult<Bound<'py, PyArray1<f64>>> {
-    let _freqs = freqs.as_slice()?;
-    let mags = mags.as_slice()?;
-    Ok(PyArray1::from_vec_bound(py, mags.to_vec()))
+    Err(PyNotImplementedError::new_err(
+        "apply_afdw_stack_rs is reserved but not implemented; use the Python A-FDW path",
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::interp1_linear;
+
+    #[test]
+    fn linear_interpolation_preserves_endpoints_and_midpoint() {
+        let x = [1.0, 2.0, 4.0];
+        let y = [10.0, 20.0, 40.0];
+
+        assert_eq!(interp1_linear(&x, &y, 0.5), 10.0);
+        assert_eq!(interp1_linear(&x, &y, 3.0), 30.0);
+        assert_eq!(interp1_linear(&x, &y, 5.0), 40.0);
+    }
 }

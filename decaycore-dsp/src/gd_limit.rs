@@ -15,6 +15,8 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::f64;
 
+const GIL_RELEASE_MIN_LEN: usize = 128;
+
 // ---------------------------------------------------------------------------
 // Gradient computation: central differences with spacing
 // ---------------------------------------------------------------------------
@@ -122,7 +124,27 @@ pub fn gd_smooth_loop_rs<'py>(
         return Ok(PyArray1::from_vec_bound(py, gd_l.to_vec()));
     }
 
-    let mut gd = gd_l.to_vec();
+    let gd = gd_l.to_vec();
+    let release_gil = gd_l.len() >= GIL_RELEASE_MIN_LEN;
+    let gd = if release_gil {
+        let log2f = log2f.to_vec();
+        let lim_arr = lim_arr.to_vec();
+        let curv_lim_arr = curv_lim_arr.to_vec();
+        py.allow_threads(move || gd_smooth_loop(gd, &log2f, &lim_arr, &curv_lim_arr, sigma))
+    } else {
+        gd_smooth_loop(gd, log2f, lim_arr, curv_lim_arr, sigma)
+    };
+
+    Ok(PyArray1::from_vec_bound(py, gd))
+}
+
+fn gd_smooth_loop(
+    mut gd: Vec<f64>,
+    log2f: &[f64],
+    lim_arr: &[f64],
+    curv_lim_arr: &[f64],
+    sigma: f64,
+) -> Vec<f64> {
     let mut current_sigma = sigma.max(0.25);
 
     for _iteration in 0..14 {
@@ -170,5 +192,22 @@ pub fn gd_smooth_loop_rs<'py>(
         current_sigma *= 1.25;
     }
 
-    Ok(PyArray1::from_vec_bound(py, gd))
+    gd
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{gaussian1d_nearest, gradient1d};
+
+    #[test]
+    fn gradient_matches_linear_input() {
+        let gradient = gradient1d(&[1.0, 3.0, 5.0], &[0.0, 1.0, 2.0]);
+        assert_eq!(gradient, vec![2.0, 2.0, 2.0]);
+    }
+
+    #[test]
+    fn gaussian_smoothing_preserves_constant_input() {
+        let smoothed = gaussian1d_nearest(&[4.0; 8], 0.8);
+        assert!(smoothed.iter().all(|value| (value - 4.0).abs() < 1e-12));
+    }
 }

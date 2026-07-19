@@ -13,8 +13,46 @@
 
 #![allow(clippy::useless_conversion)]
 
+use numpy::{PyArray1, PyReadonlyArray2};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyModule};
+use pyo3::types::{PyAny, PyDict, PyModule, PyTuple};
+
+const RANK_SCORE_BATCH_FIELDS: [&str; 31] = [
+    "avg_score",
+    "phase_benefit_bonus",
+    "boost_penalty",
+    "event_penalty",
+    "lr_delta_penalty",
+    "dsp_penalty",
+    "bass_prering_penalty",
+    "exc_penalty",
+    "bass_integration_penalty",
+    "bass_feasibility_penalty",
+    "bass_preference_bonus",
+    "mode_penalty",
+    "decay_penalty",
+    "residual_peak_penalty",
+    "correction_sharpness_penalty",
+    "dip_fill_risk_penalty",
+    "channel_overfit_penalty",
+    "target_tracking_penalty",
+    "voice_clarity_penalty",
+    "phase_risk_penalty",
+    "phase_limit_penalty",
+    "thd_boost_penalty",
+    "stereo_coherence_penalty",
+    "phantom_center_stability_penalty",
+    "policy_divergence_penalty",
+    "asymmetry_budget_overflow_penalty",
+    "worst_channel_relief_bonus",
+    "shared_preference_bias",
+    "rt60_policy_penalty",
+    "harmonic_local_boost_penalty",
+    "shared_preference_penalty",
+];
+const RANK_SCORE_BATCH_WIDTH: usize = RANK_SCORE_BATCH_FIELDS.len();
+const GIL_RELEASE_MIN_BATCH_ROWS: usize = 64;
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -32,6 +70,70 @@ fn safe_f64(v: f64) -> f64 {
 #[inline]
 fn clamp(v: f64, lo: f64, hi: f64) -> f64 {
     v.max(lo).min(hi)
+}
+
+#[inline]
+fn metric_f64(value: &Bound<'_, PyAny>) -> Option<f64> {
+    let parsed = value.extract::<f64>().ok().or_else(|| {
+        value
+            .extract::<String>()
+            .ok()
+            .and_then(|text| text.trim().parse::<f64>().ok())
+    })?;
+    parsed.is_finite().then_some(parsed)
+}
+
+#[inline]
+fn rank_raw_from_values(values: &[f64]) -> f64 {
+    debug_assert_eq!(values.len(), RANK_SCORE_BATCH_WIDTH);
+    let positive = |index: usize| safe_f64(values[index]).max(0.0);
+    safe_f64(values[0]) + positive(1)
+        - positive(2)
+        - positive(3)
+        - positive(4)
+        - positive(5)
+        - positive(6)
+        - positive(7)
+        - positive(8)
+        - positive(9)
+        + positive(10)
+        - positive(11)
+        - positive(12)
+        - positive(13)
+        - positive(14)
+        - positive(15)
+        - positive(16)
+        - positive(17)
+        - positive(18)
+        - positive(19)
+        - positive(20)
+        - positive(21)
+        - positive(22)
+        - positive(23)
+        - positive(24)
+        - positive(25)
+        + positive(26)
+        - positive(27).max(positive(30))
+        - positive(28)
+        - positive(29)
+}
+
+#[inline]
+fn score_bounds(gain: f64, bias: f64, score_min: f64, score_max: f64) -> (f64, f64, f64, f64) {
+    let gain = if gain.is_finite() { gain } else { 1.0 };
+    let bias = if bias.is_finite() { bias } else { 0.0 };
+    let lo = if score_min.is_finite() {
+        score_min
+    } else {
+        0.0
+    };
+    let hi = if score_max.is_finite() {
+        score_max
+    } else {
+        100.0
+    };
+    let (lo, hi) = if hi < lo { (hi, lo) } else { (lo, hi) };
+    (gain, bias, lo, hi)
 }
 
 // ---------------------------------------------------------------------------
@@ -149,49 +251,40 @@ fn compute_rank_score_components(
     let rt60_pen = safe_f64(rt60_policy_penalty).max(0.0);
     let harm_pen = safe_f64(harmonic_local_boost_penalty).max(0.0);
 
-    let g = if gain.is_finite() { gain } else { 1.0 };
-    let b = if bias.is_finite() { bias } else { 0.0 };
-    let lo = if score_min.is_finite() {
-        score_min
-    } else {
-        0.0
-    };
-    let hi = if score_max.is_finite() {
-        score_max
-    } else {
-        100.0
-    };
-    let (lo, hi) = if hi < lo { (hi, lo) } else { (lo, hi) };
-
-    let rank_raw = avg + phase_bon
-        - boost
-        - event
-        - lr_pen
-        - dsp_pen
-        - bass_prering
-        - exc_pen
-        - bass_pen
-        - bass_feas
-        + bass_bon
-        - mode_pen
-        - decay_pen
-        - rp_pen
-        - sharp_pen
-        - dip_pen
-        - ch_of_pen
-        - tt_pen
-        - voice_pen
-        - phase_risk
-        - phase_pen
-        - thd_pen
-        - stereo_pen
-        - center_pen
-        - policy_pen
-        - asym_pen
-        + worst_bon
-        - shared_pen
-        - rt60_pen
-        - harm_pen;
+    let (g, b, lo, hi) = score_bounds(gain, bias, score_min, score_max);
+    let rank_raw = rank_raw_from_values(&[
+        avg,
+        phase_bon,
+        boost,
+        event,
+        lr_pen,
+        dsp_pen,
+        bass_prering,
+        exc_pen,
+        bass_pen,
+        bass_feas,
+        bass_bon,
+        mode_pen,
+        decay_pen,
+        rp_pen,
+        sharp_pen,
+        dip_pen,
+        ch_of_pen,
+        tt_pen,
+        voice_pen,
+        phase_risk,
+        phase_pen,
+        thd_pen,
+        stereo_pen,
+        center_pen,
+        policy_pen,
+        asym_pen,
+        worst_bon,
+        shared_pen,
+        rt60_pen,
+        harm_pen,
+        shared_pen,
+    ]);
 
     let rank_score = clamp(g * rank_raw + b, lo, hi);
 
@@ -256,6 +349,55 @@ fn compute_rank_score_components(
 }
 
 // ---------------------------------------------------------------------------
+// compute_rank_scores_batch
+// ---------------------------------------------------------------------------
+/// Compute rank scores for a `(candidates, 31)` component matrix.
+///
+/// Column order is exposed as `RANK_SCORE_BATCH_FIELDS`. Safety gates remain
+/// outside this numeric combiner and must still be applied by winner selection.
+#[pyfunction]
+#[pyo3(signature = (
+    component_rows,
+    gain = 1.0,
+    bias = 0.0,
+    score_min = 0.0,
+    score_max = 100.0
+))]
+fn compute_rank_scores_batch<'py>(
+    py: Python<'py>,
+    component_rows: PyReadonlyArray2<f64>,
+    gain: f64,
+    bias: f64,
+    score_min: f64,
+    score_max: f64,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let view = component_rows.as_array();
+    let rows = view.nrows();
+    let columns = view.ncols();
+    if columns != RANK_SCORE_BATCH_WIDTH {
+        return Err(PyValueError::new_err(format!(
+            "component_rows must have {} columns, got {}",
+            RANK_SCORE_BATCH_WIDTH, columns
+        )));
+    }
+
+    let values: Vec<f64> = view.iter().copied().collect();
+    let (gain, bias, lo, hi) = score_bounds(gain, bias, score_min, score_max);
+    let compute = move || {
+        values
+            .chunks_exact(RANK_SCORE_BATCH_WIDTH)
+            .map(|row| clamp(gain * rank_raw_from_values(row) + bias, lo, hi))
+            .collect::<Vec<_>>()
+    };
+    let scores = if rows >= GIL_RELEASE_MIN_BATCH_ROWS {
+        py.allow_threads(compute)
+    } else {
+        compute()
+    };
+    Ok(PyArray1::from_vec_bound(py, scores))
+}
+
+// ---------------------------------------------------------------------------
 // calibrated_auto_quality
 // ---------------------------------------------------------------------------
 #[pyfunction]
@@ -270,14 +412,14 @@ fn calibrated_auto_quality(rank_score_0_100: f64, metrics: Option<&Bound<'_, PyD
 
     if let Some(m) = metrics {
         if let Ok(Some(v)) = m.get_item("max_net_boost_db") {
-            if let Ok(vf) = v.extract::<f64>() {
-                if vf.is_finite() && vf > 6.5 {
+            if let Some(vf) = metric_f64(&v) {
+                if vf > 6.5 {
                     score = score.min(69.0);
                 }
             }
         }
         if let Ok(Some(v)) = m.get_item("event_penalty") {
-            if let Ok(vf) = v.extract::<f64>() {
+            if let Some(vf) = metric_f64(&v) {
                 if vf >= 3.0 {
                     score = score.min(100.0);
                 }
@@ -294,8 +436,8 @@ fn calibrated_auto_quality(rank_score_0_100: f64, metrics: Option<&Bound<'_, PyD
             m.get_item("worst_residual_peak_db"),
             m.get_item("residual_peak_hard_gate_db"),
         ) {
-            if let (Ok(rp), Ok(rg)) = (rp_v.extract::<f64>(), rg_v.extract::<f64>()) {
-                if rp.is_finite() && rg.is_finite() && rp > rg {
+            if let (Some(rp), Some(rg)) = (metric_f64(&rp_v), metric_f64(&rg_v)) {
+                if rp > rg {
                     hard_gate_failed = true;
                 }
             }
@@ -304,22 +446,22 @@ fn calibrated_auto_quality(rank_score_0_100: f64, metrics: Option<&Bound<'_, PyD
             score = score.min(59.0);
         }
         if let Ok(Some(v)) = m.get_item("residual_peak_penalty") {
-            if let Ok(vf) = v.extract::<f64>() {
+            if let Some(vf) = metric_f64(&v) {
                 if vf > 1.5 {
                     score = score.min(100.0);
                 }
             }
         }
         if let Ok(Some(v)) = m.get_item("bass_cancellation_risk") {
-            if let Ok(vf) = v.extract::<f64>() {
-                if vf.is_finite() && vf > 0.5 {
+            if let Some(vf) = metric_f64(&v) {
+                if vf > 0.5 {
                     score = score.min(70.0);
                 }
             }
         }
         if let Ok(Some(v)) = m.get_item("bass_xo_gd_mismatch_delta_ms") {
-            if let Ok(vf) = v.extract::<f64>() {
-                if vf.is_finite() && vf.abs() > 5.0 {
+            if let Some(vf) = metric_f64(&v) {
+                if vf.abs() > 5.0 {
                     score = score.min(65.0);
                 }
             }
@@ -335,7 +477,42 @@ fn calibrated_auto_quality(rank_score_0_100: f64, metrics: Option<&Bound<'_, PyD
 #[pymodule]
 fn decaycore_scoring(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compute_rank_score_components, m)?)?;
+    m.add_function(wrap_pyfunction!(compute_rank_scores_batch, m)?)?;
     m.add_function(wrap_pyfunction!(calibrated_auto_quality, m)?)?;
-    m.add("__version__", "0.2.0")?;
+    m.add(
+        "RANK_SCORE_BATCH_FIELDS",
+        PyTuple::new_bound(m.py(), RANK_SCORE_BATCH_FIELDS),
+    )?;
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{clamp, rank_raw_from_values, safe_f64, RANK_SCORE_BATCH_WIDTH};
+
+    #[test]
+    fn safe_float_neutralizes_non_finite_values() {
+        assert_eq!(safe_f64(f64::NAN), 0.0);
+        assert_eq!(safe_f64(f64::INFINITY), 0.0);
+        assert_eq!(safe_f64(3.5), 3.5);
+    }
+
+    #[test]
+    fn clamp_respects_requested_bounds() {
+        assert_eq!(clamp(-1.0, 0.0, 100.0), 0.0);
+        assert_eq!(clamp(101.0, 0.0, 100.0), 100.0);
+        assert_eq!(clamp(42.0, 0.0, 100.0), 42.0);
+    }
+
+    #[test]
+    fn batch_row_uses_same_bonus_penalty_directions_and_shared_max() {
+        let mut row = [0.0; RANK_SCORE_BATCH_WIDTH];
+        row[0] = 80.0;
+        row[1] = 2.0;
+        row[2] = 3.0;
+        row[27] = 1.0;
+        row[30] = 4.0;
+        assert_eq!(rank_raw_from_values(&row), 75.0);
+    }
 }

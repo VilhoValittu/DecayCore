@@ -10,7 +10,6 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = { version = "0.22", features = ["extension-module"] }
 numpy = "0.22"
-rustfft = "6.2"
 
 [profile.release]
 lto = true

@@ -10,10 +10,13 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import dataclass, field
 
 import numpy as np
+
+logger = logging.getLogger("DecayCore.dsp")
 
 # Try to import Rust DSP extension
 try:
@@ -175,8 +178,8 @@ def _smooth_log_box(freq_hz: np.ndarray, values: np.ndarray, width_oct: float) -
         try:
             out[order] = _smooth_log_box_kernel_rs(x, y_raw, float(half))
             return out
-        except Exception:
-            pass
+        except (TypeError, ValueError) as exc:
+            logger.warning("Rust log-box smoothing rejected its input; using Python fallback: %s", exc)
     out[order] = _smooth_log_box_kernel(x, y_raw, half)
     return out
 
@@ -376,4 +379,3 @@ __all__ = [
     '_prepare_arrays',
     '_width_bounds',
 ]
-

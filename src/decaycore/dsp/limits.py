@@ -8,7 +8,11 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
+import logging
+
 import numpy as np
+
+logger = logging.getLogger("DecayCore.dsp")
 
 # Try to import Rust DSP extension
 try:
@@ -86,11 +90,11 @@ def _apply_slope_passes(g, x, max_db_per_oct):
     """Dispatch to Rust slope limiter if available, fallback to pure Python."""
     if _DSP_RUST_AVAILABLE:
         try:
-            g_arr = np.asarray(g, dtype=np.float64)
-            x_arr = np.asarray(x, dtype=np.float64)
+            g_arr = np.ascontiguousarray(g, dtype=np.float64)
+            x_arr = np.ascontiguousarray(x, dtype=np.float64)
             return _slope_passes_rs(g_arr, x_arr, float(max_db_per_oct))
-        except Exception:
-            pass
+        except (TypeError, ValueError) as exc:
+            logger.warning("Rust slope limiter rejected its input; using Python fallback: %s", exc)
     return _slope_passes(g, x, max_db_per_oct)
 
 
@@ -98,11 +102,11 @@ def _apply_slope_passes_asym(g, x, boost, cut):
     """Dispatch to Rust asym slope limiter if available, fallback to pure Python."""
     if _DSP_RUST_AVAILABLE:
         try:
-            g_arr = np.asarray(g, dtype=np.float64)
-            x_arr = np.asarray(x, dtype=np.float64)
+            g_arr = np.ascontiguousarray(g, dtype=np.float64)
+            x_arr = np.ascontiguousarray(x, dtype=np.float64)
             return _slope_passes_asym_rs(g_arr, x_arr, float(boost), float(cut))
-        except Exception:
-            pass
+        except (TypeError, ValueError) as exc:
+            logger.warning("Rust asymmetric slope limiter rejected its input; using Python fallback: %s", exc)
     return _slope_passes_asym(g, x, boost, cut)
 
 

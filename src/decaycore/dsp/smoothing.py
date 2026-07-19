@@ -331,15 +331,14 @@ def _smooth_mag_core_dispatch(freqs_arr: np.ndarray, vals_arr: np.ndarray, plan)
     if _DSP_RUST_AVAILABLE:
         try:
             return _smooth_mag_core_rs(
-                freqs_arr,
-                vals_arr,
-                plan["log_freqs"],
-                plan["window"],
+                np.ascontiguousarray(freqs_arr, dtype=np.float64),
+                np.ascontiguousarray(vals_arr, dtype=np.float64),
+                np.ascontiguousarray(plan["log_freqs"], dtype=np.float64),
+                np.ascontiguousarray(plan["window"], dtype=np.float64),
                 plan["pad_len"],
             )
-        except Exception:
-            # Fallback to pure-Python version on any error
-            pass
+        except (TypeError, ValueError) as exc:
+            logger.warning("Rust smoothing rejected its input; using Python fallback: %s", exc)
 
     # Pure-Python fallback
     return _smooth_mag_core(

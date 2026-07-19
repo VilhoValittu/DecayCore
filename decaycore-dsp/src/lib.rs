@@ -33,6 +33,6 @@ fn decaycore_dsp(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(slope_limit::slope_passes_asym_rs, m)?)?;
     m.add_function(wrap_pyfunction!(rms::rms_rows_kernel_rs, m)?)?;
     m.add_function(wrap_pyfunction!(log_box::smooth_log_box_kernel_rs, m)?)?;
-    m.add("__version__", "0.2.0")?;
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }

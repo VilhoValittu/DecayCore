@@ -11,9 +11,12 @@
 from __future__ import annotations
 
 import math
+import logging
 
 import numpy as np
 import scipy.integrate
+
+logger = logging.getLogger("DecayCore.dsp")
 
 # Try to import Rust DSP extension
 try:
@@ -145,14 +148,13 @@ def _gd_smooth_loop(
     """Dispatch to Rust implementation if available, fallback to pure Python."""
     if _DSP_RUST_AVAILABLE:
         try:
-            gd_l_arr = np.asarray(gd_l, dtype=np.float64)
-            log2f_arr = np.asarray(log2f, dtype=np.float64)
-            lim_arr_arr = np.asarray(lim_arr, dtype=np.float64)
-            curv_lim_arr_arr = np.asarray(curv_lim_arr, dtype=np.float64)
+            gd_l_arr = np.ascontiguousarray(gd_l, dtype=np.float64)
+            log2f_arr = np.ascontiguousarray(log2f, dtype=np.float64)
+            lim_arr_arr = np.ascontiguousarray(lim_arr, dtype=np.float64)
+            curv_lim_arr_arr = np.ascontiguousarray(curv_lim_arr, dtype=np.float64)
             return _gd_smooth_loop_rs(gd_l_arr, log2f_arr, lim_arr_arr, curv_lim_arr_arr, float(sigma))
-        except Exception:
-            # Fallback to pure-Python version on any error
-            pass
+        except (TypeError, ValueError) as exc:
+            logger.warning("Rust group-delay limiter rejected its input; using Python fallback: %s", exc)
 
     return _gd_smooth_loop_py(gd_l, log2f, lim_arr, curv_lim_arr, sigma)
 

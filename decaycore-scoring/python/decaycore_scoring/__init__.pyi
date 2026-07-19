@@ -1,6 +1,10 @@
 from typing import Any
 
+import numpy as np
+from numpy.typing import NDArray
+
 __version__: str
+RANK_SCORE_BATCH_FIELDS: tuple[str, ...]
 
 def compute_rank_score_components(
     avg_score: float,
@@ -41,6 +45,15 @@ def compute_rank_score_components(
     score_max: float = ...,
     context: str | None = ...,
 ) -> dict[str, Any]: ...
+
+def compute_rank_scores_batch(
+    component_rows: NDArray[np.float64],
+    *,
+    gain: float = ...,
+    bias: float = ...,
+    score_min: float = ...,
+    score_max: float = ...,
+) -> NDArray[np.float64]: ...
 
 def calibrated_auto_quality(
     rank_score_0_100: float,

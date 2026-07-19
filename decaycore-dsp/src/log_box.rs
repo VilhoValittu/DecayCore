@@ -14,6 +14,8 @@ use numpy::{PyArray1, PyReadonlyArray1};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
+const GIL_RELEASE_MIN_LEN: usize = 512;
+
 // ---------------------------------------------------------------------------
 // smooth_log_box_kernel_rs: box-average over a ±half window in log space.
 // ---------------------------------------------------------------------------
@@ -41,6 +43,19 @@ pub fn smooth_log_box_kernel_rs<'py>(
         )));
     }
 
+    let out = if n >= GIL_RELEASE_MIN_LEN {
+        let x = x.to_vec();
+        let y_raw = y_raw.to_vec();
+        py.allow_threads(move || smooth_log_box_kernel(&x, &y_raw, half))
+    } else {
+        smooth_log_box_kernel(x, y_raw, half)
+    };
+
+    Ok(PyArray1::from_vec_bound(py, out))
+}
+
+fn smooth_log_box_kernel(x: &[f64], y_raw: &[f64], half: f64) -> Vec<f64> {
+    let n = x.len();
     // Prefix sums of finite values and their weights.
     let mut sum_y = vec![0.0; n + 1];
     let mut sum_w = vec![0.0; n + 1];
@@ -91,5 +106,5 @@ pub fn smooth_log_box_kernel_rs<'py>(
         };
     }
 
-    Ok(PyArray1::from_vec_bound(py, out))
+    out
 }

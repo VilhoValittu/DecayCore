@@ -33,6 +33,76 @@ OFFICIAL_RANK_SCORE_DISPLAY_GAIN = 1.70
 OFFICIAL_RANK_SCORE_DISPLAY_BIAS = 0.0
 OFFICIAL_RANK_SCORE_DISPLAY_CALIBRATION = "display_x1_700"
 
+RANK_SCORE_BATCH_FIELDS = (
+    "avg_score",
+    "phase_benefit_bonus",
+    "boost_penalty",
+    "event_penalty",
+    "lr_delta_penalty",
+    "dsp_penalty",
+    "bass_prering_penalty",
+    "exc_penalty",
+    "bass_integration_penalty",
+    "bass_feasibility_penalty",
+    "bass_preference_bonus",
+    "mode_penalty",
+    "decay_penalty",
+    "residual_peak_penalty",
+    "correction_sharpness_penalty",
+    "dip_fill_risk_penalty",
+    "channel_overfit_penalty",
+    "target_tracking_penalty",
+    "voice_clarity_penalty",
+    "phase_risk_penalty",
+    "phase_limit_penalty",
+    "thd_boost_penalty",
+    "stereo_coherence_penalty",
+    "phantom_center_stability_penalty",
+    "policy_divergence_penalty",
+    "asymmetry_budget_overflow_penalty",
+    "worst_channel_relief_bonus",
+    "shared_preference_bias",
+    "rt60_policy_penalty",
+    "harmonic_local_boost_penalty",
+    "shared_preference_penalty",
+)
+
+_RANK_SCORE_BATCH_SIGNS = np.asarray(
+    [
+        1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        1.0,
+        0.0,
+        -1.0,
+        -1.0,
+        0.0,
+    ],
+    dtype=np.float64,
+)
+
 _RANK_COMPONENT_META = {
     "avg_score": {"role": "base", "direction": "higher_is_better", "unit": "score"},
     "phase_benefit_bonus": {"role": "bonus", "direction": "higher_is_better", "unit": "rank_points"},
@@ -395,6 +465,52 @@ def compute_rank_score_components(
             "score_max": float(hi),
         },
     }
+
+
+def compute_rank_scores_batch(
+    component_rows: Any,
+    *,
+    gain: Any = 1.0,
+    bias: Any = 0.0,
+    score_min: Any = 0.0,
+    score_max: Any = 100.0,
+) -> np.ndarray:
+    """Combine a ``(candidates, 31)`` component matrix into rank scores.
+
+    Columns follow :data:`RANK_SCORE_BATCH_FIELDS`. This function combines
+    numeric terms only; winner-selection hard gates remain mandatory and are
+    intentionally not represented in the matrix.
+    """
+    matrix = np.asarray(component_rows, dtype=np.float64)
+    expected_columns = len(RANK_SCORE_BATCH_FIELDS)
+    if matrix.ndim != 2 or matrix.shape[1] != expected_columns:
+        raise ValueError(
+            f"component_rows must have shape (candidates, {expected_columns}), got {matrix.shape}"
+        )
+    matrix = np.ascontiguousarray(matrix, dtype=np.float64)
+    g = float(_auto_safe_float(gain, 1.0))
+    b = float(_auto_safe_float(bias, 0.0))
+    lo = float(_auto_safe_float(score_min, 0.0))
+    hi = float(_auto_safe_float(score_max, 100.0))
+    if hi < lo:
+        lo, hi = hi, lo
+
+    rust_batch = getattr(_rust_scoring, "compute_rank_scores_batch", None) if _RUST_SCORING_AVAILABLE else None
+    if rust_batch is not None:
+        try:
+            return np.asarray(
+                rust_batch(matrix, gain=g, bias=b, score_min=lo, score_max=hi),
+                dtype=np.float64,
+            )
+        except (TypeError, ValueError) as exc:
+            logger.warning("Rust batch rank scorer rejected its input; using NumPy fallback: %s", exc)
+
+    clean = np.nan_to_num(matrix, copy=True, nan=0.0, posinf=0.0, neginf=0.0)
+    positive = np.maximum(clean[:, 1:], 0.0)
+    rank_raw = clean[:, 0] + (positive @ _RANK_SCORE_BATCH_SIGNS)
+    shared_penalty = np.maximum(positive[:, 26], positive[:, 29])
+    rank_raw -= shared_penalty
+    return np.asarray(np.clip((g * rank_raw) + b, lo, hi), dtype=np.float64)
 
 
 def attach_official_rank_score(

@@ -14,6 +14,8 @@ use numpy::{PyArray1, PyReadonlyArray1};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
+const GIL_RELEASE_MIN_LEN: usize = 2048;
+
 // ---------------------------------------------------------------------------
 // Symmetric slope limiting: forward + backward pass.
 // Mirrors limits.py::_slope_passes (in-place over a working copy).
@@ -125,7 +127,16 @@ pub fn slope_passes_rs<'py>(
             x.len()
         )));
     }
-    slope_passes(&mut gv, x, max_db_per_oct);
+    gv = if gv.len() >= GIL_RELEASE_MIN_LEN {
+        let x = x.to_vec();
+        py.allow_threads(move || {
+            slope_passes(&mut gv, &x, max_db_per_oct);
+            gv
+        })
+    } else {
+        slope_passes(&mut gv, x, max_db_per_oct);
+        gv
+    };
     Ok(PyArray1::from_vec_bound(py, gv))
 }
 
@@ -153,7 +164,38 @@ pub fn slope_passes_asym_rs<'py>(
             x.len()
         )));
     }
-    slope_passes_asym_forward(&mut gv, x, boost, cut);
-    slope_passes_asym_backward(&mut gv, x, boost, cut);
+    gv = if gv.len() >= GIL_RELEASE_MIN_LEN {
+        let x = x.to_vec();
+        py.allow_threads(move || {
+            slope_passes_asym_forward(&mut gv, &x, boost, cut);
+            slope_passes_asym_backward(&mut gv, &x, boost, cut);
+            gv
+        })
+    } else {
+        slope_passes_asym_forward(&mut gv, x, boost, cut);
+        slope_passes_asym_backward(&mut gv, x, boost, cut);
+        gv
+    };
     Ok(PyArray1::from_vec_bound(py, gv))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{slope_passes, slope_passes_asym_backward, slope_passes_asym_forward};
+
+    #[test]
+    fn symmetric_pass_limits_a_step() {
+        let mut gain = [0.0, 10.0];
+        slope_passes(&mut gain, &[0.0, 1.0], 2.0);
+        assert_eq!(gain, [0.0, 2.0]);
+    }
+
+    #[test]
+    fn asymmetric_passes_limit_cuts_with_boost_disabled() {
+        let mut gain = [0.0, 10.0, 0.0];
+        let axis = [0.0, 1.0, 2.0];
+        slope_passes_asym_forward(&mut gain, &axis, 0.0, 2.0);
+        slope_passes_asym_backward(&mut gain, &axis, 0.0, 2.0);
+        assert_eq!(gain, [8.0, 10.0, 8.0]);
+    }
 }

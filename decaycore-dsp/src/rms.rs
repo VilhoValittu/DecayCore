@@ -13,6 +13,8 @@
 use numpy::{PyArray1, PyReadonlyArray2};
 use pyo3::prelude::*;
 
+const GIL_RELEASE_MIN_VALUES: usize = 4096;
+
 // ---------------------------------------------------------------------------
 // rms_rows_kernel_rs: robust RMS per row via median of squared values.
 // ---------------------------------------------------------------------------
@@ -28,14 +30,23 @@ pub fn rms_rows_kernel_rs<'py>(
     let view = arr.as_array();
     let nrows = view.nrows();
     let ncols = view.ncols();
+    let values: Vec<f64> = view.iter().copied().collect();
+    let out = if values.len() >= GIL_RELEASE_MIN_VALUES {
+        py.allow_threads(move || rms_rows_kernel(&values, nrows, ncols))
+    } else {
+        rms_rows_kernel(&values, nrows, ncols)
+    };
 
+    Ok(PyArray1::from_vec_bound(py, out))
+}
+
+fn rms_rows_kernel(values: &[f64], nrows: usize, ncols: usize) -> Vec<f64> {
     let mut out = vec![0.0; nrows];
     let mut tmp: Vec<f64> = Vec::with_capacity(ncols);
 
     for row in 0..nrows {
         tmp.clear();
-        for col in 0..ncols {
-            let v = view[[row, col]];
+        for &v in &values[row * ncols..(row + 1) * ncols] {
             if v.is_finite() {
                 tmp.push(v * v);
             }
@@ -54,5 +65,5 @@ pub fn rms_rows_kernel_rs<'py>(
         out[row] = med.max(0.0).sqrt();
     }
 
-    Ok(PyArray1::from_vec_bound(py, out))
+    out
 }
