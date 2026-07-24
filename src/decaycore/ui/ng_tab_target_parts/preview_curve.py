@@ -198,13 +198,27 @@ def _serialize_target_curve_txt(curve: _TargetPreviewCurve) -> bytes:
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
-def _target_curve_download_filename(mode_key: Any) -> str:
+def _target_curve_download_filename(
+    mode_key: Any,
+    *,
+    is_manual_level: bool = False,
+    manual_level_db: Any = 0.0,
+    manual_tilt_db_per_oct: Any = 0.0,
+) -> str:
     try:
         raw = str(mode_key or "target")
     except (TypeError, ValueError):
         raw = "target"
     token = re.sub(r"[^A-Za-z0-9._-]+", "_", raw).strip("._-")
-    return f"DecayCore_target_{token or 'target'}.txt"
+    filename_parts = ["DecayCore", "target", token or "target"]
+    if is_manual_level:
+        level_db = round(_finite_float(manual_level_db, 0.0), 1)
+        tilt_db_per_oct = round(_finite_float(manual_tilt_db_per_oct, 0.0), 1)
+        if abs(level_db) >= 0.05:
+            filename_parts.append(f"manual_{level_db:+.1f}dB")
+        if abs(tilt_db_per_oct) >= 0.05:
+            filename_parts.append(f"tilt_{tilt_db_per_oct:+.1f}dB-per-oct")
+    return "_".join(filename_parts) + ".txt"
 
 
 def _download_current_target_curve(*, t: Callable[[str], str]) -> None:
@@ -242,5 +256,10 @@ def _download_current_target_curve(*, t: Callable[[str], str]) -> None:
         return
     ui.download(
         payload,
-        filename=_target_curve_download_filename(curve.mode_key),
+        filename=_target_curve_download_filename(
+            curve.mode_key,
+            is_manual_level=curve.is_manual_level,
+            manual_level_db=curve.manual_level_db,
+            manual_tilt_db_per_oct=curve.manual_tilt_db_per_oct,
+        ),
     )

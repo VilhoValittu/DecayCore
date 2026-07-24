@@ -12,6 +12,15 @@ All notable changes to **DecayCore** are documented in this file.
 
 ## DecayCore
 
+## [1.2.0]
+
+Target-sivulla on uusi “Lataa nykyinen tavoitekäyrä (.txt)” -painike.
+TXT sisältää esikatselun vihreän käyrän 400 pisteellä välillä 10–20 000 Hz.
+Advanced/Manual-tilan taso- ja tilt-säädöt sisältyvät tiedostoon.
+Tiedosto voidaan ladata takaisin DecayCoreen custom targetina.
+
+---
+
 ## [1.1.9]
 
 ### Smarter final validation for better AUTO results
