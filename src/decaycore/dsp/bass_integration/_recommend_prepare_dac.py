@@ -114,6 +114,7 @@ def _direct_dac_prepare_result(
     sub_array_delay_ms: float | None = None,
     main_l_delay_ms: float | None = None,
     main_r_delay_ms: float | None = None,
+    lf_rolloff: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     selected_sub_delay = float(sub_delay_ms if applied else 0.0)
     selected_sub_array_delay = float(selected_sub_delay if sub_array_delay_ms is None else sub_array_delay_ms)
@@ -140,6 +141,7 @@ def _direct_dac_prepare_result(
         "reason": str(reason),
         "study_trials": int(study_trials),
         "allpass_reason": str(allpass.get("allpass_reason", "") or ""),
+        "lf_rolloff": dict(lf_rolloff or {}),
     }
     if candidate_score is not None:
         result["candidate_score"] = float(candidate_score) if np.isfinite(float(candidate_score)) else float("inf")
@@ -219,6 +221,7 @@ def _recommend_direct_dac_prepare_builtin_core(
     # Crossover
     best_fc = 80.0
     best_sub_lpf = 80.0
+    xo_result: dict[str, Any] = {}
     try:
         xo_result = dict(
             recommend_direct_dac_crossover(
@@ -319,4 +322,5 @@ def _recommend_direct_dac_prepare_builtin_core(
         study_trials=0,
         reject_reasons=optimized_reject_reasons,
         worst_channel=str(optimized_metrics.get("bass_direct_dac_worst_channel", "unknown") or "unknown"),
+        lf_rolloff=dict(xo_result.get("lf_rolloff", {}) or {}),
     )

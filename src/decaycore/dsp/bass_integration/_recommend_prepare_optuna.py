@@ -25,7 +25,7 @@ from ._constants import (
 )
 from ._final_metrics import _final_metric_snapshot
 from ._recommend_alignment import recommend_direct_dac_alignment
-from ._recommend_crossover import recommend_direct_dac_crossover
+from ._recommend_crossover import _direct_dac_main_rolloff_meta, recommend_direct_dac_crossover
 from ._recommend_prepare_dac import (
     _direct_dac_prepare_allpass_postpass,
     _direct_dac_prepare_result,
@@ -984,6 +984,17 @@ def _direct_dac_finalize_prepare_result(
     _status_callback(
         callbacks, "DecayCore automatic mode: bass integration diagnostics refresh"
     )
+    lf_rolloff_meta = _direct_dac_main_rolloff_meta(bundle)
+    lf_rolloff = {
+        "used_measurement": bool(lf_rolloff_meta.get("main_f6_used_measurement", False)),
+        "source": str(lf_rolloff_meta.get("main_f6_source", "fallback") or "fallback"),
+        "reason": str(lf_rolloff_meta.get("main_f6_reason", "") or ""),
+        "confidence": float(_safe_float(lf_rolloff_meta.get("main_f6_confidence", 0.0), 0.0)),
+        "f6_hz": float(_safe_float(lf_rolloff_meta.get("main_f6_worst_hz", float("nan")), float("nan"))),
+        "l_f6_hz": float(_safe_float(lf_rolloff_meta.get("main_l_f6_hz", float("nan")), float("nan"))),
+        "r_f6_hz": float(_safe_float(lf_rolloff_meta.get("main_r_f6_hz", float("nan")), float("nan"))),
+        "stereo_delta_hz": float(_safe_float(lf_rolloff_meta.get("main_f6_stereo_delta_hz", float("nan")), float("nan"))),
+    }
 
     return _direct_dac_prepare_result(
         applied=applied,
@@ -1002,6 +1013,7 @@ def _direct_dac_finalize_prepare_result(
         candidate_score=candidate_score,
         reject_reasons=reject_reasons,
         worst_channel=worst_channel,
+        lf_rolloff=lf_rolloff,
     )
 
 

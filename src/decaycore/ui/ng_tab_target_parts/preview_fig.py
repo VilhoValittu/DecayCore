@@ -16,7 +16,6 @@ import logging
 logger = logging.getLogger("DecayCore")
 
 from .. import ng_controls as ctrl
-from ..target_preview_common import apply_manual_target_preview_adjustments
 from ..target_preview_interaction import (
     build_draggable_tilt_handle_shape,
     build_draggable_target_shape,
@@ -26,7 +25,7 @@ from ..target_preview_interaction import (
     build_vertical_marker_trace,
     parse_svg_path_points,
 )
-from ...ui_i18n import LVL_MODE_AUTO, LVL_MODE_MANUAL, normalize_lvl_mode_value
+from .preview_curve import _current_target_preview_curve
 from .preview_state import STATE
 
 def _build_target_preview_fig():  # noqa: C901 - target preview figure is assembled from many UI states
@@ -36,14 +35,8 @@ def _build_target_preview_fig():  # noqa: C901 - target preview figure is assemb
     """
     try:
         import math  # noqa: PLC0415
-        import numpy as np  # noqa: PLC0415
         from ...auto_mode.shared import _auto_goal_forced_level_window  # noqa: PLC0415
         from ...dsp.bass_integration import normalize_sub_combine_mode  # noqa: PLC0415
-        from ...application.house_curve_service import (  # noqa: PLC0415
-            _normalize_hc_mode_key,
-            load_house_curve,
-            load_target_curve,
-        )
 
 
         def _cv(name, default=None):
@@ -71,23 +64,15 @@ def _build_target_preview_fig():  # noqa: C901 - target preview figure is assemb
             return float(default)
 
         # --- collect ctrl values ---
-        hc_mode_raw = str(_cv("hc_mode", "Harman6") or "Harman6")
-        hc_mode = str(_normalize_hc_mode_key(hc_mode_raw))
-        hc_file = _cv("hc_custom_file", None)
+        preview_curve = _current_target_preview_curve(_cv)
+        if preview_curve is None:
+            return None, [], []
         lvl_min = _to_float(_cv("lvl_min", 500.0), 500.0)
         lvl_max = _to_float(_cv("lvl_max", 2000.0), 2000.0)
         mag_c_min = _to_float(_cv("mag_c_min", 10.0), 10.0)
         mag_c_max = _to_float(_cv("mag_c_max", 200.0), 200.0)
         auto_goal = str(_cv("auto_goal", "balanced") or "balanced")
         app_mode = str(_cv("mode", "BASIC") or "BASIC").upper()
-        lvl_mode = normalize_lvl_mode_value(_cv("lvl_mode", LVL_MODE_AUTO))
-        if app_mode in ("BASIC", "AUTO"):
-            lvl_mode = LVL_MODE_AUTO
-        is_manual_level = lvl_mode == LVL_MODE_MANUAL
-        lvl_manual_db = _to_float(_cv("lvl_manual_db", 0.0), 0.0)
-        manual_target_tilt_db_per_oct = _to_float(_cv("manual_target_tilt_db_per_oct", 0.0), 0.0)
-        preview_level_shift_db = lvl_manual_db if is_manual_level else 0.0
-        preview_manual_target_tilt_db_per_oct = manual_target_tilt_db_per_oct if is_manual_level else 0.0
         pre_ms = _to_float(_cv("ir_window_left", 85.0), 85.0)
         post_ms = _to_float(_cv("ir_window_right") or _cv("ir_window", 500.0), 500.0)
         smoothing_level = 96
@@ -96,42 +81,8 @@ def _build_target_preview_fig():  # noqa: C901 - target preview figure is assemb
             _cv("bass_integration_sub_combine_mode", "average")
         )
 
-        freq_axis = np.logspace(math.log10(10.0), math.log10(20000.0), 400)
-
-        # --- build target curve ---
-        target_curve = None
-        if hc_mode == "Upload" and isinstance(hc_file, dict) and hc_file.get("content"):
-            try:
-                tf_f, tf_m = load_target_curve(hc_file["content"])
-                if tf_f is not None and tf_m is not None:
-                    tf_f = np.asarray(tf_f, dtype=float)
-                    tf_m = np.asarray(tf_m, dtype=float)
-                    if tf_f.size >= 2 and tf_m.size == tf_f.size:
-                        target_curve = np.interp(freq_axis, tf_f, tf_m, left=tf_m[0], right=tf_m[-1])
-            except (
-
-                AttributeError,
-                TypeError,
-                ValueError,
-                KeyError,
-                IndexError,
-                RuntimeError,
-                OSError,
-                ImportError,
-                ModuleNotFoundError,
-                NameError,
-            ):
-                logger.exception("custom target curve load")
-
-        if target_curve is None:
-            hc_f, hc_m, _ = load_house_curve({"hc_mode": hc_mode})
-            if hc_f is not None and hc_m is not None:
-                hc_f = np.asarray(hc_f, dtype=float)
-                hc_m = np.asarray(hc_m, dtype=float)
-                target_curve = np.interp(freq_axis, hc_f, hc_m, left=hc_m[0], right=hc_m[-1])
-
-        if target_curve is None:
-            return None, [], []
+        freq_axis = preview_curve.frequency_hz
+        target_curve = preview_curve.base_magnitude_db
 
         # AUTO mode forced level window
         if app_mode in ("BASIC", "AUTO"):
@@ -156,17 +107,15 @@ def _build_target_preview_fig():  # noqa: C901 - target preview figure is assemb
 
         return _assemble_target_preview_figure(
             freq_axis=freq_axis,
-            target_curve=target_curve,
-            preview_level_shift_db=preview_level_shift_db,
-            preview_manual_target_tilt_db_per_oct=preview_manual_target_tilt_db_per_oct,
-            is_manual_level=is_manual_level,
+            target_curve_display=preview_curve.display_magnitude_db,
+            is_manual_level=preview_curve.is_manual_level,
             lvl_min=lvl_min,
             lvl_max=lvl_max,
             mag_c_min=mag_c_min,
             mag_c_max=mag_c_max,
-            hc_mode_raw=hc_mode_raw,
-            lvl_manual_db=lvl_manual_db,
-            manual_target_tilt_db_per_oct=manual_target_tilt_db_per_oct,
+            hc_mode_raw=preview_curve.mode_label,
+            lvl_manual_db=preview_curve.manual_level_db,
+            manual_target_tilt_db_per_oct=preview_curve.manual_tilt_db_per_oct,
             speaker_interp=speaker_interp,
             speaker_components=speaker_components,
             speaker_align_offset=_speaker_align_offset,
@@ -195,9 +144,7 @@ def _build_target_preview_fig():  # noqa: C901 - target preview figure is assemb
 def _assemble_target_preview_figure(
     *,
     freq_axis,
-    target_curve,
-    preview_level_shift_db,
-    preview_manual_target_tilt_db_per_oct,
+    target_curve_display,
     is_manual_level,
     lvl_min,
     lvl_max,
@@ -217,12 +164,6 @@ def _assemble_target_preview_figure(
     import numpy as np  # noqa: PLC0415
     import plotly.graph_objects as go  # noqa: PLC0415
 
-    target_curve_display = apply_manual_target_preview_adjustments(
-        freq_axis,
-        target_curve,
-        preview_level_shift_db,
-        preview_manual_target_tilt_db_per_oct,
-    )
     target_curve_path = build_target_curve_path(freq_axis, target_curve_display)
     drag_base_points = []
     tilt_handle_points = []

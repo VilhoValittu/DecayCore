@@ -31,6 +31,7 @@ from ...ui_i18n import (
     normalize_output_tilt_source_value,
     tr_options,
 )
+from .preview_curve import _download_current_target_curve
 from .preview_metadata import _render_target_decay_hint, _render_target_preview_metadata
 from .preview_refresh import refresh_target_preview
 from .preview_state import STATE
@@ -120,6 +121,16 @@ def _build_target_preview_section(*, t: Callable) -> None:
 
         preview_col = ui.column().classes("w-full")
         ctrl.register_container("target_preview_scope", preview_col)
+        ctrl.register(
+            "target_curve_download",
+            ui.button(
+                t("target_curve_download_button"),
+                icon="download",
+                on_click=lambda: _download_current_target_curve(t=t),
+            )
+            .props('color="secondary" outline')
+            .tooltip(t("target_curve_download_tooltip")),
+        )
         metadata_col = ui.column().classes("w-full")
         ctrl.register_container("target_preview_metadata_scope", metadata_col)
         _render_target_decay_hint()

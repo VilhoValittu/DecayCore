@@ -25,6 +25,12 @@ class LfRolloffEstimate:
     ref_db: float
     confidence: float
     method: str
+    usable: bool = False
+    reason: str = "fallback"
+    ref_spread_db: float = float("nan")
+    low_coverage_oct: float = float("nan")
+    model_delta_oct: float = float("nan")
+    reference_band: str = ""
 
 
 def _sorted_finite_xy(f_hz, mag_db) -> tuple[np.ndarray, np.ndarray]:
@@ -64,6 +70,42 @@ def _robust_reference_db(values: np.ndarray) -> float:
         if trimmed.size >= 6:
             vv = trimmed
     return float(np.quantile(vv, 0.70))
+
+
+def _reference_stats(values: np.ndarray) -> tuple[float, float]:
+    """Return the robust reference level and its residual spread in dB."""
+    vv = np.asarray(values, dtype=float).reshape(-1)
+    vv = vv[np.isfinite(vv)]
+    if vv.size < 6:
+        return float("nan"), float("nan")
+    if vv.size >= 12:
+        lo, hi = np.quantile(vv, [0.10, 0.90])
+        trimmed = vv[(vv >= float(lo)) & (vv <= float(hi))]
+        if trimmed.size >= 6:
+            vv = trimmed
+    return float(np.quantile(vv, 0.70)), float(np.quantile(vv, 0.90) - np.quantile(vv, 0.10))
+
+
+def _fallback_estimate(
+    default_hz: float,
+    *,
+    ref_db: float = float("nan"),
+    ref_spread_db: float = float("nan"),
+    reason: str,
+    reference_band: str = "",
+) -> LfRolloffEstimate:
+    return LfRolloffEstimate(
+        float(default_hz),
+        float("nan"),
+        float("nan"),
+        float(ref_db),
+        0.0,
+        "fallback",
+        usable=False,
+        reason=str(reason),
+        ref_spread_db=float(ref_spread_db),
+        reference_band=str(reference_band),
+    )
 
 
 def _interpolate_crossing(f_lo: np.ndarray, y_lo: np.ndarray, idx: int, threshold_db: float) -> float:
@@ -161,19 +203,35 @@ def estimate_lf_rolloff_f6(
     ff, mm = _sorted_finite_xy(f_hz, mag_db)
     default_f = float(default_hz)
     if ff.size < 16:
-        return LfRolloffEstimate(default_f, float("nan"), float("nan"), float("nan"), 0.0, "fallback")
+        return _fallback_estimate(default_f, reason="insufficient_samples")
     mm_use = _smooth_mag(ff, mm, smooth_oct)
     ref_mask = (ff >= float(ref_min_hz)) & (ff <= float(ref_max_hz))
+    reference_band = "configured"
     if int(np.count_nonzero(ref_mask)) < 8:
         ref_mask = (ff >= 63.0) & (ff <= 250.0)
-    ref_db = _robust_reference_db(mm_use[ref_mask])
+        reference_band = "fallback_63_250"
+    ref_db, ref_spread_db = _reference_stats(mm_use[ref_mask])
     if not np.isfinite(ref_db):
-        return LfRolloffEstimate(default_f, float("nan"), float("nan"), float("nan"), 0.0, "fallback")
+        return _fallback_estimate(default_f, reason="reference_unavailable", reference_band=reference_band)
+    if not np.isfinite(ref_spread_db) or ref_spread_db > 6.0:
+        return _fallback_estimate(
+            default_f,
+            ref_db=float(ref_db),
+            ref_spread_db=float(ref_spread_db),
+            reason="unstable_reference",
+            reference_band=reference_band,
+        )
 
     lf_hi = float(min(float(search_max_hz), float(ref_min_hz), float(max_hz)))
     lf_mask = (ff >= float(min_hz)) & (ff <= lf_hi)
     if int(np.count_nonzero(lf_mask)) < 8:
-        return LfRolloffEstimate(default_f, float("nan"), float("nan"), float(ref_db), 0.0, "fallback")
+        return _fallback_estimate(
+            default_f,
+            ref_db=float(ref_db),
+            ref_spread_db=float(ref_spread_db),
+            reason="insufficient_low_band_samples",
+            reference_band=reference_band,
+        )
     f_lo = np.asarray(ff[lf_mask], dtype=float)
     m_lo = np.asarray(mm_use[lf_mask], dtype=float)
 
@@ -182,10 +240,21 @@ def estimate_lf_rolloff_f6(
     f12 = _stable_crossing_hz(f_lo, m_lo, float(ref_db) - 12.0, min_span_oct=0.18, near_tolerance_db=1.2)
 
     if stable_f6 is None or not np.isfinite(stable_f6):
-        fallback = default_f if np.isfinite(default_f) else float("nan")
-        return LfRolloffEstimate(fallback, float("nan"), float("nan"), float(ref_db), 0.0, "fallback")
+        return _fallback_estimate(
+            default_f,
+            ref_db=float(ref_db),
+            ref_spread_db=float(ref_spread_db),
+            reason="no_stable_crossing",
+            reference_band=reference_band,
+        )
 
     model_f6, model_conf = _model_f6_from_crossings(f3, stable_f6, f12)
+    low_coverage_oct = float(np.log2(float(stable_f6) / max(float(f_lo[0]), 1e-9)))
+    model_delta_oct = (
+        float(abs(np.log2(float(model_f6) / max(float(stable_f6), 1e-9))))
+        if np.isfinite(model_f6)
+        else float("nan")
+    )
     candidates = [float(stable_f6)]
     method = "stable_crossing"
     confidence = 0.70
@@ -195,6 +264,24 @@ def estimate_lf_rolloff_f6(
         confidence = max(confidence, float(model_conf))
     f6 = float(max(candidates))
     f6 = float(np.clip(f6, float(min_hz), float(max_hz)))
+    reference_quality = float(np.clip(1.0 - max(0.0, float(ref_spread_db) - 2.0) / 12.0, 0.0, 1.0))
+    coverage_quality = float(np.clip(low_coverage_oct / 0.20, 0.0, 1.0))
+    model_quality = (
+        float(np.clip(0.30 / max(model_delta_oct, 1e-9), 0.0, 1.0))
+        if np.isfinite(model_delta_oct)
+        else 1.0
+    )
+    confidence = float(np.clip(confidence * reference_quality * coverage_quality * model_quality, 0.0, 1.0))
+    reasons: list[str] = []
+    if low_coverage_oct < 0.20:
+        reasons.append("insufficient_low_coverage")
+    if not np.isfinite(ref_spread_db) or ref_spread_db > 6.0:
+        reasons.append("unstable_reference")
+    if np.isfinite(model_delta_oct) and model_delta_oct > 0.30:
+        reasons.append("model_disagreement")
+    if confidence < 0.55:
+        reasons.append("low_confidence")
+    usable = not reasons
     return LfRolloffEstimate(
         f6_hz=float(f6),
         stable_f6_hz=float(stable_f6),
@@ -202,4 +289,10 @@ def estimate_lf_rolloff_f6(
         ref_db=float(ref_db),
         confidence=float(np.clip(confidence, 0.0, 1.0)),
         method=str(method),
+        usable=bool(usable),
+        reason="ok" if usable else ",".join(reasons),
+        ref_spread_db=float(ref_spread_db),
+        low_coverage_oct=float(low_coverage_oct),
+        model_delta_oct=float(model_delta_oct),
+        reference_band=reference_band,
     )

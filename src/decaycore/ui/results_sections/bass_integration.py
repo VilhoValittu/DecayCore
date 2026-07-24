@@ -79,6 +79,7 @@ def _render_bass_integration(*, data: dict) -> None:
     alignment_meta = dict(bi_meta.get("alignment", {}) or {})
     allpass_baseline = dict(bi_meta.get("allpass_baseline_metrics", {}) or {})
     allpass_optimized = dict(bi_meta.get("allpass_optimized_metrics", {}) or {})
+    lf_rolloff = dict(diag.get("lf_rolloff", {}) or {})
     allpass_auto_enabled = bool(data.get("bass_integration_allpass_auto_enable", False))
     allpass_on = bool(allpass_meta.get("enabled", False))
     combine_mode = str(
@@ -256,6 +257,15 @@ def _render_bass_integration(*, data: dict) -> None:
     )
     main_delay_label = f"L {_fmt(main_l_delay_value, ' ms')}, R {_fmt(main_r_delay_value, ' ms')}"
     shared_branch_label = t("results_value_bass_shared_sub_branch") if is_dual_sub_prealigned else None
+    lf_rolloff_used = bool(lf_rolloff.get("used_measurement", False))
+    lf_rolloff_f6_hz = safe_float(lf_rolloff.get("f6_hz", float("nan")), float("nan"))
+    lf_rolloff_value = _fmt(lf_rolloff_f6_hz, " Hz") if lf_rolloff_used else t("results_value_bass_f6_unavailable")
+    lf_rolloff_source = (
+        f"{lf_rolloff.get('source', 'n/a') or 'n/a'!s}, "
+        f"{safe_float(lf_rolloff.get('confidence', 0.0), 0.0) * 100.0:.0f}%"
+        if lf_rolloff_used
+        else t("results_value_bass_f6_unavailable")
+    )
 
     if dsp_settings:
         _section(
@@ -368,6 +378,14 @@ def _render_bass_integration(*, data: dict) -> None:
                 t("results_metric_bass_feasibility_reason"),
                 feasibility_reason or "n/a",
                 feasibility_reason or "n/a",
+            ),
+            *(
+                [
+                    metric_row(t("results_metric_bass_main_f6"), lf_rolloff_value, lf_rolloff_value),
+                    metric_row(t("results_metric_bass_main_f6_source"), lf_rolloff_source, lf_rolloff_source),
+                ]
+                if bi_mode == "direct_dac"
+                else []
             ),
             metric_row(
                 t("results_metric_bass_dominant_channel"),
@@ -576,4 +594,3 @@ def _render_bass_integration(*, data: dict) -> None:
 
 
 __all__ = ['_render_bass_integration']
-

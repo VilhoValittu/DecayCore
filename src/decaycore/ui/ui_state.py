@@ -274,7 +274,26 @@ def _auto_status_detail_protection(after: str, low: str, f, r, t) -> str | None:
     lc_m = re.search(r"low-cut ([\d.]+) Hz", after, re.IGNORECASE)
     exc_m = re.search(r"exc seed ([\d.]+) Hz", after, re.IGNORECASE)
     if hz_m and lc_m and exc_m:
+        source_m = re.search(r"source ([^,)]+)", after, re.IGNORECASE)
+        conf_m = re.search(r"confidence ([\d.]+)", after, re.IGNORECASE)
+        if source_m and conf_m:
+            return f(
+                "auto_detail_protection_seed_confident",
+                hz=hz_m.group(1),
+                lc=lc_m.group(1),
+                exc=exc_m.group(1),
+                source=source_m.group(1),
+                conf=int(round(float(conf_m.group(1)) * 100)),
+            )
         return f("auto_detail_protection_seed", hz=hz_m.group(1), lc=lc_m.group(1), exc=exc_m.group(1))
+    fallback_m = re.search(r"-6 dB fallback .*?\(preserving ([\d.]+) Hz\)", after, re.IGNORECASE)
+    if fallback_m and lc_m and exc_m:
+        return f(
+            "auto_detail_protection_seed_fallback",
+            hz=fallback_m.group(1),
+            lc=lc_m.group(1),
+            exc=exc_m.group(1),
+        )
     return None
 
 

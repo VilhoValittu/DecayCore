@@ -50,6 +50,7 @@ from .materialize import (
 )
 from .protection_seed import (
     _estimate_auto_hpf_from_response as _estimate_auto_hpf_from_response,
+    _estimate_auto_mag_c_min as _estimate_auto_mag_c_min,
     _estimate_auto_mag_c_min_hz as _estimate_auto_mag_c_min_hz,
     _resolve_auto_hpf_application as _resolve_auto_hpf_application,
 )

@@ -48,8 +48,8 @@ def _recommend_direct_dac_int_or_default(value: object, default: int) -> int:
 
 
 def _direct_dac_main_rolloff_meta(bundle: BassIntegrationBundle) -> dict[str, float | str]:
-    def _estimate(transfer) -> float:
-        estimate = estimate_lf_rolloff_f6(
+    def _estimate(transfer):
+        return estimate_lf_rolloff_f6(
             getattr(transfer, "freqs_hz", []),
             getattr(transfer, "mag_db", []),
             min_hz=15.0,
@@ -60,17 +60,29 @@ def _direct_dac_main_rolloff_meta(bundle: BassIntegrationBundle) -> dict[str, fl
             smooth_oct=1.0,
             default_hz=float("nan"),
         )
-        return float(estimate.f6_hz)
-
-    l_f6 = _estimate(bundle.l_main)
-    r_f6 = _estimate(bundle.r_main)
-    vals = [v for v in (l_f6, r_f6) if np.isfinite(v)]
+    l_estimate = _estimate(bundle.l_main)
+    r_estimate = _estimate(bundle.r_main)
+    l_f6 = float(l_estimate.f6_hz) if np.isfinite(l_estimate.f6_hz) else float("nan")
+    r_f6 = float(r_estimate.f6_hz) if np.isfinite(r_estimate.f6_hz) else float("nan")
+    valid = [
+        (name, estimate)
+        for name, estimate in (("L", l_estimate), ("R", r_estimate))
+        if bool(estimate.usable) and np.isfinite(estimate.f6_hz)
+    ]
+    vals = [float(estimate.f6_hz) for _name, estimate in valid]
     worst = float(max(vals)) if vals else float("nan")
-    if np.isfinite(l_f6) and np.isfinite(r_f6) and abs(l_f6 - r_f6) > 20.0:
+    source = "+".join(name for name, _estimate in valid) if valid else "fallback"
+    reasons = [
+        f"{name}:{estimate.reason}"
+        for name, estimate in (("L", l_estimate), ("R", r_estimate))
+        if not estimate.usable
+    ]
+    stereo_delta_hz = abs(l_f6 - r_f6) if bool(l_estimate.usable) and bool(r_estimate.usable) else float("nan")
+    if np.isfinite(stereo_delta_hz) and stereo_delta_hz > 20.0:
         _LOG.warning(
             "Bass integration: L/R main speaker F6 estimates diverge by %.1f Hz (L=%.1f Hz, R=%.1f Hz) — "
             "measurement asymmetry may affect crossover recommendation",
-            abs(l_f6 - r_f6),
+            stereo_delta_hz,
             l_f6,
             r_f6,
         )
@@ -78,6 +90,13 @@ def _direct_dac_main_rolloff_meta(bundle: BassIntegrationBundle) -> dict[str, fl
         "main_l_f6_hz": float(l_f6) if np.isfinite(l_f6) else float("nan"),
         "main_r_f6_hz": float(r_f6) if np.isfinite(r_f6) else float("nan"),
         "main_f6_worst_hz": float(worst),
+        "main_l_f6_usable": bool(l_estimate.usable),
+        "main_r_f6_usable": bool(r_estimate.usable),
+        "main_f6_used_measurement": bool(valid),
+        "main_f6_source": source,
+        "main_f6_reason": "ok" if valid else ";".join(reasons) or "no_usable_channel",
+        "main_f6_confidence": float(min(float(estimate.confidence) for _name, estimate in valid)) if valid else 0.0,
+        "main_f6_stereo_delta_hz": float(stereo_delta_hz) if np.isfinite(stereo_delta_hz) else float("nan"),
     }
 
 
@@ -182,6 +201,13 @@ def _recommend_direct_dac_eval_fc(
             "main_l_f6_hz": float(_safe_float(main_rolloff_meta.get("main_l_f6_hz", float("nan")), float("nan"))),
             "main_r_f6_hz": float(_safe_float(main_rolloff_meta.get("main_r_f6_hz", float("nan")), float("nan"))),
             "main_f6_worst_hz": float(_safe_float(main_rolloff_meta.get("main_f6_worst_hz", float("nan")), float("nan"))),
+            "main_l_f6_usable": bool(main_rolloff_meta.get("main_l_f6_usable", False)),
+            "main_r_f6_usable": bool(main_rolloff_meta.get("main_r_f6_usable", False)),
+            "main_f6_used_measurement": bool(main_rolloff_meta.get("main_f6_used_measurement", False)),
+            "main_f6_source": str(main_rolloff_meta.get("main_f6_source", "fallback") or "fallback"),
+            "main_f6_reason": str(main_rolloff_meta.get("main_f6_reason", "") or ""),
+            "main_f6_confidence": float(_safe_float(main_rolloff_meta.get("main_f6_confidence", 0.0), 0.0)),
+            "main_f6_stereo_delta_hz": float(_safe_float(main_rolloff_meta.get("main_f6_stereo_delta_hz", float("nan")), float("nan"))),
             "overlap_ratio": float(ratio),
             "sub_lpf_hz": float(sub_lpf),
             "metric_channel_mode": str(metrics.get("bass_metric_channel_mode", "worst_case") or "worst_case"),
@@ -235,6 +261,13 @@ def _recommend_direct_dac_scan_grid(
             "main_l_f6_hz": float("nan"),
             "main_r_f6_hz": float("nan"),
             "main_f6_worst_hz": float("nan"),
+            "main_l_f6_usable": False,
+            "main_r_f6_usable": False,
+            "main_f6_used_measurement": False,
+            "main_f6_source": "fallback",
+            "main_f6_reason": "candidate_evaluation_failed",
+            "main_f6_confidence": 0.0,
+            "main_f6_stereo_delta_hz": float("nan"),
             "overlap_ratio": MIN_DIRECT_DAC_OVERLAP_RATIO,
             "sub_lpf_hz": fc * MIN_DIRECT_DAC_OVERLAP_RATIO,
             "metric_channel_mode": "worst_case",
@@ -420,4 +453,14 @@ def recommend_direct_dac_crossover(
         "feasibility_class": str(best_entry.get("feasibility_class", "marginal") or "marginal"),
         "feasibility_reason": str(best_entry.get("feasibility_reason", "") or ""),
         "dominant_channel": str(best_entry.get("dominant_channel", "unknown") or "unknown"),
+        "lf_rolloff": {
+            "used_measurement": bool(best_entry.get("main_f6_used_measurement", False)),
+            "source": str(best_entry.get("main_f6_source", "fallback") or "fallback"),
+            "reason": str(best_entry.get("main_f6_reason", "") or ""),
+            "confidence": float(_safe_float(best_entry.get("main_f6_confidence", 0.0), 0.0)),
+            "f6_hz": float(_safe_float(best_entry.get("main_f6_worst_hz", float("nan")), float("nan"))),
+            "l_f6_hz": float(_safe_float(best_entry.get("main_l_f6_hz", float("nan")), float("nan"))),
+            "r_f6_hz": float(_safe_float(best_entry.get("main_r_f6_hz", float("nan")), float("nan"))),
+            "stereo_delta_hz": float(_safe_float(best_entry.get("main_f6_stereo_delta_hz", float("nan")), float("nan"))),
+        },
     }

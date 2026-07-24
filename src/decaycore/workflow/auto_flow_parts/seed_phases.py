@@ -37,7 +37,7 @@ from ...auto_mode.api import (
     _auto_select_target_curve_with_trials,
     _auto_signature,
     _estimate_auto_hpf_from_response,
-    _estimate_auto_mag_c_min_hz,
+    _estimate_auto_mag_c_min,
     _resolve_auto_hpf_application,
 )
 from ...auto_mode.shared import _auto_goal_forced_level_window
@@ -472,13 +472,15 @@ def _seed_phases_apply_preview_seed_heuristics(
     f_r,
     m_r,
 ) -> None:
-    est_mag_c_min = _estimate_auto_mag_c_min_hz(
+    lf_rolloff = _estimate_auto_mag_c_min(
         f_l,
         m_l,
         f_r,
         m_r,
         default_hz=_auto_safe_float(data.get("mag_c_min", 25.0), 25.0),
     )
+    est_mag_c_min = float(lf_rolloff["f6_hz"])
+    data["_auto_lf_rolloff"] = dict(lf_rolloff)
     data["mag_c_min"] = float(est_mag_c_min)
     data["_auto_mag_c_min_hz"] = float(est_mag_c_min)
     est_low_bass_cut = float(
@@ -501,11 +503,22 @@ def _seed_phases_apply_preview_seed_heuristics(
     data["_auto_exc_freq_hz"] = float(round(est_exc_freq, 1))
     data["_auto_exc_seed_freq_hz"] = float(round(est_exc_freq, 1))
 
+    if bool(lf_rolloff.get("used_measurement", False)):
+        f6_status = (
+            f"-6 dB point {float(lf_rolloff['measured_f6_hz']):.1f} Hz "
+            f"(source {lf_rolloff.get('source', 'n/a')!s}, "
+            f"confidence {float(lf_rolloff.get('confidence', 0.0)):.2f})"
+        )
+    else:
+        f6_status = (
+            f"-6 dB fallback {lf_rolloff.get('reason', 'unavailable')!s} "
+            f"(preserving {float(est_mag_c_min):.1f} Hz)"
+        )
     optimizer_backend = str(_auto_optimizer_backend(data, default_optuna_enabled=False) or "builtin").strip().lower()
     if str(optimizer_backend) == "optuna":
         auto_status(
             "DecayCore automatic mode: protection seed "
-            f"(smoothed -6 dB point {float(est_mag_c_min):.1f} Hz -> "
+            f"({f6_status} -> "
             f"mag_c_min {float(data['mag_c_min']):.1f} Hz, "
             f"low-cut {float(data['low_bass_cut_hz']):.1f} Hz, "
             f"exc seed {float(data['exc_freq']):.1f} Hz)"
@@ -513,7 +526,7 @@ def _seed_phases_apply_preview_seed_heuristics(
     else:
         auto_status(
             "DecayCore automatic mode: protection seed "
-            f"(smoothed -6 dB point {float(est_mag_c_min):.1f} Hz -> "
+            f"({f6_status} -> "
             f"mag_c_min {float(data['mag_c_min']):.1f} Hz, "
             f"low-cut {float(data['low_bass_cut_hz']):.1f} Hz, "
             f"exc seed {float(data['exc_freq']):.1f} Hz, "
@@ -1039,4 +1052,3 @@ def _run_auto_mode_seed_phases(
 
 
 __all__ = ['_run_auto_mode_seed_phases']
-

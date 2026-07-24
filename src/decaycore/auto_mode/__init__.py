@@ -39,6 +39,7 @@ _LAZY_EXPORTS = {
     "_run_auto_mode_search": ("api", "_run_auto_mode_search"),
     "get_auto_mode_cache_path": ("api", "get_auto_mode_cache_path"),
     "_estimate_auto_hpf_from_response": ("protection_seed", "_estimate_auto_hpf_from_response"),
+    "_estimate_auto_mag_c_min": ("protection_seed", "_estimate_auto_mag_c_min"),
     "_estimate_auto_mag_c_min_hz": ("protection_seed", "_estimate_auto_mag_c_min_hz"),
     "_resolve_auto_hpf_application": ("protection_seed", "_resolve_auto_hpf_application"),
     "_auto_select_builtin_target_curve": ("target_preselection", "_auto_select_builtin_target_curve"),

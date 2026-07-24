@@ -466,8 +466,8 @@ def _auto_hpf_estimate_quality(
     return float(fit_rmse_db), float(np.clip(conf, 0.0, 1.0))
 
 
-def _auto_mag_c_min_channel_f6(ff: np.ndarray, mm: np.ndarray, *, default_hz: float) -> float | None:
-    estimate = estimate_lf_rolloff_f6(
+def _auto_mag_c_min_channel_estimate(ff: np.ndarray, mm: np.ndarray, *, default_hz: float):
+    return estimate_lf_rolloff_f6(
         ff,
         mm,
         min_hz=float(shared.AUTO_MODE_MAG_C_MIN_MIN_HZ),
@@ -478,8 +478,21 @@ def _auto_mag_c_min_channel_f6(ff: np.ndarray, mm: np.ndarray, *, default_hz: fl
         smooth_oct=float(shared.AUTO_MODE_MAG_C_MIN_SMOOTH_OCT),
         default_hz=float(default_hz),
     )
-    f6 = float(estimate.f6_hz)
-    return f6 if np.isfinite(f6) else None
+
+
+def _auto_mag_c_min_estimate_payload(estimate) -> dict:
+    return {
+        "f6_hz": float(estimate.f6_hz) if np.isfinite(estimate.f6_hz) else float("nan"),
+        "usable": bool(estimate.usable),
+        "reason": str(estimate.reason),
+        "method": str(estimate.method),
+        "confidence": float(estimate.confidence),
+        "ref_db": float(estimate.ref_db) if np.isfinite(estimate.ref_db) else float("nan"),
+        "ref_spread_db": float(estimate.ref_spread_db) if np.isfinite(estimate.ref_spread_db) else float("nan"),
+        "low_coverage_oct": float(estimate.low_coverage_oct) if np.isfinite(estimate.low_coverage_oct) else float("nan"),
+        "model_delta_oct": float(estimate.model_delta_oct) if np.isfinite(estimate.model_delta_oct) else float("nan"),
+        "reference_band": str(estimate.reference_band),
+    }
 
 
 def _auto_hpf_fit_one_channel(
@@ -643,34 +656,73 @@ def _estimate_auto_mag_c_min_hz(
     *,
     default_hz: float = 25.0,
 ) -> float:
+    estimate = _estimate_auto_mag_c_min(
+        f_l,
+        m_l,
+        f_r,
+        m_r,
+        default_hz=default_hz,
+    )
+    return float(estimate["legacy_f6_hz"])
+
+
+def _estimate_auto_mag_c_min(
+    f_l,
+    m_l,
+    f_r,
+    m_r,
+    *,
+    default_hz: float = 25.0,
+) -> dict:
     fl, ml = _shared_sorted_xy(f_l, m_l)
     fr, mr = _shared_sorted_xy(f_r, m_r)
-    f6_l = _auto_mag_c_min_channel_f6(fl, ml, default_hz=default_hz)
-    f6_r = _auto_mag_c_min_channel_f6(fr, mr, default_hz=default_hz)
-    if f6_l is None or not np.isfinite(f6_l):
-        f6_l = None
-    if f6_r is None or not np.isfinite(f6_r):
-        f6_r = None
-
-    if f6_l is None and f6_r is None:
-        est = shared._auto_safe_float(default_hz, 25.0)
-    elif f6_l is None:
-        est = float(f6_r)
-    elif f6_r is None:
-        est = float(f6_l)
-    elif abs(float(f6_l) - float(f6_r)) <= 8.0:
-        est = 0.5 * (float(f6_l) + float(f6_r))
-    else:
-        est = max(float(f6_l), float(f6_r))
-
-    est = float(
+    estimate_l = _auto_mag_c_min_channel_estimate(fl, ml, default_hz=default_hz)
+    estimate_r = _auto_mag_c_min_channel_estimate(fr, mr, default_hz=default_hz)
+    channel_estimates = {"L": _auto_mag_c_min_estimate_payload(estimate_l), "R": _auto_mag_c_min_estimate_payload(estimate_r)}
+    usable = [
+        (name, estimate)
+        for name, estimate in (("L", estimate_l), ("R", estimate_r))
+        if bool(estimate.usable) and np.isfinite(estimate.f6_hz)
+    ]
+    default = float(
         np.clip(
-            est,
+            shared._auto_safe_float(default_hz, 25.0),
             float(shared.AUTO_MODE_MAG_C_MIN_MIN_HZ),
             float(shared.AUTO_MODE_MAG_C_MIN_MAX_HZ),
         )
     )
-    return float(round(est, 1))
+    legacy_l = float(estimate_l.f6_hz) if np.isfinite(estimate_l.f6_hz) else None
+    legacy_r = float(estimate_r.f6_hz) if np.isfinite(estimate_r.f6_hz) else None
+    if legacy_l is None and legacy_r is None:
+        legacy_f6_hz = default
+    elif legacy_l is None:
+        legacy_f6_hz = float(legacy_r)
+    elif legacy_r is None:
+        legacy_f6_hz = float(legacy_l)
+    elif abs(float(legacy_l) - float(legacy_r)) <= 8.0:
+        legacy_f6_hz = 0.5 * (float(legacy_l) + float(legacy_r))
+    else:
+        legacy_f6_hz = max(float(legacy_l), float(legacy_r))
+    measured_f6_hz = float(max(float(estimate.f6_hz) for _name, estimate in usable)) if usable else float("nan")
+    chosen_f6_hz = float(max(default, measured_f6_hz)) if np.isfinite(measured_f6_hz) else default
+    source = "+".join(name for name, _estimate in usable) if usable else "fallback"
+    reasons = [str(estimate.reason) for estimate in (estimate_l, estimate_r) if not estimate.usable]
+    stereo_delta_hz = (
+        abs(float(estimate_l.f6_hz) - float(estimate_r.f6_hz))
+        if bool(estimate_l.usable) and bool(estimate_r.usable)
+        else float("nan")
+    )
+    return {
+        "f6_hz": float(round(chosen_f6_hz, 1)),
+        "measured_f6_hz": float(round(measured_f6_hz, 1)) if np.isfinite(measured_f6_hz) else float("nan"),
+        "legacy_f6_hz": float(round(legacy_f6_hz, 1)),
+        "used_measurement": bool(usable),
+        "source": source,
+        "reason": "ok" if usable else ";".join(reasons) or "no_usable_channel",
+        "confidence": float(min(float(estimate.confidence) for _name, estimate in usable)) if usable else 0.0,
+        "stereo_delta_hz": float(stereo_delta_hz) if np.isfinite(stereo_delta_hz) else float("nan"),
+        "channels": channel_estimates,
+    }
 
 
 def _estimate_auto_hpf_from_response(
@@ -787,6 +839,7 @@ def _resolve_auto_hpf_application(auto_hpf: dict | None, *, user_hpf_enabled: bo
 
 __all__ = [
     "_estimate_auto_hpf_from_response",
+    "_estimate_auto_mag_c_min",
     "_estimate_auto_mag_c_min_hz",
     "_resolve_auto_hpf_application",
 ]

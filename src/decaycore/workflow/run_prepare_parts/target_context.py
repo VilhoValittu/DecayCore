@@ -309,6 +309,7 @@ def _build_bass_integration_metadata_unified(
         "diagnostics": {
             **bundle_diagnostics,
             **dict(bi_state["bi_selected_diagnostics"] or {}),
+            "lf_rolloff": dict(bi_state.get("bi_lf_rolloff", {}) or {}),
         },
         "recommended_crossover_hz": bi_state["bi_recommended_xo_hz"],
         "recommended_sub_lpf_hz": bi_state["bi_recommended_sub_lpf_hz"],
@@ -613,6 +614,7 @@ def _prepare_target_curve_bass_integration_context(
         "bi_selected_diagnostics": bi_selected_diagnostics,
         "bi_alignment_recommendation": bi_alignment_recommendation,
         "bi_allpass_recommendation": bi_allpass_recommendation,
+        "bi_lf_rolloff": dict(_bi_unified.get("lf_rolloff", {}) or {}),
     }
 
 
