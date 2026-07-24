@@ -18,7 +18,27 @@ Each script asks for confirmation before deleting. Pass `-y` / `--yes`
 (or answer the prompt) to delete without further questions. The shell scripts
 also support `--dry-run` to print what would be removed without deleting.
 
-## What gets deleted
+## Python bytecode cache
+
+When running DecayCore directly from its Python source, stale bytecode can be
+removed with the script for the operating system:
+
+| OS      | Script                             |
+|---------|------------------------------------|
+| Windows | `delete_pycache_windows.bat`       |
+| macOS   | `delete_pycache_macos.sh`          |
+| Linux   | `delete_pycache_linux.sh`          |
+
+Run these scripts from their location inside the cloned DecayCore repository.
+They find the repository relative to the script, verify that it is a DecayCore
+source tree, and remove only project `__pycache__` directories. Virtual
+environments and generated `build`, `dist`, and `out` directories are not
+scanned.
+
+The pycache scripts ask for confirmation and support `-y` / `--yes` and
+`-n` / `--dry-run`.
+
+## What the data-reset scripts delete
 
 These paths mirror `src/decaycore/app_paths.py` and
 `src/decaycore/auto_mode/optuna_backend_storage.py`.
