@@ -10,6 +10,8 @@
 
 import numpy as np
 
+USER_PRESET_MODE_PREFIX = "UserPreset::"
+
 _FULL_HC_FREQS = np.array([
     0.0,
     20.0, 25.0, 31.5, 40.0, 50.0, 63.0, 80.0, 100.0, 125.0,
@@ -136,6 +138,8 @@ def _normalize_hc_mode_key(v) -> str:
 
     known = set(_CURVE_MAGS.keys()) | {"Toole", "Cinema", "Custom", "Upload"}
     if s in known:
+        return s
+    if s.startswith(USER_PRESET_MODE_PREFIX):
         return s
 
     n = s.lower().replace(" ", "")

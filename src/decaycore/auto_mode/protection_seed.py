@@ -684,6 +684,11 @@ def _estimate_auto_mag_c_min(
         for name, estimate in (("L", estimate_l), ("R", estimate_r))
         if bool(estimate.usable) and np.isfinite(estimate.f6_hz)
     ]
+    stable = [
+        (name, estimate)
+        for name, estimate in (("L", estimate_l), ("R", estimate_r))
+        if np.isfinite(estimate.stable_f6_hz) and np.isfinite(estimate.f6_hz)
+    ]
     default = float(
         np.clip(
             shared._auto_safe_float(default_hz, 25.0),
@@ -704,8 +709,19 @@ def _estimate_auto_mag_c_min(
     else:
         legacy_f6_hz = max(float(legacy_l), float(legacy_r))
     measured_f6_hz = float(max(float(estimate.f6_hz) for _name, estimate in usable)) if usable else float("nan")
-    chosen_f6_hz = float(max(default, measured_f6_hz)) if np.isfinite(measured_f6_hz) else default
+    fallback_f6_hz = float(max(float(estimate.f6_hz) for _name, estimate in stable)) if stable else float("nan")
+    if np.isfinite(measured_f6_hz):
+        chosen_f6_hz = float(max(default, measured_f6_hz))
+    elif np.isfinite(fallback_f6_hz):
+        # A quality gate may reject a measurement for confidence reasons while
+        # its stable crossing still proves that a lower correction bound would
+        # be unsafe.  Keep that conservative bound rather than falling to the
+        # UI's 10 Hz default.
+        chosen_f6_hz = float(max(default, fallback_f6_hz))
+    else:
+        chosen_f6_hz = default
     source = "+".join(name for name, _estimate in usable) if usable else "fallback"
+    fallback_source = "+".join(name for name, _estimate in stable) if stable else "none"
     reasons = [str(estimate.reason) for estimate in (estimate_l, estimate_r) if not estimate.usable]
     stereo_delta_hz = (
         abs(float(estimate_l.f6_hz) - float(estimate_r.f6_hz))
@@ -715,6 +731,8 @@ def _estimate_auto_mag_c_min(
     return {
         "f6_hz": float(round(chosen_f6_hz, 1)),
         "measured_f6_hz": float(round(measured_f6_hz, 1)) if np.isfinite(measured_f6_hz) else float("nan"),
+        "fallback_f6_hz": float(round(fallback_f6_hz, 1)) if np.isfinite(fallback_f6_hz) else float("nan"),
+        "fallback_source": fallback_source,
         "legacy_f6_hz": float(round(legacy_f6_hz, 1)),
         "used_measurement": bool(usable),
         "source": source,

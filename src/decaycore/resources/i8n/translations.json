@@ -471,6 +471,7 @@
     "plot_level_exported": "Headroom baked in",
     "plot_level_compensated": "Headroom removed",
     "plot_level_both": "Both",
+    "plot_confidence_title": "Confidence",
     "lvl_algo_median": "Median",
     "lvl_algo_average": "Average",
     "ui_ir_export_window_title": "IR Export Window",
@@ -764,7 +765,20 @@
     "session_cancel": "Cancel session",
     "session_continue": "Continue",
     "session_use_final": "Use final measurements",
-    "session_live_event_log": "Live event log"
+    "session_live_event_log": "Live event log",
+    "target_curve_save_preset_button": "Save target curve as preset…",
+    "target_curve_save_preset_tooltip": "Save the current target curve as a named preset for reuse",
+    "target_curve_save_preset_dialog_title": "Save target curve preset",
+    "target_curve_save_preset_name_label": "Preset name",
+    "target_curve_save_preset_save_button": "Save",
+    "target_curve_save_preset_cancel_button": "Cancel",
+    "target_curve_save_preset_success": "Target curve preset saved",
+    "target_curve_save_preset_empty_name": "Enter a name for the preset",
+    "target_curve_save_preset_duplicate_name": "A preset with this name already exists",
+    "target_curve_save_preset_unavailable": "The current target curve could not be saved",
+    "target_curve_save_preset_list_title": "Saved presets",
+    "target_curve_save_preset_delete_tooltip": "Delete this preset",
+    "target_curve_save_preset_deleted": "Preset deleted"
   },
   "fi": {
     "about_body": "**DecayCore** on huonekorjauksen FIR-generaattori DSP-järjestelmille, jotka tukevat FIR-suodattimia.\n\n- **Tekijä:** Vilho Valittu 📧 [vilho.valittu@gmail.com](mailto:vilho.valittu@gmail.com)\n\n- **Yhteisötestaus ja palaute:** Patu\n- **Erityiskiitokset:** OCA <a href='https://www.youtube.com/@ocaudiophile' target='_blank'>youtube.com/@ocaudiophile</a>\n\n☕ **Tue kehitystä:** <a href='https://ko-fi.com/vilhovalittu' target='_blank'>ko-fi.com/vilhovalittu</a>",
@@ -1232,6 +1246,7 @@
     "plot_level_exported": "Headroom leivottuna sisään",
     "plot_level_compensated": "Headroom pois",
     "plot_level_both": "Molemmat",
+    "plot_confidence_title": "Luottamus",
     "lvl_algo_median": "Mediaani",
     "lvl_algo_average": "Keskiarvo",
     "ui_ir_export_window_title": "IR Export Window",
@@ -1525,6 +1540,19 @@
     "session_cancel": "Peruuta istunto",
     "session_continue": "Jatka",
     "session_use_final": "Käytä lopullisia mittauksia",
-    "session_live_event_log": "Tapahtumaloki"
+    "session_live_event_log": "Tapahtumaloki",
+    "target_curve_save_preset_button": "Tallenna tavoitekäyrä presettinä…",
+    "target_curve_save_preset_tooltip": "Tallenna nykyinen tavoitekäyrä nimettynä presettinä uudelleenkäyttöä varten",
+    "target_curve_save_preset_dialog_title": "Tallenna tavoitekäyrän presetti",
+    "target_curve_save_preset_name_label": "Presetin nimi",
+    "target_curve_save_preset_save_button": "Tallenna",
+    "target_curve_save_preset_cancel_button": "Peruuta",
+    "target_curve_save_preset_success": "Tavoitekäyrän presetti tallennettu",
+    "target_curve_save_preset_empty_name": "Anna presetille nimi",
+    "target_curve_save_preset_duplicate_name": "Tämän niminen presetti on jo olemassa",
+    "target_curve_save_preset_unavailable": "Nykyistä tavoitekäyrää ei voitu tallentaa",
+    "target_curve_save_preset_list_title": "Tallennetut presetit",
+    "target_curve_save_preset_delete_tooltip": "Poista tämä presetti",
+    "target_curve_save_preset_deleted": "Presetti poistettu"
   }
 }

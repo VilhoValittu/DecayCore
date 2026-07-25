@@ -213,15 +213,6 @@ def estimate_lf_rolloff_f6(
     ref_db, ref_spread_db = _reference_stats(mm_use[ref_mask])
     if not np.isfinite(ref_db):
         return _fallback_estimate(default_f, reason="reference_unavailable", reference_band=reference_band)
-    if not np.isfinite(ref_spread_db) or ref_spread_db > 6.0:
-        return _fallback_estimate(
-            default_f,
-            ref_db=float(ref_db),
-            ref_spread_db=float(ref_spread_db),
-            reason="unstable_reference",
-            reference_band=reference_band,
-        )
-
     lf_hi = float(min(float(search_max_hz), float(ref_min_hz), float(max_hz)))
     lf_mask = (ff >= float(min_hz)) & (ff <= lf_hi)
     if int(np.count_nonzero(lf_mask)) < 8:
@@ -240,11 +231,14 @@ def estimate_lf_rolloff_f6(
     f12 = _stable_crossing_hz(f_lo, m_lo, float(ref_db) - 12.0, min_span_oct=0.18, near_tolerance_db=1.2)
 
     if stable_f6 is None or not np.isfinite(stable_f6):
+        reason = "no_stable_crossing"
+        if not np.isfinite(ref_spread_db) or ref_spread_db > 6.0:
+            reason = "unstable_reference,no_stable_crossing"
         return _fallback_estimate(
             default_f,
             ref_db=float(ref_db),
             ref_spread_db=float(ref_spread_db),
-            reason="no_stable_crossing",
+            reason=reason,
             reference_band=reference_band,
         )
 

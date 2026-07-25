@@ -11,8 +11,14 @@
 """Application-level house-curve loading helpers."""
 
 import numpy as np
-from ..common.house_curves import _normalize_hc_mode_key, get_house_curve_by_name, adapt_house_curve_to_rt60
+from ..common.house_curves import (
+    USER_PRESET_MODE_PREFIX,
+    _normalize_hc_mode_key,
+    adapt_house_curve_to_rt60,
+    get_house_curve_by_name,
+)
 from ..config.legacy_keys import is_auto_mode
+from .target_preset_service import load_user_target_preset
 
 MANUAL_TARGET_TILT_PIVOT_HZ = 1000.0
 
@@ -219,6 +225,15 @@ def _load_upload_house_curve(data: dict, *, mode_key: str):
     return None, None, "Preset"
 
 
+def _load_user_preset_house_curve(data: dict, *, mode_key: str):
+    if not mode_key.startswith(USER_PRESET_MODE_PREFIX):
+        return None, None, "Preset"
+    hc_f, hc_m = load_user_target_preset(mode_key)
+    if hc_f is None or hc_m is None:
+        return None, None, "Preset"
+    return hc_f, hc_m, "UserPreset"
+
+
 def _load_local_house_curve(data: dict, *, parse_measurements_from_path=None):
     if not data.get("local_path_house") or not callable(parse_measurements_from_path):
         return None, None, "Preset"
@@ -265,6 +280,8 @@ def load_house_curve(data: dict, *, parse_measurements_from_path=None):
     hc_f, hc_m, hc_source = _load_adaptive_house_curve(data, mode_key=mode_key)
     if hc_f is None:
         hc_f, hc_m, hc_source = _load_upload_house_curve(data, mode_key=mode_key)
+    if hc_f is None:
+        hc_f, hc_m, hc_source = _load_user_preset_house_curve(data, mode_key=mode_key)
     if hc_f is None:
         hc_f, hc_m, hc_source = _load_local_house_curve(data, parse_measurements_from_path=parse_measurements_from_path)
     if hc_f is None:

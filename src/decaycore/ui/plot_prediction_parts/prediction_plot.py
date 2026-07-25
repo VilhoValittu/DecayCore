@@ -65,7 +65,7 @@ def _prediction_plot_fft_context(*, filt_ir, fs, target_stats) -> dict:
     return {
         "vis_points": 4000,
         "show_afdw": bool(show_afdw),
-        "fig_height": 1520 if show_afdw else 1220,
+        "fig_height": 1820 if show_afdw else 1520,
         "fig_width": 1750,
         "n_fft": int(n_fft),
         "f_lin": f_lin,
@@ -155,6 +155,7 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
 
         _subplot_titles = (
             "<b>Magnitude & Alignment</b>",
+            f"<b>{t('plot_confidence_title')}</b>",
             "<b>Filter Phase (delay compensated)</b>",
             "<b>Filter Group Delay (delay compensated)</b>",
             "<b>Filter (dB)</b>",
@@ -162,7 +163,7 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
         if show_afdw:
             _subplot_titles = _subplot_titles + ("<b>A-FDW Effective BW (oct)</b>",)
         fig = make_subplots(
-            rows=5 if show_afdw else 4,
+            rows=6 if show_afdw else 5,
             cols=1,
             vertical_spacing=0.045,
             subplot_titles=_subplot_titles,
@@ -248,10 +249,9 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
                     fill="tozeroy",
                     fillcolor="rgba(148,163,184,0.18)",
                     line=dict(color="rgba(148,163,184,0.45)", width=1.8),
-                    yaxis="y6",
                     showlegend=True,
                 ),
-                row=1,
+                row=2,
                 col=1,
             )
 
@@ -277,7 +277,7 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
                 line=dict(color="#a78bfa", width=1.2),
                 showlegend=False,
             ),
-            row=2,
+            row=3,
             col=1,
         )
         fig.add_trace(
@@ -288,7 +288,7 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
                 line=dict(color="#a78bfa", width=1.2),
                 showlegend=False,
             ),
-            row=3,
+            row=4,
             col=1,
         )
 
@@ -302,7 +302,7 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
                 showlegend=False,
                 visible=True,
             ),
-            row=4,
+            row=5,
             col=1,
         )
         idx_filter_comp = len(fig.data)
@@ -315,7 +315,7 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
                 showlegend=False,
                 visible=False,
             ),
-            row=4,
+            row=5,
             col=1,
         )
 
@@ -425,7 +425,7 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
                         fillcolor="rgba(96,165,250,0.07)",
                         layer="below",
                         line_width=0,
-                        row=4,
+                        row=5,
                         col=1,
                     )
             except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
@@ -503,7 +503,7 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
                                     showlegend=False,
                                     name="A-FDW BW",
                                 ),
-                                row=5,
+                                row=6,
                                 col=1,
                             )
                         else:
@@ -520,8 +520,8 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
                     text=f"No A-FDW BW data ({bw_dbg})",
                     x=0.5,
                     y=0.5,
-                    xref="x5 domain",
-                    yref="y5 domain",
+                    xref="x6 domain",
+                    yref="y6 domain",
                     showarrow=False,
                     font=dict(color=_PLOT_FONT),
                     bgcolor=_PLOT_PANEL_BG,
@@ -531,7 +531,7 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
 
         _t_vals_full = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
         t_vals = [v for v in _t_vals_full if v <= x_max_hz]
-        _n_rows = 5 if show_afdw else 4
+        _n_rows = 6 if show_afdw else 5
         for r in range(1, _n_rows + 1):
             fig.update_xaxes(matches="x", row=r, col=1)
             fig.update_xaxes(type="log", range=[np.log10(10), np.log10(x_max_hz)], tickvals=t_vals, row=r, col=1)
@@ -540,9 +540,16 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
             fig.update_yaxes(range=[-y_mag_range_db, y_mag_range_db], row=1, col=1)
         else:
             fig.update_yaxes(autorange=True, row=1, col=1)
-        fig.update_yaxes(autorange=True, row=2, col=1)
+        fig.update_yaxes(
+            range=[0.0, 1.0],
+            tickvals=[0.0, 0.25, 0.5, 0.75, 1.0],
+            ticktext=["0%", "25%", "50%", "75%", "100%"],
+            row=2,
+            col=1,
+        )
         fig.update_yaxes(autorange=True, row=3, col=1)
-        fig.update_yaxes(range=[-30, 12], row=4, col=1)
+        fig.update_yaxes(autorange=True, row=4, col=1)
+        fig.update_yaxes(range=[-30, 12], row=5, col=1)
         if show_afdw:
             if bw_vis_smooth is not None and len(bw_vis_smooth) > 0:
                 bw_data_min = float(np.min(bw_vis_smooth))
@@ -554,10 +561,10 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
                 if bw_hi - bw_lo < 0.02:
                     bw_lo = max(0.0, (bw_data_min + bw_data_max) / 2.0 - 0.01)
                     bw_hi = bw_lo + 0.02
-                fig.update_yaxes(range=[bw_lo, bw_hi], row=5, col=1)
+                fig.update_yaxes(range=[bw_lo, bw_hi], row=6, col=1)
             else:
-                fig.update_yaxes(range=[0.0, 1.0 / 3.0], row=5, col=1)
-            fig.update_yaxes(title_text="oct", row=5, col=1)
+                fig.update_yaxes(range=[0.0, 1.0 / 3.0], row=6, col=1)
+            fig.update_yaxes(title_text="oct", row=6, col=1)
 
         title_text = f"{title} Analysis"
         if analysis_meta_text:
@@ -580,15 +587,6 @@ def generate_prediction_plot(  # noqa: C901 - prediction plot keeps full diagnos
                 xanchor="left",
             ),
             uirevision="keep",
-            yaxis6=dict(
-                overlaying="y",
-                range=[0, 1],
-                side="right",
-                showticklabels=False,
-                showgrid=False,
-                zeroline=False,
-                layer="below traces",
-            ),
         )
 
         fig.update_xaxes(

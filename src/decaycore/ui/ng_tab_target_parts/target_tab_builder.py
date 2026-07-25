@@ -31,7 +31,12 @@ from ...ui_i18n import (
     normalize_output_tilt_source_value,
     tr_options,
 )
-from .preview_curve import _download_current_target_curve
+from ...application.target_preset_service import (
+    delete_user_target_preset,
+    list_user_target_presets,
+    preset_name_exists,
+)
+from .preview_curve import _download_current_target_curve, _save_current_target_curve_as_preset
 from .preview_metadata import _render_target_decay_hint, _render_target_preview_metadata
 from .preview_refresh import refresh_target_preview
 from .preview_state import STATE
@@ -54,6 +59,13 @@ _HC_OPTS = {
     "Cinema":    "Cinema",
     "Upload":    "Upload Custom",
 }
+
+
+def _hc_opts_with_user_presets() -> dict:
+    opts = dict(_HC_OPTS)
+    for preset in list_user_target_presets():
+        opts[preset["mode_key"]] = preset["name"]
+    return opts
 
 
 def _step_manual_target(delta_db: float) -> None:
@@ -121,20 +133,105 @@ def _build_target_preview_section(*, t: Callable) -> None:
 
         preview_col = ui.column().classes("w-full")
         ctrl.register_container("target_preview_scope", preview_col)
-        ctrl.register(
-            "target_curve_download",
-            ui.button(
-                t("target_curve_download_button"),
-                icon="download",
-                on_click=lambda: _download_current_target_curve(t=t),
+        with ui.row().classes("w-full gap-2"):
+            ctrl.register(
+                "target_curve_download",
+                ui.button(
+                    t("target_curve_download_button"),
+                    icon="download",
+                    on_click=lambda: _download_current_target_curve(t=t),
+                )
+                .props('color="secondary" outline')
+                .tooltip(t("target_curve_download_tooltip")),
             )
-            .props('color="secondary" outline')
-            .tooltip(t("target_curve_download_tooltip")),
-        )
+            _build_target_save_preset_dialog(t=t)
         metadata_col = ui.column().classes("w-full")
         ctrl.register_container("target_preview_metadata_scope", metadata_col)
         _render_target_decay_hint()
         _render_target_preview_metadata()
+
+
+def _build_target_save_preset_dialog(*, t: Callable) -> None:
+    from nicegui import ui
+
+    with ui.dialog() as save_dialog, ui.card().classes("w-full max-w-md gap-3 cf-modal-card"):
+        with ui.row().classes("w-full justify-between items-center shrink-0"):
+            ui.label(t("target_curve_save_preset_dialog_title")).classes("text-lg font-semibold")
+            ui.button(icon="close", on_click=save_dialog.close).props("flat dense round")
+
+        name_input = (
+            ui.input(label=t("target_curve_save_preset_name_label"))
+            .props("dense outlined")
+            .classes("w-full")
+        )
+
+        preset_list_col = ui.column().classes("w-full gap-1")
+
+        def _render_preset_list() -> None:
+            preset_list_col.clear()
+            presets = list_user_target_presets()
+            if not presets:
+                return
+            with preset_list_col:
+                ui.label(t("target_curve_save_preset_list_title")).classes(
+                    "text-xs font-medium text-gray-400 mt-2"
+                )
+                for preset in presets:
+                    with ui.row().classes("w-full items-center justify-between gap-2"):
+                        ui.label(preset["name"]).classes("text-sm")
+                        ui.button(
+                            icon="delete",
+                            on_click=lambda _, mode_key=preset["mode_key"]: _on_delete_preset(mode_key),
+                        ).props('flat dense round color="negative"').tooltip(
+                            t("target_curve_save_preset_delete_tooltip")
+                        )
+
+        def _on_save_preset() -> None:
+            name = str(name_input.value or "").strip()
+            if not name:
+                ui.notify(t("target_curve_save_preset_empty_name"), type="warning", position="top")
+                return
+            if preset_name_exists(name):
+                ui.notify(t("target_curve_save_preset_duplicate_name"), type="warning", position="top")
+                return
+            new_mode_key = _save_current_target_curve_as_preset(name)
+            if new_mode_key is None:
+                ui.notify(t("target_curve_save_preset_unavailable"), type="warning", position="top")
+                return
+            ctrl.set_options("hc_mode", _hc_opts_with_user_presets())
+            ctrl.set_value("hc_mode", new_mode_key)
+            name_input.set_value("")
+            _render_preset_list()
+            ui.notify(t("target_curve_save_preset_success"), type="positive", position="top")
+            save_dialog.close()
+
+        def _on_delete_preset(mode_key: str) -> None:
+            delete_user_target_preset(mode_key)
+            if ctrl.value("hc_mode", None) == mode_key:
+                ctrl.set_value("hc_mode", "Harman6")
+            ctrl.set_options("hc_mode", _hc_opts_with_user_presets())
+            _render_preset_list()
+            ui.notify(t("target_curve_save_preset_deleted"), type="info", position="top")
+
+        with ui.row().classes("w-full justify-end gap-2 mt-2"):
+            ui.button(t("target_curve_save_preset_cancel_button"), on_click=save_dialog.close).props("flat")
+            ui.button(
+                t("target_curve_save_preset_save_button"),
+                on_click=_on_save_preset,
+            ).props('color="primary"')
+
+        _render_preset_list()
+
+    ctrl.register(
+        "target_curve_save_preset",
+        ui.button(
+            t("target_curve_save_preset_button"),
+            icon="save",
+            on_click=save_dialog.open,
+        )
+        .props('color="secondary" outline')
+        .tooltip(t("target_curve_save_preset_tooltip")),
+    )
 
 
 def _build_target_hc_section(*, t: Callable, get_val: Callable) -> None:
@@ -149,7 +246,7 @@ def _build_target_hc_section(*, t: Callable, get_val: Callable) -> None:
         ctrl.register(
             "hc_mode",
             ui.select(
-                options=_HC_OPTS,
+                options=_hc_opts_with_user_presets(),
                 value=hc_value,
                 label=t("hc_mode"),
             ).props("dense outlined").classes("w-full"),

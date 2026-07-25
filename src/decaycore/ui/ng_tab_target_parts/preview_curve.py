@@ -26,6 +26,7 @@ from ...application.house_curve_service import (
     load_house_curve,
     load_target_curve,
 )
+from ...application.target_preset_service import save_user_target_preset
 from ...ui_i18n import LVL_MODE_AUTO, LVL_MODE_MANUAL, normalize_lvl_mode_value
 
 _TARGET_PREVIEW_MIN_HZ = 10.0
@@ -178,6 +179,29 @@ def _current_target_preview_curve(
             0.0,
         ),
     )
+
+
+def _save_current_target_curve_as_preset(name: str) -> str | None:
+    """Save the currently displayed target curve as a named preset.
+
+    Returns the new hc_mode key on success, or None if the curve could not
+    be resolved or the name/curve was rejected by the preset service.
+    """
+    try:
+        curve = _current_target_preview_curve()
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        RuntimeError,
+        OSError,
+        OverflowError,
+    ):
+        logger.warning("Target curve preset save failed while resolving curve", exc_info=True)
+        return None
+    if curve is None:
+        return None
+    return save_user_target_preset(name, curve.frequency_hz, curve.display_magnitude_db)
 
 
 def _serialize_target_curve_txt(curve: _TargetPreviewCurve) -> bytes:
