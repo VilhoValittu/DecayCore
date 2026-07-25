@@ -76,7 +76,6 @@ def _direct_dac_prepare_allpass_postpass(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         _LOG.debug("Direct-DAC allpass post-pass failed", exc_info=True)
         result["allpass_reason"] = "Allpass post-pass failed."
@@ -207,7 +206,6 @@ def _recommend_direct_dac_prepare_builtin_core(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         _LOG.debug("Direct-DAC builtin alignment recommendation failed; keeping baseline alignment", exc_info=True)
     best_delay = float(align_result.get("sub_delay_ms", 0.0) or 0.0)
@@ -253,7 +251,6 @@ def _recommend_direct_dac_prepare_builtin_core(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         _LOG.debug("Direct-DAC builtin crossover recommendation failed; keeping 80 Hz default", exc_info=True)
 

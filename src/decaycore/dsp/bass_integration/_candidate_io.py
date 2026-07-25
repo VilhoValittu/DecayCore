@@ -45,7 +45,6 @@ def _order_from_slope(value: Any, default_order: int) -> int:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return int(default_order)
 

@@ -16,9 +16,9 @@ import numpy as np
 
 _logger = logging.getLogger(__name__)
 
-from ...dsp.modal_analysis import RoomModeEvent, detect_room_modes
+from ...dsp.modal_analysis_parts import RoomModeEvent, detect_room_modes
 from ...dsp.smoothing import smooth_gain_fractional_octave
-from .. import shared
+from .. import shared_parts as shared
 
 from .metrics_common import _auto_stats_band_n, _auto_stats_pick_arr
 
@@ -267,7 +267,6 @@ def _broad_residual_smooth_series(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         detect = np.asarray(err_use, dtype=float)
     if detect.size != err_use.size:
@@ -291,7 +290,6 @@ def _broad_residual_smooth_series(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         baseline = np.full_like(err_use, float(np.nanmedian(err_use)))
     if baseline.size != err_use.size:
@@ -496,7 +494,6 @@ def _modal_residual_promoted_peaks(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return []
 

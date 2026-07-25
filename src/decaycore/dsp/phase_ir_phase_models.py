@@ -35,7 +35,6 @@ def _cfg_value(cfg, key: str, default):
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         logger.exception("cfg dict value read")
     try:
@@ -51,7 +50,6 @@ def _cfg_value(cfg, key: str, default):
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         logger.exception("cfg attr value read")
         return default
@@ -78,7 +76,6 @@ def _collect_phase_anchor_hz(cfg) -> tuple[float, ...]:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         logger.exception("crossover anchor collect")
     try:
@@ -172,7 +169,6 @@ def phase_confidence_profile(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         conf = np.asarray([], dtype=float)
     if conf.size != f.size:

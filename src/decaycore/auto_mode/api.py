@@ -44,7 +44,7 @@ from .candidate_generation import (
     _suggest_auto_mode_candidate_optuna as _suggest_auto_mode_candidate_optuna,
 )
 from .filter_priors import get_auto_mode_filter_seed_preset as get_auto_mode_filter_seed_preset
-from .materialize import (
+from .materialize_parts import (
     AutoModeMaterializeContext as AutoModeMaterializeContext,
     build_materialize_helpers as build_materialize_helpers,
 )
@@ -72,7 +72,7 @@ from .search_state import (
     _AutoModeSearchState as _AutoModeSearchState,
     _auto_set_search_winner as _auto_set_search_winner,
 )
-from .shared import (
+from .shared_parts import (
     AUTO_MODE_COMPAT_VERSION as AUTO_MODE_COMPAT_VERSION,
     AUTO_MODE_CACHE_SCHEMA_VERSION as SHARED_AUTO_MODE_CACHE_SCHEMA_VERSION,
     AUTO_MODE_LOW_BASS_MAX_HZ as SHARED_AUTO_MODE_LOW_BASS_MAX_HZ,
@@ -117,7 +117,7 @@ from .shared import (
     _auto_trial_chunk_size as _auto_trial_chunk_size,
     _auto_trial_workers,
 )
-from .target_preselection import _auto_select_builtin_target_curve as _auto_select_builtin_target_curve
+from .target_preselection_parts import _auto_select_builtin_target_curve as _auto_select_builtin_target_curve
 from ..app_paths import (
     decaycore_data_dir as decaycore_data_dir,
     program_version_token as program_version_token,

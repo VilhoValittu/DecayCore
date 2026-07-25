@@ -21,7 +21,7 @@ from ..scoring_ranking import (
     _auto_mode_ripple_for_pareto,
     _auto_prepost_for_pareto,
 )
-from ..shared import _auto_safe_float, _m
+from ..shared_parts import _auto_safe_float, _m
 
 logger = logging.getLogger("DecayCore")
 
@@ -200,4 +200,3 @@ __all__ = [
     '_LOW_BASS_CUT_WINNER_POLISH_STEP_HZ',
     '_LOW_BASS_CUT_WINNER_POLISH_MAX_DELTA_HZ',
 ]
-

@@ -17,7 +17,7 @@ import math
 from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from ...config.schema import AUTO_MODE_DEFAULT_CFG_TO_UI
 from ...auto_mode.filter_priors import get_auto_mode_filter_auto_defaults
-from ...auto_mode.shared import (
+from ...auto_mode.shared_parts import (
     _auto_filter_type_for_key,
     _auto_goal_is_flat_family,
 )

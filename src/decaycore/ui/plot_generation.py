@@ -22,7 +22,7 @@ from .plot_common import (
     remove_ir_peak_delay,
     smooth_complex,
 )
-from .plot_prediction import ChannelPlotData, compute_channel_plot_data
+from .plot_prediction_parts import ChannelPlotData, compute_channel_plot_data
 
 __all__ = [
     "PHASE_SMOOTH_OCT",

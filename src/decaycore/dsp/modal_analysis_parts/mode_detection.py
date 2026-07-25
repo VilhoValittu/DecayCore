@@ -18,6 +18,7 @@ from .modal_preparation import (
     ModalAnalysisResult,
     RoomModeEvent,
     _empty_result,
+    _prepare_arrays,
     _smooth_log_box,
     _width_bounds,
 )
@@ -261,7 +262,6 @@ def _decay_severity_at(rt60_by_band, center_hz: float) -> float:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return 0.0
     if not pairs:
@@ -283,7 +283,6 @@ def _decay_severity_at(rt60_by_band, center_hz: float) -> float:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return 0.0
     target = 0.45 if float(center_hz) <= 120.0 else 0.38
@@ -547,7 +546,6 @@ def detect_room_modes(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return _empty_result()
 
@@ -561,4 +559,3 @@ __all__ = [
     '_classify_event',
     'detect_room_modes',
 ]
-

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..config.decaycore_pipeline import collect_ui_config
+from ..config.pipeline_parts import collect_ui_config
 from ..config.schema import REQUEST_RUNTIME_DEFAULTS
 
 from .run_request import RunRequest

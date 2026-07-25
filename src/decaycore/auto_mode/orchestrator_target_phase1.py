@@ -30,7 +30,7 @@ from .scoring_ranking import (
     _auto_rank_key,
     _auto_select_best_scored,
 )
-from .shared import (
+from .shared_parts import (
     AUTO_MODE_LOCAL_REFINE_ENABLED,
     AUTO_MODE_LOCAL_REFINE_TOP_K,
     AUTO_MODE_LOCAL_REFINE_TRIALS_PER_TOP,
@@ -364,7 +364,6 @@ def _run_target_local_refine_trials(
                     OSError,
                     ImportError,
                     ModuleNotFoundError,
-                    NameError,
                 ) as exc:
                     li = future_to_li[future]
                     logger.warning(

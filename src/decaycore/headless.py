@@ -18,7 +18,7 @@ import traceback
 from pathlib import Path
 
 from .config.legacy_keys import CAMILLAFIR_AUTO_MODE
-from .core.runner import ConsoleProgressSink, prepare_headless_config, run_batch
+from .core.runner_parts import ConsoleProgressSink, prepare_headless_config, run_batch
 from .version import VERSION
 
 

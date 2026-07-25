@@ -34,7 +34,6 @@ def _auto_safe_float(value, default=0.0) -> float:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         logger.exception("safe float parse")
     return float(default)
@@ -57,7 +56,6 @@ def _auto_safe_bool(value, default=False) -> bool:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return bool(default)
     if s in ("1", "true", "yes", "y", "on"):
@@ -80,7 +78,6 @@ def _auto_safe_int(value, default: int = 0) -> int:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return int(default)
 
@@ -100,7 +97,6 @@ def _auto_output_tilt_bounds(base_data: dict | None) -> tuple[float, float]:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         auto_target_mode = ""
     if auto_target_mode == "adaptive":
@@ -122,4 +118,3 @@ __all__ = [
     '_auto_output_tilt_bounds',
     '_clip',
 ]
-

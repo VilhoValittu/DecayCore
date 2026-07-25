@@ -16,7 +16,7 @@ from typing import Any
 
 from . import decaycore_plot as plots
 from .export_scoring import _append_export_ranking
-from .export_summary_text import (
+from .export_summary import (
     _append_acoustic_events,
     _append_dsp_effective_params,
     _append_export_decision_summary,
@@ -26,7 +26,7 @@ from .export_summary_text import (
 )
 from ..app_paths import program_version_token
 from ..common.result_postprocess import _irwin_tag
-from ..config.decaycore_pipeline import build_xos_hpf
+from ..config.pipeline_parts import build_xos_hpf
 from ..config.decaycore_convolver_configs import generate_hlc_config, generate_raspberry_yaml
 from ..config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from ..config.results import FilterResult

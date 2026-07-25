@@ -23,7 +23,7 @@ from decaycore.config.models import FilterConfig
 
 from .._measurement_ctx_local import measurement_ctx_scope
 from ..correction_types import MeasurementSideContext
-from ..decaycore_leveling import StereoLinkContext, find_shared_stereo_level_window
+from ..leveling_parts import StereoLinkContext, find_shared_stereo_level_window
 from ..dsp_utils import safe_range as _safe_range
 
 logger = logging.getLogger("DecayCore.dsp")
@@ -61,7 +61,6 @@ def _side_policy_value(side_policy, shared, key: str):
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         value = getattr(side_policy, key, None)
         if value is None and shared is not None:

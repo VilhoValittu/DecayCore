@@ -36,7 +36,7 @@ _CONF_PULL_MAX_MAX_HZ = 220.0
 
 from decaycore.common.measurement_features import estimate_schroeder_hz
 
-from .shared import (
+from .shared_parts import (
     AUTO_MODE_LOW_BASS_MAX_HZ,
     AUTO_MODE_LOW_BASS_MIN_HZ,
     AUTO_MODE_MAG_C_MAX_MIN_HZ,
@@ -558,7 +558,6 @@ def _build_auto_mode_candidates_optuna(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return None
 

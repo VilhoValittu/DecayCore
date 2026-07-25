@@ -13,6 +13,7 @@ import logging
 import numpy as np
 
 from ._constants import *
+from .safe_values import _auto_safe_float
 
 logger = logging.getLogger("DecayCore")
 
@@ -129,7 +130,6 @@ def _m(metrics: dict | None, key: str, default=float("nan")) -> float:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         v = float(default)
     return float(v)
@@ -146,4 +146,3 @@ __all__ = [
     '_auto_metric_text',
     '_m',
 ]
-

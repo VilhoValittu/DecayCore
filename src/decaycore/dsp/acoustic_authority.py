@@ -15,7 +15,7 @@ from typing import Any, Sequence
 
 import numpy as np
 
-from .modal_analysis import RoomModeEvent, detect_room_modes
+from .modal_analysis_parts import RoomModeEvent, detect_room_modes
 
 
 @dataclass(frozen=True)
@@ -53,7 +53,6 @@ def _as_float_array(value) -> np.ndarray:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return np.asarray([], dtype=float)
 

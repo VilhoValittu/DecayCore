@@ -16,7 +16,7 @@ import numpy as np
 
 _logger = logging.getLogger(__name__)
 
-from .. import shared
+from .. import shared_parts as shared
 from ..runtime_context import (
     _auto_pick_metric,
 )
@@ -403,7 +403,6 @@ def _auto_excursion_penalty(st: dict | None) -> tuple[float, dict]:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         exc_bins = 0
     lf_boost_max = shared._auto_safe_float(st.get("lf_boost_max_db", 0.0), 0.0)

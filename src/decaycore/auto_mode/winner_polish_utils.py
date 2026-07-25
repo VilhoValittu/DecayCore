@@ -18,7 +18,7 @@ import numpy as np
 
 from .rank_score import official_rank_score
 from .scoring_ranking import _auto_hard_gate_reasons, get_residual_peak_db, get_residual_peak_hard_gate_db
-from .shared import _auto_safe_float
+from .shared_parts import _auto_safe_float
 
 logger = logging.getLogger("DecayCore")
 
@@ -169,7 +169,6 @@ def _enrich_target_tracking_metrics(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         logger.warning(
             "Automatic mode target-tracking enrichment failed: %s",

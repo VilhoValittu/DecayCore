@@ -18,7 +18,7 @@ from decaycore.config.models import FilterConfig
 
 from ._pruning import get_pruning_hook as _get_pruning_hook
 from .correction_baseline import _prepare_correction_baseline
-from .decaycore_leveling import StereoLinkContext
+from .leveling_parts import StereoLinkContext
 from .dsp_correction import run_correction_stage
 from .dsp_ops import (
     _limit_gd_gradient_ms_per_oct,
@@ -33,7 +33,7 @@ from .dsp_preprocess import run_preprocess
 from .dsp_utils import cfg_float_allow_zero as _cfg_float_allow_zero
 from .hpf_policy import HPF_IIR_TAP_THRESHOLD, filter_config_should_use_iir_hpf
 from .hybrid_iir import HybridIIRPolicy, design_hybrid_iir, peaking_eq_response
-from .modal_analysis import detect_room_modes
+from .modal_analysis_parts import detect_room_modes
 from .phase import remove_time_of_flight
 
 logger = logging.getLogger("DecayCore.dsp")
@@ -250,7 +250,6 @@ def _apply_hybrid_iir_preconditioning(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         logger.warning("Hybrid IIR design failed; continuing FIR-only", exc_info=True)
         return gain_db, {
@@ -389,7 +388,6 @@ def _run_generate_filter_pre_correction(
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ) as exc:
             if (
                 type(exc).__name__ == "TrialPruned"

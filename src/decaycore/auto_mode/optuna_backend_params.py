@@ -20,7 +20,7 @@ import numpy as np
 
 from .cache_signature import _auto_compat_version
 from .candidate_base import _derive_adaptive_freq_bounds
-from .shared import (
+from .shared_parts import (
     AUTO_MODE_LOW_BASS_MAX_HZ,
     AUTO_MODE_LOW_BASS_MIN_HZ,
     AUTO_MODE_MAG_C_MAX_MIN_HZ,

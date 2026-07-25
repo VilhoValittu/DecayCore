@@ -17,7 +17,7 @@ import numpy as np
 
 _LOG = logging.getLogger("DecayCore.dsp")
 
-from ...auto_mode.shared import _auto_bass_integration_profile_weights
+from ...auto_mode.shared_parts import _auto_bass_integration_profile_weights
 from ...dsp.lf_rolloff import estimate_lf_rolloff_f6
 from ...io.measurement_bundle import BassIntegrationBundle
 from ._constants import (
@@ -42,7 +42,6 @@ def _recommend_direct_dac_int_or_default(value: object, default: int) -> int:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return int(default)
 

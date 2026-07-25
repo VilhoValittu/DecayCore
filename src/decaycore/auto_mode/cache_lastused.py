@@ -16,7 +16,7 @@ import time
 
 from .cache_io import _auto_cache_guard, _auto_cache_load, _auto_cache_save
 from .cache_structure import _auto_cache_bucket
-from .shared import (
+from .shared_parts import (
     AUTO_MODE_CACHE_SCHEMA_VERSION,
     AUTO_MODE_GOAL_DEFAULT,
     _auto_filter_cache_key,

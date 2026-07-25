@@ -14,7 +14,7 @@ import logging
 
 import numpy as np
 
-from ..shared import (
+from ..shared_parts import (
     AUTO_MODE_GOAL_DEFAULT,
     AUTO_MODE_MAG_C_MAX_MIN_HZ,
     AUTO_MODE_PHASE2_PARETO_ACOUSTIC_DROP,

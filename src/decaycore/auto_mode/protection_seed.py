@@ -14,9 +14,9 @@ import logging
 
 import numpy as np
 
-from ..dsp import decaycore_dsp as dsp
+from ..dsp import decaycore_dsp_parts as dsp
 from ..dsp.lf_rolloff import estimate_lf_rolloff_f6
-from . import shared
+from . import shared_parts as shared
 
 logger = logging.getLogger("DecayCore")
 
@@ -36,7 +36,6 @@ def _shared_sorted_xy(f, y):
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return np.asarray([], dtype=float), np.asarray([], dtype=float)
     if ff.size != yy.size or ff.size < 16:
@@ -71,7 +70,6 @@ def _shared_stable_crossing_hz(fx: np.ndarray, yx: np.ndarray, thr_db: float) ->
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         df = float("nan")
     if np.isfinite(df) and df > 0.0:
@@ -118,7 +116,6 @@ def _auto_mag_c_min_prepare_channel(ff: np.ndarray, mm: np.ndarray, *, default_h
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         mm_use = np.asarray(mm, dtype=float)
 
@@ -173,7 +170,6 @@ def _auto_mag_c_min_crossing(prepared: dict | None) -> float | None:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         df = float("nan")
     n_cons = int(max(3, round(3.0 / df))) if np.isfinite(df) and df > 0.0 else 3
@@ -224,7 +220,6 @@ def _auto_hpf_prepare_channel(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         mm_use = np.asarray(mm, dtype=float)
 
@@ -295,7 +290,6 @@ def _auto_hpf_append_secondary_order_estimate(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         logger.exception("f3/f12 slope order estimate")
 
@@ -330,7 +324,6 @@ def _auto_hpf_estimate_order(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         logger.exception("f3/f6 slope order estimate")
     _auto_hpf_append_secondary_order_estimate(n_estimates, f3=f3, f12=f12, c12=c12)
@@ -360,7 +353,6 @@ def _auto_hpf_estimate_order(
                 OSError,
                 ImportError,
                 ModuleNotFoundError,
-                NameError,
             ):
                 n_est = float(default_slope_db_oct) / 6.0
         else:
@@ -460,7 +452,6 @@ def _auto_hpf_estimate_quality(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         logger.exception("slope confidence ratio check")
     return float(fit_rmse_db), float(np.clip(conf, 0.0, 1.0))
@@ -568,7 +559,6 @@ def _floor_slope(v: float, *, allowed_slopes: list[int], default_slope_db_oct: i
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         x = float(default_slope_db_oct)
     below = [s for s in allowed_slopes if float(s) <= x]
@@ -589,7 +579,6 @@ def _nearest_slope(v: float, *, allowed_slopes: list[int], default_slope_db_oct:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         x = float(default_slope_db_oct)
     return int(min(allowed_slopes, key=lambda s: abs(float(s) - x)))

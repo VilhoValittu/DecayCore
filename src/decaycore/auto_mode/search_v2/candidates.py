@@ -34,7 +34,6 @@ def preset_identity(preset: dict | None) -> str:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return str(sorted(payload.items()))
 

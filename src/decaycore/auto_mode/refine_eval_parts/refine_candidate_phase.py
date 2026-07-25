@@ -26,7 +26,7 @@ from ..search_state import _AutoModePhaseState, _AutoModeSearchState, _auto_set_
 from ..scoring_ranking import _auto_is_better_refine, _auto_rank_key
 from ..winner_polish_utils import _polish_rank_status
 from ...dsp.bass_integration import compute_bass_integration_metric_payload
-from ..shared import (
+from ..shared_parts import (
     AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO,
     AUTO_MODE_BASS_INTEGRATION_GUARD_LO_RATIO,
     AUTO_MODE_REFINE_TIEBREAK_RANK_EPS,
@@ -195,7 +195,6 @@ def _refine_eval_apply_trial_tuning(cfg_trial, trial_data: dict) -> None:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         pass
 
@@ -280,7 +279,6 @@ def _refine_eval_apply_bass_integration_metrics(result, trial_data: dict, trial_
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         logger.debug("Bass integration trial metrics failed: %s: %s", type(exc).__name__, exc)
 
@@ -899,7 +897,6 @@ def _run_candidate_phase_local_serial(
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ) as exc:
             out = {"idx": int(idx), "ok": False, "error": f"{type(exc).__name__}: {exc}"}
         if _consume_one(int(idx), out):
@@ -979,7 +976,6 @@ def _run_candidate_phase_local_parallel(
                     OSError,
                     ImportError,
                     ModuleNotFoundError,
-                    NameError,
                 ) as exc:
                     out = {"idx": int(idx), "ok": False, "error": f"{type(exc).__name__}: {exc}"}
                 chunk_out[int(idx)] = dict(out)

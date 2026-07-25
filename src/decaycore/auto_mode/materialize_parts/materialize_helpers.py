@@ -23,7 +23,7 @@ from ...dsp.target_synthesis import synthesize_target_from_measurements
 from ..auto_mode_profile import profiled_section
 from ..cache_signature import _auto_signature_payload, get_or_build_synth_target
 from ..rank_score import official_rank_score
-from ..shared import (
+from ..shared_parts import (
     AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO,
     AUTO_MODE_BASS_INTEGRATION_GUARD_LO_RATIO,
     AUTO_MODE_EXC_MAX_HZ,

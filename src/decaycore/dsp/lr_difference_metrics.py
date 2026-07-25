@@ -99,7 +99,6 @@ def _get_mags(st: dict, key: str = "measured_mags") -> np.ndarray | None:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return None
     if arr.size < 8:
@@ -125,7 +124,6 @@ def _get_freq(st: dict) -> np.ndarray | None:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return None
     if arr.size < 8:
@@ -257,7 +255,6 @@ def compute_lr_difference_metrics(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         logger.debug("compute_lr_difference_metrics failed: %s", exc, exc_info=True)
         return _NAN_RESULT
@@ -293,7 +290,6 @@ def _compute_gd_rms_band(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return float("nan")
 

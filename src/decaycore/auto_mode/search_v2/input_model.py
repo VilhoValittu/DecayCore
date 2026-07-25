@@ -18,7 +18,7 @@ from types import MappingProxyType
 from typing import Any
 
 from ..cache_measurement_sig import _auto_measurement_metadata_identity, _auto_measurement_signature
-from ..shared import _auto_filter_cache_key, _auto_filter_type_for_key, _auto_hash_array
+from ..shared_parts import _auto_filter_cache_key, _auto_filter_type_for_key, _auto_hash_array
 
 _WINNER_ONLY_KEYS = frozenset(
     {
@@ -102,7 +102,6 @@ def _jsonable(value: Any) -> Any:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return str(value)
 
@@ -199,7 +198,6 @@ def build_auto_search_input(raw_data, measurements, context: dict | None = None)
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         frequency_grid_identity = ""
     hpf = ctx.get("hpf")

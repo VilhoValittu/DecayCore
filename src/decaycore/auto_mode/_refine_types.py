@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .refine_eval import RefineEvalContext
+from .refine_eval_parts import RefineEvalContext
 
 
 @dataclass(slots=True)

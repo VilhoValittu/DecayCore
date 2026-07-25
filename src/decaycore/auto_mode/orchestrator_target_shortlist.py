@@ -33,7 +33,7 @@ from .scoring_ranking import (
     _auto_select_best_scored,
     _tc_score,
 )
-from .shared import (
+from .shared_parts import (
     AUTO_MODE_LOCAL_REFINE_ENABLED,
     AUTO_MODE_LOCAL_REFINE_TOP_K,
     AUTO_MODE_LOCAL_REFINE_TRIALS_PER_TOP,
@@ -48,7 +48,7 @@ from .shared import (
     _auto_safe_bool,
     _auto_safe_float,
 )
-from .target_preselection import (
+from .target_preselection_parts import (
     _auto_target_adaptive_shortlist,
     _auto_target_insert_cached_wildcard,
     _auto_target_one_step_milder,
@@ -254,7 +254,6 @@ def _run_shortlist_curve_parallel(
                 OSError,
                 ImportError,
                 ModuleNotFoundError,
-                NameError,
             ) as exc:
                 logger.warning(
                     "Automatic mode target curve failed: target=%s (%s)",
@@ -792,5 +791,3 @@ def _evaluate_target_shortlist_core(
         status_cb=status_cb,
         select_f6_txt=select_f6_txt,
     )
-
-

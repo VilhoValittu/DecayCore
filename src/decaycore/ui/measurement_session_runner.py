@@ -16,7 +16,7 @@ import threading
 from typing import Any, Callable, Literal
 
 from ..measurement.models import MeasurementRequest, MeasurementSessionAggregate
-from ..measurement.workflow import run_measurement_session
+from ..measurement.workflow_parts import run_measurement_session
 
 
 @dataclass(slots=True)

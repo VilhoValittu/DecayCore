@@ -19,11 +19,8 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    # Imported only for static analysis; runtime imports are explicit below.
-    from .overview import _section  # noqa: F401
+from .section import _section
 
 from ...resources.i8n.decaycore_i18n import t
 from ..results_formatters import (
@@ -244,13 +241,15 @@ def _build_ir_alignment_summary(ir_align: dict, ir_align_sub: dict) -> str:
             continue
         if bool(d.get("ir_align_polarity_inverted")) or bool(d.get("ir_align_xcorr_polarity_flip")):
             issues.append(t("ir_align_issue_polarity"))
-        off = safe_float(d.get("ir_align_xcorr_offset_ms"), None)
-        if off is not None and math.isfinite(off) and abs(off) >= 5.0:
+        offset_value = d.get("ir_align_xcorr_offset_ms")
+        off = safe_float(offset_value) if offset_value is not None else float("nan")
+        if math.isfinite(off) and abs(off) >= 5.0:
             issues.append(t("ir_align_issue_timing"))
         if not bool(d.get("ir_align_phase_in_phase", True)) and d is ir_align_sub:
             issues.append(t("ir_align_issue_phase"))
-        rms = safe_float(d.get("ir_align_level_rms_diff_db"), None)
-        if rms is not None and math.isfinite(rms) and abs(rms) >= 10.0:
+        rms_value = d.get("ir_align_level_rms_diff_db")
+        rms = safe_float(rms_value) if rms_value is not None else float("nan")
+        if math.isfinite(rms) and abs(rms) >= 10.0:
             issues.append(t("ir_align_issue_level"))
 
     seen: set[str] = set()

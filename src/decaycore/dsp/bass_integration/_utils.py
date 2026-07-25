@@ -48,7 +48,6 @@ def _status_callback(callbacks: Any, message: str) -> None:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         _LOG.debug("Bass-integration status callback failed", exc_info=True)
 
@@ -77,7 +76,6 @@ def _band_mask(freqs_hz: np.ndarray, lo_hz: float, hi_hz: float) -> np.ndarray:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return np.zeros(0, dtype=bool)
     lo = _safe_float(lo_hz, float("nan"))

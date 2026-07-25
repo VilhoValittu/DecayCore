@@ -16,7 +16,7 @@ import numpy as np
 
 _logger = logging.getLogger(__name__)
 
-from .. import shared
+from .. import shared_parts as shared
 
 from ..auto_mode_profile import profiled_section
 from .modal_intelligence import (

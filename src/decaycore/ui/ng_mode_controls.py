@@ -23,7 +23,7 @@ from typing import Callable
 
 from . import ng_controls as ctrl
 from .decaycore_utils import scale_taps_with_fs
-from ..config.decaycore_pipeline import (
+from ..config.pipeline_parts import (
     filter_type_supports_xo_phase_model,
     multi_rate_target_rates,
 )

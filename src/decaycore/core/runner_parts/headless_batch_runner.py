@@ -18,7 +18,7 @@ from pathlib import Path
 
 from ...application.run_request import RunRequest
 from ...version import VERSION
-from ...workflow.auto_flow import _run_auto_mode_search_if_needed, _run_auto_mode_seed_phases
+from ...workflow.auto_flow_parts import _run_auto_mode_search_if_needed, _run_auto_mode_seed_phases
 from ...workflow.pipeline_flow import _run_pipeline
 from ...workflow.process_run_flow import ProcessRunSupport
 from ...workflow.process_support import (
@@ -29,7 +29,7 @@ from ...workflow.process_support import (
     slugify_filename_token,
 )
 from ...workflow.run_finalize import _finalize_run_outputs
-from ...workflow.run_prepare import _prepare_target_curve_and_run_context, _prepare_ui_and_measurements
+from ...workflow.run_prepare_parts import _prepare_target_curve_and_run_context, _prepare_ui_and_measurements
 
 from .headless_export_bundle import (
     _normalize_headless_config,
@@ -206,4 +206,3 @@ def prepare_headless_config(config_path: Path, output_dir: Path, *, no_plots: bo
 
 
 __all__ = ['_copy_export_artifacts', 'run_batch', 'prepare_headless_config']
-

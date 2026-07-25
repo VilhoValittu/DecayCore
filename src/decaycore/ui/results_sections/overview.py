@@ -17,13 +17,13 @@ can call it without changes to workflow code.
 """
 from __future__ import annotations
 
-import html
 import logging
 import math
 import time
 from typing import Any
 
 from .plots_export import clear_plot_render_cache, _render_plots_and_export
+from .section import _esc, _metric_table_html, _section
 from .quality import (
     _render_dsp_quality,
     _render_hybrid_iir_cuts,
@@ -234,68 +234,6 @@ def render_results(
     set_progress_visual_state(completed=True)
 
     _update_last_run_info(l_st_f, r_st_f)
-
-def _esc(v: Any) -> str:
-    return html.escape(str(v) if v is not None else "-")
-
-def _metric_table_html(rows: list[dict]) -> str:
-    """Build an HTML table from metric_row() / fmt_* dicts."""
-    shared: list[tuple[str, str]] = []
-    stereo: list[tuple[str, str, str]] = []
-
-    for row in rows:
-        left = dict(row.get("left", {}) or {})
-        right = dict(row.get("right", {}) or {})
-        label = str(row.get("label", "") or "")
-        if str(left.get("compare", "")) == str(right.get("compare", "")):
-            shared.append((label, left.get("render", "-")))
-        else:
-            stereo.append((label, left.get("render", "-"), right.get("render", "-")))
-
-    parts = []
-    if shared:
-        parts.append(
-            "<table style='width:100%;border-collapse:collapse;font-size:12px;'>"
-            "<thead><tr>"
-            f"<th style='text-align:left;padding:4px 8px;background:rgba(255,255,255,0.06);'>{_esc(t('results_table_metric'))}</th>"
-            f"<th style='text-align:left;padding:4px 8px;background:rgba(255,255,255,0.06);'>{_esc(t('results_table_value'))}</th>"
-            "</tr></thead><tbody>"
-            + "".join(
-                f"<tr><td style='padding:3px 8px;border-top:1px solid rgba(255,255,255,0.06);'>{_esc(lbl)}</td>"
-                f"<td style='padding:3px 8px;border-top:1px solid rgba(255,255,255,0.06);'>{val}</td></tr>"
-                for lbl, val in shared
-            )
-            + "</tbody></table>"
-        )
-    if stereo:
-        parts.append(
-            "<table style='width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;'>"
-            "<thead><tr>"
-            f"<th style='text-align:left;padding:4px 8px;background:rgba(255,255,255,0.06);'>{_esc(t('results_table_metric'))}</th>"
-            f"<th style='text-align:left;padding:4px 8px;background:rgba(255,255,255,0.06);'>{_esc(t('results_table_left_short'))}</th>"
-            f"<th style='text-align:left;padding:4px 8px;background:rgba(255,255,255,0.06);'>{_esc(t('results_table_right_short'))}</th>"
-            "</tr></thead><tbody>"
-            + "".join(
-                f"<tr><td style='padding:3px 8px;border-top:1px solid rgba(255,255,255,0.06);'>{_esc(lbl)}</td>"
-                f"<td style='padding:3px 8px;border-top:1px solid rgba(255,255,255,0.06);'>{lv}</td>"
-                f"<td style='padding:3px 8px;border-top:1px solid rgba(255,255,255,0.06);'>{rv}</td></tr>"
-                for lbl, lv, rv in stereo
-            )
-            + "</tbody></table>"
-        )
-    return "\n".join(parts)
-
-def _section(title: str, rows: list[dict], summary_lines: list[str] | None = None) -> None:
-    """Render a collapsible metric section."""
-    from nicegui import ui  # noqa: PLC0415
-
-    with ui.expansion(title).classes("w-full"):
-        for line in list(summary_lines or []):
-            if line:
-                ui.markdown(str(line))
-        table_html = _metric_table_html(rows)
-        if table_html:
-            ui.html(table_html)
 
 def _render_run_overview(*, data: dict, l_st_f: dict, r_st_f: dict) -> None:
     l_ai = plots.calc_ai_summary_from_stats(l_st_f)

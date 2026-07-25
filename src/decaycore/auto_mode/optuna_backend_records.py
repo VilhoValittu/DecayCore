@@ -16,7 +16,7 @@ import logging
 
 import numpy as np
 
-from .shared import (
+from .shared_parts import (
     AUTO_MODE_OPTUNA_USER_ATTR_OUT,
     _auto_goal_is_flat_family,
     _auto_safe_float,

@@ -246,6 +246,5 @@ def run_ir_alignment_check(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return {}

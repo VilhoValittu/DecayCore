@@ -18,7 +18,7 @@ import logging
 import numpy as np
 
 from .auto_mode_profile import profiled_section
-from .shared import AUTO_MODE_MAG_C_MIN_MAX_HZ, AUTO_MODE_MAG_C_MIN_MIN_HZ, _auto_mag_c_min_center, _auto_safe_float
+from .shared_parts import AUTO_MODE_MAG_C_MIN_MAX_HZ, AUTO_MODE_MAG_C_MIN_MIN_HZ, _auto_mag_c_min_center, _auto_safe_float
 from .winner_polish_utils import _enrich_target_tracking_metrics, _polish_rank_transition_status, _winner_polish_acceptance
 
 logger = logging.getLogger("DecayCore")
@@ -121,7 +121,6 @@ def _mag_c_min_preset_signature(*, preset: dict | None, metrics: dict | None, ca
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return str(sorted(dict(ready or {}).items()))
 
@@ -194,7 +193,6 @@ def _mag_c_min_materialize_candidate(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return dict(cand_test), None, None
     return dict(cand_test), dict(mag_c_min_metrics or {}), reuse_entry

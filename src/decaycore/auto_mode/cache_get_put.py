@@ -18,7 +18,7 @@ import time
 from .cache_io import _AUTO_CACHE_STATS, _auto_cache_guard, _auto_cache_load, _auto_cache_save
 from .cache_measurement_sig import _auto_get_measurement_signature
 from .cache_structure import _auto_cache_bucket
-from .shared import (
+from .shared_parts import (
     AUTO_MODE_CACHE_MAX_ITEMS,
     AUTO_MODE_CACHE_SCHEMA_VERSION,
     AUTO_MODE_GOAL_DEFAULT,
@@ -209,7 +209,6 @@ def _auto_cache_prune_global_target_map(target_map: dict) -> dict:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         logger.exception("global target_map eviction")
         return target_map
@@ -331,7 +330,6 @@ def _target_cache_latest_item_for_measurement(
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ):
             t = 0
         if t >= best_t:
@@ -449,7 +447,6 @@ def _auto_cache_put_target_for_measurements(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         logger.exception("cache target_map eviction")
     bucket["target_by_measurement"] = target_map
@@ -529,7 +526,6 @@ def _auto_cache_put_best(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         logger.exception("cache items eviction")
     bucket["items"] = items

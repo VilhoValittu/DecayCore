@@ -188,7 +188,6 @@ def _gd_metrics_from_fir(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return 0.0, 0.0, False
 
@@ -250,7 +249,6 @@ def _magnitude_metrics(
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ):
             smoothed = corrected * 0.0
         err = corrected - smoothed

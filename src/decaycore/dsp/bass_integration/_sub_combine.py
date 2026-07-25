@@ -43,7 +43,6 @@ def _transfer_is_effectively_silent(transfer: TransferData | None) -> bool:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return True
     return spec.size == 0 or float(np.max(np.abs(spec))) <= 1e-12

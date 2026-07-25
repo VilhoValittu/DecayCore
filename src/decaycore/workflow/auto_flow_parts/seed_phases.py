@@ -40,9 +40,9 @@ from ...auto_mode.api import (
     _estimate_auto_mag_c_min,
     _resolve_auto_hpf_application,
 )
-from ...auto_mode.shared import _auto_goal_forced_level_window
+from ...auto_mode.shared_parts import _auto_goal_forced_level_window
 from ...config.legacy_keys import is_auto_mode
-from ...config.decaycore_pipeline import (
+from ...config.pipeline_parts import (
     build_xos_hpf,
     choose_target_rates,
     detect_is_wav_source,
@@ -51,6 +51,7 @@ from ...ui.decaycore_utils import scale_taps_with_fs
 from ..bridge_types import ProcessRunCallbacks
 
 from .progress import _get_auto_status_callback
+from .status_text import _resolve_auto_hpf_seed_source
 
 if typing.TYPE_CHECKING:
     from ..process_run_flow import ProcessRunSupport

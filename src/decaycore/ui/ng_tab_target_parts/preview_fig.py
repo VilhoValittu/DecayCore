@@ -35,7 +35,7 @@ def _build_target_preview_fig():  # noqa: C901 - target preview figure is assemb
     """
     try:
         import math  # noqa: PLC0415
-        from ...auto_mode.shared import _auto_goal_forced_level_window  # noqa: PLC0415
+        from ...auto_mode.shared_parts import _auto_goal_forced_level_window  # noqa: PLC0415
         from ...dsp.bass_integration import normalize_sub_combine_mode  # noqa: PLC0415
 
 
@@ -523,7 +523,7 @@ def _build_target_preview_speaker_curves(
                 _speaker_align_offset[ch] = float(np.nanmedian(m_aligned - m_interp))
                 speaker_interp[ch] = _smooth_for_preview(freq_axis, m_aligned)
 
-    from ...io.measurements_loader import _try_load_harmonic_sidecar  # noqa: PLC0415
+    from ...io.measurements_loader_parts import _try_load_harmonic_sidecar  # noqa: PLC0415
     for _hch in ("L", "R"):
         if _hch in _harmonic_sources:
             continue

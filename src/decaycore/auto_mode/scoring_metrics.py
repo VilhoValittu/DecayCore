@@ -25,7 +25,7 @@ from .search.residual_peaks import (
     compute_broad_residual_peak_metrics, compute_modal_intelligence_metrics,
 )
 from .search.component_scores import score_residual_peaks
-from .search.score_result import _auto_score_result
+from .search.score_result_parts import _auto_score_result
 
 __all__ = [
     "calc_ai_summary_from_stats", "_auto_dsp_quality_penalty", "_auto_exc_penalty_bins_from_dbg",

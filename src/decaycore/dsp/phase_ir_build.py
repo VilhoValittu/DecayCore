@@ -18,7 +18,7 @@ from .phase_ir_align import _compute_alignment_target, _shift_ir
 from .phase_ir_guards import _pre_energy_guard, _tdc_postprocess
 from .phase_ir_ir import _build_complex_spectrum, _ifft_to_ir, _normalize_ir
 from .phase_ir_metrics import _summarize_ir_metrics
-from .phase_ir_phase import _PhaseComponents, _apply_phase_model, _compute_excess_phase, _unwrap_phases
+from .phase_ir_phase_parts import _PhaseComponents, _apply_phase_model, _compute_excess_phase, _unwrap_phases
 from .phase_ir_utils import _ms_value, _resolve_ir_anchor_mode, _resolve_ir_window_mode
 from .phase_ir_window import _apply_fdw_if_enabled, _apply_ir_window
 

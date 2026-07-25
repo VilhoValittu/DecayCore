@@ -14,7 +14,7 @@ import logging
 
 import numpy as np
 
-from ..shared import (
+from ..shared_parts import (
     AUTO_MODE_GOAL_DEFAULT,
     AUTO_MODE_MAX_AVG_SCORE_LOSS_FOR_SAFETY_OVERRIDE,
     _auto_goal_is_flat_family,

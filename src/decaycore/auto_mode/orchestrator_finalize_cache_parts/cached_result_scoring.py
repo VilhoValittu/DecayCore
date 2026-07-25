@@ -28,7 +28,7 @@ from ..cache_signature import (
 from ..scoring_ranking import (
     maybe_override_hard_failed_winner,
 )
-from ..shared import AUTO_MODE_CACHE_SCHEMA_VERSION, _auto_builtin_target_name, _auto_safe_float
+from ..shared_parts import AUTO_MODE_CACHE_SCHEMA_VERSION, _auto_builtin_target_name, _auto_safe_float
 
 from .cache_finalize_status import _override_candidates
 
@@ -306,4 +306,3 @@ __all__ = [
     '_score_cached_result',
     '_attach_cached_debug',
 ]
-

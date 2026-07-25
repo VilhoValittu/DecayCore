@@ -14,7 +14,7 @@ import logging
 
 import numpy as np
 
-from ..shared import (
+from ..shared_parts import (
     AUTO_MODE_ADAPTIVE_SHRINK_ENABLED,
     AUTO_MODE_ADAPTIVE_SHRINK_MAX,
     AUTO_MODE_ADAPTIVE_SHRINK_MIN,

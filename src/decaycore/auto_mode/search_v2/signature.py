@@ -83,7 +83,6 @@ def compute_auto_search_signature_object(search_input: AutoSearchInput) -> AutoS
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         h.update(str(sorted(payload.items())).encode("utf-8", "ignore"))
     return AutoSearchSignature(

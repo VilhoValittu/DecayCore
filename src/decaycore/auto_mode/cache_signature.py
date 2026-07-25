@@ -67,7 +67,7 @@ from .cache_synth_target import (
     _synth_target_cache_key as _synth_target_cache_key,
     get_or_build_synth_target as get_or_build_synth_target,
 )
-from .shared import (
+from .shared_parts import (
     AUTO_MODE_CACHE_SCHEMA_VERSION,
     AUTO_MODE_COMPAT_VERSION as AUTO_MODE_COMPAT_VERSION,
     _auto_goal,
@@ -147,7 +147,6 @@ def _auto_signature(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         h.update(str(sorted(payload.items())).encode("utf-8", "ignore"))
     return h.hexdigest()
@@ -668,7 +667,6 @@ def _auto_seed_from_signature(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         try:
             msig = _auto_search_measurement_identity(measurements or {})
@@ -684,7 +682,6 @@ def _auto_seed_from_signature(
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ):
             return 0
 
@@ -703,7 +700,6 @@ def _auto_apply_seed(seed: int) -> None:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         s = 0
     try:
@@ -719,7 +715,6 @@ def _auto_apply_seed(seed: int) -> None:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         logger.exception("random seed apply")
     try:
@@ -735,7 +730,6 @@ def _auto_apply_seed(seed: int) -> None:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         logger.exception("numpy random seed apply")
 

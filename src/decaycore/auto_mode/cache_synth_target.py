@@ -96,7 +96,6 @@ def get_or_build_synth_target(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         result = None
     with _SYNTH_TARGET_CACHE_LOCK:

@@ -23,7 +23,7 @@ from ...dsp._pruning import (
     set_pruning_hook as _set_pruning_hook,
 )
 from ..cache_signature import _auto_cache_stats_snapshot
-from ..shared import (
+from ..shared_parts import (
     AUTO_MODE_OPTUNA_CROSS_STUDY_SEEDS,
     AUTO_MODE_OPTUNA_CROSS_STUDY_SEEDS_TOP_N,
     AUTO_MODE_OPTUNA_DUPLICATE_MAX_ATTEMPTS,
@@ -166,7 +166,7 @@ class _AutoOptunaPerRunStartupPruner:
     def prune(self, study, trial) -> bool:
         try:
             trial_number = int(getattr(trial, "number", -1))
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        except (RuntimeError, OSError, TypeError, ValueError, OverflowError, FloatingPointError):
             trial_number = -1
         if 0 <= int(trial_number) < int(self.existing_trials + self.startup_trials):
             return False
@@ -178,7 +178,7 @@ def _auto_optuna_existing_trial_count(study) -> int:
         trials = study.get_trials(deepcopy=False)
     except TypeError:
         trials = study.get_trials()
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+    except (RuntimeError, OSError, TypeError, ValueError, OverflowError, FloatingPointError):
         trials = getattr(study, "trials", [])
     return int(len(list(trials or [])))
 
@@ -268,7 +268,7 @@ def _auto_optuna_prepare_run_setup(
                         pruner,
                         startup_trials=int(startup_effective),
                     )
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+            except (RuntimeError, OSError, TypeError, ValueError, OverflowError, FloatingPointError):
                 pruner = None
     logger.info(
         "Automatic mode Optuna study %s: startup=%d total=%d pruning=%s",
@@ -373,7 +373,7 @@ def _auto_optuna_apply_study_user_attrs(
     for attr_key, attr_value in dict(study_user_attrs or {}).items():
         try:
             study.set_user_attr(str(attr_key), attr_value)
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        except (RuntimeError, OSError, TypeError, ValueError, OverflowError, FloatingPointError):
             logger.debug("Optuna study user_attr set failed", exc_info=True)
 
 
@@ -394,7 +394,7 @@ def _auto_optuna_has_existing_completed_trials(study) -> bool:
             tr for tr in study.get_trials(deepcopy=False)
             if getattr(tr, "value", None) is not None
         ]
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+    except (RuntimeError, OSError, TypeError, ValueError, OverflowError, FloatingPointError):
         existing_complete = []
     return bool(existing_complete)
 
@@ -433,7 +433,7 @@ def _auto_optuna_maybe_enqueue_cross_study_seeds(
         try:
             study.enqueue_trial(_auto_optuna_sanitize_enqueued_params(dict(cp), base_data=base_data))
             cross_enqueued += 1
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        except (RuntimeError, OSError, TypeError, ValueError, OverflowError, FloatingPointError):
             logger.exception("optuna cross-study trial enqueue")
     if cross_enqueued:
         logger.info(
@@ -474,7 +474,7 @@ def _auto_optuna_make_pruning_hook(*, trial_obj_ref, trial_pruned_cls):
             trial_obj_ref.report(float(partial_score), step=step_counter[0])
             step_counter[0] += 1
             should = trial_obj_ref.should_prune()
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        except (RuntimeError, OSError, TypeError, ValueError, OverflowError, FloatingPointError):
             return
         if bool(should) and trial_pruned_cls is not None:
             raise trial_pruned_cls()
@@ -555,7 +555,7 @@ def _auto_optuna_objective_value_from_out(
         if not np.isfinite(value):
             return 0.0
         return float(value)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+    except (RuntimeError, OSError, TypeError, ValueError, OverflowError, FloatingPointError):
         return 0.0
 
 
@@ -570,7 +570,7 @@ def _auto_optuna_set_trial_out_payload(
                 AUTO_MODE_OPTUNA_USER_ATTR_OUT,
                 _auto_optuna_jsonable(dict(out_payload or {})),
             )
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+    except (RuntimeError, OSError, TypeError, ValueError, OverflowError, FloatingPointError):
         logger.exception("optuna tell_trial user attr set")
 
 
@@ -596,7 +596,7 @@ def _auto_optuna_tell_study_trial(
                         )
         else:
             context.study.tell(trial_obj, state=context.fail_state)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+    except (RuntimeError, OSError, TypeError, ValueError, OverflowError, FloatingPointError):
         logger.exception("optuna tell_trial tell")
 
 
@@ -692,14 +692,14 @@ def _auto_optuna_reuse_duplicate_trial(
                 AUTO_MODE_OPTUNA_USER_ATTR_OUT,
                 _auto_optuna_jsonable(out_payload),
             )
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        except (RuntimeError, OSError, TypeError, ValueError, OverflowError, FloatingPointError):
             logger.exception("optuna duplicate trial user attr set")
     try:
         if val is not None and np.isfinite(float(val)):
             context.study.tell(trial_obj, float(val))
         else:
             context.study.tell(trial_obj, state=context.fail_state)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+    except (RuntimeError, OSError, TypeError, ValueError, OverflowError, FloatingPointError):
         logger.exception("optuna duplicate trial tell")
     if bool(dict(out_prev or {}).get("ok", False)):
         try:
@@ -708,7 +708,7 @@ def _auto_optuna_reuse_duplicate_trial(
                 "Automatic mode Optuna duplicate replay consumed into current search state (sig=%.12s)",
                 str(params_sig),
             )
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        except (RuntimeError, OSError, TypeError, ValueError, OverflowError, FloatingPointError):
             logger.debug("Automatic mode Optuna duplicate replay consume failed", exc_info=True)
 
 
@@ -722,7 +722,7 @@ def _auto_optuna_ask_new_trial(
         try:
             trial_obj = context.study.ask()
             preset = dict(context.build_preset(trial_obj) or {})
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError) as exc:
+        except (RuntimeError, OSError, TypeError, ValueError, OverflowError, FloatingPointError) as exc:
             last_error = f"{type(exc).__name__}: {exc}"
             break
         params = _auto_optuna_sanitize_enqueued_params(
@@ -761,7 +761,7 @@ def _auto_optuna_ask_new_trial(
                         _auto_optuna_jsonable(dict(reserved_out or {})),
                     )
                 context.study.tell(trial_obj, state=context.fail_state)
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+            except (RuntimeError, OSError, TypeError, ValueError, OverflowError, FloatingPointError):
                 logger.exception("optuna reserved trial fail-tell")
             continue
         if params_sig in context.known_records:
@@ -794,7 +794,7 @@ def _auto_optuna_filter_and_enqueue_seed_items(
                 dict(context.seed_to_params(dict(preset or {})) or {}),
                 base_data=context.base_data,
             )
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+        except (RuntimeError, OSError, TypeError, ValueError, OverflowError, FloatingPointError):
             params = {}
         params_sig = _auto_optuna_param_signature(params)
         if bool(context.duplicate_guard) and params_sig and (
@@ -807,7 +807,7 @@ def _auto_optuna_filter_and_enqueue_seed_items(
                 context.study.enqueue_trial(dict(params))
                 if params_sig:
                     enqueued_signatures.add(str(params_sig))
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError, NameError):
+            except (RuntimeError, OSError, TypeError, ValueError, OverflowError, FloatingPointError):
                 logger.exception("optuna seed trial enqueue")
         seed_items_filtered.append(dict(preset or {}))
     return list(seed_items_filtered)

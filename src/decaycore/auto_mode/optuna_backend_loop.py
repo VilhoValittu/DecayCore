@@ -21,7 +21,7 @@ from ..dsp._pruning import (
     clear_pruning_hook as _clear_pruning_hook,
     set_pruning_hook as _set_pruning_hook,
 )
-from .shared import AutoModeConfig
+from .shared_parts import AutoModeConfig
 
 logger = logging.getLogger("DecayCore")
 
@@ -35,7 +35,6 @@ _OPTUNA_RECOVERABLE_EXC_TYPES = (
     OSError,
     ImportError,
     ModuleNotFoundError,
-    NameError,
 )
 
 
@@ -105,7 +104,7 @@ def _submit_or_schedule_trials(
     *,
     context: _OptunaEvalContext,
 ) -> _OptunaEvalState:
-    from .optuna_backend_core import _auto_run_optuna_eval_loop_core
+    from .optuna_backend_core_parts import _auto_run_optuna_eval_loop_core
     telemetry = _auto_run_optuna_eval_loop_core(**dict(context.params or {}))
     return _OptunaEvalState(
         context=context,
@@ -217,7 +216,6 @@ def _run_optuna_seed_trials(
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ) as exc:
             out = {
                 "idx": int(idx_next),
@@ -344,7 +342,6 @@ def _handle_serial_pruned_trial(
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ):
             logger.exception("optuna tell pruned trial")
     if params_sig:
@@ -491,7 +488,6 @@ def _run_optuna_parallel_trials(
                             OSError,
                             ImportError,
                             ModuleNotFoundError,
-                            NameError,
                         ):
                             logger.exception("optuna tell pruned trial in parallel")
                     if params_sig:

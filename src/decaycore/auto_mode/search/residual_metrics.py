@@ -16,7 +16,7 @@ import numpy as np
 
 _logger = logging.getLogger(__name__)
 
-from .. import shared
+from .. import shared_parts as shared
 
 from .residual_analysis import compute_broad_residual_peak_metrics
 

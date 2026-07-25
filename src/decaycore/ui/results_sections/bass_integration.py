@@ -22,8 +22,8 @@ from typing import Any
 
 from .overview import (
     _format_recommended_xo_hz,
-    _section,
 )
+from .section import _section
 
 from ...resources.i8n.decaycore_i18n import t
 from ..bass_integration_dsp_settings import build_bass_integration_dsp_settings

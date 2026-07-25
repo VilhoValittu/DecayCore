@@ -16,8 +16,8 @@ import numpy as np
 
 _logger = logging.getLogger(__name__)
 
-from ...dsp.modal_analysis import ModalAnalysisResult, RoomModeEvent, detect_room_modes
-from .. import shared
+from ...dsp.modal_analysis_parts import ModalAnalysisResult, RoomModeEvent, detect_room_modes
+from .. import shared_parts as shared
 
 from .metrics_common import _auto_stats_band_n, _auto_stats_pick_arr, _finite_json_float
 

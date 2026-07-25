@@ -14,7 +14,7 @@ import logging
 
 import numpy as np
 
-from ..shared import (
+from ..shared_parts import (
     MAX_SAFE_BOOST,
     _auto_safe_float,
 )

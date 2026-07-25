@@ -21,7 +21,7 @@ from .phase_ir_contracts import (
     require_scalar_unchanged,
     require_unchanged,
 )
-from .phase_ir_phase import _compute_excess_phase
+from .phase_ir_phase_parts import _compute_excess_phase
 from .phase_ir_residual import apply_residual_pass_if_enabled
 from .phase_ir_theoretical import compute_theoretical_phase_and_store_stats
 from .phase_ir_types import PhaseIRInputs, PhaseIROutputs

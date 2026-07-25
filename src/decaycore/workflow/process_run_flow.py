@@ -15,14 +15,14 @@ import typing
 from dataclasses import dataclass
 
 from ..application.run_request import RunRequest
-from .auto_flow import (
+from .auto_flow_parts import (
     _run_auto_mode_search_if_needed,
     _run_auto_mode_seed_phases,
 )
 from .bridge_types import ProcessRunUiBridge
 from .pipeline_flow import _run_pipeline
 from .run_finalize import _finalize_run_outputs
-from .run_prepare import (
+from .run_prepare_parts import (
     _prepare_target_curve_and_run_context,
     _prepare_ui_and_measurements,
 )

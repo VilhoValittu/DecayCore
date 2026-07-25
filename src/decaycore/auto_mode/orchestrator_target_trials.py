@@ -39,7 +39,7 @@ from .compute_context import AutoRunComputeContext
 from .cache_measurement_sig import _auto_get_measurement_signature, _auto_search_measurement_identity
 from .candidate_generation import _build_auto_mode_candidates
 from .search_v2.candidates import deduplicate_presets
-from .shared import (
+from .shared_parts import (
     MAX_SAFE_BOOST,
     _auto_phase_limit_center,
     _auto_phase_limit_clip,
@@ -147,7 +147,6 @@ def _target_eval_one(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         # Optional trial-only smoothing knobs may be absent on older config objects.
         pass
@@ -428,7 +427,6 @@ def _run_target_trials_serial(
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ) as exc:
             out = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
         out_by_idx[int(idx)] = dict(out or {})
@@ -503,7 +501,6 @@ def _run_target_trials_parallel(
                     OSError,
                     ImportError,
                     ModuleNotFoundError,
-                    NameError,
                 ) as exc:
                     out = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
                 out_by_idx[int(idx)] = dict(out or {})
@@ -714,7 +711,6 @@ def _load_target_curve_arrays(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return None
     if hc_f.size < 4 or hc_m.size != hc_f.size:

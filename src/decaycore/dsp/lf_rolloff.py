@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from . import decaycore_dsp as dsp
+from . import decaycore_dsp_parts as dsp
 
 
 @dataclass(frozen=True)

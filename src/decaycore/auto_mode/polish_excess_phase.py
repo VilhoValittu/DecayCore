@@ -17,7 +17,7 @@ import logging
 import numpy as np
 
 from .auto_mode_profile import profiled_section
-from .shared import _auto_safe_float
+from .shared_parts import _auto_safe_float
 from .winner_polish_utils import _polish_rank_status, _winner_polish_acceptance
 
 logger = logging.getLogger("DecayCore")
@@ -32,7 +32,6 @@ _RECOVERABLE_EXCESS_POLISH_EXCEPTIONS = (
     OSError,
     ImportError,
     ModuleNotFoundError,
-    NameError,
 )
 
 

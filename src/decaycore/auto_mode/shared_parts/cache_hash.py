@@ -66,7 +66,6 @@ def _auto_hash_array(a: np.ndarray, *, decimals: int = 4, max_len: int = 1200) -
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return ""
     if x.size <= 0:
@@ -96,7 +95,6 @@ def _auto_hash_array_full(a: np.ndarray) -> str:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return ""
     if raw.size <= 0:
@@ -116,7 +114,6 @@ def _auto_hash_array_full(a: np.ndarray) -> str:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return ""
     if x.size <= 0:
@@ -139,7 +136,6 @@ def _auto_hash_array_full(a: np.ndarray) -> str:
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ):
             return ""
         dtype_name = "float64"

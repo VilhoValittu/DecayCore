@@ -12,6 +12,7 @@ import logging
 import os
 
 from ._constants import *
+from .safe_values import _auto_safe_bool, _auto_safe_int
 
 logger = logging.getLogger("DecayCore")
 

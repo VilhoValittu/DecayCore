@@ -12,7 +12,7 @@ import logging
 import math
 import sys
 
-from ...config.decaycore_pipeline import filter_type_supports_xo_phase_model
+from ...config.pipeline_parts import filter_type_supports_xo_phase_model
 
 logger = logging.getLogger(__name__)
 from ...auto_mode.rank_score import calibrated_auto_quality
@@ -219,4 +219,3 @@ __all__ = [
     '_runtime_versions_text',
     '_append_main_speaker_xo_hpf_summary',
 ]
-

@@ -19,7 +19,7 @@ from .candidate_generation import _seed_auto_mode_candidate_micro_optuna_params
 from .rank_score import official_rank_score
 from .runtime_context import coerce_orchestrator_runtime
 from .scoring_ranking import _auto_is_better_refine
-from .shared import _auto_safe_float
+from .shared_parts import _auto_safe_float
 from ._refine_types import (
     _CacheRefineContext,
     _CacheRefineProgress,
@@ -146,7 +146,6 @@ def _load_explicit_target_seed(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         logger.warning(
             "Automatic mode: target preselect seed micro-refine setup failed, "
@@ -203,7 +202,6 @@ def _load_exact_cached_payload(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         logger.debug(
             "Auto-mode cache read failed, disabling fast path: %s: %s",
@@ -269,7 +267,6 @@ def _load_optuna_phase1_seed_payload(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return {}, {}, ""
     return {}, {}, ""
@@ -330,7 +327,6 @@ def _materialize_cache_seed_payload(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         logger.warning(
             "Automatic mode: exact preset cache materialization failed, "

@@ -14,7 +14,7 @@ import logging
 
 import numpy as np
 
-from ..shared import (
+from ..shared_parts import (
     AUTO_MODE_GOAL_DEFAULT,
     AUTO_MODE_HYBRID_MIXED_FREQ_SOFT_DEN_HZ,
     AUTO_MODE_HYBRID_MIXED_FREQ_SOFT_MAX_HZ,

@@ -42,7 +42,7 @@ from ..mag_limits import (
     _apply_slope_limits as _apply_slope_limits,
     _blend_masked_fractional_octave as _blend_masked_fractional_octave,
 )
-from ..mag_post_limits import apply_post_limits_and_metrics as _apply_post_limits_and_metrics_impl
+from ..mag_post_limits_parts import apply_post_limits_and_metrics as _apply_post_limits_and_metrics_impl
 from ..mag_postprocess import apply_bass_boost_post_restore, apply_confpull_post_slope
 from ..mag_shape import (
     _apply_confidence_logic as _apply_confidence_logic,
@@ -889,4 +889,3 @@ __all__ = [
     '_apply_post_limits_and_metrics',
     '_apply_hard_boost_cut_clamp',
 ]
-

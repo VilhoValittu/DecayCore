@@ -16,7 +16,7 @@ import numpy as np
 
 from .cache_utils import BoundedLruCache
 from .decaycore_analysis import analyze_acoustic_confidence
-from .decaycore_leveling import compute_leveling
+from .leveling_parts import compute_leveling
 from .phase import remove_time_of_flight
 from .smoothing import apply_adaptive_fdw, apply_smoothing_std, psychoacoustic_smoothing
 from .dsp_types import DspContext, PreprocessResult

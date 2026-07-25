@@ -20,7 +20,7 @@ logger = logging.getLogger("DecayCore")
 AUTO_SEARCH_CACHE_SCHEMA_VERSION = 6
 
 from ..cache_signature import _auto_cache_get_entry, _auto_cache_get_last_used_best
-from ..shared import _auto_filter_cache_key
+from ..shared_parts import _auto_filter_cache_key
 from .input_model import AutoSearchInput
 
 auto_api = SimpleNamespace(
@@ -152,7 +152,6 @@ def read_exact_cache_with_reason(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         reason = f"exact cache read failed: {type(exc).__name__}"
         logger.info("Automatic mode search v2: %s", reason, exc_info=True)
@@ -199,7 +198,6 @@ def read_exact_cache_seed_with_reason(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         reason = f"exact cache seed read failed: {type(exc).__name__}"
         logger.info("Automatic mode search v2: %s", reason, exc_info=True)
@@ -258,7 +256,6 @@ def read_last_used_best_with_reason(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         reason = f"last-best cache read failed: {type(exc).__name__}"
         logger.info("Automatic mode search v2: %s", reason, exc_info=True)

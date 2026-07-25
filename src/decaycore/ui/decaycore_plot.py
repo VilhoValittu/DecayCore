@@ -24,7 +24,7 @@ from .plot_generation import (
     remove_ir_peak_delay,
     smooth_complex,
 )
-from .plot_summary import (
+from .plot_summary_parts import (
     _calc_acoustic_score,
     _calc_target_match,
     _clamp,

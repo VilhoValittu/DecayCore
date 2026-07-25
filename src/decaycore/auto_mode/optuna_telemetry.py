@@ -33,7 +33,6 @@ def _auto_metric_summary(values) -> dict:
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ):
             pass
 
@@ -69,7 +68,6 @@ def _auto_metric_summary_text(name: str, summary: dict | None, ndigits: int = 3)
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ):
             pass
         return "n/a"
@@ -157,7 +155,6 @@ def _auto_optuna_fmt_value(v, ndigits: int = 3) -> str:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         pass
     return "n/a"
@@ -263,7 +260,6 @@ def _auto_optuna_events_debug_text(tel: dict | None, ndigits: int = 3) -> str:
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ):
             pass
         return "n/a"
@@ -352,7 +348,6 @@ def _auto_optuna_telemetry_rollup(items: list[dict] | None) -> dict:
                 OSError,
                 ImportError,
                 ModuleNotFoundError,
-                NameError,
             ):
                 pass
 
@@ -375,7 +370,6 @@ def _auto_optuna_telemetry_rollup(items: list[dict] | None) -> dict:
                 OSError,
                 ImportError,
                 ModuleNotFoundError,
-                NameError,
             ):
                 pass
 

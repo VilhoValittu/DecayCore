@@ -203,7 +203,7 @@ def register_main_page() -> None:
 
         with ui.tab_panels(tabs, value=tab_files).classes("w-full cf-tab-panels-shell"):
             with ui.tab_panel(tab_files):
-                from .ng_tab_files import build_files_tab  # noqa: PLC0415
+                from .ng_tab_files_parts import build_files_tab  # noqa: PLC0415
 
                 build_files_tab(t=t, get_val=get_val)
 
@@ -219,7 +219,7 @@ def register_main_page() -> None:
                 build_basic_tab(t=t, get_val=get_val, max_safe_boost=float(MAX_SAFE_BOOST))
 
             with ui.tab_panel(tab_target):
-                from .ng_tab_target import build_target_tab  # noqa: PLC0415
+                from .ng_tab_target_parts import build_target_tab  # noqa: PLC0415
 
                 build_target_tab(t=t, get_val=get_val)
 

@@ -16,7 +16,7 @@ import logging
 import os
 
 from ..app_paths import decaycore_data_dir, program_version_token
-from .shared import AUTO_MODE_CACHE_FILENAME
+from .shared_parts import AUTO_MODE_CACHE_FILENAME
 
 logger = logging.getLogger("DecayCore")
 
@@ -54,7 +54,6 @@ def _auto_cache_path(*, compat_version: str | None = None) -> str:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         try:
             os.makedirs(legacy_base, exist_ok=True)
@@ -69,7 +68,6 @@ def _auto_cache_path(*, compat_version: str | None = None) -> str:
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ):
             logger.exception("cache dir create fallback")
         return legacy_path
@@ -105,7 +103,6 @@ def _auto_cache_path(*, compat_version: str | None = None) -> str:
                 OSError,
                 ImportError,
                 ModuleNotFoundError,
-                NameError,
             ):
                 with open(source_path, "rb") as src_f:
                     payload = src_f.read()
@@ -124,7 +121,6 @@ def _auto_cache_path(*, compat_version: str | None = None) -> str:
                     OSError,
                     ImportError,
                     ModuleNotFoundError,
-                    NameError,
                 ):
                     logger.exception("cache source file remove after copy")
             logger.info(f"Automatic mode cache migrated to: {preferred_path}")
@@ -139,7 +135,6 @@ def _auto_cache_path(*, compat_version: str | None = None) -> str:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return legacy_path
 

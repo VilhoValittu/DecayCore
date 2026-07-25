@@ -75,7 +75,7 @@ def _drain_pending_result_render() -> None:
         return
     args, kwargs = pending
     try:
-        from .ng_results_sections import render_results  # noqa: PLC0415
+        from .results_sections import render_results  # noqa: PLC0415
 
         render_results(*args, **kwargs)
     except (

@@ -19,7 +19,7 @@ import logging
 import numpy as np
 
 from .optuna_telemetry import _auto_metric_summary
-from .shared import (
+from .shared_parts import (
     AUTO_MODE_CACHE_SCHEMA_VERSION,
     AUTO_MODE_OPTUNA_CONSTRAINTS_ZERO_FEASIBLE_FALLBACK,
     AUTO_MODE_OPTUNA_USER_ATTR_OUT,
@@ -285,7 +285,6 @@ def _auto_optuna_collect_run_trials(study, *, run_token: str) -> list[tuple]:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         trials = []
     _auto_optuna_note_trial_scan(len(trials))
@@ -304,7 +303,6 @@ def _auto_optuna_collect_run_trials(study, *, run_token: str) -> list[tuple]:
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ):
             user_attrs = {}
         out = dict(user_attrs.get(AUTO_MODE_OPTUNA_USER_ATTR_OUT, {}) or {})
@@ -425,7 +423,6 @@ def _auto_optuna_constraint_threshold_summary(base_data: dict | None, study_scop
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         constraint_thresholds = {}
     return constraint_thresholds

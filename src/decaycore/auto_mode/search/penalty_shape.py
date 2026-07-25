@@ -17,7 +17,7 @@ import numpy as np
 _logger = logging.getLogger(__name__)
 
 from ...dsp.smoothing import smooth_gain_fractional_octave
-from .. import shared
+from .. import shared_parts as shared
 
 from .metrics_common import _auto_stats_pick_arr
 from .residual_analysis import (
@@ -39,7 +39,6 @@ _RECOVERABLE_SHAPE_PENALTY_EXCEPTIONS = (
     OSError,
     ImportError,
     ModuleNotFoundError,
-    NameError,
 )
 
 

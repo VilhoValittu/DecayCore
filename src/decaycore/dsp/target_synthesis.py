@@ -43,7 +43,6 @@ def _slope_db_oct(f_hz, mag_db, f_lo=None, f_hi=None) -> float:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return float("nan")
     m = np.isfinite(ff) & np.isfinite(mm) & (ff > 0.)
@@ -71,7 +70,6 @@ def _slope_db_oct(f_hz, mag_db, f_lo=None, f_hi=None) -> float:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return float("nan")
 
@@ -194,7 +192,6 @@ def _target_synthesis_to_arr(x):
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return np.array([], dtype=float)
 
@@ -358,7 +355,6 @@ def synthesize_target_from_measurements(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         m_sm = m_avg.copy()
 

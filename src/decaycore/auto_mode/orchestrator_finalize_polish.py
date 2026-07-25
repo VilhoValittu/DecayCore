@@ -41,7 +41,7 @@ from .scoring_ranking import (
     _auto_is_better_refine,
 )
 from .stereo_policy_refine import apply_stereo_policy_refine
-from .shared import _auto_builtin_target_name, _auto_safe_float
+from .shared_parts import _auto_builtin_target_name, _auto_safe_float
 from .winner_polish import (
     apply_excess_phase_strength_winner_polish,
     apply_hpf_winner_polish,
@@ -52,7 +52,7 @@ from .winner_polish import (
     apply_tdc_strength_winner_polish,
 )
 
-from .orchestrator_finalize_cache import (
+from .orchestrator_finalize_cache_parts import (
     _LOW_BASS_CUT_WINNER_POLISH_STEP_HZ,
     _LOW_BASS_CUT_WINNER_POLISH_MAX_DELTA_HZ,
     _public_stereo_policy_refine_meta,
@@ -249,7 +249,6 @@ def _save_final_search_cache(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         # Cache persistence must not change the selected winner when the cache backend misbehaves.
         pass
@@ -307,7 +306,6 @@ def _save_final_search_cache(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         pass
 

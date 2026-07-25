@@ -19,7 +19,7 @@ from functools import wraps
 from threading import RLock
 
 from .cache_structure import _auto_cache_bucket_template, _auto_cache_empty
-from .shared import (
+from .shared_parts import (
     AUTO_MODE_CACHE_FILTER_KEYS,
     AUTO_MODE_CACHE_SCHEMA_VERSION,
     AUTO_MODE_COMPAT_VERSION,
@@ -50,7 +50,6 @@ _RECOVERABLE_CACHE_IO_EXCEPTIONS = (
     OSError,
     ImportError,
     ModuleNotFoundError,
-    NameError,
 )
 
 
@@ -180,7 +179,6 @@ def _auto_cache_load(
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ):
             expected_ver = str(compat_version or AUTO_MODE_COMPAT_VERSION).strip()
             if expected_ver:

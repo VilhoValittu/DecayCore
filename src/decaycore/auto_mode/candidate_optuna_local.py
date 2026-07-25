@@ -16,7 +16,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-from .shared import (
+from .shared_parts import (
     AUTO_MODE_LOCAL_REFINE_SHRINK,
     AUTO_MODE_LOW_BASS_MAX_HZ,
     AUTO_MODE_LOW_BASS_MIN_HZ,

@@ -49,7 +49,7 @@ from ...measurement.devices import (
 )
 from ...measurement.io import save_measurement_bundle
 from ...measurement.models import MeasurementBundle, MeasurementRequest, MeasurementSessionAggregate
-from ...measurement.reference_signal import _sanitize_measurement_dither_level_db
+from ...measurement.reference_signal_parts import _sanitize_measurement_dither_level_db
 from ...measurement.sweep import (
     DEFAULT_MEASUREMENT_DITHER_LEVEL_DB,
     DEFAULT_MEASUREMENT_SAMPLE_RATE,
@@ -61,10 +61,10 @@ from ...measurement.sweep import (
     DEFAULT_SWEEP_START_HZ,
 )
 from ...measurement.capture import run_audibility_test
-from ...measurement.workflow import run_measurement_workflow
+from ...measurement.workflow_parts import run_measurement_workflow
 from .. import measurement_state, ng_controls as ctrl
 from ..ng_sections import page_shell, section_card
-from ..measurement_session_dialog import build_measurement_session_dialog
+from ..measurement_session_dialog_parts import build_measurement_session_dialog
 
 _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS = (
     AttributeError,
@@ -501,7 +501,7 @@ class _MeasurementTabContext:
     # --- bundle application ------------------------------------------------
     def refresh_target_preview(self) -> None:
         try:
-            from ..ng_tab_target import refresh_target_preview  # noqa: PLC0415
+            from ..ng_tab_target_parts import refresh_target_preview  # noqa: PLC0415
 
             refresh_target_preview()
         except (ImportError, AttributeError, RuntimeError, OSError):
@@ -1021,4 +1021,3 @@ __all__ = [
     'ctrl',
     '_sanitize_measurement_dither_level_db',
 ]
-

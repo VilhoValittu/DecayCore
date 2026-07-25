@@ -31,7 +31,7 @@ from .winner_polish import (
 )
 from .stereo_policy_refine import apply_stereo_policy_refine
 
-from .orchestrator_finalize_cache import (
+from .orchestrator_finalize_cache_parts import (
     _LOW_BASS_CUT_WINNER_POLISH_STEP_HZ,
     _LOW_BASS_CUT_WINNER_POLISH_MAX_DELTA_HZ,
     _cache_refine_winner_phase_label,
@@ -55,7 +55,6 @@ _RECOVERABLE_CACHE_FINALIZE_EXCEPTIONS = (
     OSError,
     ImportError,
     ModuleNotFoundError,
-    NameError,
 )
 
 

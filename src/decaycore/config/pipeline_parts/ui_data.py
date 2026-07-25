@@ -14,7 +14,7 @@ from typing import Any
 import logging
 import math
 
-from ...auto_mode.shared import _auto_bass_integration_profile_norm, _auto_goal_is_flat_family
+from ...auto_mode.shared_parts import _auto_bass_integration_profile_norm, _auto_goal_is_flat_family
 from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from ...config.schema import (
     AUTO_MODE_DEFAULT_CFG_TO_UI,

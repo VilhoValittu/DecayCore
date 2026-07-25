@@ -18,7 +18,7 @@ import re
 import numpy as np
 
 from .scoring_ranking import _auto_ripple_metric_for_gate
-from .shared import (
+from .shared_parts import (
     AUTO_MODE_OPTUNA_CONSTRAINTS_ENABLED,
     AUTO_MODE_OPTUNA_CONSTRAINTS_MAX_EVENTS_SEVERITY,
     AUTO_MODE_OPTUNA_CONSTRAINTS_MAX_MODE_RIPPLE_DB,
@@ -182,7 +182,6 @@ def _auto_optuna_trial_out_payload(trial) -> dict:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         user_attrs = {}
     out = user_attrs.get(AUTO_MODE_OPTUNA_USER_ATTR_OUT, {})

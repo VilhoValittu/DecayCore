@@ -19,7 +19,7 @@ import numpy as np
 
 from .auto_mode_profile import profiled_section
 from .scoring_ranking import _auto_hard_gate_reasons, get_residual_peak_db, get_residual_peak_hard_gate_db
-from .shared import _auto_safe_float
+from .shared_parts import _auto_safe_float
 from .winner_polish_utils import _polish_metric_delta, _polish_rank_status
 
 logger = logging.getLogger("DecayCore")
@@ -199,7 +199,6 @@ def _residual_peak_candidate_signature(cand_test: dict) -> str:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return str(sorted(dict(cand_test or {}).items()))
 
@@ -597,7 +596,6 @@ def apply_residual_peak_winner_polish(
                 OSError,
                 ImportError,
                 ModuleNotFoundError,
-                NameError,
             ) as exc:
                 logger.warning(
                     "Automatic mode %s failed for residual-peak candidate %d (%s): %s",

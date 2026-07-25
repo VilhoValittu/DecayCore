@@ -19,7 +19,7 @@ import json
 import numpy as np
 
 from .cache_io import _AUTO_CACHE_LOCK
-from .shared import _auto_hash_array, _auto_hash_array_full, _auto_safe_float
+from .shared_parts import _auto_hash_array, _auto_hash_array_full, _auto_safe_float
 
 logger = logging.getLogger("DecayCore")
 
@@ -33,7 +33,6 @@ _RECOVERABLE_HASH_EXCEPTIONS = (
     OSError,
     ImportError,
     ModuleNotFoundError,
-    NameError,
 )
 
 
@@ -168,7 +167,6 @@ def _auto_get_measurement_signature(measurements: dict) -> str:
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ):
             logger.exception("measurement signature memo store")
         return sig

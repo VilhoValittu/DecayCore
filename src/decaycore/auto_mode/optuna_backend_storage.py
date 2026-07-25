@@ -19,7 +19,7 @@ import re
 
 from ..app_paths import decaycore_data_dir, program_version_token
 from .cache_signature import _auto_compat_version
-from .shared import (
+from .shared_parts import (
     AUTO_MODE_OPTUNA_STORAGE_FILENAME,
     _auto_filter_cache_key,
     _auto_safe_bool,
@@ -81,7 +81,6 @@ def _auto_optuna_prime_known_signatures_from_study(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         logger.exception("optuna study signature prime")
     _OPTUNA_KNOWN_SIGNATURES_PRIMED.add(study_name)
@@ -134,7 +133,6 @@ def _auto_import_optuna():
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         # Optional dependency: fall back to builtin search if Optuna is absent or unusable.
         logger.debug("Optuna not available; automatic mode will use builtin backend", exc_info=True)
@@ -155,7 +153,6 @@ def _auto_import_optuna():
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         pass
     return optuna
@@ -349,7 +346,6 @@ def _auto_optuna_create_storage(optuna_mod, *, base_data: dict | None):
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ):
             # Third-party Optuna journal backends differ across versions; try the next compatible variant.
             logger.debug("Optuna journal storage candidate initialization failed", exc_info=True)
@@ -389,7 +385,6 @@ def _auto_optuna_create_study(
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ) as exc:
             logger.warning(
                 "Automatic mode Optuna storage unavailable for study %s (%s: %s). "

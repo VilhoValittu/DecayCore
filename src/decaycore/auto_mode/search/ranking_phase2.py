@@ -14,7 +14,7 @@ import logging
 
 import numpy as np
 
-from ..shared import (
+from ..shared_parts import (
     AUTO_MODE_GOAL_DEFAULT,
     AUTO_MODE_PHASE2_HARD_GATE_ABS_MAX_PEAK_DB,
     AUTO_MODE_PHASE2_HARD_GATE_FALLBACK_TO_RANK,

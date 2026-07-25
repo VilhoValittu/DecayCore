@@ -21,7 +21,7 @@ from typing import Any
 
 from .rank_score import attach_official_rank_score, official_rank_score
 from .scoring_ranking import _auto_hard_gate_diagnostic
-from .shared import _auto_safe_float
+from .shared_parts import _auto_safe_float
 
 AUTO_MODE_AUDIT_TRAIL_SCHEMA_VERSION = 1
 

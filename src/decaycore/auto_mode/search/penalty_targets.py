@@ -16,7 +16,7 @@ import numpy as np
 
 _logger = logging.getLogger(__name__)
 
-from .. import shared
+from .. import shared_parts as shared
 
 from .metrics_common import _auto_stats_pick_arr
 
@@ -30,7 +30,6 @@ _RECOVERABLE_TARGET_PENALTY_EXCEPTIONS = (
     OSError,
     ImportError,
     ModuleNotFoundError,
-    NameError,
 )
 
 

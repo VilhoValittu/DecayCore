@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ... import shared
+from ... import shared_parts as shared
 from ...auto_mode_profile import profiled_section
 from ..component_scores import (
     score_acoustic_fit,
@@ -614,4 +614,3 @@ def _auto_score_result(
 
 
 __all__ = ['_auto_score_result']
-

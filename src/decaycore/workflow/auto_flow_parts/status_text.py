@@ -19,7 +19,7 @@ from ...auto_mode.api import (
     _auto_safe_float,
 )
 from ...auto_mode.rank_score import attach_official_rank_score, official_rank_score
-from ...config.decaycore_pipeline import (
+from ...config.pipeline_parts import (
     filter_type_short,
 )
 
@@ -213,4 +213,3 @@ __all__ = [
     '_auto_finalize_status_suffix',
     '_build_auto_finalize_status',
 ]
-

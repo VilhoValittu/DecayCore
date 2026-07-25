@@ -25,7 +25,7 @@ from ..cache_measurement_sig import (
     _auto_search_measurement_identity,
 )
 from ..cache_signature import _auto_seed_from_signature
-from ..materialize import AutoModeMaterializeContext, build_materialize_helpers
+from ..materialize_parts import AutoModeMaterializeContext, build_materialize_helpers
 from .runtime import _runtime
 from .seeds import _apply_explicit_seed, _apply_legacy_opportunistic_seeds
 
@@ -159,7 +159,6 @@ def _safe_target_label(search_base_data: dict) -> str:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         target_label = ""
     return str(target_label or "").strip()
@@ -252,7 +251,6 @@ def _maybe_seed_search_state_baseline(*, context: AutoSearchExecutionContext) ->
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         logger.exception("cache seed baseline")
 

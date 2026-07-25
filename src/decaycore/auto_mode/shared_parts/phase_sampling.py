@@ -13,6 +13,8 @@ import logging
 import numpy as np
 
 from ._constants import *
+from .cache_hash import _auto_filter_cache_key
+from .safe_values import _auto_safe_float, _clip
 
 logger = logging.getLogger("DecayCore")
 
@@ -57,7 +59,6 @@ def _auto_mag_c_min_center(base_data: dict | None, *, default: float = 25.0) -> 
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         raw = default
     seed = _auto_safe_float(raw, float("nan"))
@@ -154,7 +155,6 @@ def _jitter(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         x = float(center)
     return _clip(x, lo, hi)

@@ -16,7 +16,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from .shared import (
+from .shared_parts import (
     AUTO_MODE_EVENT_PEN_BASE_PER_EVENT,
     AUTO_MODE_EVENT_PEN_DT_POWER,
     AUTO_MODE_EVENT_PEN_DT_REF_MS,

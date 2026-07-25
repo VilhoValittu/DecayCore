@@ -16,7 +16,7 @@ import numpy as np
 
 _logger = logging.getLogger(__name__)
 
-from .. import shared
+from .. import shared_parts as shared
 
 def _bass_metric(result_metrics: dict, key: str, default: float = float("nan")) -> float:
     return shared._auto_safe_float(result_metrics.get(key, default), default)
@@ -390,7 +390,6 @@ def _auto_exc_penalty_bins_from_dbg(exc_dbg: dict | None) -> float:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         dbg = {}
     v = shared._auto_safe_float(dbg.get("pen_bins", float("nan")), float("nan"))

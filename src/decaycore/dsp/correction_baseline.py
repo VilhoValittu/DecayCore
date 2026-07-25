@@ -29,7 +29,7 @@ from .correction_types import (
     _BaselineContext,
 )
 from .decaycore_analysis import calculate_rt60, calculate_rt60_bands
-from .decaycore_leveling import compute_leveling
+from .leveling_parts import compute_leveling
 from .dsp_config import CfgReader
 from .limits import build_slope_limit_envelope
 from .mag_shape import _active_correction_band_min

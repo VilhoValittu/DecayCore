@@ -24,7 +24,7 @@ from .export_scoring import (
     _pick_metric,
     _score_export_result,
 )
-from .export_summary_text import (
+from .export_summary import (
     _append_acoustic_events,
     _append_dsp_effective_params,
     _append_export_decision_summary,

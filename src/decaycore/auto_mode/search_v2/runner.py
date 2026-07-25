@@ -19,7 +19,7 @@ from .logging import log_plan_decision
 from .plan import AutoSearchPlan
 from .planner import determine_auto_search_plan
 from .signature import compute_auto_search_signature_object
-from ..shared import _auto_filter_cache_key, _auto_goal
+from ..shared_parts import _auto_filter_cache_key, _auto_goal
 from ..cache_signature import _auto_compat_version
 
 

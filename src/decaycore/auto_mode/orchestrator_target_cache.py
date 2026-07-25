@@ -20,7 +20,7 @@ from .cache_signature import (
     _auto_signature,
 )
 from .cache_measurement_sig import _auto_search_measurement_identity
-from .shared import (
+from .shared_parts import (
     AUTO_MODE_CACHE_ENABLED,
     AUTO_MODE_SYNTH_TARGET_NAME,
     _auto_builtin_target_name,

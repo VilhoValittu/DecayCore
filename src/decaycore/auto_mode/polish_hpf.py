@@ -17,7 +17,7 @@ import logging
 import numpy as np
 
 from .auto_mode_profile import profiled_section
-from .shared import AUTO_MODE_HPF_ALLOWED_SLOPES_DB_OCT, AUTO_MODE_HPF_MAX_HZ, AUTO_MODE_HPF_MIN_HZ, _auto_safe_float
+from .shared_parts import AUTO_MODE_HPF_ALLOWED_SLOPES_DB_OCT, AUTO_MODE_HPF_MAX_HZ, AUTO_MODE_HPF_MIN_HZ, _auto_safe_float
 from .winner_polish_utils import _polish_rank_status, _winner_polish_acceptance
 
 logger = logging.getLogger("DecayCore")
@@ -236,7 +236,6 @@ def _hpf_materialize_candidate(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return None
     return {

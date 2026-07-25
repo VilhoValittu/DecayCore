@@ -17,7 +17,7 @@ import numpy as np
 
 _logger = logging.getLogger(__name__)
 
-from .. import shared
+from .. import shared_parts as shared
 from ..runtime_context import (
     _auto_collect_reflections,
     _auto_event_penalty_weighted,

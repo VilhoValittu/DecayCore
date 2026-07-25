@@ -16,7 +16,7 @@ import numpy as np
 
 _logger = logging.getLogger(__name__)
 
-from .. import shared
+from .. import shared_parts as shared
 
 _RECOVERABLE_TEMPORAL_PENALTY_EXCEPTIONS = (
     AttributeError,
@@ -28,7 +28,6 @@ _RECOVERABLE_TEMPORAL_PENALTY_EXCEPTIONS = (
     OSError,
     ImportError,
     ModuleNotFoundError,
-    NameError,
 )
 
 
@@ -232,7 +231,6 @@ def _auto_rt60_policy_penalty(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return 0.0
 
@@ -624,7 +622,6 @@ def _auto_harmonic_local_boost_penalty(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return 0.0
 

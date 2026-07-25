@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-from .shared import (
+from .shared_parts import (
     AUTO_MODE_TARGET_TOP_N,
     AUTO_MODE_TARGET_TRIALS_PER_CURVE,
 )

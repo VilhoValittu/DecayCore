@@ -18,7 +18,7 @@ import numpy as np
 
 from ...common.acoustic_stats import calc_acoustic_score, calc_ai_summary_from_stats
 from ...dsp.target_match import target_match_from_stats
-from .. import shared
+from .. import shared_parts as shared
 
 _AI_SUMMARY_SCORING_RANGE_SUPPORT_CACHE: dict[tuple[int, str], bool] = {}
 
@@ -48,7 +48,6 @@ def _auto_stats_pick_arr(st: dict | None, base_key: str, *fallback_keys: str, _m
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ):
             arr = np.asarray([], dtype=float)
         if arr.size:
@@ -86,7 +85,6 @@ def _auto_stats_band_n(st: dict | None, hi_guard: float, key: str = "freq_axis")
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return None
 
@@ -210,7 +208,6 @@ def _ai_score_with_fallback(st: dict, ai: dict, *, scoring_range) -> float:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return 0.0
 

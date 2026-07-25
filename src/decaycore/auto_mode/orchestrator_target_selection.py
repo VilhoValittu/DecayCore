@@ -27,7 +27,7 @@ from .scoring_ranking import (
     _auto_target_result_mode_ripple,
     _auto_target_result_rank_key,
 )
-from .shared import (
+from .shared_parts import (
     AutoModeConfig,
     AUTO_MODE_CACHE_SCHEMA_VERSION,
     AUTO_MODE_SYNTH_TARGET_BASS_COMP_FRAC,
@@ -177,7 +177,6 @@ def _try_adaptive_target_fast_path(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         logger.warning("Adaptive target synthesis failed: %s: %s", type(exc).__name__, exc)
     return None

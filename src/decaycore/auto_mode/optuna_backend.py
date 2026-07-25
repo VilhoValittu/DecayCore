@@ -97,7 +97,7 @@ from .optuna_backend_loop import (
     _submit_or_schedule_trials as _submit_or_schedule_trials,
     _update_best_and_telemetry as _update_best_and_telemetry,
 )
-from .optuna_backend_core import _auto_run_optuna_eval_loop_core as _auto_run_optuna_eval_loop_core
+from .optuna_backend_core_parts import _auto_run_optuna_eval_loop_core as _auto_run_optuna_eval_loop_core
 
 
 

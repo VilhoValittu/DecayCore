@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ..shared import _auto_filter_cache_key, _auto_goal, _auto_safe_bool
+from ..shared_parts import _auto_filter_cache_key, _auto_goal, _auto_safe_bool
 from .cache import (
     read_exact_cache_seed_with_reason,
     read_exact_cache_with_reason,

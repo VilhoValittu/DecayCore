@@ -373,7 +373,7 @@ def _initial_state_sync(*, t: Callable, get_val: Callable) -> None:
 def _update_target_preview() -> None:
     """Refresh the target curve preview if the preview tab is available."""
     try:
-        from .ng_tab_target import refresh_target_preview  # noqa: PLC0415
+        from .ng_tab_target_parts import refresh_target_preview  # noqa: PLC0415
 
         refresh_target_preview()
     except (

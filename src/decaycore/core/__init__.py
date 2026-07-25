@@ -10,6 +10,6 @@
 
 """Headless/core orchestration helpers."""
 
-from .runner import ConsoleProgressSink, ProgressSink, run_batch
+from .runner_parts import ConsoleProgressSink, ProgressSink, run_batch
 
 __all__ = ["ConsoleProgressSink", "ProgressSink", "run_batch"]

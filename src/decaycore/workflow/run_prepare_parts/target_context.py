@@ -25,7 +25,7 @@ from ...application.run_contracts import (
 )
 from ...common.result_postprocess import _irwin_tag
 from ...config.legacy_keys import is_auto_mode
-from ...config.decaycore_pipeline import (
+from ...config.pipeline_parts import (
     build_xos_hpf,
     choose_dash_fs,
     choose_target_rates,

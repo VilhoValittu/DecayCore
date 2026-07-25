@@ -32,7 +32,7 @@ from ..common.result_postprocess import (
 )
 from ..config.models import FilterConfig
 from ..config.results import FilterResult
-from ..dsp import decaycore_dsp as dsp
+from ..dsp import decaycore_dsp_parts as dsp
 from ..dsp._measurement_ctx_local import measurement_ctx_scope
 from ..dsp.dsp_telemetry import quiet_dsp_info_logging
 from ..dsp.bass_integration import (

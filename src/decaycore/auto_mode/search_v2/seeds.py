@@ -201,7 +201,6 @@ def _try_apply_cache_signature_seed(context: AutoSearchExecutionContext) -> None
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         record_auto_search_fallback(
             search_base_data,
@@ -266,7 +265,6 @@ def _try_apply_optuna_phase1_seed(context: AutoSearchExecutionContext) -> None:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         record_auto_search_fallback(
             search_base_data,
@@ -306,7 +304,6 @@ def _try_apply_last_used_seed(context: AutoSearchExecutionContext) -> None:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         record_auto_search_fallback(
             search_base_data,

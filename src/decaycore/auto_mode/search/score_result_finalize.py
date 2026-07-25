@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .. import shared
+from .. import shared_parts as shared
 from ..rank_score import attach_official_rank_score, calibrated_auto_quality
 
 AUTO_MODE_PREFER_BASS_RESIDUAL_PEAK_HARD_GATE_MAX_DB = 12.0

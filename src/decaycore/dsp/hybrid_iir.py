@@ -16,7 +16,7 @@ from typing import Any, Sequence
 import numpy as np
 import scipy.optimize
 
-from .modal_analysis import RoomModeEvent
+from .modal_analysis_parts import RoomModeEvent
 
 HYBRID_IIR_POLICY_VERSION = 5
 
@@ -400,7 +400,6 @@ def _event_float(event: Any, key: str, default: float = 0.0) -> float:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         value = default
     return _safe_float(value, default)

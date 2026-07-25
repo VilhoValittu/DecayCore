@@ -19,7 +19,7 @@ from .candidate_generation import (
     _suggest_auto_mode_candidate_micro_optuna,
 )
 from .runtime_context import coerce_orchestrator_runtime
-from .shared import _auto_safe_float
+from .shared_parts import _auto_safe_float
 from ._refine_types import (
     _CacheRefineContext,
     _CacheRefineOutcome,
@@ -428,7 +428,6 @@ def _execute_exact_cache_refine(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         logger.warning(
             "Automatic mode: exact preset cache refine failed, "

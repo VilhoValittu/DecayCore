@@ -14,7 +14,7 @@ import json
 from pathlib import Path
 
 from ..app_paths import decaycore_data_dir
-from .shared import _auto_filter_cache_key
+from .shared_parts import _auto_filter_cache_key
 
 
 _BOOL_KEYS = {
@@ -77,7 +77,6 @@ def _measurement_signature(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return ""
 
@@ -99,7 +98,6 @@ def _normalize_scalar(key: str, value):
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ):
             return value
     if isinstance(value, float):
@@ -117,7 +115,6 @@ def _normalize_scalar(key: str, value):
             OSError,
             ImportError,
             ModuleNotFoundError,
-            NameError,
         ):
             return value
     return value
@@ -187,7 +184,6 @@ def _read_json(path: Path) -> dict:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return {}
 
@@ -537,7 +533,6 @@ def update_auto_mode_filter_priors_from_winner(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         logging.getLogger(__name__).warning(
             f"Failed to update auto-mode filter priors: {type(exc).__name__}: {exc}"

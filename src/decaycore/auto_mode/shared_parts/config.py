@@ -15,6 +15,8 @@ import numpy as np
 
 from ...config.schema import normalize_flat_config
 from ._constants import *
+from .goal_profile import _auto_goal_norm
+from .safe_values import _auto_safe_bool, _auto_safe_float, _auto_safe_int
 from .safe_values import _auto_safe_bool, _auto_safe_float, _auto_safe_int
 from .goal_profile import _auto_goal_norm
 
@@ -739,4 +741,3 @@ class AutoModeConfig:
 
 
 __all__ = ['AutoModeConfig']
-

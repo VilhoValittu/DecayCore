@@ -225,7 +225,6 @@ def _store_phase_authority_telemetry(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         pass
 

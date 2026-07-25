@@ -14,7 +14,6 @@ from .overview import (
     render_results,
     _esc,
     _metric_table_html,
-    _section,
     _render_run_overview,
     _build_auto_polish_lines,
     _append_auto_polish_to_status_log,
@@ -23,6 +22,7 @@ from .overview import (
     _render_auto_diagnostics,
     _update_crossover_recommendation_label,
 )
+from .section import _section
 from .plots_export import clear_plot_render_cache, _render_plots_and_export
 from .quality import (
     _render_ir_alignment,

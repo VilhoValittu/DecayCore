@@ -22,7 +22,7 @@ try:
     from .decaycore_wav_window import ir_wav_to_freq_response as _wav_ir_to_fr
 except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
     try:
-        from src.decaycore.io.decaycore_wav_window import ir_wav_to_freq_response as _wav_ir_to_fr
+        from decaycore.io.decaycore_wav_window import ir_wav_to_freq_response as _wav_ir_to_fr
     except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         _wav_ir_to_fr = None
 
@@ -30,7 +30,7 @@ try:
     from .decaycore_wav_window import ir_wav_to_complex_response as _wav_ir_to_complex
 except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
     try:
-        from src.decaycore.io.decaycore_wav_window import ir_wav_to_complex_response as _wav_ir_to_complex
+        from decaycore.io.decaycore_wav_window import ir_wav_to_complex_response as _wav_ir_to_complex
     except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         _wav_ir_to_complex = None
 

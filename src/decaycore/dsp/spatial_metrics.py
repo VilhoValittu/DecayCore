@@ -165,7 +165,6 @@ def compute_filter_similarity_metric(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return _IACC_NAN
 

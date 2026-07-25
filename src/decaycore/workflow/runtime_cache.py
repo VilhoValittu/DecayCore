@@ -25,7 +25,7 @@ def reset_runtime_caches() -> None:
     from ..dsp import (
         bass_integration,
         decaycore_analysis,
-        decaycore_leveling,
+        leveling_parts as decaycore_leveling,
         dsp_preprocess,
         smoothing,
     )

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-from .refine_eval import build_phase2_rollup_telemetry
+from .refine_eval_parts import build_phase2_rollup_telemetry
 from .runtime_context import coerce_orchestrator_runtime
 from ._refine_types import (
     _SearchPhase1State,

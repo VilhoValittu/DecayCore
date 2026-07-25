@@ -25,7 +25,7 @@ from ...dsp.quality_metrics import (
     normalized_policy_divergence_score,
     worst_channel_relief_db,
 )
-from .. import shared
+from .. import shared_parts as shared
 
 from .metric_penalties import (
     _auto_bass_boost_metrics_from_stats, _auto_bass_integration_penalty,

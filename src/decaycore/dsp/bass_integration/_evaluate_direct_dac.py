@@ -15,7 +15,7 @@ from typing import Any
 
 import numpy as np
 
-from ...auto_mode.shared import (
+from ...auto_mode.shared_parts import (
     AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO,
     AUTO_MODE_BASS_INTEGRATION_GUARD_LO_RATIO,
     _auto_bass_integration_profile_norm,

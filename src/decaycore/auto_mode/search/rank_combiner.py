@@ -16,7 +16,7 @@ import numpy as np
 
 _logger = logging.getLogger(__name__)
 
-from .. import shared
+from .. import shared_parts as shared
 from ..rank_score import (
     OFFICIAL_RANK_SCORE_CONTEXT,
     compute_rank_score_components,
@@ -96,7 +96,6 @@ def _collect_rank_top_modes(result) -> list[float]:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return []
 

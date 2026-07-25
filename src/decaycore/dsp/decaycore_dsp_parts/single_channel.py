@@ -36,7 +36,7 @@ from ..dsp_stats import (
     safe_stage_probes,
     safe_stats_update,
 )
-from ..decaycore_leveling import StereoLinkContext, find_shared_stereo_level_window as find_shared_stereo_level_window
+from ..leveling_parts import StereoLinkContext, find_shared_stereo_level_window as find_shared_stereo_level_window
 from ..dsp_utils import cfg_float_allow_zero as _cfg_float_allow_zero
 from ..filter_pipeline import (
     _run_generate_filter_pipeline,
@@ -374,7 +374,6 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         logger.debug("selected target trace export skipped", exc_info=True)
 
@@ -454,7 +453,6 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         logger.warning("acoustic authority map failed", exc_info=True)
         stats["acoustic_authority_error"] = str(exc)
@@ -630,4 +628,3 @@ __all__ = [
     '_limit_gd_gradient_ms_per_oct',
     'apply_confidence_weighted_target_pull',
 ]
-

@@ -24,7 +24,7 @@ import logging
 import numpy as np
 
 from .auto_mode_profile import profiled_section
-from .shared import _auto_safe_float
+from .shared_parts import _auto_safe_float
 from .winner_polish import apply_phase_limit_winner_polish, apply_residual_peak_winner_polish
 
 logger = logging.getLogger("DecayCore")

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from ..config.decaycore_pipeline import filter_type_supports_xo_phase_model
+from ..config.pipeline_parts import filter_type_supports_xo_phase_model
 from ..config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from . import ng_controls as ctrl
 from .ng_sections import page_shell, section_card

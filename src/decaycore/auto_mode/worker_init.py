@@ -31,6 +31,5 @@ def _auto_worker_init() -> None:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         pass

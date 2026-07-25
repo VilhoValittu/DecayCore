@@ -34,7 +34,6 @@ def _camilladsp_crossover_order_model(value: float | str | None, default: int = 
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         order = int(default)
     if order <= 2:

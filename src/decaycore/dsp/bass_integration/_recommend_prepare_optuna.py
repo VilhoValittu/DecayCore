@@ -14,7 +14,7 @@ from typing import Any
 
 import numpy as np
 
-from ...auto_mode.shared import _auto_bass_integration_profile_weights
+from ...auto_mode.shared_parts import _auto_bass_integration_profile_weights
 from ...io.measurement_bundle import BassIntegrationBundle
 from ._constants import (
     AVR_CROSSOVER_CANDIDATES,

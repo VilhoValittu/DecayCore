@@ -15,7 +15,7 @@ from typing import Any
 
 import numpy as np
 
-from .shared import _auto_safe_float
+from .shared_parts import _auto_safe_float
 
 logger = logging.getLogger("DecayCore")
 

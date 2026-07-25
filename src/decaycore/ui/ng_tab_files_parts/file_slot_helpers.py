@@ -21,7 +21,7 @@ from typing import Any, Callable
 
 logger = logging.getLogger("DecayCore")
 
-from ...io.measurements_loader import _try_load_harmonic_sidecar, _try_load_rt60_sidecar
+from ...io.measurements_loader_parts import _try_load_harmonic_sidecar, _try_load_rt60_sidecar
 from ...ui_i18n import normalize_layout_value
 
 
@@ -205,4 +205,3 @@ __all__ = [
     '_file_slot_scope_name',
     '_file_slot_input_name',
 ]
-

@@ -18,7 +18,7 @@ from ..dsp.quality_metrics import (
     worst_channel_relief_db,
 )
 from .rank_score import official_rank_score
-from .shared import _auto_safe_float
+from .shared_parts import _auto_safe_float
 
 logger = logging.getLogger("DecayCore")
 

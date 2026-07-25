@@ -536,7 +536,7 @@ class _FilesTabContext:
     # --- rendering ---------------------------------------------------------
     def refresh_target_preview(self) -> None:
         try:
-            from ..ng_tab_target import refresh_target_preview  # noqa: PLC0415
+            from ..ng_tab_target_parts import refresh_target_preview  # noqa: PLC0415
 
             refresh_target_preview()
         except (
@@ -1260,4 +1260,3 @@ __all__ = [
     '_suggest_measurement_library_matches_if_ready',
     'build_files_tab',
 ]
-

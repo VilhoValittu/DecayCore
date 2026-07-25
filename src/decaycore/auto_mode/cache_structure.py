@@ -12,7 +12,7 @@
 
 from __future__ import annotations
 
-from .shared import (
+from .shared_parts import (
     AUTO_MODE_CACHE_FILTER_KEYS,
     AUTO_MODE_CACHE_SCHEMA_VERSION,
     AUTO_MODE_COMPAT_VERSION,
@@ -37,7 +37,6 @@ def _auto_compat_version(base_data: dict | None) -> str:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         raw = str(AUTO_MODE_COMPAT_VERSION)
     return str(raw or AUTO_MODE_COMPAT_VERSION)

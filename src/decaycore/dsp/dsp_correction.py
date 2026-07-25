@@ -16,7 +16,7 @@ from decaycore.auto_mode.auto_mode_profile import profiled_section
 
 from .acoustic_authority import acoustic_authority_to_stats, build_acoustic_authority_map
 from .correction_baseline import _prepare_correction_baseline
-from .correction_mag import _run_mag_correction_pipeline
+from .correction_mag_parts import _run_mag_correction_pipeline
 from .correction_types import (
     CorrectionInputs,
     CorrectionOutputs,
@@ -74,7 +74,6 @@ def _store_correction_authority_stats(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         try:
             logger.warning("acoustic authority map failed before mag correction", exc_info=True)

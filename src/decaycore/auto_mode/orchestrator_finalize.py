@@ -34,7 +34,7 @@ from .orchestrator_finalize_run import (
 
 # Re-export the names that tests import or patch directly on this module's
 # namespace so nothing breaks without touching test files.
-from .orchestrator_finalize_cache import (
+from .orchestrator_finalize_cache_parts import (
     _build_phase2_pareto_status,
     _build_modal_intelligence_debug,
     _cache_refine_winner_phase_label as _cache_refine_winner_phase_label,

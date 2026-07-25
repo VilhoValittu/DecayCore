@@ -122,7 +122,7 @@ def _empty_target_metadata_channel(side: str) -> dict[str, object]:
 def _build_target_preview_metadata_payload() -> dict[str, object]:
     from ...common.measurement_features import normalize_rt60_bands, normalize_rt60_value  # noqa: PLC0415
     from ...io.generated_measurement_source import generated_source_matches_upload  # noqa: PLC0415
-    from ...io.measurements_loader import _try_load_harmonic_sidecar, _try_load_rt60_sidecar  # noqa: PLC0415
+    from ...io.measurements_loader_parts import _try_load_harmonic_sidecar, _try_load_rt60_sidecar  # noqa: PLC0415
     from ..target_preview_cache import load_path_measurement_curve, load_upload_measurement_curve  # noqa: PLC0415
 
     def _cv(name, default=None):

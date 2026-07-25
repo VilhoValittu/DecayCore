@@ -120,7 +120,6 @@ def _as_float_array(value) -> np.ndarray:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return np.asarray([], dtype=float)
 

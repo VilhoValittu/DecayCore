@@ -275,7 +275,6 @@ def _policy_effective_value(policy, shared, key: str):
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         value = getattr(policy, key, None)
         if value is None and shared is not None:

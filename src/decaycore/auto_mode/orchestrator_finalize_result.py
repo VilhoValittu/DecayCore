@@ -23,8 +23,8 @@ from .auto_mode_profile import profiled_section
 from .cache_signature import _auto_cache_stats_snapshot
 from .rank_score import attach_official_rank_score
 from .scoring_ranking import _auto_rank_key
-from .shared import AUTO_MODE_CACHE_SCHEMA_VERSION, _auto_safe_float
-from .orchestrator_finalize_cache import (
+from .shared_parts import AUTO_MODE_CACHE_SCHEMA_VERSION, _auto_safe_float
+from .orchestrator_finalize_cache_parts import (
     _apply_residual_peak_safety_override,
     _build_modal_intelligence_debug,
     _override_candidates,
@@ -42,7 +42,6 @@ _RECOVERABLE_P6_EXCEPTIONS = (
     OSError,
     ImportError,
     ModuleNotFoundError,
-    NameError,
 )
 
 
@@ -99,7 +98,6 @@ def _materialize_final_search_winner(
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ) as exc:
         # Materialization can fail on late-stage result packaging; keep the last known winner if available.
         logger.warning(
@@ -137,7 +135,6 @@ def _p6_extract_fir_and_stats(result) -> tuple:
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return None, None, {}, {}
 
@@ -162,7 +159,6 @@ def _p6_stat_arr(st: dict, key: str):
         OSError,
         ImportError,
         ModuleNotFoundError,
-        NameError,
     ):
         return None
 
@@ -224,7 +220,7 @@ def _p6_filter_mag_arr(st: dict) -> tuple[object | None, str]:
 
 def _p6_import_validation_dependencies():
     try:
-        from ..dsp.final_ir_validation import validate_final_fir_against_ir, final_ir_validation_to_stats
+        from ..dsp.final_ir_validation_parts import validate_final_fir_against_ir, final_ir_validation_to_stats
         from ..dsp.dsp_config import CfgReader
     except _RECOVERABLE_P6_EXCEPTIONS:
         return None

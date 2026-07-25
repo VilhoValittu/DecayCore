@@ -15,7 +15,7 @@ from typing import Any
 
 import numpy as np
 
-from .config.decaycore_pipeline import (
+from .config.pipeline_parts import (
     _apply_auto_hpf_runtime_override,
     build_filter_config,
     build_xos_hpf,
@@ -24,7 +24,7 @@ from .config.decaycore_pipeline import (
 from .config.mode_policy import apply_mode_to_cfg
 from .config.models import FilterConfig, StereoResolvedAutoPolicies
 from .config.schema import FilterConfigProjection, RunConfigSnapshot
-from .auto_mode.shared import _auto_goal_is_flat_family, _auto_goal_norm
+from .auto_mode.shared_parts import _auto_goal_is_flat_family, _auto_goal_norm
 
 logger = logging.getLogger("DecayCore")
 
