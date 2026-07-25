@@ -165,9 +165,7 @@ def _build_headless_export_zip(
     ft_short: str,
     file_ts: str,
     irw_tag: str = "auto",
-    write_dashboards: bool = False,
-    dash_fs: int | None = None,
-) -> tuple[io.BytesIO, dict, dict]:
+) -> tuple[io.BytesIO, dict]:
     import scipy.io.wavfile
 
     from ...io.bypass_fir_export import bypass_zip_path, write_bypass_fir_wavs
@@ -357,7 +355,7 @@ def _build_headless_export_zip(
                 ),
             )
 
-    return zip_buffer, {}, perf
+    return zip_buffer, perf
 
 def _save_headless_export_bundle(
     zip_buffer: io.BytesIO,
@@ -496,4 +494,3 @@ __all__ = [
     '_first_existing',
     '_normalize_headless_config',
 ]
-

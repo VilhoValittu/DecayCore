@@ -226,7 +226,6 @@ def _prepare_export_parameters(data: dict, support: ProcessRunSupport) -> dict:
         "target_rates": target_rates,
         "dash_fs": dash_fs,
         "auto_mode_enabled": auto_mode_enabled,
-        "zip_dashboards_on": False,
         "ts": ts,
         "file_ts": file_ts,
         "ft_short": ft_short,
@@ -430,7 +429,6 @@ def _finalize_target_context(
             "target_rates": export_state["target_rates"],
             "dash_fs": export_state["dash_fs"],
             "auto_mode_enabled": export_state["auto_mode_enabled"],
-            "zip_dashboards_on": export_state["zip_dashboards_on"],
             "ts": export_state["ts"],
             "file_ts": export_state["file_ts"],
             "ft_short": export_state["ft_short"],
@@ -445,7 +443,6 @@ def _finalize_target_context(
             "sub_meas_f": {},
             "l_imp_f": None,
             "r_imp_f": None,
-            "ui_dashboards": {},
         }
     )
 

@@ -9,9 +9,6 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 import logging
-import os
-import sys
-
 import numpy as np
 import scipy.ndimage
 
@@ -104,19 +101,6 @@ def _prepare_curve_for_target_plot(
         return m_abs
     except _RECOVERABLE_PLOT_EXCEPTIONS:
         return np.asarray(mags_db, dtype=float)
-
-
-def _resource_path(rel_path: str) -> str:
-    if hasattr(sys, "_MEIPASS"):
-        base = sys._MEIPASS  # type: ignore[attr-defined]
-    else:
-        base = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base, rel_path)
-
-
-def _plotly_js_path() -> str | None:
-    p = _resource_path(os.path.join("assets", "plotly.min.js"))
-    return p if os.path.isfile(p) else None
 
 
 def _confidence_prepare_arrays(freqs, conf_mask):

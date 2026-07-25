@@ -507,9 +507,7 @@ def _write_fs_outputs(
     r_st,
     *,
     result: FilterResult | None = None,
-    write_dashboards: bool = True,
     irw_tag: str = "auto",
-    ui_dashboards: dict | None = None,
     ranking_context: dict | None = None,
 ):
     if result is not None:
@@ -530,45 +528,6 @@ def _write_fs_outputs(
     sum_name = f"Summary_{ft_short}_{fs_v}Hz_{file_ts}.txt"
     summary_content = _build_summary_text(data, fs_v, ft_short, file_ts, l_st, r_st, ranking_context=ranking_context)
     zf.writestr(sum_name, summary_content)
-
-    if bool(write_dashboards):
-        psl = data.get("plot_smoothing_level", "Psychoacoustic")
-        mixed_freq = data.get("mixed_freq")
-
-        html_l = plots.generate_prediction_plot(
-            f_l,
-            m_l,
-            p_l,
-            l_imp,
-            fs_v,
-            "Left",
-            None,
-            l_st,
-            mixed_freq,
-            "low",
-            create_full_html=False,
-            plot_smoothing_level=psl,
-        )
-        if isinstance(ui_dashboards, dict):
-            ui_dashboards["fs_hz"] = int(fs_v)
-            ui_dashboards["left_html"] = str(html_l)
-
-        html_r = plots.generate_prediction_plot(
-            f_r,
-            m_r,
-            p_r,
-            r_imp,
-            fs_v,
-            "Right",
-            None,
-            r_st,
-            mixed_freq,
-            "low",
-            create_full_html=False,
-            plot_smoothing_level=psl,
-        )
-        if isinstance(ui_dashboards, dict):
-            ui_dashboards["right_html"] = str(html_r)
 
     target_curve_tag = str(data.get("target_curve_tag", "") or "").strip()
 

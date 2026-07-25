@@ -12,6 +12,7 @@
 
 Call apply_theme() once during page setup (before any components are created).
 """
+
 from __future__ import annotations
 
 _CF_CSS = """
@@ -220,6 +221,14 @@ body {
 
 .q-btn--round {
     border-radius: 50% !important;
+}
+
+.cf-results-choice-toggle {
+    gap: 0.8rem;
+}
+
+.cf-results-choice-toggle > .q-btn-item {
+    border-radius: var(--cf-radius-xs) !important;
 }
 
 .q-btn:not([disabled]):hover {
@@ -761,6 +770,7 @@ def apply_theme(*, dark: bool = True):
     Returns the DarkMode element so callers can toggle it later.
     """
     from nicegui import ui  # noqa: PLC0415
+
     dark_mode = ui.dark_mode()
     if dark:
         dark_mode.enable()

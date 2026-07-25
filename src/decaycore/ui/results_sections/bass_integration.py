@@ -25,14 +25,6 @@ from .overview import (
     _section,
 )
 
-# ---------------------------------------------------------------------------
-# Interactive plot render cache
-# Key: (run_signature, channel, plot_smoothing_level)
-# Value: plotly Figure object
-# Cleared at the start of each render_results call (per-run semantics).
-# ---------------------------------------------------------------------------
-_PLOT_RENDER_CACHE: dict = {}
-
 from ...resources.i8n.decaycore_i18n import t
 from ..bass_integration_dsp_settings import build_bass_integration_dsp_settings
 from ..results_formatters import (

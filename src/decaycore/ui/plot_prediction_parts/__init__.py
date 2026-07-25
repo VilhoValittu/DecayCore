@@ -9,9 +9,15 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 from .prediction_plot import (
+    ChannelPlotData,
     _prediction_plot_fft_context,
     _resolve_magnitude_display_offset_db,
-    generate_prediction_plot,
+    compute_channel_plot_data,
 )
 
-__all__ = ['_prediction_plot_fft_context', '_resolve_magnitude_display_offset_db', 'generate_prediction_plot']
+__all__ = [
+    "ChannelPlotData",
+    "_prediction_plot_fft_context",
+    "_resolve_magnitude_display_offset_db",
+    "compute_channel_plot_data",
+]

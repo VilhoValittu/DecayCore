@@ -114,21 +114,17 @@ def _finalize_run_outputs(ctx: dict, *, callbacks: ProcessRunCallbacks, support:
     ft_short = ctx["ft_short"]
     file_ts = ctx["file_ts"]
     irw_tag = ctx["irw_tag"]
-    dash_fs = int(ctx["dash_fs"])
     ts = ctx["ts"]
     target_curve_tag = ctx["target_curve_tag"]
 
     zip_started_at = time.perf_counter()
-    zip_buffer, ui_dashboards, zip_perf = support.ui_bridge.build_export_zip(
+    zip_buffer, zip_perf = support.ui_bridge.build_export_zip(
         data=data,
         results=results_by_fs,
         ft_short=ft_short,
         file_ts=file_ts,
         irw_tag=irw_tag,
-        write_dashboards=bool(ctx["zip_dashboards_on"]),
-        dash_fs=dash_fs,
     )
-    ctx["ui_dashboards"] = ui_dashboards
     zip_elapsed = max(0.0, float(time.perf_counter() - zip_started_at))
     perf_stats["zip_png_s"] += max(float(zip_perf.get("zip_png_s", 0.0) or 0.0), zip_elapsed)
     for fs_key, st in (zip_perf.get("per_fs_stats", {}) or {}).items():
@@ -172,8 +168,6 @@ def _finalize_run_outputs(ctx: dict, *, callbacks: ProcessRunCallbacks, support:
         r_st_f,
         fname,
         zip_buffer,
-        dash_html_l=ui_dashboards.get("left_html"),
-        dash_html_r=ui_dashboards.get("right_html"),
         run_started_at=ctx["run_started_at"],
         perf_stats=perf_stats,
         per_fs_stats=per_fs_stats,

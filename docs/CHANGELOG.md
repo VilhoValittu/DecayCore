@@ -20,7 +20,9 @@ Advanced/Manual-tilan taso- ja tilt-säädöt sisältyvät tiedostoon.
 Tiedosto voidaan ladata takaisin DecayCoreen custom targetina.
 Confidence näkyy nyt omana täysikokoisena kuvaajarivinään 0–100 % asteikolla. Magnitude-kuvaajan pieni päällekkäinen confidence-akseli poistettiin.
 
-Implemented the "save target curve as named preset" feature and validated it. Summary:
+Implemented the "save target curve as named preset" feature and validated it.
+
+Uusi yksinkertaisempi result's grafiikka näkymä
 
 Changed:
 
@@ -29,7 +31,6 @@ src/decaycore/application/target_preset_service.py (new) — save/list/load/dele
 src/decaycore/application/house_curve_service.py — new _load_user_preset_house_curve branch wired into load_house_curve()'s existing fallback chain.
 src/decaycore/ui/ng_tab_target_parts/preview_curve.py — _save_current_target_curve_as_preset() reusing the existing _current_target_preview_curve() helper (same curve the download button already uses).
 src/decaycore/ui/ng_tab_target_parts/target_tab_builder.py — "Save target curve as preset…" button + dialog (name input, save, list with per-item delete) next to the existing download button; hc_mode select now merges in saved presets.
-src/decaycore/resources/i8n/translations.json — 13 new EN/FI key pairs, target_curve_save_preset_*.
 tests/test_target_preset_service.py (new, 11 tests) — save/list/load/delete round trip, empty-name/too-short-curve rejection, case-insensitive duplicate detection, slug-collision handling, corrupt-file skipping, _normalize_hc_mode_key passthrough, and load_house_curve() returning saved data (and falling back gracefully if a preset file is deleted).
 
 ---

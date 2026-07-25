@@ -174,7 +174,7 @@ class _HeadlessBridge:
     def render_results(self, *args: Any, **kwargs: Any) -> None:
         return None
 
-    def build_export_zip(self, **kwargs: Any) -> tuple[io.BytesIO, dict, dict]:
+    def build_export_zip(self, **kwargs: Any) -> tuple[io.BytesIO, dict]:
         from .headless_export_bundle import _build_headless_export_zip
 
         return _build_headless_export_zip(**kwargs)

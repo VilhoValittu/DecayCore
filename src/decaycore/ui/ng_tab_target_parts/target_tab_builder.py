@@ -133,6 +133,10 @@ def _build_target_preview_section(*, t: Callable) -> None:
 
         preview_col = ui.column().classes("w-full")
         ctrl.register_container("target_preview_scope", preview_col)
+        metadata_col = ui.column().classes("w-full")
+        ctrl.register_container("target_preview_metadata_scope", metadata_col)
+        _render_target_decay_hint()
+        _render_target_preview_metadata()
         with ui.row().classes("w-full gap-2"):
             ctrl.register(
                 "target_curve_download",
@@ -145,10 +149,6 @@ def _build_target_preview_section(*, t: Callable) -> None:
                 .tooltip(t("target_curve_download_tooltip")),
             )
             _build_target_save_preset_dialog(t=t)
-        metadata_col = ui.column().classes("w-full")
-        ctrl.register_container("target_preview_metadata_scope", metadata_col)
-        _render_target_decay_hint()
-        _render_target_preview_metadata()
 
 
 def _build_target_save_preset_dialog(*, t: Callable) -> None:

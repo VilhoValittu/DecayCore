@@ -23,7 +23,7 @@ from .overview import (
     _render_auto_diagnostics,
     _update_crossover_recommendation_label,
 )
-from .plots_export import _render_plots_and_export
+from .plots_export import clear_plot_render_cache, _render_plots_and_export
 from .quality import (
     _render_ir_alignment,
     _render_dsp_quality,
@@ -52,6 +52,7 @@ __all__ = [
     '_render_ir_alignment',
     '_render_lr_difference',
     '_render_plots_and_export',
+    'clear_plot_render_cache',
     '_render_run_overview',
     '_section',
     '_update_crossover_recommendation_label',

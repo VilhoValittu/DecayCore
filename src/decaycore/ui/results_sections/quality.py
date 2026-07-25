@@ -25,14 +25,6 @@ if TYPE_CHECKING:
     # Imported only for static analysis; runtime imports are explicit below.
     from .overview import _section  # noqa: F401
 
-# ---------------------------------------------------------------------------
-# Interactive plot render cache
-# Key: (run_signature, channel, plot_smoothing_level)
-# Value: plotly Figure object
-# Cleared at the start of each render_results call (per-run semantics).
-# ---------------------------------------------------------------------------
-_PLOT_RENDER_CACHE: dict = {}
-
 from ...resources.i8n.decaycore_i18n import t
 from ..results_formatters import (
     format_ir_window,
@@ -465,4 +457,3 @@ __all__ = [
     '_fmt_external_iir_hpf',
     '_rejected_reasons',
 ]
-

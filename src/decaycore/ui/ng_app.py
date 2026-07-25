@@ -351,9 +351,14 @@ def _build_brand_header(*, version: str, dark_mode, initial_theme_dark: bool) ->
 
                     def _toggle_theme(btn=None):
                         from nicegui import ui as _ui  # noqa: PLC0415
+                        from .results_plot_figures import results_plot_theme_javascript  # noqa: PLC0415
+
                         if _state["dark"]:
                             dark_mode.disable()
                             _ui.run_javascript("document.body.classList.add('cf-light')")
+                            _ui.run_javascript(
+                                results_plot_theme_javascript(dark=False)
+                            )
                             if logo_light_src:
                                 logo_el.set_content(
                                     f'<img id="cf-brand-logo" src="{logo_light_src}" style="{logo_img_style}" />'
@@ -363,6 +368,9 @@ def _build_brand_header(*, version: str, dark_mode, initial_theme_dark: bool) ->
                         else:
                             dark_mode.enable()
                             _ui.run_javascript("document.body.classList.remove('cf-light')")
+                            _ui.run_javascript(
+                                results_plot_theme_javascript(dark=True)
+                            )
                             if logo_dark_src:
                                 logo_el.set_content(
                                     f'<img id="cf-brand-logo" src="{logo_dark_src}" style="{logo_img_style}" />'

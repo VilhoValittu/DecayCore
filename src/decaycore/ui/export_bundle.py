@@ -13,8 +13,6 @@ import logging
 import os
 import time
 import zipfile
-from typing import Any
-
 import numpy as np
 import scipy.io.wavfile
 
@@ -58,19 +56,15 @@ def build_export_zip(
     ft_short: str,
     file_ts: str,
     irw_tag: str = "auto",
-    write_dashboards: bool = False,
-    dash_fs: int | None = None,
-) -> tuple[io.BytesIO, dict, dict]:
+) -> tuple[io.BytesIO, dict]:
     """Build full export ZIP from pipeline results.
 
     Returns:
     - zip_buffer: in-memory ZIP payload
-    - ui_dashboards: optional dashboard HTML payloads
     - perf: {"zip_png_s": float, "per_fs_stats": {fs: {"zip_png_s": float}}}
 
     """
     zip_buffer = io.BytesIO()
-    ui_dashboards: dict[str, Any] = {}
     perf = {"zip_png_s": 0.0, "per_fs_stats": {}}
     target_curve_tag = str(data.get("target_curve_tag", "") or "").strip()
     multi_rate_on = bool(data.get("multi_rate_opt", False))
@@ -150,10 +144,6 @@ def build_export_zip(
                 ),
             )
 
-            write_dash = bool(
-                write_dashboards
-                and ((not multi_rate_on) or (dash_fs is not None and int(fs_v) == int(dash_fs)))
-            )
             _write_fs_outputs(
                 zf,
                 data,
@@ -171,9 +161,7 @@ def build_export_zip(
                 None,
                 {},
                 result=result,
-                write_dashboards=write_dash,
                 irw_tag=irw_tag,
-                ui_dashboards=ui_dashboards if (dash_fs is not None and int(fs_v) == int(dash_fs)) else None,
                 ranking_context=ranking_context,
             )
 
@@ -223,7 +211,7 @@ def build_export_zip(
                 yaml_content,
             )
 
-    return zip_buffer, ui_dashboards, perf
+    return zip_buffer, perf
 
 
 def save_export_bundle(

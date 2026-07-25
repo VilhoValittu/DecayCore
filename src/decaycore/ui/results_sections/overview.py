@@ -23,21 +23,13 @@ import math
 import time
 from typing import Any
 
-from .plots_export import _render_plots_and_export
+from .plots_export import clear_plot_render_cache, _render_plots_and_export
 from .quality import (
     _render_dsp_quality,
     _render_hybrid_iir_cuts,
     _render_ir_alignment,
     _render_lr_difference,
 )
-
-# ---------------------------------------------------------------------------
-# Interactive plot render cache
-# Key: (run_signature, channel, plot_smoothing_level)
-# Value: plotly Figure object
-# Cleared at the start of each render_results call (per-run semantics).
-# ---------------------------------------------------------------------------
-_PLOT_RENDER_CACHE: dict = {}
 
 from ...config.legacy_keys import is_auto_mode
 from ...resources.i8n.decaycore_i18n import t
@@ -164,8 +156,6 @@ def render_results(
     fname,
     zip_buffer,
     *,
-    dash_html_l=None,
-    dash_html_r=None,
     run_started_at=None,
     perf_stats=None,
     per_fs_stats=None,
@@ -184,8 +174,8 @@ def render_results(
     prog = get_progress_element()
     _set_progress_value(prog, 0.96, log_context="progress bar set 0.96")
 
-    # Clear the per-run plot cache so stale figures don't survive across runs.
-    _PLOT_RENDER_CACHE.clear()
+    # Clear per-run plot data and figures so stale curves never survive a run.
+    clear_plot_render_cache()
 
     container = get_results_container()
     if container is None:
@@ -220,11 +210,7 @@ def render_results(
             r_st_f=r_st_f,
             fname=fname,
             zip_buffer=zip_buffer,
-            dash_html_l=dash_html_l,
-            dash_html_r=dash_html_r,
             saved_filters_dir=saved_filters_dir,
-            auto_cache_path=auto_cache_path,
-            optuna_storage_path=optuna_storage_path,
             sub_imp_f=sub_imp_f,
             sub_meas_f=sub_meas_f,
             sub_st_f=sub_st_f,
