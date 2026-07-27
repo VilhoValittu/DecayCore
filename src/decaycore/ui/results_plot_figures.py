@@ -150,6 +150,29 @@ def _base_layout(
     return theme
 
 
+def _title_with_filter_metadata(title: str, data: ChannelPlotData) -> str:
+    """Append the applied level and removed FIR delay to a channel plot title."""
+    values = (
+        float(data.auto_global_gain_db),
+        float(data.auto_headroom_db),
+        float(data.filter_delay_ms),
+    )
+    if not all(np.isfinite(value) for value in values):
+        return title
+    auto_gain_db, headroom_db, filter_delay_ms = values
+    metadata = " | ".join(
+        (
+            t("results_plot_auto_gain").format(value=auto_gain_db),
+            t("results_plot_headroom").format(value=headroom_db),
+            t("results_plot_filter_delay_removed").format(value=filter_delay_ms),
+        )
+    )
+    return (
+        f"{title}<span style='font-size:0.78em; font-weight:400;'>"
+        f"&nbsp;&nbsp;&nbsp;&nbsp;{metadata}</span>"
+    )
+
+
 def _apply_log_x_axis(
     fig: go.Figure,
     *,
@@ -455,7 +478,12 @@ def build_response_figure(
         else full_range
     )
     initial_range = full_range if default_full_range else correction_range
-    _base_layout(fig, title=title, dark=dark, height=500)
+    _base_layout(
+        fig,
+        title=_title_with_filter_metadata(title, data),
+        dark=dark,
+        height=500,
+    )
     _apply_log_x_axis(fig, range_hz=initial_range, full_max_hz=full_range[1])
     fig.update_yaxes(title_text=t("results_plot_magnitude_axis"), autorange=True)
     _set_results_plot_controls(
@@ -500,7 +528,12 @@ def build_filter_figure(
         if data.has_valid_correction_range
         else full_range
     )
-    _base_layout(fig, title=title, dark=dark, height=440)
+    _base_layout(
+        fig,
+        title=_title_with_filter_metadata(title, data),
+        dark=dark,
+        height=440,
+    )
     _apply_log_x_axis(fig, range_hz=full_range, full_max_hz=full_range[1])
     fig.update_yaxes(title_text=t("results_plot_filter_axis"), range=[-30.0, 12.0])
     _set_results_plot_controls(
@@ -554,7 +587,13 @@ def build_timing_figure(
         col=1,
     )
     full_range = _full_range(data)
-    _base_layout(fig, title=title, dark=dark, height=650, show_legend=False)
+    _base_layout(
+        fig,
+        title=_title_with_filter_metadata(title, data),
+        dark=dark,
+        height=650,
+        show_legend=False,
+    )
     for row in (1, 2):
         _apply_log_x_axis(
             fig,

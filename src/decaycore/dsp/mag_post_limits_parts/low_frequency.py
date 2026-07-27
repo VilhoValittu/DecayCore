@@ -171,7 +171,7 @@ def _prepare_boost_caps_confidence_cap(
                 float(max_boost_db_base)
                 + float(bass_boost_cap_extra_db) * np.asarray(w[bass_boost_cap_mask], dtype=float)
             )
-            boost_cap_db[bass_boost_cap_mask] = np.minimum(local_cap, float(max_boost_db_base))
+            boost_cap_db[bass_boost_cap_mask] = local_cap
             bass_boost_cap_enabled = bool(np.any(boost_cap_db[bass_boost_cap_mask] > (max_boost_db_base + 1e-6)))
             return bass_boost_cap_mask, bass_boost_cap_enabled
     except (TypeError, ValueError, FloatingPointError, IndexError):
@@ -419,4 +419,3 @@ def _authority_band_metrics(
 
 
 __all__ = ['_apply_low_frequency_policy', '_prepare_boost_caps', '_stats_array', '_authority_band_metrics']
-

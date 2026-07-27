@@ -24,6 +24,10 @@ Implemented the "save target curve as named preset" feature and validated it.
 
 Uusi yksinkertaisempi result's grafiikka näkymä
 
+ZIP-latauspainike poistettu tuloksista.
+Näytetään selkeä tallennuskansioilmoitus.
+Valmis-ilmoituksesta poistettu kuvaajan lataukseen viittaava teksti.
+
 Changed:
 
 src/decaycore/common/house_curves.py — added USER_PRESET_MODE_PREFIX = "UserPreset::" and a passthrough in _normalize_hc_mode_key so preset keys don't collapse to "Harman6".

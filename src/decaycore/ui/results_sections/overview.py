@@ -208,8 +208,6 @@ def render_results(
             r_imp_f=r_imp_f,
             l_st_f=l_st_f,
             r_st_f=r_st_f,
-            fname=fname,
-            zip_buffer=zip_buffer,
             saved_filters_dir=saved_filters_dir,
             sub_imp_f=sub_imp_f,
             sub_meas_f=sub_meas_f,
@@ -751,6 +749,7 @@ def _render_auto_diagnostics(*, data: dict) -> None:
                 total=trials_total,
             )
         )
+        ui.markdown(t("auto_score_context_notice"))
         audit_md = _build_auto_audit_markdown(data=data, auto_meta=auto_meta, bm=bm)
         if audit_md:
             ui.markdown(audit_md)

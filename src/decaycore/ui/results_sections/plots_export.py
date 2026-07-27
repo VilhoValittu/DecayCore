@@ -311,8 +311,6 @@ def _render_plots_and_export(
     r_imp_f,
     l_st_f,
     r_st_f,
-    fname,
-    zip_buffer,
     saved_filters_dir=None,
     sub_imp_f=None,
     sub_meas_f=None,
@@ -373,20 +371,10 @@ def _render_plots_and_export(
     with ui.card().classes("w-full min-w-0"):
         _render_diagnostics(channel_inputs=channel_inputs, dark=dark)
 
-    with ui.row().classes("w-full items-center gap-4 mt-2"):
-        if zip_buffer is not None and fname:
-            try:
-                zip_bytes = zip_buffer.getvalue()
-                ui.button(
-                    t("results_download_zip").format(fname=fname),
-                    on_click=lambda: ui.download(zip_bytes, filename=fname),
-                ).props('color="primary" unelevated').classes("font-bold")
-            except _PLOT_EXCEPTIONS:
-                logger.debug("ZIP download button failed", exc_info=True)
-        if saved_filters_dir:
-            ui.label(t("results_saved_to").format(path=saved_filters_dir)).classes(
-                "text-sm text-gray-400"
-            )
+    if saved_filters_dir:
+        ui.label(t("results_saved_to").format(path=saved_filters_dir)).classes(
+            "text-sm text-gray-400 mt-2"
+        )
 
 
 __all__ = [
