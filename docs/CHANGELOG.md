@@ -12,30 +12,45 @@ All notable changes to **DecayCore** are documented in this file.
 
 ## DecayCore
 
-## [1.2.0]
+## [1.2.0] - 27-7-2026
 
-Target-sivulla on uusi “Lataa nykyinen tavoitekäyrä (.txt)” -painike.
-TXT sisältää esikatselun vihreän käyrän 400 pisteellä välillä 10–20 000 Hz.
-Advanced/Manual-tilan taso- ja tilt-säädöt sisältyvät tiedostoon.
-Tiedosto voidaan ladata takaisin DecayCoreen custom targetina.
-Confidence näkyy nyt omana täysikokoisena kuvaajarivinään 0–100 % asteikolla. Magnitude-kuvaajan pieni päällekkäinen confidence-akseli poistettiin.
+### Keep your target curves ready to use
 
-Implemented the "save target curve as named preset" feature and validated it.
+You can now download the active target curve from the Target page as a `.txt` file. The file contains the green preview curve at 400 points between 10 and 20,000 Hz, including the level and tilt adjustments from Advanced and Manual modes. Target is compatible almost every program (REW, MSO etc.)
 
-Uusi yksinkertaisempi result's grafiikka näkymä
+You can also save important target curves as named presets. Save, select, and remove presets directly on the Target page, so your proven starting points are always ready for the next measurement.
 
-ZIP-latauspainike poistettu tuloksista.
-Näytetään selkeä tallennuskansioilmoitus.
-Valmis-ilmoituksesta poistettu kuvaajan lataukseen viittaava teksti.
+### Clearer graphs and results
 
-Changed:
+Confidence is now shown on its own full-size graph row with a clear 0–100% scale. The overlapping confidence axis has been removed from the Magnitude graph, making it easier to assess measurement reliability at a glance.
 
-src/decaycore/common/house_curves.py — added USER_PRESET_MODE_PREFIX = "UserPreset::" and a passthrough in _normalize_hc_mode_key so preset keys don't collapse to "Harman6".
-src/decaycore/application/target_preset_service.py (new) — save/list/load/delete for named presets, stored as JSON under decaycore_data_dir()/target_presets/, atomic tmp+os.replace writes.
-src/decaycore/application/house_curve_service.py — new _load_user_preset_house_curve branch wired into load_house_curve()'s existing fallback chain.
-src/decaycore/ui/ng_tab_target_parts/preview_curve.py — _save_current_target_curve_as_preset() reusing the existing _current_target_preview_curve() helper (same curve the download button already uses).
-src/decaycore/ui/ng_tab_target_parts/target_tab_builder.py — "Save target curve as preset…" button + dialog (name input, save, list with per-item delete) next to the existing download button; hc_mode select now merges in saved presets.
-tests/test_target_preset_service.py (new, 11 tests) — save/list/load/delete round trip, empty-name/too-short-curve rejection, case-insensitive duplicate detection, slug-collision handling, corrupt-file skipping, _normalize_hc_mode_key passthrough, and load_house_curve() returning saved data (and falling back gracefully if a preset file is deleted).
+The results graph view has been refreshed for greater clarity. Every graph now also has a ⛶ button that opens it in a maximized view. Close the view with the × button or the Esc key.
+
+Completed results are now found directly in the indicated output folder. The separate ZIP download button and the unnecessary graph-download reference in the completion message have been removed to keep the workflow straightforward.
+
+### More transparent AUTO-mode scoring
+
+The AUTO-mode settings card and result diagnostics now clearly explain that scoring is based on the current measurement and listening room. This makes it reliable for comparing solutions from the same measurement set, but it is not intended for comparisons between different speakers or rooms.
+
+---
+
+### Omat tavoitekäyrät talteen ja käyttöön
+
+Target-sivulla voit nyt ladata käytössä olevan tavoitekäyrän `.txt`-tiedostona. Tiedosto sisältää esikatselun vihreän käyrän 400 pisteellä välillä 10–20 000 Hz sekä Advanced- ja Manual-tilan taso- ja tilt-säädöt. Ladattava target on yhteensopiva melkein kaikkien ohjelmien kanssa (REW, MSO jne.)
+
+Tärkeät tavoitekäyrät voi myös tallentaa nimetyiksi esiasetuksiksi. Esiasetuksia on helppo tallentaa, valita ja poistaa suoraan Target-sivulla, joten toimivat lähtökohdat säilyvät aina valmiina seuraavaa mittausta varten.
+
+### Selkeämmät kuvaajat ja tulokset
+
+Confidence esitetään nyt omana täyskokoisena kuvaajarivinään selkeällä 0–100 % asteikolla. Magnitude-kuvaajan päällekkäinen confidence-akseli on poistettu, jotta mittaustulosten luotettavuus on helpompi nähdä yhdellä silmäyksellä.
+
+Tulosten grafiikkanäkymä on uudistettu selkeämmäksi. Jokaisessa kuvaajassa on nyt myös ⛶-painike, jolla valittu kuvaaja avautuu maksimoituun näkymään. Näkymän voi sulkea ×-painikkeesta tai Esc-näppäimellä.
+
+Valmiit tulokset löytyvät jatkossa suoraan ilmoitetusta tallennuskansiosta. Tulossivulta poistettiin erillinen ZIP-latauspainike ja tarpeeton kuvaajan lataukseen viittaava valmisilmoitus, jotta työnkulku pysyy suoraviivaisena.
+
+### Läpinäkyvämpi AUTO-tilan pisteytys
+
+AUTO-tilan asetuskortti ja tulosdiagnostiikka kertovat nyt selkeästi, että pisteytys perustuu kyseiseen mittaukseen ja kuunteluhuoneeseen. Se auttaa vertailemaan saman mittauskokonaisuuden ratkaisuja luotettavasti, mutta ei ole tarkoitettu eri kaiuttimien tai huoneiden keskinäiseen vertailuun.
 
 ---
 

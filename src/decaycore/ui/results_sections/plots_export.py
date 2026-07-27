@@ -132,13 +132,21 @@ def _render_plot_widget(figure) -> None:
 
     controls = results_plot_control_metadata(figure)
     widget_ref: dict[str, object] = {}
+    fullscreen_widget_ref: dict[str, object] = {}
+    dialog_ref: dict[str, object] = {}
 
     def refresh_widget() -> None:
-        widget = widget_ref.get("widget")
-        if widget is None:
-            return
-        widget.figure = figure
-        widget.update()
+        for ref in (widget_ref, fullscreen_widget_ref):
+            widget = ref.get("widget")
+            if widget is not None:
+                widget.figure = figure
+                widget.update()
+
+    def open_fullscreen() -> None:
+        refresh_widget()
+        dialog = dialog_ref.get("dialog")
+        if dialog is not None:
+            dialog.open()
 
     def on_level_change(event) -> None:
         mode = _resolve_toggle_value(
@@ -164,10 +172,10 @@ def _render_plot_widget(figure) -> None:
     has_range_control = bool(
         controls.get("correction_range") and controls.get("full_range")
     )
-    if has_level_control or has_range_control:
-        with ui.row().classes(
-            "w-full items-center justify-between gap-3 flex-wrap px-2 pt-1"
-        ):
+    with ui.row().classes(
+        "w-full items-center justify-between gap-3 flex-wrap px-2 pt-1"
+    ):
+        with ui.row().classes("items-center gap-3 flex-wrap"):
             if has_level_control:
                 with ui.row().classes("items-center gap-2 flex-wrap"):
                     ui.label(t("results_plot_level_control")).classes(
@@ -195,8 +203,25 @@ def _render_plot_widget(figure) -> None:
                         value=str(controls.get("default_range_mode", "full")),
                         on_change=on_range_change,
                     ).props("dense no-caps").classes("cf-results-choice-toggle")
+        ui.button(icon="fullscreen", on_click=open_fullscreen).props(
+            'dense round color="primary"'
+        ).classes("cf-results-fullscreen-button").tooltip(
+            t("results_plot_fullscreen_open_tooltip")
+        )
 
     widget_ref["widget"] = ui.plotly(figure).classes("w-full cf-results-plot")
+
+    with ui.dialog() as fullscreen_dialog:
+        fullscreen_dialog.props("maximized")
+        dialog_ref["dialog"] = fullscreen_dialog
+        with ui.card().classes("cf-results-fullscreen-card"):
+            with ui.row().classes("w-full justify-end shrink-0"):
+                ui.button(icon="close", on_click=fullscreen_dialog.close).props(
+                    "flat dense round"
+                ).tooltip(t("results_plot_fullscreen_close_tooltip"))
+            fullscreen_widget_ref["widget"] = ui.plotly(figure).classes(
+                "w-full grow cf-results-plot cf-results-fullscreen-plot"
+            )
 
 
 def _resolve_toggle_value(value, options: tuple[str, ...], *, fallback: str) -> str:

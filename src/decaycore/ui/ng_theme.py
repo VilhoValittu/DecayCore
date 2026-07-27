@@ -231,6 +231,35 @@ body {
     border-radius: var(--cf-radius-xs) !important;
 }
 
+.cf-results-fullscreen-card.q-card {
+    width: 100vw;
+    max-width: none;
+    height: 100vh;
+    border-radius: 0 !important;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.cf-results-fullscreen-plot {
+    min-height: 0;
+}
+
+.cf-results-fullscreen-button.q-btn {
+    width: 2.5rem;
+    min-height: 2.5rem;
+    background: var(--cf-accent-strong) !important;
+    color: #120f35 !important;
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    box-shadow: 2px 2px 0 rgba(6, 4, 25, 0.54);
+}
+
+.cf-results-fullscreen-button.q-btn:not([disabled]):hover {
+    background: #c9fbff !important;
+    border-color: #ffffff;
+    box-shadow: 3px 3px 0 rgba(6, 4, 25, 0.62);
+}
+
 .q-btn:not([disabled]):hover {
     transform: translate(-1px, -1px);
     box-shadow: 3px 3px 0 rgba(6, 4, 25, 0.34);
