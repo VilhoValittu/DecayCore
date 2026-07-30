@@ -14,46 +14,71 @@ All notable changes to **DecayCore** are documented in this file.
 
 ## [1.2.1]
 
-Adaptive Target now treats Harman6 as a stable reference instead of counting its own bass shelf as room buildup. Room evidence is evaluated per channel, channel disagreement reduces adaptation, target changes are bounded below 500 Hz, and RT60 is used only as a confidence guard against extra bass lift. AUTO no longer applies a separate full-band output tilt or measurement-derived high-frequency target rise.
+### Adaptive Target v2 — a target that stays a target
 
-Navigointi 1–8 on nyt aina Automatic mode details -osion yläpuolella ja omassa erillisessä palkissaan. Ajon eteneminen, valittu ratkaisu ja yksityiskohdat näkyvät navigoinnin alla.
+Adaptive Target now treats Harman6 as a stable reference instead of mistaking its own bass shelf for room buildup. Room evidence is measured against the baseline curve and evaluated per channel, so one noisy channel can no longer drag the target off course: when left and right disagree, adaptation is reduced or falls back to the Harman6 baseline. Channel level offsets stay neutral.
 
-Syy varmistui: sahalaita syntyy magnitudikorjauksessa, ei vaihetyypissä tai IR-ikkunassa. Auto-gain siirtää käyrän alas, joten vanha boost-raja ei tunnistanut negatiiviselle siirtyneitä paikallisia korostuksia.
-Lisäsin toimivan, paikalliseen tasoitettuun vasteeseen perustuvan rajan:
-Advanced → Shaping → Fine tune → “Ohita tätä pienemmät paikalliskorjaukset (dB)”
-Nykyinen arvo 2,0 dB on varmennettu myös DSP-konfiguraatioon asti.
-0,0 poistaa rajan.
+Every adaptation is bounded to −2.0…+0.75 dB and faded out by 500 Hz, so the target guides the correction instead of quietly becoming a second correction stage. RT60 is now used only as a confidence signal that limits extra bass lift — never as a reason to add it. AUTO no longer applies a separate full-band output tilt or a measurement-derived high-frequency target rise.
 
-Päivitin [User_Manual.md (line 152)](/home/ville/dev/DecayCore-source/docs/User_Manual.md:152) -oppaan.
-Lisätty AUTO-moodin Advanced-sivusta:
-mitkä säädöt jäävät käyttäjän muokattaviksi
-lukittujen kenttien ja presetien toiminta
-Ignore local correction below -asetuksen alue, oletusarvo ja vaikutus
-excess phase- ja GD-säätöjen kuvaukset
-viittaus Hybrid IIR -asetuksiin
-huomautus, että lopulliset arvot tarkistetaan vientiyhteenvedosta
+Target smoothing (`smooth_oct`) now genuinely affects the synthesised curve, and both the log and the export summary tell you which adaptation was applied — and, if it was not, exactly why.
 
-Hybrid IIR toimii nyt näin:
-FIR:ltä IIR:lle siirretty leikkaus kompensoidaan edelleen FIR:ssä.
-FIR-rajoitusten jälkeen jäljelle jäävä moodi analysoidaan uudelleen.
-Vain varmennettu residual-moodi saa kompensoimattoman lisäleikkauksen.
-Kokonaisleikkaus noudattaa Max cut-, confidence-, GD-, priority-, voice-risk- ja residual-authority-rajoja.
-Min cut priority koskee nyt myös room_mode-tapahtumia.
-Mittaussovituksen löytämä huippuvoimakkuus osallistuu turvallisen kokonaisrajan määrittämiseen.
-Keskeiset muutokset ovat [hybrid_iir.py (line 167)](/home/ville/dev/DecayCore-source/src/decaycore/dsp/hybrid_iir.py:167) ja [filter_pipeline.py (line 181)](/home/ville/dev/DecayCore-source/src/decaycore/dsp/filter_pipeline.py:181). Yhteenveto raportoi nyt erikseen FIR_transfer, residual_extra, authority-rajan ja kokonaisleikkauksen: [events.py (line 109)](/home/ville/dev/DecayCore-source/src/decaycore/ui/export_summary/events.py:109).
+### Smoother corrections: Ignore local correction below
 
-Adaptive Target v2 -korjaukset.
-Keskeiset muutokset:
-Harman6 on nyt vakaa kiintopiste ja kanavien tasosiirrot ovat neutraaleja.
-Bassoevidenssi lasketaan pohjakäyrään suhteutettuna ja kanavakohtaisesti.
-L/R-erimielisyys pienentää adaptointia tai palauttaa Harman6-pohjaan.
-Target-muutos on rajattu −2,0…+0,75 dB ja häivytetään pois 500 Hz:iin mennessä.
-RT60 toimii vain basson lisäystä rajoittavana confidence-signaalina.
-AUTO:n mittausperäinen HF-nousu ja erillinen full-band output tilt poistettiin.
-smooth_oct vaikuttaa nyt oikeasti synteesiin.
-Diagnostiikka ja fallback-syy näkyvät lokissa ja vientiyhteenvedossa.
-Cache-versiot nostettiin: schema 31, compat am45, synth-algoritmi 3.
+I tracked down the cause of the jagged corrected response: it originates in magnitude correction, not in the phase type or the IR window. Because auto-gain shifts the whole curve downwards, the old boost limit no longer recognised local peaks that had moved into negative territory.
 
+The fix is a real threshold based on the locally smoothed response, and it is yours to control:
+
+**Advanced → Shaping → Fine tune → Ignore local correction below (dB)**
+
+The range is `0–3 dB` and the default `2.0 dB` is verified all the way through to the DSP configuration. Set it to `0` to keep every local detail, or raise it for a smoother, more conservative filter.
+
+### Hybrid IIR — every decibel of modal cut accounted for
+
+Hybrid IIR now follows a clear chain of custody. A cut moved from FIR to IIR is still compensated in FIR. After the FIR limits are applied, the remaining mode is re-analysed, and only a verified residual mode earns an additional uncompensated cut. The total cut always respects the Max cut, confidence, group-delay, priority, voice-risk and residual-authority limits, and Min cut priority now applies to `room_mode` events as well. The peak strength found during measurement fitting also contributes to the safe total limit.
+
+The export summary reports FIR transfer, residual extra, the authority limit and the total cut separately, so you can see precisely how each modal cut was reached.
+
+### A clearer view of the AUTO run
+
+Steps 1–8 now always sit above the Automatic mode details section, in their own separate bar. Run progress, the selected solution and the details appear below the navigation, so a long AUTO run is easy to follow without losing your place.
+
+### User Manual updated
+
+The manual now documents the AUTO mode Advanced page: which controls remain editable, how locked fields and presets behave, the range, default and effect of Ignore local correction below, the excess-phase and group-delay controls, a pointer to the Hybrid IIR settings, and a reminder that the final values are always confirmed in the export summary.
+
+---
+
+### Adaptive Target v2 — target pysyy targetina
+
+Adaptive Target kohtelee Harman6:ta nyt vakaana kiintopisteenä sen sijaan, että tulkitsisi sen oman bassoshelfin huoneen korostumaksi. Basso lasketaan pohjakäyrään suhteutettuna ja kanavakohtaisesti, joten yksi kohiseva kanava ei enää vedä targetia harhaan: kun vasen ja oikea ovat eri mieltä, adaptointia pienennetään tai palataan Harman6-pohjaan. Kanavien tasosiirrot pysyvät neutraaleina.
+
+Target-muutos on rajattu −2,0…+0,75 dB ja häivytetään pois 500 Hz:iin mennessä, joten target ohjaa korjausta eikä muutu huomaamatta toiseksi korjausvaiheeksi. RT60 toimii nyt vain confidence-signaalina, joka rajoittaa basson lisäystä — se ei koskaan ole syy lisätä sitä. AUTO ei enää käytä erillistä full-band output tiltiä eikä mittausperäistä HF-nousua, joten diskantti pysyy siellä, mihin sen itse asetit.
+
+Targetin tasoitus (`smooth_oct`) vaikuttaa nyt aidosti syntetisoituun käyrään, ja sekä loki että vientiyhteenveto kertovat, mikä adaptointi tehtiin — ja jos sitä ei tehty, miksi..
+
+### Tasaisempi korjaus: Ohita tätä pienemmät paikalliskorjaukset
+
+Sahalaidan syy varmistui: se syntyy magnitudikorjauksessa, ei vaihetyypissä tai IR-ikkunassa. Koska auto-gain siirtää koko käyrää alaspäin, vanha boost-raja ei enää tunnistanut negatiiviselle puolelle siirtyneitä paikallisia korostuksia.
+
+Ratkaisuna on aito, paikalliseen tasoitettuun vasteeseen perustuva raja, jonka säädät itse:
+
+**Advanced → Shaping → Fine tune → Ohita tätä pienemmät paikalliskorjaukset (dB)**
+
+Säätöalue on `0–3 dB`, ja oletusarvo `2,0 dB` on varmennettu DSP-konfiguraatioon asti. Arvo `0` säilyttää kaiken paikallisen yksityiskohdan, suurempi arvo antaa tasaisemman ja varovaisemman suodattimen.
+
+### Hybrid IIR — jokainen desibeli modaalileikkausta perusteltuna
+
+Hybrid IIR noudattaa nyt selkeää ketjua. FIR:ltä IIR:lle siirretty leikkaus kompensoidaan edelleen FIR:ssä. FIR-rajoitusten jälkeen jäljelle jäävä moodi analysoidaan uudelleen, ja vain varmennettu residual-moodi saa kompensoimattoman lisäleikkauksen. Kokonaisleikkaus noudattaa aina Max cut-, confidence-, GD-, priority-, voice-risk- ja residual-authority-rajoja, ja Min cut priority koskee nyt myös `room_mode`-tapahtumia. Myös mittaussovituksen löytämä huippuvoimakkuus osallistuu turvallisen kokonaisrajan määrittämiseen.
+
+Vientiyhteenveto raportoi erikseen FIR-siirron, residual-lisäleikkauksen, authority-rajan ja kokonaisleikkauksen, joten näet tarkasti, miten jokainen modaalileikkaus muodostui.
+
+### Selkeämpi näkymä AUTO-ajoon
+
+Navigointi 1–8 on nyt aina Automatic mode details -osion yläpuolella ja omassa erillisessä palkissaan. Ajon eteneminen, valittu ratkaisu ja yksityiskohdat näkyvät navigoinnin alla, joten pitkääkin AUTO-ajoa on helppo seurata paikkaa kadottamatta.
+
+### Käyttöopas päivitetty
+
+Opas kuvaa nyt AUTO-tilan Advanced-sivun: mitkä säädöt jäävät käyttäjän muokattaviksi, miten lukitut kentät ja presetit toimivat, Ohita tätä pienemmät paikalliskorjaukset -asetuksen alueen, oletusarvon ja vaikutuksen, excess phase- ja GD-säätöjen kuvaukset, viittauksen Hybrid IIR -asetuksiin sekä muistutuksen siitä, että lopulliset arvot tarkistetaan aina vientiyhteenvedosta.
 
 ---
 
