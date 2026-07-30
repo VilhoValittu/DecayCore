@@ -144,9 +144,10 @@ def _apply_phase2_hard_gate_if_enabled(*, phase2_kept: list[dict], cfg) -> list[
         _unsafe = next(it for it in phase2_kept if bool((it or {}).get("unsafe_fallback", False)))
         logger.error(
             "Phase2 hard-gate: ALL candidates failed the absolute residual peak gate "
-            "(threshold=%.2f dB). Returning unsafe fallback with residual_peak=%.2f dB. "
+            "(threshold=%.2f dB, policy=%s). Returning unsafe fallback with residual_peak=%.2f dB. "
             "Consider relaxing constraints or re-measuring.",
             float((_unsafe or {}).get("unsafe_fallback_abs_max_peak_db", float("nan"))),
+            str((_unsafe or {}).get("unsafe_fallback_abs_gate_policy", "phase2_absolute_default")),
             float((_unsafe or {}).get("unsafe_fallback_residual_peak_db", float("nan"))),
         )
     return list(phase2_kept)

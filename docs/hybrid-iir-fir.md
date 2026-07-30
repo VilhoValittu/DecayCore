@@ -21,11 +21,12 @@ The hybrid approach uses both:
 When hybrid IIR is enabled, DecayCore:
 
 1. Detects room modes in the configured bass frequency range using confidence and group-delay excess criteria.
-2. Designs conservative Peaking EQ biquads targeting confirmed modal peaks (cuts only — no boosts).
-3. Subtracts the IIR biquad magnitude response from the FIR target gain curve. The FIR then corrects only what the IIR has not already handled.
-4. Exports the IIR biquad parameters in the CamillaDSP YAML configuration alongside the FIR convolver block.
+2. Checks which confirmed modes remain after the bounded FIR magnitude correction.
+3. Moves the supported FIR cut into a Peaking EQ biquad and compensates that transferred part in the FIR.
+4. Adds a bounded, uncompensated residual cut only when the remaining mode independently passes the confidence, group-delay, priority, voice-risk, and residual-authority guards.
+5. Exports the IIR biquad parameters in the CamillaDSP YAML configuration alongside the FIR convolver block.
 
-This preconditioning approach keeps the IIR and FIR responsibilities separated: the IIR handles precision narrow-band cuts, and the FIR handles everything else.
+This keeps the IIR and FIR responsibilities separated while allowing verified residual modes to receive additional narrow-band reduction. The combined IIR cut never exceeds the configured maximum or the supported source-mode height.
 
 ## When to use
 
@@ -45,7 +46,7 @@ Be more conservative or leave it disabled when:
 
 When hybrid IIR produces biquads, they are added to the exported CamillaDSP YAML configuration as Peaking EQ filter entries alongside the FIR convolver block.
 
-**Important:** the IIR and FIR must both be active in your CamillaDSP pipeline for the hybrid correction to work as intended. If you load only the FIR WAV without the IIR biquads, the bass correction will be incomplete — the FIR was designed expecting the IIR to handle the modal peaks it skipped.
+**Important:** the IIR and FIR must both be active in your CamillaDSP pipeline for the hybrid correction to work as intended. If you load only the FIR WAV without the IIR biquads, the transferred modal correction and any verified residual reduction will be missing.
 
 Verify your CamillaDSP pipeline includes both stages before finalizing the deployment.
 
@@ -60,7 +61,7 @@ Verify your CamillaDSP pipeline includes both stages before finalizing the deplo
 | `min_peak_db` | `4.0 dB` | Minimum peak height required to qualify for an IIR cut |
 | `min_q` | `3.0` | Minimum allowed Q for designed biquads |
 | `max_q` | `12.0` | Maximum allowed Q for designed biquads |
-| `max_cut_db` | `6.0 dB` | Maximum allowed cut depth per biquad |
+| `max_cut_db` | `6.0 dB` | Maximum combined transfer + residual cut depth per biquad |
 | `min_confidence` | `0.30` | Minimum confidence required at the mode frequency |
 | `min_gd_excess_ms` | `10.0 ms` | Minimum group delay excess required for mode detection |
 | `min_cut_priority` | `0.0` | Minimum cut priority score required to place a filter |

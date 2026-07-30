@@ -157,18 +157,55 @@ class _AdvancedTabContext:
 
                 with ui.row().classes("w-full gap-4"):
                     _number_field(
-                        "mixed_phase_budget_lf_deg",
-                        label_key="mixed_phase_budget_lf_deg",
-                        default=40.0,
+                        "min_boost_peak_db",
+                        label_key="min_boost_peak_db",
+                        default=2.0,
                         t=t,
                         get_val=get_val,
+                        min=0.0,
+                        max=3.0,
+                        step=0.1,
+                    )
+
+                with ui.row().classes("w-full gap-4"):
+                    _number_field(
+                        "excess_phase_strength",
+                        label_key="excess_phase_strength",
+                        default=0.9,
+                        t=t,
+                        get_val=get_val,
+                        min=0.0,
+                        max=1.0,
+                        step=0.05,
                     )
                     _number_field(
-                        "mixed_phase_budget_hf_deg",
-                        label_key="mixed_phase_budget_hf_deg",
-                        default=22.5,
+                        "low_freq_full_correction_hz",
+                        label_key="low_freq_full_correction_hz",
+                        default=140.0,
                         t=t,
                         get_val=get_val,
+                        min=20.0,
+                        max=1000.0,
+                    )
+
+                with ui.row().classes("w-full gap-4"):
+                    _number_field(
+                        "high_freq_no_correction_hz",
+                        label_key="high_freq_no_correction_hz",
+                        default=900.0,
+                        t=t,
+                        get_val=get_val,
+                        min=40.0,
+                        max=4000.0,
+                    )
+                    _number_field(
+                        "gd_grad_limit_ms_per_oct",
+                        label_key="gd_grad_limit_ms_per_oct",
+                        default=30.0,
+                        t=t,
+                        get_val=get_val,
+                        min=0.0,
+                        max=100.0,
                     )
 
                 with ui.row().classes("w-full gap-4"):
@@ -628,9 +665,7 @@ class _AdvancedTabContext:
                 )
 
 
-def build_advanced_tab(
-    *, t: Callable, get_val: Callable, max_safe_boost: float
-) -> None:
+def build_advanced_tab(*, t: Callable, get_val: Callable) -> None:
     ctx = _AdvancedTabContext(t=t, get_val=get_val)
     with page_shell(title=t("tab_adv"), intro=t("advanced_page_intro")):
         ctx.build_shaping_section()

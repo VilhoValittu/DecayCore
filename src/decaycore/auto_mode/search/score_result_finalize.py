@@ -16,6 +16,9 @@ from .. import shared_parts as shared
 from ..rank_score import attach_official_rank_score, calibrated_auto_quality
 
 AUTO_MODE_PREFER_BASS_RESIDUAL_PEAK_HARD_GATE_MAX_DB = 12.0
+AUTO_MODE_BASS_INTEGRATION_RESIDUAL_PEAK_GATE_MARGIN_DB = 2.0
+AUTO_MODE_BASS_INTEGRATION_RESIDUAL_PEAK_GATE_MAX_DB = 8.0
+BASS_INTEGRATION_RESIDUAL_GATE_POLICY_VERSION = 1
 _RESIDUAL_PEAK_SAFETY_MARGIN_DB = 0.25
 _RESIDUAL_PEAK_CORRECTABLE_CONFIDENCE_MIN = 0.55
 _RESIDUAL_PEAK_CORRECTABLE_SAFE_CUT_MIN_DB = 1.0
@@ -35,16 +38,46 @@ def _effective_residual_peak_hard_gate_db(
     *,
     base_data: dict | None,
     default_gate: float,
-) -> float:
+) -> tuple[float, bool, float]:
     gate = shared._auto_safe_float(default_gate, float("nan"))
     if not np.isfinite(gate):
-        return float("nan")
-    if not shared._auto_goal_is_flat_family(shared._auto_goal(base_data)):
-        return float(gate)
-    bass_boost = _bass_boost_support_db(metrics)
-    if float(bass_boost) < 3.0:
-        return float(gate)
-    return float(min(AUTO_MODE_PREFER_BASS_RESIDUAL_PEAK_HARD_GATE_MAX_DB, float(gate) + float(bass_boost)))
+        return float("nan"), False, 0.0
+
+    effective_gate = float(gate)
+    if shared._auto_goal_is_flat_family(shared._auto_goal(base_data)):
+        bass_boost = _bass_boost_support_db(metrics)
+        if float(bass_boost) >= 3.0:
+            effective_gate = float(
+                min(
+                    AUTO_MODE_PREFER_BASS_RESIDUAL_PEAK_HARD_GATE_MAX_DB,
+                    float(effective_gate) + float(bass_boost),
+                )
+            )
+
+    data = dict(base_data or {})
+    feasibility_class = str(dict(metrics or {}).get("bass_feasibility_class", "") or "").strip().lower()
+    reject_reasons = list(dict(metrics or {}).get("bass_direct_dac_reject_reasons", []) or [])
+    integration_active = bool(data.get("bass_integration_enable", False)) and (
+        str(data.get("bass_integration_mode", "direct_dac") or "direct_dac").strip().lower()
+        == "direct_dac"
+    )
+    relaxation_active = bool(
+        integration_active
+        and feasibility_class in {"good", "marginal"}
+        and not reject_reasons
+    )
+    applied_margin = 0.0
+    if relaxation_active:
+        relaxed_gate = float(
+            min(
+                AUTO_MODE_BASS_INTEGRATION_RESIDUAL_PEAK_GATE_MAX_DB,
+                float(effective_gate) + AUTO_MODE_BASS_INTEGRATION_RESIDUAL_PEAK_GATE_MARGIN_DB,
+            )
+        )
+        relaxed_gate = float(max(effective_gate, relaxed_gate))
+        applied_margin = float(max(0.0, relaxed_gate - effective_gate))
+        effective_gate = float(relaxed_gate)
+    return float(effective_gate), bool(relaxation_active), float(applied_margin)
 
 
 def _correctable_residual_peak_near_gate(
@@ -110,14 +143,34 @@ def finalize_score_result_metrics(
 
     metrics_out["bass_integration_hard_gate_failed"] = bool(bass_failed)
     metrics_out["bass_integration_hard_gate_reason"] = str(bass_reason)
+    metrics_out["bass_integration_enable"] = bool(dict(base_data or {}).get("bass_integration_enable", False))
+    metrics_out["bass_integration_mode"] = str(
+        dict(base_data or {}).get("bass_integration_mode", "direct_dac") or "direct_dac"
+    )
 
     hard_gate_failures = []
-    rp_gate = _effective_residual_peak_hard_gate_db(
+    rp_gate_base = shared._auto_safe_float(
+        metrics_out.get("residual_peak_hard_gate_db", float("nan")),
+        float("nan"),
+    )
+    rp_gate, bi_residual_relaxation_active, bi_residual_margin_db = _effective_residual_peak_hard_gate_db(
         metrics_out,
         base_data=base_data,
-        default_gate=shared._auto_safe_float(metrics_out.get("residual_peak_hard_gate_db", float("nan")), float("nan")),
+        default_gate=rp_gate_base,
+    )
+    metrics_out["residual_peak_hard_gate_base_db"] = (
+        float(rp_gate_base) if np.isfinite(rp_gate_base) else float("nan")
     )
     metrics_out["residual_peak_hard_gate_effective_db"] = float(rp_gate) if np.isfinite(rp_gate) else float("nan")
+    metrics_out["bass_integration_residual_peak_relaxation_active"] = bool(
+        bi_residual_relaxation_active
+    )
+    metrics_out["bass_integration_residual_peak_gate_margin_db"] = float(
+        bi_residual_margin_db
+    )
+    metrics_out["bass_integration_residual_gate_policy_version"] = int(
+        BASS_INTEGRATION_RESIDUAL_GATE_POLICY_VERSION
+    )
     rp_gate_value = shared._auto_safe_float(metrics_out.get("residual_peak_gate_value_db", float("nan")), float("nan"))
     rp_gate_source = str(metrics_out.get("residual_peak_gate_source", "") or "").strip().lower()
     if not np.isfinite(rp_gate_value):

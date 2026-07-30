@@ -18,7 +18,7 @@ import scipy.optimize
 
 from .modal_analysis_parts import RoomModeEvent
 
-HYBRID_IIR_POLICY_VERSION = 5
+HYBRID_IIR_POLICY_VERSION = 6
 
 
 @dataclass(frozen=True)
@@ -101,9 +101,13 @@ class HybridBiquad:
     confidence: float
     gd_excess_ms: float
     cut_priority: float
+    transfer_cut_db: float = 0.0
+    residual_cut_db: float = 0.0
+    residual_authority_cap_db: float = 0.0
+    fitted_peak_db: float = 0.0
     fit_refined: bool = False
 
-    def to_camilladsp(self) -> dict[str, float | str]:
+    def to_camilladsp(self) -> dict[str, float | str | bool]:
         return {
             "type": "Peaking",
             "freq": float(self.freq_hz),
@@ -111,6 +115,14 @@ class HybridBiquad:
             "gain": float(self.gain_db),
             "confidence": float(self.confidence),
             "safe_cut_db": float(self.safe_cut_db),
+            "source_peak_db": float(self.source_peak_db),
+            "fitted_peak_db": float(self.fitted_peak_db),
+            "transfer_cut_db": float(self.transfer_cut_db),
+            "residual_cut_db": float(self.residual_cut_db),
+            "residual_authority_cap_db": float(self.residual_authority_cap_db),
+            "cut_priority": float(self.cut_priority),
+            "gd_excess_ms": float(self.gd_excess_ms),
+            "fit_refined": bool(self.fit_refined),
         }
 
 
@@ -122,8 +134,10 @@ class HybridIIRResult:
     response: np.ndarray = field(default_factory=lambda: np.asarray([], dtype=complex))
     mag_db: np.ndarray = field(default_factory=lambda: np.asarray([], dtype=float))
     phase_rad: np.ndarray = field(default_factory=lambda: np.asarray([], dtype=float))
+    transfer_mag_db: np.ndarray = field(default_factory=lambda: np.asarray([], dtype=float))
+    residual_extra_mag_db: np.ndarray = field(default_factory=lambda: np.asarray([], dtype=float))
     policy_version: int = HYBRID_IIR_POLICY_VERSION
-    mode: str = "magnitude_preconditioning_only"
+    mode: str = "residual_aware_magnitude_preconditioning"
 
     def to_stats(self) -> dict[str, Any]:
         return {
@@ -136,6 +150,17 @@ class HybridIIRResult:
             "hybrid_iir_fit_refined_count": int(sum(1 for b in self.biquads if bool(getattr(b, "fit_refined", False)))),
             "hybrid_iir_mag_db": np.asarray(self.mag_db, dtype=float).tolist(),
             "hybrid_iir_phase_rad": np.asarray(self.phase_rad, dtype=float).tolist(),
+            "hybrid_iir_transfer_mag_db": np.asarray(self.transfer_mag_db, dtype=float).tolist(),
+            "hybrid_iir_residual_extra_mag_db": np.asarray(
+                self.residual_extra_mag_db,
+                dtype=float,
+            ).tolist(),
+            "hybrid_iir_transfer_filter_count": int(
+                sum(1 for b in self.biquads if b.transfer_cut_db > 1e-6)
+            ),
+            "hybrid_iir_residual_cut_count": int(
+                sum(1 for b in self.biquads if b.residual_cut_db > 1e-6)
+            ),
         }
 
 
@@ -145,6 +170,10 @@ def design_hybrid_iir(
     fs: float,
     policy: HybridIIRPolicy,
     measured_mag_db: np.ndarray | None = None,
+    *,
+    residual_events: Sequence[RoomModeEvent] | None = None,
+    fir_gain_db: np.ndarray | None = None,
+    residual_cut_cap_db: np.ndarray | None = None,
 ) -> HybridIIRResult:
     policy = policy.normalized()
     freq = np.asarray(freq_axis, dtype=float).reshape(-1)
@@ -156,6 +185,32 @@ def design_hybrid_iir(
         mm = np.asarray(measured_mag_db, dtype=float).reshape(-1)
         if mm.size == freq.size:
             mag_meas = mm
+    residual_plan_requested = residual_events is not None or fir_gain_db is not None
+    fir_gain = None
+    if fir_gain_db is not None:
+        fg = np.asarray(fir_gain_db, dtype=float).reshape(-1)
+        if fg.size == freq.size and np.all(np.isfinite(fg)):
+            fir_gain = fg
+    residual_cut_cap = None
+    if residual_cut_cap_db is not None:
+        rc = np.asarray(residual_cut_cap_db, dtype=float).reshape(-1)
+        if rc.size == freq.size:
+            residual_cut_cap = np.clip(
+                np.nan_to_num(rc, nan=0.0, posinf=policy.max_cut_db, neginf=0.0),
+                0.0,
+                float(policy.max_cut_db),
+            )
+        else:
+            residual_cut_cap = np.zeros_like(freq, dtype=float)
+    use_residual_plan = fir_gain is not None and residual_events is not None
+    if residual_plan_requested and not use_residual_plan:
+        return HybridIIRResult(
+            enabled=True,
+            rejected=tuple(
+                _rejection(event, "invalid_residual_plan")
+                for event in tuple(events or ())
+            ),
+        )
 
     selected: list[HybridBiquad] = []
     rejected: list[dict[str, Any]] = []
@@ -166,14 +221,42 @@ def design_hybrid_iir(
             continue
         if mag_meas is not None:
             biquad = _refine_biquad_against_measurement(biquad, event, freq, mag_meas, float(fs), policy)
+        if use_residual_plan:
+            biquad = _apply_residual_cut_plan(
+                biquad,
+                event,
+                residual_events=tuple(residual_events or ()),
+                freq_axis=freq,
+                fir_gain_db=fir_gain,
+                residual_cut_cap_db=residual_cut_cap,
+                policy=policy,
+            )
+            if biquad is None:
+                rejected.append(_rejection(event, "no_transfer_or_residual_authority"))
+                continue
+        else:
+            biquad = replace(
+                biquad,
+                residual_cut_db=float(biquad.safe_cut_db),
+            )
         selected.append(biquad)
         if len(selected) >= int(policy.max_filters_per_channel):
             break
 
     response = np.ones(freq.size, dtype=complex)
+    transfer_response = np.ones(freq.size, dtype=complex)
     for biquad in selected:
         response *= peaking_eq_response(freq, float(fs), biquad.freq_hz, biquad.q, biquad.gain_db)
+        if biquad.transfer_cut_db > 0.0:
+            transfer_response *= peaking_eq_response(
+                freq,
+                float(fs),
+                biquad.freq_hz,
+                biquad.q,
+                -float(biquad.transfer_cut_db),
+            )
     mag_db = 20.0 * np.log10(np.maximum(np.abs(response), 1e-12))
+    transfer_mag_db = 20.0 * np.log10(np.maximum(np.abs(transfer_response), 1e-12))
     phase_rad = np.unwrap(np.angle(response)) if response.size else np.asarray([], dtype=float)
     return HybridIIRResult(
         enabled=True,
@@ -182,6 +265,18 @@ def design_hybrid_iir(
         response=response,
         mag_db=np.nan_to_num(mag_db, nan=0.0, posinf=0.0, neginf=0.0),
         phase_rad=np.nan_to_num(phase_rad, nan=0.0, posinf=0.0, neginf=0.0),
+        transfer_mag_db=np.nan_to_num(
+            transfer_mag_db,
+            nan=0.0,
+            posinf=0.0,
+            neginf=0.0,
+        ),
+        residual_extra_mag_db=np.nan_to_num(
+            mag_db - transfer_mag_db,
+            nan=0.0,
+            posinf=0.0,
+            neginf=0.0,
+        ),
     )
 
 
@@ -282,10 +377,125 @@ def _refine_biquad_against_measurement(
             biquad,
             freq_hz=float(result.x[0]),
             q=float(np.clip(result.x[1], policy.min_q, policy.max_q)),
+            fitted_peak_db=float(g_fit),
             fit_refined=True,
         )
     except (TypeError, ValueError, FloatingPointError, RuntimeError, np.linalg.LinAlgError):
         return biquad
+
+
+def _matching_residual_event(
+    event: RoomModeEvent,
+    residual_events: Sequence[RoomModeEvent],
+) -> RoomModeEvent | None:
+    """Return the closest residual mode inside the source mode's safe width."""
+    source_freq_hz = _event_float(event, "freq_hz")
+    if source_freq_hz <= 0.0:
+        return None
+    safe_width_oct = _event_float(
+        event,
+        "safe_width_oct",
+        _event_float(event, "width_oct"),
+    )
+    tolerance_oct = float(np.clip(0.5 * safe_width_oct, 1.0 / 24.0, 0.12))
+    matched: list[tuple[float, RoomModeEvent]] = []
+    for residual in residual_events or ():
+        if str(getattr(residual, "kind", "") or "").strip().lower() != "room_mode":
+            continue
+        residual_freq_hz = _event_float(residual, "freq_hz")
+        if residual_freq_hz <= 0.0:
+            continue
+        distance_oct = abs(np.log2(residual_freq_hz / source_freq_hz))
+        if np.isfinite(distance_oct) and distance_oct <= tolerance_oct:
+            matched.append((float(distance_oct), residual))
+    if not matched:
+        return None
+    matched.sort(
+        key=lambda item: (
+            item[0],
+            -_event_float(item[1], "cut_priority"),
+            -_event_float(item[1], "peak_db"),
+        )
+    )
+    return matched[0][1]
+
+
+def _apply_residual_cut_plan(
+    biquad: HybridBiquad,
+    event: RoomModeEvent,
+    *,
+    residual_events: Sequence[RoomModeEvent],
+    freq_axis: np.ndarray,
+    fir_gain_db: np.ndarray,
+    residual_cut_cap_db: np.ndarray | None,
+    policy: HybridIIRPolicy,
+) -> HybridBiquad | None:
+    """Split the IIR cut into FIR transfer and residual-reduction authority."""
+    freq = np.asarray(freq_axis, dtype=float).reshape(-1)
+    fir_gain = np.asarray(fir_gain_db, dtype=float).reshape(-1)
+    if freq.size < 2 or fir_gain.size != freq.size:
+        return None
+
+    fir_gain_at_mode_db = float(
+        np.interp(
+            float(biquad.freq_hz),
+            freq,
+            fir_gain,
+        )
+    )
+    transferable_cut_db = max(0.0, -fir_gain_at_mode_db)
+    transfer_cut_db = float(
+        min(
+            float(biquad.safe_cut_db),
+            transferable_cut_db,
+        )
+    )
+
+    residual_cut_db = 0.0
+    residual_authority_cap_db = float(policy.max_cut_db)
+    if residual_cut_cap_db is not None:
+        residual_authority_cap_db = float(
+            np.interp(
+                float(biquad.freq_hz),
+                freq,
+                np.asarray(residual_cut_cap_db, dtype=float),
+            )
+        )
+    residual_event = _matching_residual_event(event, residual_events)
+    if residual_event is not None:
+        residual_biquad, _reason = _candidate_to_biquad(residual_event, policy)
+        if residual_biquad is not None:
+            supported_peak_db = (
+                float(biquad.fitted_peak_db)
+                if biquad.fit_refined and biquad.fitted_peak_db > 0.0
+                else float(biquad.source_peak_db)
+            )
+            total_cut_cap_db = float(
+                min(
+                    float(policy.max_cut_db),
+                    supported_peak_db,
+                )
+            )
+            remaining_cut_db = max(0.0, total_cut_cap_db - transfer_cut_db)
+            residual_cut_db = float(
+                min(
+                    float(residual_biquad.safe_cut_db),
+                    remaining_cut_db,
+                    residual_authority_cap_db,
+                )
+            )
+
+    total_cut_db = float(transfer_cut_db + residual_cut_db)
+    if total_cut_db <= 1e-6:
+        return None
+    return replace(
+        biquad,
+        gain_db=-total_cut_db,
+        safe_cut_db=total_cut_db,
+        transfer_cut_db=transfer_cut_db,
+        residual_cut_db=residual_cut_db,
+        residual_authority_cap_db=residual_authority_cap_db,
+    )
 
 
 def peaking_eq_response(freq_axis: np.ndarray, fs: float, freq_hz: float, q: float, gain_db: float) -> np.ndarray:
@@ -345,7 +555,7 @@ def _candidate_to_biquad(event: RoomModeEvent, policy: HybridIIRPolicy) -> tuple
         return None, "gd_evidence_below_threshold"
     if voice_risk > policy.max_voice_clarity_risk:
         return None, "voice_clarity_risk"
-    if kind != "room_mode" and cut_priority < policy.min_cut_priority:
+    if cut_priority < policy.min_cut_priority:
         return None, "modal_priority_below_threshold"
 
     q_raw = _event_float(event, "q_estimate")

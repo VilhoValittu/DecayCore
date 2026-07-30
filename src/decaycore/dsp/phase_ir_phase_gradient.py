@@ -58,8 +58,13 @@ def gd_grad_metrics(freq_axis: np.ndarray, phase_rad: np.ndarray, *, mask: np.nd
         # 95th-percentile is robust against single-bin spikes from resonances or
         # measurement artifacts that would otherwise trigger limiting unnecessarily.
         robust_max = float(np.percentile(abs_grad, 95.0)) if abs_grad.size >= 8 else float(abs_grad[idx])
+        robust_idx = (
+            int(np.argmin(np.abs(abs_grad - robust_max)))
+            if abs_grad.size >= 8
+            else idx
+        )
         out["max_ms_per_oct"] = robust_max
-        out["at_hz"] = float(ff[idx]) if ff.size else None
+        out["at_hz"] = float(ff[robust_idx]) if ff.size else None
         gd_curv = np.nan_to_num(np.gradient(gd_grad, np.log2(np.maximum(ff, 1e-9))), nan=0.0, posinf=0.0, neginf=0.0)
         abs_curv = np.abs(gd_curv)
         if abs_curv.size:
@@ -166,7 +171,10 @@ def _gd_grad_limiter_apply(
         except (AttributeError, TypeError, ValueError):
             gd_sigma = 0.8
         gd_sigma = gd_sigma if np.isfinite(gd_sigma) else 0.8
-        lim_effective = _gd_zone_limit_ms_per_oct(lim_cfg, info.get("max_grad_before_hz"))
+        # The limiter applies the frequency-zone profile per bin. Keep the
+        # configured value as the neutral mid-band limit here so the zone
+        # policy is not applied twice based on one global peak location.
+        lim_effective = float(lim_cfg)
         info["limit_ms_per_oct"] = float(lim_effective)
         # Kaarevuusraja valitetaan vain jos config maarittaa sen, jotta
         # vanhat/karsityt limiter_fn-toteutukset eivat kaadu uuteen kwargiin.

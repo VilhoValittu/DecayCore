@@ -809,9 +809,13 @@ def _seed_phases_apply_target_curve_selection(
     data["local_path_house"] = ""
     data["_auto_target_curve_meta"] = dict(tc_pick)
     if chosen_hc == "Adaptive":
+        adaptive_diag = dict(tc_pick.get("adaptive_target_diagnostics", {}) or {})
+        fallback_reason = str(adaptive_diag.get("fallback_reason", "") or "")
         auto_status(
             "DecayCore automatic mode: adaptive target selected "
-            "(synthesized from room measurements, bass buildup, tilt and HF roll-off)"
+            "(confidence-weighted bass evidence, bounded below 500 Hz"
+            + (f", fallback {fallback_reason}" if fallback_reason else "")
+            + ")"
         )
     elif selection_method_raw in cached_target_methods:
         auto_status(

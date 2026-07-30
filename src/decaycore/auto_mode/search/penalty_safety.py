@@ -96,6 +96,7 @@ def _auto_dsp_quality_penalty(st: dict | None) -> tuple[float, float, dict]:
     gd_grad_max = _auto_pick_metric(
         st,
         (
+            "phase_realized_filter_gd_gradient_p95_ms_per_oct",
             "gd_grad_limiter_after_max_ms_per_oct",
             "gd_grad_limiter_before_max_ms_per_oct",
             "gd_limiter_max_grad_ms_per_oct",
@@ -360,6 +361,16 @@ def _auto_phase_quality(st: dict | None) -> tuple[float, float, dict]:
     )
     extra_risk, pre_ringing_db, gd_grad_max, gd_abs_max, hf_share = _phase_quality_extra_risk(st)
     risk += float(extra_risk)
+    realized_improvement = shared._auto_safe_float(
+        st.get("phase_realized_gd_improvement_score", float("nan")),
+        float("nan"),
+    )
+    if np.isfinite(realized_improvement):
+        realized_improvement = float(np.clip(realized_improvement, -1.0, 1.0))
+        # Once the final FIR realization is available, correction authority is
+        # only useful when it actually reduces corrected-system timing error.
+        benefit *= max(0.0, realized_improvement)
+        risk += 1.50 * max(0.0, -realized_improvement)
 
     dbg = _phase_quality_debug(
         useful_lf=useful_lf,
@@ -377,6 +388,12 @@ def _auto_phase_quality(st: dict | None) -> tuple[float, float, dict]:
         risk=risk,
     )
     dbg["hf_share"] = hf_share
+    dbg["realized_improvement"] = (
+        float(realized_improvement) if np.isfinite(realized_improvement) else float("nan")
+    )
+    dbg["realized_metrics_used"] = bool(np.isfinite(realized_improvement))
+    dbg["benefit"] = float(np.clip(benefit, 0.0, 3.5))
+    dbg["risk"] = float(np.clip(risk, 0.0, 4.5))
     return float(dbg["benefit"]), float(dbg["risk"]), dbg
 
 

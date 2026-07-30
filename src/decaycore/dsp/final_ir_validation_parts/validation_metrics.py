@@ -22,10 +22,10 @@ from ..dsp_config import CfgReader
 from .validation_checks import (
     _fir_to_mag_db,
     _gd_metrics_from_fir,
-    _is_minimum_phase,
     _magnitude_metrics,
     _skip_pre_ringing,
     _stereo_metrics,
+    _system_gd_improvement_metrics,
     _temporal_energy_metrics,
 )
 from .validation_setup import (
@@ -145,6 +145,8 @@ def _final_ir_validation_thresholds(cr: CfgReader) -> dict[str, float]:
         "reject_pre": cr.float("final_ir_validation_reject_pre_energy_db", -18.0),
         "warn_gd": cr.float("final_ir_validation_warn_gd_peak_ms", 45.0),
         "reject_gd": cr.float("final_ir_validation_reject_gd_peak_ms", 80.0),
+        "warn_gd_worsening": cr.float("final_ir_validation_warn_gd_worsening_frac", 0.10),
+        "reject_gd_worsening": cr.float("final_ir_validation_reject_gd_worsening_frac", 0.35),
         "warn_voice": cr.float("final_ir_validation_warn_voice_peak_db", 6.5),
         "reject_voice": cr.float("final_ir_validation_reject_voice_peak_db", 8.0),
         "warn_stereo": cr.float("final_ir_validation_warn_stereo_delta_db", 6.5),
@@ -311,6 +313,7 @@ def _final_ir_validation_severity_and_penalty(
     *,
     pre_db: float,
     gd_peak: float,
+    gd_improvement_frac: float,
     voice_peak: float,
     stereo_peak: float,
     bass_residual_peak: float,
@@ -346,6 +349,15 @@ def _final_ir_validation_severity_and_penalty(
     for value, warn_thr, scale in penalty_specs:
         if np.isfinite(value):
             penalty += max(0.0, value - warn_thr) / scale
+    if np.isfinite(gd_improvement_frac):
+        worsening = max(0.0, -float(gd_improvement_frac))
+        if worsening > float(thresholds["warn_gd_worsening"]):
+            severity = _bump_severity(severity, "warn")
+            reasons.append("gd_worsening_warn")
+        if worsening > float(thresholds["reject_gd_worsening"]):
+            severity = _bump_severity(severity, "reject")
+            reasons.append("gd_worsening_reject")
+        penalty += worsening
     return severity, min(penalty, 5.0), reasons
 
 def validate_final_fir_against_ir(
@@ -363,6 +375,7 @@ def validate_final_fir_against_ir(
     measured_mag_db_l: np.ndarray | None = None,
     measured_mag_db_r: np.ndarray | None = None,
     ir_anchor_mode: str | None = None,
+    filter_type: str | None = None,
     authority_voice_risk: np.ndarray | None = None,
     authority_modal_support: np.ndarray | None = None,
     authority_null_risk: np.ndarray | None = None,
@@ -388,8 +401,7 @@ def validate_final_fir_against_ir(
         measured_ir_r=measured_ir_r,
     )
 
-    skip_pre = _skip_pre_ringing(fir_l_arr, ir_anchor_mode)
-    min_phase = _is_minimum_phase(ir_anchor_mode)
+    skip_pre = _skip_pre_ringing(fir_l_arr, ir_anchor_mode, filter_type)
 
     temp_l, temp_r, pre_db, post_db, early_db = _final_ir_validation_temporal_metrics(
         analysis_l=analysis_l,
@@ -400,10 +412,33 @@ def validate_final_fir_against_ir(
         post_window_ms=thresholds["post_window_ms"],
         skip_pre=skip_pre,
     )
-    if min_phase:
-        gd_peak, gd_rms, gd_ok = float("nan"), float("nan"), True
+    gd_peak, gd_rms, gd_ok = _gd_metrics_from_fir(fir_l_arr, fs)
+    system_gd_l = _system_gd_improvement_metrics(
+        _safe_arr(measured_ir_l),
+        analysis_l if measured_ir_l is not None else None,
+        fs,
+    )
+    if analysis_r is not None and measured_ir_r is not None:
+        system_gd_r = _system_gd_improvement_metrics(
+            _safe_arr(measured_ir_r),
+            analysis_r,
+            fs,
+        )
     else:
-        gd_peak, gd_rms, gd_ok = _gd_metrics_from_fir(fir_l_arr, fs)
+        system_gd_r = {}
+    improvement_values = [
+        float(v)
+        for v in (
+            system_gd_l.get("gd_improvement_frac", float("nan")),
+            system_gd_r.get("gd_improvement_frac", float("nan")),
+        )
+        if np.isfinite(float(v))
+    ]
+    gd_improvement_frac = (
+        float(np.mean(np.asarray(improvement_values, dtype=float)))
+        if improvement_values
+        else float("nan")
+    )
     freq_arr = _safe_arr(freq_axis)
     mag_metrics, stereo = _final_ir_validation_mag_and_stereo_metrics(
         freq_arr=freq_arr,
@@ -433,6 +468,7 @@ def validate_final_fir_against_ir(
     severity, penalty, reasons = _final_ir_validation_severity_and_penalty(
         pre_db=pre_db,
         gd_peak=gd_peak,
+        gd_improvement_frac=gd_improvement_frac,
         voice_peak=voice_peak,
         stereo_peak=stereo_peak,
         bass_residual_peak=bass_residual_peak,
@@ -449,6 +485,11 @@ def validate_final_fir_against_ir(
         "early_energy_ratio_db": early_db,
         "gd_peak_ms": gd_peak,
         "gd_rms_ms": gd_rms,
+        "gd_before_peak_ms": float(system_gd_l.get("gd_before_peak_ms", float("nan"))),
+        "gd_after_peak_ms": float(system_gd_l.get("gd_after_peak_ms", float("nan"))),
+        "gd_before_rms_ms": float(system_gd_l.get("gd_before_rms_ms", float("nan"))),
+        "gd_after_rms_ms": float(system_gd_l.get("gd_after_rms_ms", float("nan"))),
+        "gd_improvement_frac": float(gd_improvement_frac),
         **mag_metrics,
         **stereo,
     }
@@ -488,6 +529,21 @@ def final_ir_validation_to_stats(result: FinalIRValidationResult) -> dict[str, A
         "final_ir_validation_early_energy_ratio_db": _f(result.early_energy_ratio_db),
         "final_ir_validation_gd_peak_ms": _f(result.gd_peak_ms),
         "final_ir_validation_gd_rms_ms": _f(result.gd_rms_ms),
+        "final_ir_validation_gd_before_peak_ms": _f(
+            result.metrics.get("gd_before_peak_ms", float("nan"))
+        ),
+        "final_ir_validation_gd_after_peak_ms": _f(
+            result.metrics.get("gd_after_peak_ms", float("nan"))
+        ),
+        "final_ir_validation_gd_before_rms_ms": _f(
+            result.metrics.get("gd_before_rms_ms", float("nan"))
+        ),
+        "final_ir_validation_gd_after_rms_ms": _f(
+            result.metrics.get("gd_after_rms_ms", float("nan"))
+        ),
+        "final_ir_validation_gd_improvement_frac": _f(
+            result.metrics.get("gd_improvement_frac", float("nan"))
+        ),
         "final_ir_validation_voice_band_peak_excess_db": _f(result.voice_band_peak_excess_db),
         "final_ir_validation_voice_band_energy_excess_db": _f(result.voice_band_energy_excess_db),
         "final_ir_validation_stereo_delta_rms_db": _f(result.stereo_delta_rms_db),
@@ -498,4 +554,3 @@ def final_ir_validation_to_stats(result: FinalIRValidationResult) -> dict[str, A
 
 
 __all__ = ['_safe_missing_result', 'validate_final_fir_against_ir', 'final_ir_validation_to_stats']
-

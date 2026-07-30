@@ -14,6 +14,7 @@ from typing import Any
 
 import numpy as np
 
+from ...features import require_packaged_bass_engine
 from ...auto_mode.shared_parts import _auto_bass_integration_profile_weights
 from ...io.measurement_bundle import BassIntegrationBundle
 from ._constants import (
@@ -1038,6 +1039,7 @@ def recommend_direct_dac_prepare_optuna(
     with one joint search over fc, overlap_ratio, delay, polarity, and gain.
     Falls back to builtin staged approach if optuna is unavailable.
     """
+    require_packaged_bass_engine()
     combine_mode_norm = normalize_sub_combine_mode(sub_combine_mode)
     hpf_order_i = max(1, int(main_hpf_order))
     lpf_order_i = max(1, int(sub_lpf_order))

@@ -149,8 +149,22 @@ What it does:
 In AUTO mode, the target curve can be determined three ways (selectable from the Basic tab):
 
 - **Auto: search best built-in** (default) — evaluates multiple built-in target curves in parallel and picks the best-ranked result. Most robust choice, especially with external measurements.
-- **Adaptive: derive target from room acoustics** — synthesizes a Harman6-based target from the measured room's bass buildup, tilt, and RT60 characteristics. Faster than the search path. See section 6 for full details and RT60 requirements.
+- **Adaptive: derive target from room acoustics** — synthesizes a conservative Harman6-based target from broad, stereo-consistent bass evidence. Faster than the search path. See section 6 for full details.
 - **Use selected target curve from Target page** — uses the target curve you manually selected in the Target tab.
+
+**Advanced-tab tuning in AUTO mode**
+
+AUTO mode does not make the whole Advanced tab read-only. It keeps the main search and safety policy under program control, while allowing a limited set of expert overrides. Disabled or dimmed fields are managed by AUTO, and the `Safe`, `Normal`, and `Aggressive` Advanced presets cannot be applied during an automatic run.
+
+The main user-adjustable correction-shaping controls are:
+
+- **Ignore local correction below (dB)** — suppresses narrow local correction details whose peak is smaller than the selected threshold, primarily above 80 Hz, while preserving the broader response shape. The range is `0–3 dB` and the default is `2.0 dB`. Set it to `0` to retain all local detail; increase it for a smoother, more conservative filter.
+- **Excess-phase correction strength (0–1)** — sets how strongly supported excess-phase error is corrected. AUTO may still refine the final strength during winner polish.
+- **Full phase correction up to (Hz)** — defines the upper end of the range receiving full phase-correction strength.
+- **Phase correction faded out by (Hz)** — defines where that correction has faded to zero.
+- **GD gradient limit (ms/oct)** — limits abrupt group-delay changes and helps contain phase-correction artifacts.
+
+The optional Hybrid IIR controls also remain available from the Advanced tab; see section 9.7. Leave expert overrides at their defaults unless you have a measured reason to change them. The exported summary reports the effective values selected and refined by AUTO.
 
 Best for:
 
@@ -220,11 +234,12 @@ The `Adaptive: derive target from room acoustics` strategy synthesizes a custom 
 How it works:
 
 1. Starts with a Harman6-style reference shape as a base.
-2. Estimates the room's natural bass buildup and tilt from the measurement.
-3. Adjusts bass and tilt compensation fractions based on those estimates.
-4. When RT60 data is available, further refines the compensation using measured decay times across bass, mid, and treble bands (bounded to ±2 dB).
+2. Aligns each channel to that reference and estimates only broad residual bass trends.
+3. Reduces adaptation when left and right disagree and bounds changes to −2.0/+0.75 dB below 500 Hz.
+4. Uses RT60 as a confidence guard: long bass decay can prevent extra target lift, but RT60 does not create target tilt.
+5. Preserves the Harman6 shape above 500 Hz by default.
 
-**RT60 requirement:** adaptive target achieves its full room-specific behavior only when RT60 data is present in the measurement. RT60 is captured automatically by DecayCore's built-in measurement tool. With external REW exports or WAV impulse files, RT60 data is typically absent — in that case the RT60-based compensation step is skipped and the target is derived from bass buildup and tilt only.
+**RT60 is optional:** it is captured automatically by DecayCore's built-in measurement tool. With external REW exports or WAV impulse files, adaptive target remains valid and simply omits the decay-based bass-lift guard.
 
 If you are using external measurements without RT60 data, `Auto: search best built-in` is the safer choice. It evaluates how well different built-in curves match the measured room without requiring RT60 data.
 
@@ -428,10 +443,11 @@ Hybrid IIR is an optional bass mode that adds a small set of narrow IIR Peaking 
 What it does:
 
 - detects narrow modal peaks in the bass using confidence and group delay excess criteria
-- designs conservative Peaking EQ cuts (no boosts) for confirmed peaks
-- subtracts the IIR biquad contribution from the FIR magnitude gain curve — the FIR then handles only what remains after the IIR stage
+- checks which confirmed modes remain after the bounded FIR magnitude correction
+- transfers supported FIR cut depth into conservative Peaking EQ cuts (no boosts)
+- adds bounded residual reduction only when the remaining mode passes the acoustic safety guards
 
-The result is a combined correction: IIR biquads handle the narrowest peaks precisely, and the FIR handles the broader response.
+The result is a combined correction: the transferred IIR part replaces equivalent FIR correction, while a separately gated residual part can reduce a verified modal peak that the bounded FIR leaves behind.
 
 When to use it:
 
@@ -445,7 +461,7 @@ When not to use it:
 - the room bass does not show clear narrow modal peaks
 - your deployment target cannot run IIR biquads
 
-**CamillaDSP deployment note:** when hybrid IIR produces biquads, they are included in the exported CamillaDSP YAML alongside the FIR convolver. Both stages must be active in the pipeline. Loading only the FIR WAV file without the IIR biquads will result in incomplete bass correction, because the FIR was designed with the IIR contribution already subtracted from its target.
+**CamillaDSP deployment note:** when hybrid IIR produces biquads, they are included in the exported CamillaDSP YAML alongside the FIR convolver. Both stages must be active in the pipeline. Loading only the FIR WAV file without the IIR biquads omits both the transferred modal correction and any verified residual reduction.
 
 Controls are available in the Advanced tab under a collapsible hybrid IIR tuning section. Default state is disabled.
 

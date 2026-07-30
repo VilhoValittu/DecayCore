@@ -35,6 +35,7 @@ from .hpf_policy import HPF_IIR_TAP_THRESHOLD, filter_config_should_use_iir_hpf
 from .hybrid_iir import HybridIIRPolicy, design_hybrid_iir, peaking_eq_response
 from .modal_analysis_parts import detect_room_modes
 from .phase import remove_time_of_flight
+from .residual_authority import build_residual_authority_caps
 
 logger = logging.getLogger("DecayCore.dsp")
 
@@ -122,15 +123,37 @@ def _hybrid_iir_modal_analysis_axis(cfg: FilterConfig, policy: HybridIIRPolicy, 
 def _hybrid_iir_native_result(result, native_freq: np.ndarray, fs: float):
     freq = np.asarray(native_freq, dtype=float).reshape(-1)
     response = np.ones(freq.size, dtype=complex)
+    transfer_response = np.ones(freq.size, dtype=complex)
     for biquad in result.biquads:
         response *= peaking_eq_response(freq, float(fs), biquad.freq_hz, biquad.q, biquad.gain_db)
+        if float(getattr(biquad, "transfer_cut_db", 0.0) or 0.0) > 0.0:
+            transfer_response *= peaking_eq_response(
+                freq,
+                float(fs),
+                biquad.freq_hz,
+                biquad.q,
+                -float(biquad.transfer_cut_db),
+            )
     mag_db = 20.0 * np.log10(np.maximum(np.abs(response), 1e-12))
+    transfer_mag_db = 20.0 * np.log10(np.maximum(np.abs(transfer_response), 1e-12))
     phase_rad = np.unwrap(np.angle(response)) if response.size else np.asarray([], dtype=float)
     return replace(
         result,
         response=response,
         mag_db=np.nan_to_num(mag_db, nan=0.0, posinf=0.0, neginf=0.0),
         phase_rad=np.nan_to_num(phase_rad, nan=0.0, posinf=0.0, neginf=0.0),
+        transfer_mag_db=np.nan_to_num(
+            transfer_mag_db,
+            nan=0.0,
+            posinf=0.0,
+            neginf=0.0,
+        ),
+        residual_extra_mag_db=np.nan_to_num(
+            mag_db - transfer_mag_db,
+            nan=0.0,
+            posinf=0.0,
+            neginf=0.0,
+        ),
     )
 
 
@@ -153,6 +176,72 @@ def _hybrid_iir_dense_gd_from_phase(
     except (TypeError, ValueError, FloatingPointError):
         pass
     return _group_delay_excess_from_phase(modal_freq, phase_rad)
+
+
+def _hybrid_iir_residual_cut_caps(
+    *,
+    st: dict,
+    native_freq: np.ndarray,
+    modal_freq: np.ndarray,
+    max_cut_db: float,
+) -> np.ndarray:
+    """Reuse residual-authority gates when their source arrays are available."""
+    modal_support = _array_from_stats(st, "authority_modal_support", "modal_support")
+    decay_need = _array_from_stats(st, "authority_decay_need", "decay_need")
+    if (
+        modal_support.size != native_freq.size
+        and decay_need.size != native_freq.size
+    ):
+        return np.full_like(modal_freq, float(max_cut_db), dtype=float)
+
+    def authority_on_modal_axis(*keys: str) -> np.ndarray | None:
+        values = _array_from_stats(st, *keys)
+        if values.size != native_freq.size:
+            return None
+        return np.clip(
+            _interp_to_axis(native_freq, values, modal_freq),
+            0.0,
+            1.0,
+        )
+
+    caps = build_residual_authority_caps(
+        modal_freq,
+        authority_null_risk=authority_on_modal_axis(
+            "authority_null_risk",
+            "null_risk",
+        ),
+        authority_cut=authority_on_modal_axis(
+            "authority_cut",
+            "cut_authority",
+        ),
+        authority_modal_support=authority_on_modal_axis(
+            "authority_modal_support",
+            "modal_support",
+        ),
+        authority_decay_need=authority_on_modal_axis(
+            "authority_decay_need",
+            "decay_need",
+        ),
+        authority_reflection_risk=authority_on_modal_axis(
+            "authority_reflection_risk",
+            "reflection_risk",
+        ),
+        residual_pass_mode="modal_polish",
+        max_cut_db=float(max_cut_db),
+    )
+    cut_cap = np.asarray(caps.get("residual_cut_cap_db", []), dtype=float)
+    if cut_cap.size != modal_freq.size:
+        return np.full_like(modal_freq, float(max_cut_db), dtype=float)
+    return np.clip(
+        np.nan_to_num(
+            cut_cap,
+            nan=0.0,
+            posinf=float(max_cut_db),
+            neginf=0.0,
+        ),
+        0.0,
+        float(max_cut_db),
+    )
 
 
 def _apply_hybrid_iir_preconditioning(
@@ -231,12 +320,37 @@ def _apply_hybrid_iir_preconditioning(
             hi_hz=float(policy.max_freq_hz),
             min_peak_db=float(policy.min_peak_db),
         )
+        fir_gain_dense = _interp_to_axis(
+            native_freq,
+            np.asarray(gain_db, dtype=float),
+            modal_freq,
+        )
+        residual_modal = detect_room_modes(
+            modal_freq,
+            measured_dense,
+            target_mag_db=target_dense,
+            corrected_mag_db=fir_gain_dense,
+            group_delay_ms=gd_dense,
+            confidence_mask=conf_dense,
+            lo_hz=float(policy.min_freq_hz),
+            hi_hz=float(policy.max_freq_hz),
+            min_peak_db=float(policy.min_peak_db),
+        )
+        residual_cut_caps = _hybrid_iir_residual_cut_caps(
+            st=st,
+            native_freq=native_freq,
+            modal_freq=modal_freq,
+            max_cut_db=float(policy.max_cut_db),
+        )
         result = design_hybrid_iir(
             modal.events,
             modal_freq,
             int(getattr(cfg, "fs", 0) or 0),
             policy,
             measured_mag_db=measured_dense,
+            residual_events=residual_modal.events,
+            fir_gain_db=fir_gain_dense,
+            residual_cut_cap_db=residual_cut_caps,
         )
         result = _hybrid_iir_native_result(result, native_freq, float(getattr(cfg, "fs", 0) or 0))
     except (
@@ -260,6 +374,14 @@ def _apply_hybrid_iir_preconditioning(
 
     stats = result.to_stats()
     stats["hybrid_iir_modal_event_count"] = int(getattr(modal, "mode_count", 0) or 0)
+    stats["hybrid_iir_residual_modal_event_count"] = int(
+        getattr(residual_modal, "mode_count", 0) or 0
+    )
+    stats["hybrid_iir_residual_authority_cap_max_db"] = float(
+        np.max(residual_cut_caps)
+        if np.asarray(residual_cut_caps).size
+        else 0.0
+    )
     stats["hybrid_iir_gd_source"] = str(gd_source)
     stats["hybrid_iir_min_gd_excess_ms_effective"] = float(policy.min_gd_excess_ms)
     stats["hybrid_iir_max_freq_hz_effective"] = float(policy.max_freq_hz)
@@ -268,9 +390,14 @@ def _apply_hybrid_iir_preconditioning(
     stats["hybrid_iir_modal_analysis_bin_count"] = int(np.asarray(modal_freq).size)
     stats["hybrid_iir_modal_measured_source"] = str(measured_source)
     stats["hybrid_iir_modal_gd_source"] = str(gd_source)
-    if result.biquads and result.mag_db.size == np.asarray(gain_db).size:
+    if (
+        result.biquads
+        and result.mag_db.size == np.asarray(gain_db).size
+        and result.transfer_mag_db.size == np.asarray(gain_db).size
+    ):
         iir_mag = np.asarray(result.mag_db, dtype=float)
-        adjusted_gain = np.asarray(gain_db, dtype=float) - iir_mag
+        transfer_mag = np.asarray(result.transfer_mag_db, dtype=float)
+        adjusted_gain = np.asarray(gain_db, dtype=float) - transfer_mag
         stats["hybrid_iir_preconditioned_mags"] = (
             np.asarray(m_anal, dtype=float) - float(calc_offset_db) + iir_mag
         ).tolist()

@@ -92,9 +92,9 @@ def _auto_cache_resolve_path(*, compat_version: str | None = None) -> str:
 
 _BASS_ALLPASS_ALGO_V = 1
 _BASS_INTEGRATION_COMBINE_ALGO_V = 2
-_BASS_INTEGRATION_ALGO_V = 5
+_BASS_INTEGRATION_ALGO_V = 6
 _DIRECT_DAC_SUB_TARGET_POLICY_V = 1
-_AUTO_LF_ROLLOFF_POLICY_V = 3
+_AUTO_LF_ROLLOFF_POLICY_V = 5
 _AUTO_TDC_DECAY_SCORING_ALGO_V = 2
 _AUTO_BROAD_RESIDUAL_PEAK_SCORING_ALGO_V = 3
 _AUTO_CORRECTION_SHARPNESS_SCORING_ALGO_V = 1
@@ -210,6 +210,9 @@ def _auto_signature_payload(
             "bass_smooth_w_max": float(_auto_safe_float(base_data.get("bass_smooth_w_max", float("nan")), float("nan"))),
         },
         "mag_post_limits": {
+            "min_boost_peak_db": float(
+                _auto_safe_float(base_data.get("min_boost_peak_db", 2.0), 2.0)
+            ),
             "acoustic_authority_limits_enable": bool(base_data.get("acoustic_authority_limits_enable", True)),
             "authority_boost_gamma": float(
                 _auto_safe_float(base_data.get("authority_boost_gamma", 1.35), 1.35)

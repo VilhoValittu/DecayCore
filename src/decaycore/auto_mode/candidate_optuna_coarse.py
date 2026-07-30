@@ -20,6 +20,7 @@ from .shared_parts import (
     AUTO_MODE_MAG_C_MAX_MIN_HZ,
     AUTO_MODE_PHASE_LIMIT_MAX_HZ,
     AUTO_MODE_PHASE_LIMIT_MIN_HZ,
+    AUTO_MODE_SYNTH_TARGET_BASS_COMP_FRAC,
     _auto_is_phase_search_filter,
     _auto_mag_c_min_center,
     _auto_output_tilt_bounds,
@@ -201,17 +202,20 @@ def _suggest_auto_mode_candidate_optuna(
         ),
         "low_bass_cut_hz": float(low_bass_cut_hz),
     }
-    cand["output_tilt_db_per_oct"] = _auto_optuna_snap_to_step(
-        trial.suggest_float(
-            "output_tilt_db_per_oct",
-            -2.0,
-            2.0,
+    if output_tilt_hi <= output_tilt_lo:
+        cand["output_tilt_db_per_oct"] = float(output_tilt_lo)
+    else:
+        cand["output_tilt_db_per_oct"] = _auto_optuna_snap_to_step(
+            trial.suggest_float(
+                "output_tilt_db_per_oct",
+                float(output_tilt_lo),
+                float(output_tilt_hi),
+                step=0.05,
+            ),
+            lo=float(output_tilt_lo),
+            hi=float(output_tilt_hi),
             step=0.05,
-        ),
-        lo=-2.0,
-        hi=2.0,
-        step=0.05,
-    )
+        )
     if bool(is_synth_target):
         cand["synth_tilt_frac"] = _auto_optuna_snap_to_step(
             trial.suggest_float("synth_tilt_frac", 0.05, 0.55, step=0.01),
@@ -223,12 +227,6 @@ def _suggest_auto_mode_candidate_optuna(
             trial.suggest_float("synth_bass_frac", 0.20, 0.75, step=0.01),
             lo=0.20,
             hi=0.75,
-            step=0.01,
-        )
-        cand["synth_hf_frac"] = _auto_optuna_snap_to_step(
-            trial.suggest_float("synth_hf_frac", 0.10, 0.80, step=0.01),
-            lo=0.10,
-            hi=0.80,
             step=0.01,
         )
     if bool(is_mixed):
@@ -364,15 +362,12 @@ def _seed_auto_mode_candidate_optuna_params(
             step=0.01,
         )
         out["synth_bass_frac"] = _auto_optuna_snap_to_step(
-            _auto_safe_float(p.get("synth_bass_frac", 0.50), 0.50),
+            _auto_safe_float(
+                p.get("synth_bass_frac", AUTO_MODE_SYNTH_TARGET_BASS_COMP_FRAC),
+                AUTO_MODE_SYNTH_TARGET_BASS_COMP_FRAC,
+            ),
             lo=0.20,
             hi=0.75,
-            step=0.01,
-        )
-        out["synth_hf_frac"] = _auto_optuna_snap_to_step(
-            _auto_safe_float(p.get("synth_hf_frac", 0.50), 0.50),
-            lo=0.10,
-            hi=0.80,
             step=0.01,
         )
     if bool(optimize_mag_low):

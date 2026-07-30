@@ -385,6 +385,7 @@ class FilterConfig:
     mag_c_min: float = 10.0
     mag_c_max: float = 200.0
     max_boost_db: float = 9.0
+    min_boost_peak_db: float = 2.0
     max_cut_db: float = 15.0
     phase_limit: float = 1000.0
     phase_safe_2058: bool = False

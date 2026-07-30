@@ -168,26 +168,7 @@ def _resolve_output_tilt_db_per_oct(data: dict[str, Any]) -> float:
     output_tilt_source = _effective_output_tilt_source(data)
 
     if mode_u == "AUTO":
-        try:
-            auto_target_mode = str(data.get("auto_target_mode", "auto") or "auto").strip().lower()
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            auto_target_mode = "auto"
-        # AUTO-mode filter tilt is only allowed for the explicit adaptive-target path.
-        if auto_target_mode != "adaptive":
-            return 0.0
-        return max(0.0, _finite_float_or_default(data.get("output_tilt_db_per_oct", 0.0), 0.0))
+        return 0.0
     if lvl_mode == LVL_MODE_MANUAL and output_tilt_source == OUTPUT_TILT_SOURCE_MANUAL_TARGET_TILT:
         return _finite_float_or_default(data.get("manual_target_tilt_db_per_oct", 0.0), 0.0)
     return 0.0
@@ -221,6 +202,13 @@ def _auto_mode_filter_type_or_default(value: Any) -> str:
         return str(raw)
     return str(_auto_filter_type_for_key("asym"))
 
+
+def _auto_mode_min_local_correction_db(data: dict[str, Any]) -> float:
+    """Keep the local-correction policy explicit through AUTO-mode setup."""
+    value = _finite_float_or_default(data.get("min_boost_peak_db", 2.0), 2.0)
+    return float(max(0.0, min(3.0, value)))
+
+
 def _apply_auto_mode_managed_settings(data: dict[str, Any]) -> None:
     """Force AUTO mode to use program-managed settings except allowed user choices."""
     filter_type = _auto_mode_filter_type_or_default(data.get("filter_type", "Asymmetric"))
@@ -249,6 +237,7 @@ def _apply_auto_mode_managed_settings(data: dict[str, Any]) -> None:
         "hpf_enable": True,
         "comparison_mode": True,
         "df_smoothing": False,
+        "min_boost_peak_db": _auto_mode_min_local_correction_db(data),
         "auto_target_mode": str(data.get("auto_target_mode", "auto") or "auto"),
         "filter_type": str(filter_type),
     }

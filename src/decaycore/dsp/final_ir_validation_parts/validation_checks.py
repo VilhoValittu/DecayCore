@@ -156,7 +156,7 @@ def _gd_metrics_from_fir(
     lo_hz: float = 20.0,
     hi_hz: float = 600.0,
 ) -> tuple[float, float, bool]:
-    """Returns (gd_peak_ms, gd_rms_ms, stable)."""
+    """Return delay-compensated GD spread metrics for an FIR or system IR."""
     try:
         spectrum, freqs = _fir_spectrum(fir, fs)
         phase = np.unwrap(np.angle(spectrum))
@@ -174,8 +174,10 @@ def _gd_metrics_from_fir(
         if not np.any(np.isfinite(gd_band)):
             return 0.0, 0.0, False
         gd_finite = gd_band[np.isfinite(gd_band)]
-        gd_peak = float(np.percentile(np.abs(gd_finite), 95))
-        gd_rms = _safe_rms(gd_finite)
+        center = float(np.median(gd_finite))
+        gd_residual = gd_finite - center
+        gd_peak = float(np.percentile(np.abs(gd_residual), 95))
+        gd_rms = _safe_rms(gd_residual)
         return gd_peak, gd_rms, True
     except (
 
@@ -205,14 +207,69 @@ def _fir_to_mag_db(
         mag_interp -= float(np.median(mag_interp[norm_mask]))
     return mag_interp
 
-def _skip_pre_ringing(fir: np.ndarray, ir_anchor_mode: str | None) -> bool:
+def _skip_pre_ringing(
+    fir: np.ndarray,
+    ir_anchor_mode: str | None,
+    filter_type: str | None = None,
+) -> bool:
     """Return True when pre-ringing check is not meaningful for this filter type."""
-    mode = str(ir_anchor_mode or "").strip().lower()
-    return "min_causal" in mode or "minimum" in mode
+    del fir, ir_anchor_mode
+    return _is_minimum_phase(filter_type)
 
-def _is_minimum_phase(ir_anchor_mode: str | None) -> bool:
-    mode = str(ir_anchor_mode or "").strip().lower()
-    return "min_causal" in mode or "minimum" in mode
+def _is_minimum_phase(filter_type: str | None) -> bool:
+    mode = str(filter_type or "").strip().lower()
+    return "minimum" in mode or mode in {"min", "minimum phase"}
+
+
+def _system_gd_improvement_metrics(
+    measured_ir: np.ndarray | None,
+    corrected_ir: np.ndarray | None,
+    fs: int,
+) -> dict[str, float]:
+    out = {
+        "gd_before_peak_ms": float("nan"),
+        "gd_after_peak_ms": float("nan"),
+        "gd_before_rms_ms": float("nan"),
+        "gd_after_rms_ms": float("nan"),
+        "gd_improvement_frac": float("nan"),
+    }
+    if measured_ir is None or corrected_ir is None:
+        return out
+    measured = np.asarray(measured_ir, dtype=float).reshape(-1)
+    corrected = np.asarray(corrected_ir, dtype=float).reshape(-1)
+    if measured.size < 16 or corrected.size < 16:
+        return out
+    before_peak, before_rms, before_ok = _gd_metrics_from_fir(measured, fs)
+    after_peak, after_rms, after_ok = _gd_metrics_from_fir(corrected, fs)
+    if not (before_ok and after_ok):
+        return out
+    components: list[tuple[float, float]] = []
+    if np.isfinite(before_peak) and before_peak > 0.20 and np.isfinite(after_peak):
+        components.append(
+            (0.55, float(np.clip((before_peak - after_peak) / before_peak, -1.0, 1.0)))
+        )
+    if np.isfinite(before_rms) and before_rms > 0.10 and np.isfinite(after_rms):
+        components.append(
+            (0.45, float(np.clip((before_rms - after_rms) / before_rms, -1.0, 1.0)))
+        )
+    if components:
+        denom = float(sum(weight for weight, _ in components))
+        improvement = float(
+            np.clip(
+                sum(weight * value for weight, value in components) / max(denom, 1e-12),
+                -1.0,
+                1.0,
+            )
+        )
+    else:
+        improvement = float("nan")
+    return {
+        "gd_before_peak_ms": float(before_peak),
+        "gd_after_peak_ms": float(after_peak),
+        "gd_before_rms_ms": float(before_rms),
+        "gd_after_rms_ms": float(after_rms),
+        "gd_improvement_frac": float(improvement),
+    }
 
 def _magnitude_metrics(
     freq_axis: np.ndarray,

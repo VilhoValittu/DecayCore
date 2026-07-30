@@ -109,6 +109,22 @@ def _auto_gate_threshold(values: list[float], keep_fraction: float) -> float:
     return float(vals[idx])
 
 
+def _phase2_abs_peak_limit(metrics: dict, *, default_limit_db: float) -> tuple[float, str]:
+    default_limit = float(max(0.0, default_limit_db))
+    feasibility_class = str(metrics.get("bass_feasibility_class", "") or "").strip().lower()
+    bi_relaxation_active = bool(
+        metrics.get("bass_integration_residual_peak_relaxation_active", False)
+        and feasibility_class in {"good", "marginal"}
+        and not list(metrics.get("bass_direct_dac_reject_reasons", []) or [])
+    )
+    if not bi_relaxation_active:
+        return float(default_limit), "phase2_absolute_default"
+    effective_limit = _m(metrics, "residual_peak_hard_gate_effective_db", float("nan"))
+    if not np.isfinite(effective_limit):
+        return float(default_limit), "phase2_absolute_default"
+    return float(max(default_limit, effective_limit)), "bass_integration_effective"
+
+
 def _phase2_abs_peak_gate_filter(
     *,
     pool: list[dict],
@@ -119,10 +135,19 @@ def _phase2_abs_peak_gate_filter(
     for it in pool:
         m = dict((it or {}).get("metrics", {}) or {})
         pk_i = _auto_peak_metric_for_gate(m)
-        if np.isfinite(pk_i) and float(pk_i) > float(abs_peak):
+        peak_limit, peak_limit_policy = _phase2_abs_peak_limit(
+            m,
+            default_limit_db=float(abs_peak),
+        )
+        if np.isfinite(pk_i) and float(pk_i) > float(peak_limit):
             abs_rejected += 1
             continue
-        abs_pool.append(dict(it or {}))
+        kept_item = dict(it or {})
+        kept_metrics = dict(m)
+        kept_metrics["phase2_abs_residual_peak_gate_db"] = float(peak_limit)
+        kept_metrics["phase2_abs_residual_peak_gate_policy"] = str(peak_limit_policy)
+        kept_item["metrics"] = kept_metrics
+        abs_pool.append(kept_item)
     if abs_pool:
         return list(abs_pool), int(abs_rejected), None
     least_unsafe = sorted(
@@ -133,16 +158,24 @@ def _phase2_abs_peak_gate_filter(
         ),
     )[0]
     lu = dict(least_unsafe or {})
-    lu_pk = _auto_peak_metric_for_gate(dict(lu.get("metrics", {}) or {}))
+    lu_metrics = dict(lu.get("metrics", {}) or {})
+    lu_pk = _auto_peak_metric_for_gate(lu_metrics)
+    lu_limit, lu_limit_policy = _phase2_abs_peak_limit(
+        lu_metrics,
+        default_limit_db=float(abs_peak),
+    )
     lu["unsafe_fallback"] = True
     lu["unsafe_fallback_reason"] = "all_candidates_failed_absolute_residual_peak_gate"
-    lu["unsafe_fallback_abs_max_peak_db"] = float(abs_peak)
+    lu["unsafe_fallback_abs_max_peak_db"] = float(lu_limit)
+    lu["unsafe_fallback_abs_gate_policy"] = str(lu_limit_policy)
     lu["unsafe_fallback_residual_peak_db"] = float(lu_pk)
     logger.warning(
-        "Phase2 hard-gate: ALL %d candidates failed absolute residual peak gate (threshold=%.2f dB); "
+        "Phase2 hard-gate: ALL %d candidates failed absolute residual peak gate "
+        "(threshold=%.2f dB, policy=%s); "
         "returning least-unsafe fallback candidate with peak=%.2f dB.",
         int(len(pool)),
-        float(abs_peak),
+        float(lu_limit),
+        str(lu_limit_policy),
         float(lu_pk),
     )
     return [], int(abs_rejected), dict(lu)

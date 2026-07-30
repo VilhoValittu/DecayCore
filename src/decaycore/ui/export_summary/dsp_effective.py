@@ -142,6 +142,16 @@ def _decision_phase_tdc(data: dict, best_preset: dict, bm: dict, l_st: dict, r_s
             phase_bits.append(f"phase limit {_decision_fmt_hz(phase_limit)}")
 
     lines = ["; ".join(phase_bits)]
+    gd_before_l = _decision_pick_float(l_st.get("phase_realized_gd_before_rms_ms"))
+    gd_after_l = _decision_pick_float(l_st.get("phase_realized_gd_after_rms_ms"))
+    gd_before_r = _decision_pick_float(r_st.get("phase_realized_gd_before_rms_ms"))
+    gd_after_r = _decision_pick_float(r_st.get("phase_realized_gd_after_rms_ms"))
+    if any(math.isfinite(v) for v in (gd_before_l, gd_after_l, gd_before_r, gd_after_r)):
+        lines.append(
+            "Final-FIR system GD RMS before -> after: "
+            f"L {_decision_fmt_ms(gd_before_l)} -> {_decision_fmt_ms(gd_after_l)}, "
+            f"R {_decision_fmt_ms(gd_before_r)} -> {_decision_fmt_ms(gd_after_r)}"
+        )
     if bool(data.get("enable_tdc", False)):
         strength = _decision_pick_float(_decision_value(data, best_preset, "tdc_strength"))
         decision = str(bm.get("tdc_decision", "") or "").replace("_", " ").strip()
@@ -1256,10 +1266,29 @@ def _append_dsp_effective_auto_target_summary(summary_content: str, tc: dict) ->
     if not tc:
         return summary_content
     tc_method = str(tc.get("selection_method", "fit_rms"))
+    fit_rms = _safe_float(tc.get("fit_rms_db", float("nan")), float("nan"))
+    fit_text = f"{fit_rms:.3f} dB" if math.isfinite(fit_rms) else "n/a"
     summary_content += (
         f"Selected target curve: {tc.get('selected_hc_mode', 'n/a')!s} "
-        f"(fit_rms={float(tc.get('fit_rms_db', 0.0)):.3f} dB, method={tc_method})\n"
+        f"(fit_rms={fit_text}, method={tc_method})\n"
     )
+    adaptive_diag = dict(tc.get("adaptive_target_diagnostics", {}) or {})
+    if adaptive_diag:
+        summary_content += (
+            "Adaptive target evidence: "
+            f"bass residual {_safe_float(adaptive_diag.get('bass_residual_db'), 0.0):+.2f} dB, "
+            f"L/R disagreement {_safe_float(adaptive_diag.get('channel_disagreement_db'), 0.0):.2f} dB, "
+            f"channel confidence {_safe_float(adaptive_diag.get('channel_confidence'), 0.0) * 100.0:.0f}%, "
+            f"RT60 confidence {_safe_float(adaptive_diag.get('rt60_confidence'), 0.0) * 100.0:.0f}%\n"
+        )
+        summary_content += (
+            "Adaptive target delta: "
+            f"{_safe_float(adaptive_diag.get('target_delta_min_db'), 0.0):+.2f} to "
+            f"{_safe_float(adaptive_diag.get('target_delta_max_db'), 0.0):+.2f} dB vs Harman6\n"
+        )
+        fallback_reason = str(adaptive_diag.get("fallback_reason", "") or "").strip()
+        if fallback_reason:
+            summary_content += f"Adaptive target fallback: {fallback_reason}\n"
     if tc_method != "top3x10_trials":
         return summary_content
     ev = list(tc.get("evaluated", []) or [])

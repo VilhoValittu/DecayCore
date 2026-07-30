@@ -416,6 +416,16 @@ body {
     box-shadow: var(--cf-shadow-card);
 }
 
+.cf-run-status-outer {
+    padding: 8px 22px 0;
+}
+
+.cf-run-status-shell {
+    max-width: 1380px;
+    margin: 0 auto;
+    gap: 8px;
+}
+
 .cf-tab-panels-shell {
     background: transparent !important;
 }

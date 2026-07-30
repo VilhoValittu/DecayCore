@@ -24,6 +24,11 @@ from ...application.run_contracts import (
     copy_resolved_data,
     copy_source_ui_data,
 )
+from ...common.measurement_features import (
+    normalize_rt60_bands,
+    normalize_rt60_value,
+    prepare_rt60_analysis_ir,
+)
 from ...config.decaycore_config import save_config
 from ...config.pipeline_parts import (
     filter_type_short,
@@ -37,11 +42,6 @@ from ...io.measurements_loader_parts import (
     load_measurements_lr,
     load_raw_irs_lr,
     load_raw_ir_sub,
-)
-from ...measurement.rt60 import (
-    _measurement_rt60_analysis_ir,
-    normalize_rt60_bands,
-    normalize_rt60_value,
 )
 from ...resources.i8n.decaycore_i18n import t
 from ..bridge_types import ProcessRunCallbacks
@@ -233,7 +233,7 @@ def _compute_rt60_from_raw_ir(
     if ir_arr.size == 0 or fs_i <= 0:
         return None, None
     try:
-        analysis_ir = _measurement_rt60_analysis_ir(ir_arr, fs_i, -1)
+        analysis_ir = prepare_rt60_analysis_ir(ir_arr, fs_i, -1)
         rt60_val = normalize_rt60_value(calculate_rt60(analysis_ir, fs_i))
         rt60_bands = normalize_rt60_bands(calculate_rt60_bands(analysis_ir, fs_i))
         return rt60_val, rt60_bands

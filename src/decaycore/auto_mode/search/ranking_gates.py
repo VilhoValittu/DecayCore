@@ -115,6 +115,12 @@ def get_residual_peak_hard_gate_effective_db(
     goal: str = AUTO_MODE_GOAL_DEFAULT,
 ) -> float:
     metrics = _auto_candidate_metrics(candidate_or_metrics)
+    finalized_gate = _auto_safe_float(
+        metrics.get("residual_peak_hard_gate_effective_db", float("nan")),
+        float("nan"),
+    )
+    if np.isfinite(finalized_gate):
+        return float(finalized_gate)
     gate = get_residual_peak_hard_gate_db(metrics)
     if not np.isfinite(gate):
         return float("nan")

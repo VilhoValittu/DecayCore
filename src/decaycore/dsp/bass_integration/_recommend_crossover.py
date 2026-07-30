@@ -48,17 +48,29 @@ def _recommend_direct_dac_int_or_default(value: object, default: int) -> int:
 
 def _direct_dac_main_rolloff_meta(bundle: BassIntegrationBundle) -> dict[str, float | str]:
     def _estimate(transfer):
-        return estimate_lf_rolloff_f6(
-            getattr(transfer, "freqs_hz", []),
-            getattr(transfer, "mag_db", []),
-            min_hz=15.0,
-            max_hz=float(AVR_CROSSOVER_CANDIDATES[-1]),
-            ref_min_hz=220.0,
-            ref_max_hz=600.0,
-            search_max_hz=220.0,
-            smooth_oct=1.0,
-            default_hz=float("nan"),
-        )
+        # Establish the passband reference as close as practical above the
+        # crossover.  A distant 220--600 Hz reference can be coloured very
+        # differently in the two listening positions/channels; its lower
+        # level then makes a 60--90 Hz room-mode bump look like the main
+        # speaker's -6 dB point.  Move the reference higher only when the
+        # nearer band overlaps a genuinely high main-speaker roll-off.
+        fallback = None
+        for ref_min_hz, ref_max_hz in ((140.0, 300.0), (180.0, 400.0), (220.0, 600.0)):
+            estimate = estimate_lf_rolloff_f6(
+                getattr(transfer, "freqs_hz", []),
+                getattr(transfer, "mag_db", []),
+                min_hz=15.0,
+                max_hz=float(AVR_CROSSOVER_CANDIDATES[-1]),
+                ref_min_hz=float(ref_min_hz),
+                ref_max_hz=float(ref_max_hz),
+                search_max_hz=220.0,
+                smooth_oct=1.0,
+                default_hz=float("nan"),
+            )
+            if bool(estimate.usable):
+                return estimate
+            fallback = estimate
+        return fallback
     l_estimate = _estimate(bundle.l_main)
     r_estimate = _estimate(bundle.r_main)
     l_f6 = float(l_estimate.f6_hz) if np.isfinite(l_estimate.f6_hz) else float("nan")

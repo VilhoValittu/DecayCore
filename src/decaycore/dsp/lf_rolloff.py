@@ -275,7 +275,16 @@ def estimate_lf_rolloff_f6(
         reasons.append("model_disagreement")
     if confidence < 0.55:
         reasons.append("low_confidence")
-    usable = not reasons
+    resolved_crossing = bool(float(stable_f6) > float(f_lo[0]) * (1.0 + 1e-6))
+    if not resolved_crossing:
+        reasons.append("crossing_at_low_boundary")
+    # Once the curve has a stable -6 dB crossing away from the measurement
+    # boundary, confidence describes how
+    # strongly the surrounding measurement supports it; it is not a second
+    # hard gate.  In-room responses commonly have an uneven reference band or
+    # short infrabass coverage, yet their crossing remains the safer correction
+    # boundary than a generic 10/20 Hz fallback.
+    usable = bool(resolved_crossing)
     return LfRolloffEstimate(
         f6_hz=float(f6),
         stable_f6_hz=float(stable_f6),
@@ -284,7 +293,7 @@ def estimate_lf_rolloff_f6(
         confidence=float(np.clip(confidence, 0.0, 1.0)),
         method=str(method),
         usable=bool(usable),
-        reason="ok" if usable else ",".join(reasons),
+        reason="ok" if not reasons else "quality_note:" + ",".join(reasons),
         ref_spread_db=float(ref_spread_db),
         low_coverage_oct=float(low_coverage_oct),
         model_delta_oct=float(model_delta_oct),

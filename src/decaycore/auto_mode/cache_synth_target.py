@@ -20,7 +20,7 @@ from .cache_measurement_sig import _auto_get_measurement_signature
 _SYNTH_TARGET_MISS = object()
 _SYNTH_TARGET_CACHE: dict = {}
 _SYNTH_TARGET_CACHE_LOCK = RLock()
-_SYNTH_TARGET_ALGO_V = 2
+_SYNTH_TARGET_ALGO_V = 3
 
 
 def _synth_target_cache_key(

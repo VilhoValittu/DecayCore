@@ -19,6 +19,7 @@ from typing import Callable
 from . import ng_controls as ctrl
 from .ng_sections import page_shell, section_card
 from ..config.legacy_keys import CAMILLAFIR_AUTO_MODE
+from ..features import has_packaged_bass_engine
 
 _FS_OPTS = [44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000]
 _TAPS_OPTS = [512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576]
@@ -65,15 +66,22 @@ def _normalize_auto_target_mode_value(value, *, auto_goal=None) -> str:
     return "auto"
 
 
-def build_basic_tab(*, t: Callable, get_val: Callable, max_safe_boost: float) -> None:
+def _bass_integration_control_state(saved_value, *, engine_available: bool) -> tuple[bool, bool]:
+    """Return checkbox value and disabled state without preserving unusable config."""
+    available = bool(engine_available)
+    return (bool(saved_value) if available else False, not available)
+
+
+def build_basic_tab(*, t: Callable, get_val: Callable) -> None:
     from nicegui import ui
 
+    bass_engine_available = has_packaged_bass_engine()
     mode_value = str(get_val("mode", "AUTO") or "AUTO").strip().upper()
     if mode_value not in ("BASIC", "ADVANCED", "AUTO"):
         mode_value = "AUTO"
     if bool(get_val(CAMILLAFIR_AUTO_MODE, False)):
         mode_value = "AUTO"
-    if bool(get_val("bass_integration_enable", False)):
+    if bass_engine_available and bool(get_val("bass_integration_enable", False)):
         mode_value = "AUTO"
 
     auto_goal_value = str(get_val("auto_goal", "balanced") or "balanced").strip().lower()
@@ -136,15 +144,25 @@ def build_basic_tab(*, t: Callable, get_val: Callable, max_safe_boost: float) ->
                             label=t("auto_target_mode_label"),
                         ).props("dense outlined").classes("w-full"),
                     )
-                    ctrl.register(
-                        "bass_integration_enable",
-                        ui.checkbox(
-                            t("bass_integration_enable"),
-                            value=bool(get_val("bass_integration_enable", False)),
-                        ),
+                    bass_value, bass_disabled = _bass_integration_control_state(
+                        get_val("bass_integration_enable", False),
+                        engine_available=bass_engine_available,
                     )
+                    bass_integration_checkbox = ui.checkbox(
+                        t("bass_integration_enable"),
+                        value=bass_value,
+                    )
+                    if bass_disabled:
+                        bass_integration_checkbox.props("disable")
+                    ctrl.register("bass_integration_enable", bass_integration_checkbox)
                     ui.label(t("auto_score_context_notice")).classes("text-sm text-gray-400")
-                    ui.label(t("bass_integration_auto_help")).classes("text-xs text-gray-400")
+                    ui.label(
+                        t(
+                            "bass_integration_auto_help"
+                            if bass_engine_available
+                            else "bass_integration_packaged_only_help"
+                        )
+                    ).classes("text-xs text-gray-400")
                     with ui.card().classes("w-full gap-2"):
                         ctrl.register(
                             "enable_channel_specific_auto_policy",

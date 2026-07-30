@@ -15,12 +15,18 @@ from typing import Any
 import numpy as np
 import scipy.signal
 
+from ...features import require_packaged_bass_engine
 from ...auto_mode.shared_parts import (
     AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO,
     AUTO_MODE_BASS_INTEGRATION_GUARD_LO_RATIO,
 )
 from ...io.measurement_bundle import TransferData
 from ._utils import _band_mask, _interp_complex_response, _safe_float
+
+try:
+    from decaycore_bass_engine import channel_overlap_metrics_rs as _channel_overlap_metrics_rs
+except ImportError:
+    _channel_overlap_metrics_rs = None
 
 
 def _channel_overlap_metrics(
@@ -55,49 +61,19 @@ def _channel_overlap_metrics(
             "sub_dominance_db": float("nan"),
         }
 
-    main_mag = np.maximum(np.abs(main_spec[mask]), 1e-12)
-    sub_mag = np.maximum(np.abs(sub_spec[mask]), 1e-12)
-    total_mag = np.maximum(np.abs(total_spec[mask]), 1e-12)
-    stronger = np.maximum(main_mag, sub_mag)
-    weaker = np.minimum(main_mag, sub_mag)
-    overlap_ratio = float(np.mean(weaker / np.maximum(stronger, 1e-12)))
-
-    total_db = 20.0 * np.log10(np.maximum(total_mag, 1e-12))
-    if total_db.size >= 5:
-        ripple_db = float(np.percentile(total_db, 95.0) - np.percentile(total_db, 5.0))
-    else:
-        ripple_db = float(np.max(total_db) - np.min(total_db))
-
-    main_phase = np.angle(main_spec[mask])
-    sub_phase = np.angle(sub_spec[mask])
-    phase_delta = np.angle(np.exp(1j * (sub_phase - main_phase)))
-    # Phase opposition: 0 when in phase (≤90°), ramps to 1 at 180°.
-    # Pure cosine-based — no arbitrary offset shifting the zero crossing.
-    phase_opposition = np.clip(-np.cos(phase_delta), 0.0, 1.0)
-    depth_db = 20.0 * np.log10(np.maximum(stronger, 1e-12) / np.maximum(total_mag, 1e-12))
-    depth_weight = np.clip(depth_db / 12.0, 0.0, 1.0)
-    cancellation_risk = float(np.mean(phase_opposition * depth_weight))
-
-    # Evaluate sub_dominance only in the crossover overlap zone where both components contribute.
-    # Below fc, the main is intentionally attenuated by the HPF (by design), so comparing
-    # sub vs HPF'd main there inflates apparent dominance without reflecting integration quality.
-    # Priority: [fc, sub_lpf] overlap zone → [0.90×fc, hi] near-passband → full guard band.
-    if fc_hz is not None and sub_lpf_hz is not None and float(sub_lpf_hz) > float(fc_hz) + 5.0:
-        sub_dom_lo = float(fc_hz)
-        sub_dom_hi = float(sub_lpf_hz)
-    elif fc_hz is not None and float(fc_hz) * 0.90 > lo_hz:
-        sub_dom_lo = float(fc_hz) * 0.90
-        sub_dom_hi = hi_hz
-    else:
-        sub_dom_lo = lo_hz
-        sub_dom_hi = hi_hz
-    sub_dom_mask = _band_mask(freqs, sub_dom_lo, sub_dom_hi)
-    if int(np.count_nonzero(sub_dom_mask)) >= 3:
-        sd_main = np.maximum(np.abs(main_spec[sub_dom_mask]), 1e-12)
-        sd_sub = np.maximum(np.abs(sub_spec[sub_dom_mask]), 1e-12)
-        sub_dominance_db = float(np.median(20.0 * np.log10(sd_sub / sd_main)))
-    else:
-        sub_dominance_db = float(np.median(20.0 * np.log10(sub_mag / np.maximum(main_mag, 1e-12))))
+    if _channel_overlap_metrics_rs is None:
+        require_packaged_bass_engine()
+        raise RuntimeError("Packaged bass engine did not expose channel_overlap_metrics_rs")
+    overlap_ratio, ripple_db, cancellation_risk, sub_dominance_db = _channel_overlap_metrics_rs(
+        np.ascontiguousarray(freqs, dtype=np.float64),
+        np.ascontiguousarray(main_spec, dtype=np.complex128),
+        np.ascontiguousarray(sub_spec, dtype=np.complex128),
+        np.ascontiguousarray(total_spec, dtype=np.complex128),
+        float(lo_hz),
+        float(hi_hz),
+        None if fc_hz is None else float(fc_hz),
+        None if sub_lpf_hz is None else float(sub_lpf_hz),
+    )
     return {
         "overlap_ratio": float(overlap_ratio),
         "overlap_ripple_db": float(ripple_db),
@@ -361,4 +337,3 @@ def _metric_delta(left_value: Any, right_value: Any) -> float:
     if np.isfinite(left) and np.isfinite(right):
         return float(abs(float(left) - float(right)))
     return float("nan")
-

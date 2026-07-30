@@ -14,6 +14,7 @@ from typing import Any
 
 import numpy as np
 
+from ...features import require_packaged_bass_engine
 from ...io.measurement_bundle import BassIntegrationBundle
 from ._final_metrics import _final_metric_snapshot
 from ._recommend_alignment import recommend_direct_dac_alignment
@@ -164,6 +165,7 @@ def _recommend_direct_dac_prepare_builtin_core(
     callbacks=None,
 ) -> dict[str, Any]:
     """Fallback: run existing staged alignment + crossover and return unified result dict."""
+    require_packaged_bass_engine()
     combine_mode_norm = normalize_sub_combine_mode(sub_combine_mode)
 
     # Baseline
@@ -206,7 +208,7 @@ def _recommend_direct_dac_prepare_builtin_core(
         OSError,
         ImportError,
         ModuleNotFoundError,
-    ):
+):
         _LOG.debug("Direct-DAC builtin alignment recommendation failed; keeping baseline alignment", exc_info=True)
     best_delay = float(align_result.get("sub_delay_ms", 0.0) or 0.0)
     best_sub_array_delay = float(align_result.get("sub_array_delay_ms", best_delay) or 0.0)

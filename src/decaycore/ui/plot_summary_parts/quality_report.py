@@ -442,6 +442,21 @@ def _quality_report_collect(st, settings, *, debug_report=False):
         "gd_abs_max_20_500_ms": _quality_report_safe_float(st.get("gd_abs_max_20_500_ms", None)),
         "gd_grad_max": _quality_report_gd_grad_max_value(st),
         "gd_grad_max_hz": _quality_report_gd_grad_max_hz(st),
+        "phase_realized_gd_before_rms_ms": _quality_report_safe_float(
+            st.get("phase_realized_gd_before_rms_ms", None)
+        ),
+        "phase_realized_gd_after_rms_ms": _quality_report_safe_float(
+            st.get("phase_realized_gd_after_rms_ms", None)
+        ),
+        "phase_realized_gd_before_p95_ms": _quality_report_safe_float(
+            st.get("phase_realized_gd_before_p95_ms", None)
+        ),
+        "phase_realized_gd_after_p95_ms": _quality_report_safe_float(
+            st.get("phase_realized_gd_after_p95_ms", None)
+        ),
+        "phase_realized_gd_improvement_score": _quality_report_safe_float(
+            st.get("phase_realized_gd_improvement_score", None)
+        ),
         "phase_boundary_peak_mdb": None,
         "phase_boundary_peak_hz": None,
         "bass_adaptive_enabled": bool(st.get("bass_adaptive_smoothing_enabled", False)),
@@ -612,6 +627,9 @@ def _quality_report_build_lines(lq, rq, *, debug_report: bool):
         f"GD abs spread 20-500 Hz (ms): L {_quality_report_fmt(lq['gd_abs_max_20_500_ms'], '', 2)} | R {_quality_report_fmt(rq['gd_abs_max_20_500_ms'], '', 2)}",
         f"GD gradient max (ms/oct): L {_quality_report_fmt(lq['gd_grad_max'], '', 2)} | R {_quality_report_fmt(rq['gd_grad_max'], '', 2)}",
         f"GD gradient max @ Hz:    L {_quality_report_fmt(lq['gd_grad_max_hz'], '', 1)} | R {_quality_report_fmt(rq['gd_grad_max_hz'], '', 1)}",
+        f"Realized system GD RMS before -> after (ms): L {_quality_report_fmt(lq['phase_realized_gd_before_rms_ms'], '', 2)} -> {_quality_report_fmt(lq['phase_realized_gd_after_rms_ms'], '', 2)} | R {_quality_report_fmt(rq['phase_realized_gd_before_rms_ms'], '', 2)} -> {_quality_report_fmt(rq['phase_realized_gd_after_rms_ms'], '', 2)}",
+        f"Realized system GD p95 before -> after (ms): L {_quality_report_fmt(lq['phase_realized_gd_before_p95_ms'], '', 2)} -> {_quality_report_fmt(lq['phase_realized_gd_after_p95_ms'], '', 2)} | R {_quality_report_fmt(rq['phase_realized_gd_before_p95_ms'], '', 2)} -> {_quality_report_fmt(rq['phase_realized_gd_after_p95_ms'], '', 2)}",
+        f"Realized GD improvement: L {_quality_report_fmt(lq['phase_realized_gd_improvement_score'], '', 3)} | R {_quality_report_fmt(rq['phase_realized_gd_improvement_score'], '', 3)}",
         f"Phase boundary peak (mdB): L {_quality_report_fmt(lq['phase_boundary_peak_mdb'], '', 2)} | R {_quality_report_fmt(rq['phase_boundary_peak_mdb'], '', 2)}",
         f"Phase boundary peak @ Hz:  L {_quality_report_fmt(lq['phase_boundary_peak_hz'], '', 1)} | R {_quality_report_fmt(rq['phase_boundary_peak_hz'], '', 1)}",
         f"Pre-ringing dB:          L {_quality_report_fmt(lq['pre_ringing_db'], ' dB')} | R {_quality_report_fmt(rq['pre_ringing_db'], ' dB')}",

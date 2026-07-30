@@ -19,6 +19,7 @@ from .phase_ir_guards import _pre_energy_guard, _tdc_postprocess
 from .phase_ir_ir import _build_complex_spectrum, _ifft_to_ir, _normalize_ir
 from .phase_ir_metrics import _summarize_ir_metrics
 from .phase_ir_phase_parts import _PhaseComponents, _apply_phase_model, _compute_excess_phase, _unwrap_phases
+from .phase_ir_realized import compute_realized_phase_gd_metrics
 from .phase_ir_utils import _ms_value, _resolve_ir_anchor_mode, _resolve_ir_window_mode
 from .phase_ir_window import _apply_fdw_if_enabled, _apply_ir_window
 
@@ -508,6 +509,19 @@ def build_phase_and_ir(
     impulse = _tdc_postprocess(impulse, cfg, st)
     impulse = _apply_midband_realized_level_match(impulse, total_mag, cfg, st)
     _summarize_ir_metrics(impulse, cfg, st)
+    try:
+        realized_metrics = compute_realized_phase_gd_metrics(
+            freq_axis=np.asarray(freq_axis, dtype=float),
+            measured_phase_rad=np.asarray(p_rad_interp, dtype=float),
+            impulse=np.asarray(impulse, dtype=float),
+            fs=float(cfg.fs),
+            phase_limit_hz=float(getattr(cfg, "phase_limit", 0.0) or 0.0),
+            confidence_mask=conf_mask,
+        )
+        if isinstance(st, dict):
+            st.update(realized_metrics)
+    except (AttributeError, TypeError, ValueError, FloatingPointError, IndexError):
+        pass
 
     return {
         "impulse": np.asarray(impulse, dtype=float),

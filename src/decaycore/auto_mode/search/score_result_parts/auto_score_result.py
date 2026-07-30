@@ -141,6 +141,7 @@ def _auto_score_result(
     phase_benefit_bonus = pq["phase_benefit_bonus"]
     phase_risk_penalty = pq["phase_risk_penalty"]
     phase_net_score = pq["phase_net_score"]
+    phase_realized_gd_improvement = pq["phase_realized_gd_improvement"]
     phase_lr_consistency_penalty = pq["phase_lr_consistency_penalty"]
     phase_dbg_l = pq["phase_dbg_l"]
     phase_dbg_r = pq["phase_dbg_r"]
@@ -570,6 +571,11 @@ def _auto_score_result(
         "phase_benefit_bonus": float(phase_benefit_bonus),
         "phase_risk_penalty": float(phase_risk_penalty),
         "phase_net_score": float(phase_net_score),
+        "phase_realized_gd_improvement": (
+            float(phase_realized_gd_improvement)
+            if np.isfinite(phase_realized_gd_improvement)
+            else float("nan")
+        ),
         "phase_lr_consistency_penalty": float(phase_lr_consistency_penalty),
         "phase_limit_hz": float(phase_limit_used_hz) if np.isfinite(phase_limit_used_hz) else float("nan"),
         "phase_limit_penalty": float(phase_limit_penalty),

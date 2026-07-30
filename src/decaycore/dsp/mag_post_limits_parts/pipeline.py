@@ -30,6 +30,7 @@ from ..mag_authority_trace import (
     REASON_HARDCLAMP_CUT,
     REASON_LOW_BASS_CUTS_ONLY,
     REASON_LOW_BASS_FLOOR_REAPPLIED,
+    REASON_MIN_BOOST_PEAK,
     REASON_REGULARIZATION_SMOOTH,
     REASON_SLOPE_LIMIT,
     REASON_SOFTCLIP_BOOST,
@@ -68,6 +69,123 @@ from .low_frequency import (
     _prepare_boost_caps,
 )
 from .metrics import _store_realized_pre_ir_metrics
+
+
+def _suppress_subthreshold_local_detail_lobes(
+    gain_db: np.ndarray,
+    freq_axis: np.ndarray,
+    mask_c: np.ndarray,
+    *,
+    min_peak_db: float,
+) -> tuple[np.ndarray, dict[str, float | int]]:
+    """Suppress inaudible local filter detail above 100 Hz without flattening broad response."""
+    gain = np.asarray(gain_db, dtype=float)
+    freq = np.asarray(freq_axis, dtype=float)
+    mask = np.asarray(mask_c, dtype=bool)
+    if (
+        gain.shape != mask.shape
+        or freq.shape != gain.shape
+        or not np.all(np.isfinite(freq))
+        or not np.all(np.diff(freq) > 0.0)
+        or not np.isfinite(min_peak_db)
+        or min_peak_db <= 0.0
+    ):
+        return gain, {
+            "threshold_db": float(max(min_peak_db, 0.0)) if np.isfinite(min_peak_db) else 0.0,
+            "suppressed_lobes": 0,
+            "suppressed_bins": 0,
+            "suppressed_peak_max_db": 0.0,
+        }
+
+    if np.ptp(gain[mask]) <= 1e-9:
+        return gain, {
+            "threshold_db": float(min_peak_db),
+            "suppressed_lobes": 0,
+            "suppressed_bins": 0,
+            "suppressed_peak_max_db": 0.0,
+        }
+
+    baseline = smooth_gain_fractional_octave(freq, gain, 6.0)
+    detail = gain - baseline
+    active = mask & (freq >= 80.0) & np.isfinite(detail) & (np.abs(detail) > 1e-9)
+    if not np.any(active):
+        return gain, {
+            "threshold_db": float(min_peak_db),
+            "suppressed_lobes": 0,
+            "suppressed_bins": 0,
+            "suppressed_peak_max_db": 0.0,
+        }
+
+    sign = np.sign(detail)
+    same_lobe_as_previous = np.concatenate(
+        (np.array([False]), active[:-1] & (sign[:-1] == sign[1:])),
+    )
+    starts = active & ~same_lobe_as_previous
+    lobe_ids = np.cumsum(starts, dtype=int) - 1
+    active_ids = lobe_ids[active]
+    peak_by_lobe = np.zeros(int(np.max(active_ids)) + 1, dtype=float)
+    np.maximum.at(peak_by_lobe, active_ids, np.abs(detail[active]))
+    suppressed_lobes = peak_by_lobe < float(min_peak_db)
+    suppress = active & suppressed_lobes[lobe_ids]
+
+    if not np.any(suppress):
+        return gain, {
+            "threshold_db": float(min_peak_db),
+            "suppressed_lobes": 0,
+            "suppressed_bins": 0,
+            "suppressed_peak_max_db": 0.0,
+        }
+
+    fade = np.clip((freq - 80.0) / 20.0, 0.0, 1.0)
+    fade = fade * fade * (3.0 - 2.0 * fade)
+    out = gain.copy()
+    out[suppress] = gain[suppress] + fade[suppress] * (baseline[suppress] - gain[suppress])
+    return out, {
+        "threshold_db": float(min_peak_db),
+        "suppressed_lobes": int(np.count_nonzero(suppressed_lobes)),
+        "suppressed_bins": int(np.count_nonzero(suppress)),
+        "suppressed_peak_max_db": float(np.max(peak_by_lobe[suppressed_lobes])),
+    }
+
+
+def _run_min_boost_peak_stage(
+    gain_db: np.ndarray,
+    freq_axis: np.ndarray,
+    mask_c: np.ndarray,
+    cfg_reader: CfgReader,
+    st: dict,
+    mag_authority_trace,
+) -> np.ndarray:
+    threshold_db = cfg_reader.float_allow_zero("min_boost_peak_db", 0.5)
+    if not np.isfinite(threshold_db):
+        threshold_db = 0.5
+    threshold_db = float(np.clip(threshold_db, 0.0, 3.0))
+    before = np.asarray(gain_db, dtype=float).copy()
+    out, info = _suppress_subthreshold_local_detail_lobes(
+        before,
+        freq_axis,
+        mask_c,
+        min_peak_db=threshold_db,
+    )
+    safe_put_many(
+        st,
+        {
+            "min_boost_peak_db": float(info["threshold_db"]),
+            "min_boost_peak_suppressed_lobes": int(info["suppressed_lobes"]),
+            "min_boost_peak_suppressed_bins": int(info["suppressed_bins"]),
+            "min_boost_peak_suppressed_max_db": float(info["suppressed_peak_max_db"]),
+        },
+    )
+    append_mag_authority_stage(
+        mag_authority_trace,
+        "after_min_boost_peak",
+        before,
+        out,
+        freq_axis,
+        mask_c,
+        reason_codes=[REASON_MIN_BOOST_PEAK],
+    )
+    return out
 
 
 def _run_softclip_stage(
@@ -1055,6 +1173,15 @@ def apply_post_limits_and_metrics(
         low_cut_strength=low_cut_strength,
         st=st,
         logger=logger,
+        mag_authority_trace=mag_authority_trace,
+    )
+
+    gain_db = _run_min_boost_peak_stage(
+        gain_db=gain_db,
+        freq_axis=freq_axis,
+        mask_c=mask_c,
+        cfg_reader=cfg_reader,
+        st=st,
         mag_authority_trace=mag_authority_trace,
     )
 

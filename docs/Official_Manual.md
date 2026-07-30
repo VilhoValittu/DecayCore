@@ -433,9 +433,10 @@ Hybrid IIR is an optional bass preconditioning stage that combines narrow IIR Pe
 When enabled, DecayCore:
 
 1. Detects narrow room modes in the configured bass frequency range using confidence and group-delay excess thresholds.
-2. Designs conservative Peaking EQ biquad cuts for confirmed modal peaks (cuts only — no boosts ever).
-3. Subtracts the IIR biquad magnitude response from the FIR target gain curve before magnitude correction. The FIR corrects only the remaining residual response.
-4. Exports the IIR biquad parameters into the CamillaDSP YAML configuration alongside the FIR convolver.
+2. Checks which confirmed modes remain after the bounded FIR magnitude correction.
+3. Transfers supported FIR cut depth into Peaking EQ biquads and compensates that transferred part in the FIR.
+4. Adds bounded residual cut depth only when the remaining mode passes the confidence, group-delay, priority, voice-risk, and residual-authority guards.
+5. Exports the IIR biquad parameters into the CamillaDSP YAML configuration alongside the FIR convolver.
 
 This keeps the two filter types clearly separated in responsibility: IIR for precision narrow-band cuts, FIR for everything else.
 
@@ -455,7 +456,7 @@ Leave it disabled when:
 
 #### CamillaDSP deployment
 
-When hybrid IIR produces biquads, they are included in the exported CamillaDSP YAML as Peaking EQ filter entries. **Both the IIR biquad stage and the FIR convolver must be active in the pipeline.** Loading only the FIR WAV without the IIR biquads will leave the bass correction incomplete because the FIR target was designed with the IIR contribution already subtracted.
+When hybrid IIR produces biquads, they are included in the exported CamillaDSP YAML as Peaking EQ filter entries. **Both the IIR biquad stage and the FIR convolver must be active in the pipeline.** Loading only the FIR WAV without the IIR biquads will omit both the transferred modal correction and any verified residual reduction.
 
 #### Key parameters
 
@@ -468,7 +469,7 @@ When hybrid IIR produces biquads, they are included in the exported CamillaDSP Y
 | `min_peak_db` | `4.0 dB` | Minimum peak height required to place a cut |
 | `min_q` | `3.0` | Minimum allowed biquad Q |
 | `max_q` | `12.0` | Maximum allowed biquad Q |
-| `max_cut_db` | `6.0 dB` | Maximum cut depth per biquad |
+| `max_cut_db` | `6.0 dB` | Maximum combined transfer + residual cut depth per biquad |
 | `min_confidence` | `0.30` | Minimum confidence required at the mode frequency |
 | `min_gd_excess_ms` | `10.0 ms` | Minimum group delay excess required |
 | `min_cut_priority` | `0.0` | Minimum cut priority score to place a filter |
@@ -485,19 +486,20 @@ See also: [Hybrid IIR + FIR Room Correction]({{ '/hybrid-iir-fir/' | relative_ur
 In AUTO mode, DecayCore supports three target selection strategies:
 
 - **Auto: search best built-in** (default) — evaluates multiple built-in target curves in parallel and picks the best-ranked result.
-- **Adaptive: derive target from room acoustics** — synthesizes a custom Harman6-based target from the measured room's bass buildup, tilt, and RT60 characteristics. Skips the multi-curve search entirely.
+- **Adaptive: derive target from room acoustics** — synthesizes a conservative Harman6-based target from broad, stereo-consistent bass evidence. Skips the multi-curve search entirely.
 - **Use selected target curve from Target page** — uses the target curve manually selected in the Target tab.
 
 #### How adaptive target synthesis works
 
 1. Starts from a Harman6-style reference shape.
-2. Estimates the room's natural bass buildup and overall tilt from the measured response.
-3. Adjusts bass and tilt compensation fractions based on those estimates.
-4. When RT60 data is available, further refines compensation using measured decay times across bass (20–125 Hz), mid (400–2000 Hz), and treble (2000–8000 Hz) bands. The RT60 adjustment is bounded to ±2 dB.
+2. Aligns each channel to the reference and estimates broad bass residuals instead of treating the reference curve's own bass shelf as room buildup.
+3. Reduces adaptation when the left and right channels disagree, and bounds target changes to −2.0/+0.75 dB below 500 Hz.
+4. Uses RT60 only as a confidence guard that can prevent additional bass lift in a slow-decay room. RT60 does not create broadband target tilt.
+5. Keeps the Harman6 response unchanged above 500 Hz by default. Optional high-frequency adaptation requires explicit high-SNR, stereo-consistent evidence.
 
 #### RT60 requirement
 
-RT60 data is automatically available when measurements are produced by DecayCore's built-in measurement tool. With external REW exports or WAV impulse files, RT60 data is typically absent — the RT60 refinement step is skipped and the target is derived from bass buildup and tilt only.
+RT60 data is automatically available when measurements are produced by DecayCore's built-in measurement tool. With external REW exports or WAV impulse files, RT60 data is typically absent; adaptive target remains valid and simply omits the decay-based bass-lift guard.
 
 If RT60 data is not available, `Auto: search best built-in` is generally the safer strategy.
 

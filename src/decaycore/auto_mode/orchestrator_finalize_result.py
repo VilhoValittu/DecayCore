@@ -352,6 +352,13 @@ def _p6_validate_candidate(
             measured_mag_db_l=_p6_active_stat_arr(st_l, "measured_mags"),
             measured_mag_db_r=_p6_active_stat_arr(st_r, "measured_mags"),
             ir_anchor_mode=str(st_l.get("ir_anchor_mode", "") or ""),
+            filter_type=str(
+                st_l.get(
+                    "filter_type",
+                    st_l.get("filter_type_str", getattr(cfg, "filter_type_str", "")),
+                )
+                or ""
+            ),
             authority_voice_risk=_p6_stat_arr(st_l, "authority_voice_risk"),
             authority_modal_support=_p6_stat_arr(st_l, "authority_modal_support"),
             authority_null_risk=_p6_stat_arr(st_l, "authority_null_risk"),

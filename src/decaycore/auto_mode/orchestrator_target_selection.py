@@ -47,7 +47,10 @@ from .shared_parts import (
     _auto_optimizer_backend,
     _auto_safe_float,
 )
-from ..dsp.target_synthesis import synthesize_target_from_measurements
+from ..dsp.target_synthesis import (
+    adaptive_target_diagnostics,
+    synthesize_target_from_measurements,
+)
 from .orchestrator_target_types import (
     _TargetSelectionContext,
     _TargetSelectionOutcome,
@@ -148,14 +151,52 @@ def _try_adaptive_target_fast_path(
         )
         if synth is not None:
             synth_f, synth_m = synth
-            logger.info("Automatic mode target select: adaptive fast path used")
+            diagnostics = adaptive_target_diagnostics(
+                measurements.get("f_l"),
+                measurements.get("m_l"),
+                measurements.get("f_r"),
+                measurements.get("m_r"),
+                target_f=synth_f,
+                target_m=synth_m,
+                smooth_oct=float(AUTO_MODE_SYNTH_TARGET_SMOOTH_OCT),
+                measurements=measurements,
+            )
+            logger.info(
+                "Automatic mode target select: adaptive fast path used "
+                "(bass_residual=%.3f dB, channel_disagreement=%.3f dB, "
+                "channel_confidence=%.3f, rt60_confidence=%.3f, "
+                "target_delta=[%.3f, %.3f] dB%s)",
+                _auto_safe_float(diagnostics.get("bass_residual_db"), 0.0),
+                _auto_safe_float(diagnostics.get("channel_disagreement_db"), 0.0),
+                _auto_safe_float(diagnostics.get("channel_confidence"), 0.0),
+                _auto_safe_float(diagnostics.get("rt60_confidence"), 0.0),
+                _auto_safe_float(diagnostics.get("target_delta_min_db"), 0.0),
+                _auto_safe_float(diagnostics.get("target_delta_max_db"), 0.0),
+                (
+                    f", fallback={diagnostics.get('fallback_reason')}"
+                    if diagnostics.get("fallback_reason")
+                    else ""
+                ),
+            )
             if callable(status_cb):
-                status_cb("DecayCore automatic mode: adaptive target synthesized from measurements")
+                if diagnostics.get("fallback_reason"):
+                    status_cb(
+                        "DecayCore automatic mode: adaptive target used conservative "
+                        f"fallback ({diagnostics.get('fallback_reason')})"
+                    )
+                else:
+                    status_cb(
+                        "DecayCore automatic mode: adaptive target synthesized "
+                        "from confidence-weighted bass evidence"
+                    )
             return {
                 "selected_hc_mode": str(AUTO_MODE_SYNTH_TARGET_NAME),
-                "fit_rms_db": float("nan"),
+                "fit_rms_db": _auto_safe_float(
+                    diagnostics.get("fit_rms_db"),
+                    0.0,
+                ),
                 "offset_db": 0.0,
-                "selection_method": "adaptive",
+                "selection_method": "adaptive_guarded",
                 "selection_basis": str(rank_basis),
                 "auto_goal": str(goal),
                 "top_n": 0,
@@ -163,6 +204,7 @@ def _try_adaptive_target_fast_path(
                 "candidates": [],
                 "evaluated": [],
                 "best_preset": {},
+                "adaptive_target_diagnostics": dict(diagnostics),
                 "_synth_hc_f": synth_f,
                 "_synth_hc_m": synth_m,
             }

@@ -42,7 +42,7 @@ Goal: let DecayCore search for a good preset automatically.
 In AUTO mode, three target strategies are available from the Basic tab:
 
 - **Auto: search best built-in** (default) — evaluates multiple built-in target curves in parallel and picks the best-ranked match. Most robust choice when measurement source is unknown or external.
-- **Adaptive: derive target from room acoustics** — synthesizes a Harman6-based target from the room's measured bass buildup, tilt, and RT60 characteristics. Skips the multi-curve search phase; significantly faster. Works best with DecayCore's built-in measurement tool, which automatically records RT60 data. With external REW or WAV imports, RT60 data is typically absent and the adaptive target falls back to bass/tilt compensation only.
+- **Adaptive: derive target from room acoustics** — synthesizes a safety-bounded Harman6-based target from broad, stereo-consistent bass evidence. It reduces adaptation when channels disagree, preserves the reference above 500 Hz by default, and uses optional RT60 data only to prevent unsafe bass lift in slow-decay rooms. Skips the multi-curve search phase.
 - **Use selected target curve from Target page** — uses the target curve manually selected in the Target tab. Disables automatic target search.
 
 When `auto_goal` is set to "Prefer Bass", the mode is locked to `selected`.

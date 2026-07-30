@@ -32,6 +32,8 @@ RUN_RANKING_SCORE_CONTEXT = "run_ranking_score"
 OFFICIAL_RANK_SCORE_DISPLAY_GAIN = 1.70
 OFFICIAL_RANK_SCORE_DISPLAY_BIAS = 0.0
 OFFICIAL_RANK_SCORE_DISPLAY_CALIBRATION = "display_x1_700"
+RANK_SCORE_LOWER_BOUND_POLICY = "soft_floor_v1"
+RANK_SCORE_SOFT_FLOOR_KNEE = 20.0
 
 RANK_SCORE_BATCH_FIELDS = (
     "avg_score",
@@ -150,6 +152,37 @@ def display_rank_score(score: Any) -> float:
             100.0,
         )
     )
+
+
+def _bounded_rank_score(value: Any, *, score_min: float, score_max: float) -> float:
+    """Keep poor finite candidates distinguishable without inflating normal scores."""
+    lo = float(score_min)
+    hi = float(score_max)
+    if hi < lo:
+        lo, hi = hi, lo
+    span = float(hi - lo)
+    if span <= 0.0:
+        return float(lo)
+    knee = float(min(RANK_SCORE_SOFT_FLOOR_KNEE, span))
+    relative = float(_auto_safe_float(value, lo)) - lo
+    if relative < knee:
+        relative = float(knee * np.exp(np.clip((relative - knee) / knee, -745.0, 0.0)))
+    return float(np.clip(lo + relative, lo, hi))
+
+
+def _bounded_rank_scores(values: np.ndarray, *, score_min: float, score_max: float) -> np.ndarray:
+    lo = float(score_min)
+    hi = float(score_max)
+    if hi < lo:
+        lo, hi = hi, lo
+    span = float(hi - lo)
+    if span <= 0.0:
+        return np.full_like(np.asarray(values, dtype=np.float64), lo, dtype=np.float64)
+    knee = float(min(RANK_SCORE_SOFT_FLOOR_KNEE, span))
+    relative = np.asarray(values, dtype=np.float64) - lo
+    softened = knee * np.exp(np.clip((relative - knee) / knee, -745.0, 0.0))
+    relative = np.where(relative < knee, softened, relative)
+    return np.asarray(np.clip(lo + relative, lo, hi), dtype=np.float64)
 
 
 def _official_rank_score_is_calibrated(metrics: dict[str, Any], components: dict[str, Any]) -> bool:
@@ -418,7 +451,7 @@ def compute_rank_score_components(
         - rt60_pen
         - harmonic_pen
     )
-    rank_score = float(np.clip((g * rank_raw) + b, lo, hi))
+    rank_score = _bounded_rank_score((g * rank_raw) + b, score_min=lo, score_max=hi)
     score_kind = str(context or OFFICIAL_RANK_SCORE_CONTEXT).strip() or OFFICIAL_RANK_SCORE_CONTEXT
     score_label = "Best rank score" if score_kind == OFFICIAL_RANK_SCORE_CONTEXT else "Run ranking score"
 
@@ -463,6 +496,8 @@ def compute_rank_score_components(
             "score_label": str(score_label),
             "score_min": float(lo),
             "score_max": float(hi),
+            "lower_bound_policy": str(RANK_SCORE_LOWER_BOUND_POLICY),
+            "soft_floor_knee": float(min(RANK_SCORE_SOFT_FLOOR_KNEE, max(0.0, hi - lo))),
         },
     }
 
@@ -510,7 +545,7 @@ def compute_rank_scores_batch(
     rank_raw = clean[:, 0] + (positive @ _RANK_SCORE_BATCH_SIGNS)
     shared_penalty = np.maximum(positive[:, 26], positive[:, 29])
     rank_raw -= shared_penalty
-    return np.asarray(np.clip((g * rank_raw) + b, lo, hi), dtype=np.float64)
+    return _bounded_rank_scores((g * rank_raw) + b, score_min=lo, score_max=hi)
 
 
 def attach_official_rank_score(
@@ -624,7 +659,15 @@ def calibrated_auto_quality(rank_score_0_100: Any, metrics: dict[str, Any] | Non
 
     hard_gate_failed = bool(m.get("hard_gate_failed", False) or m.get("stereo_policy_gate_failed", False))
     rp_worst = float(_auto_safe_float(m.get("worst_residual_peak_db", float("nan")), float("nan")))
-    rp_gate = float(_auto_safe_float(m.get("residual_peak_hard_gate_db", float("nan")), float("nan")))
+    rp_gate = float(
+        _auto_safe_float(
+            m.get(
+                "residual_peak_hard_gate_effective_db",
+                m.get("residual_peak_hard_gate_db", float("nan")),
+            ),
+            float("nan"),
+        )
+    )
     if np.isfinite(rp_worst) and np.isfinite(rp_gate) and rp_worst > rp_gate:
         hard_gate_failed = True
     if hard_gate_failed:

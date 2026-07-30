@@ -847,6 +847,14 @@ def _apply_phase_model(  # noqa: C901 - phase containment and spike suppression 
     except (TypeError, ValueError, FloatingPointError):
         pass
 
+    if not is_mixed:
+        extra_phase = _smooth_linear_boundary(f, extra_phase, phase_lim_hz, cfg, st)
+        extra_phase = _enforce_linear_tail_decay(f, extra_phase, phase_lim_hz, cfg, st)
+
+    # P4: acoustic authority gating — scale excess-phase correction by authority
+    extra_phase = _apply_phase_authority_gating(f, extra_phase, cfg, st, logger)
+    # Run the GD limiter after every frequency-domain phase transform so its
+    # "after" telemetry describes the phase that is actually sent to IR build.
     extra_phase, gd_lim_info = _gd_grad_limiter(
         extra_phase,
         cfg,
@@ -857,12 +865,6 @@ def _apply_phase_model(  # noqa: C901 - phase containment and spike suppression 
         afdw_on=phase_components.afdw_on,
         limiter_fn=phase_components.limit_gd_gradient_ms_per_oct_fn,
     )
-    if not is_mixed:
-        extra_phase = _smooth_linear_boundary(f, extra_phase, phase_lim_hz, cfg, st)
-        extra_phase = _enforce_linear_tail_decay(f, extra_phase, phase_lim_hz, cfg, st)
-
-    # P4: acoustic authority gating — scale excess-phase correction by authority
-    extra_phase = _apply_phase_authority_gating(f, extra_phase, cfg, st, logger)
 
     try:
         if isinstance(st, dict):
@@ -1003,4 +1005,3 @@ __all__ = [
     '_pre_ringing_band_protection_floor',
     '_apply_phase_model',
 ]
-

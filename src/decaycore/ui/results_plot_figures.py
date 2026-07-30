@@ -28,6 +28,7 @@ _SUB = "#f59e0b"
 _TARGET = "#34d399"
 _FILTER = "#f87171"
 _TIMING = "#a78bfa"
+_HYBRID_IIR = "#f59e0b"
 
 
 @dataclass(frozen=True)
@@ -422,8 +423,26 @@ def build_response_figure(
     dark: bool,
     default_full_range: bool = True,
 ) -> go.Figure:
-    fig = go.Figure()
-    fig.add_trace(
+    has_hybrid_iir = bool(data.hybrid_iir_cuts)
+    if has_hybrid_iir:
+        fig = make_subplots(
+            rows=2,
+            cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.10,
+            row_heights=(0.74, 0.26),
+            subplot_titles=("", t("results_plot_hybrid_iir_title")),
+        )
+    else:
+        fig = go.Figure()
+
+    def add_response_trace(trace: go.Scatter) -> None:
+        if has_hybrid_iir:
+            fig.add_trace(trace, row=1, col=1)
+        else:
+            fig.add_trace(trace)
+
+    add_response_trace(
         go.Scatter(
             x=data.freq_hz,
             y=data.measured_db,
@@ -433,7 +452,7 @@ def build_response_figure(
         )
     )
     exported_index = len(fig.data)
-    fig.add_trace(
+    add_response_trace(
         go.Scatter(
             x=data.freq_hz,
             y=data.predicted_exported_db,
@@ -442,7 +461,7 @@ def build_response_figure(
         )
     )
     compensated_index = len(fig.data)
-    fig.add_trace(
+    add_response_trace(
         go.Scatter(
             x=data.freq_hz,
             y=data.predicted_compensated_db,
@@ -452,7 +471,7 @@ def build_response_figure(
         )
     )
     if data.effective_target_db is not None:
-        fig.add_trace(
+        add_response_trace(
             go.Scatter(
                 x=data.target_freq_hz,
                 y=data.effective_target_db,
@@ -461,7 +480,7 @@ def build_response_figure(
             )
         )
     if data.requested_target_db is not None:
-        fig.add_trace(
+        add_response_trace(
             go.Scatter(
                 x=data.target_freq_hz,
                 y=data.requested_target_db,
@@ -470,6 +489,51 @@ def build_response_figure(
                 visible="legendonly",
             )
         )
+
+    if has_hybrid_iir:
+        combined_response_db = np.sum(
+            np.stack(
+                [cut.response_db for cut in data.hybrid_iir_cuts],
+                axis=0,
+            ),
+            axis=0,
+        )
+        if len(data.hybrid_iir_cuts) > 1:
+            fig.add_trace(
+                go.Scatter(
+                    x=data.freq_hz,
+                    y=combined_response_db,
+                    name=t("results_plot_hybrid_iir_total").format(
+                        count=len(data.hybrid_iir_cuts),
+                    ),
+                    line=dict(color=_HYBRID_IIR, width=2.4),
+                    legendgroup="hybrid_iir",
+                ),
+                row=2,
+                col=1,
+            )
+        for index, cut in enumerate(data.hybrid_iir_cuts, start=1):
+            fig.add_trace(
+                go.Scatter(
+                    x=data.freq_hz,
+                    y=cut.response_db,
+                    name=t("results_plot_hybrid_iir_cut").format(
+                        index=index,
+                        freq=cut.freq_hz,
+                        gain=cut.gain_db,
+                        q=cut.q,
+                    ),
+                    line=dict(
+                        color=_HYBRID_IIR,
+                        width=2.1 if len(data.hybrid_iir_cuts) == 1 else 1.3,
+                        dash="solid" if len(data.hybrid_iir_cuts) == 1 else "dot",
+                    ),
+                    opacity=1.0 if len(data.hybrid_iir_cuts) == 1 else 0.68,
+                    legendgroup="hybrid_iir",
+                ),
+                row=2,
+                col=1,
+            )
 
     full_range = _full_range(data)
     correction_range = (
@@ -482,10 +546,41 @@ def build_response_figure(
         fig,
         title=_title_with_filter_metadata(title, data),
         dark=dark,
-        height=500,
+        height=650 if has_hybrid_iir else 500,
     )
     _apply_log_x_axis(fig, range_hz=initial_range, full_max_hz=full_range[1])
-    fig.update_yaxes(title_text=t("results_plot_magnitude_axis"), autorange=True)
+    if has_hybrid_iir:
+        minimum_iir_db = float(np.nanmin(combined_response_db))
+        iir_axis_min_db = min(-1.0, 1.15 * minimum_iir_db)
+        fig.update_xaxes(title_text=None, showticklabels=False, row=1, col=1)
+        fig.update_xaxes(
+            title_text=t("results_plot_frequency_axis"),
+            showticklabels=True,
+            row=2,
+            col=1,
+        )
+        fig.update_yaxes(
+            title_text=t("results_plot_magnitude_axis"),
+            autorange=True,
+            row=1,
+            col=1,
+        )
+        fig.update_yaxes(
+            title_text=t("results_plot_hybrid_iir_axis"),
+            range=[iir_axis_min_db, 0.5],
+            row=2,
+            col=1,
+        )
+        fig.add_hline(
+            y=0.0,
+            line_width=1,
+            line_dash="dot",
+            line_color=plot_theme(dark=dark).muted,
+            row=2,
+            col=1,
+        )
+    else:
+        fig.update_yaxes(title_text=t("results_plot_magnitude_axis"), autorange=True)
     _set_results_plot_controls(
         fig,
         exported_indexes=[exported_index],
@@ -494,7 +589,7 @@ def build_response_figure(
         full_range=full_range,
         default_range_mode="full" if default_full_range else "correction",
     )
-    _add_correction_and_guard_shapes(fig, data)
+    _add_correction_and_guard_shapes(fig, data, row=1)
     return fig
 
 
@@ -557,50 +652,81 @@ def build_timing_figure(
     fig = make_subplots(
         rows=2,
         cols=1,
-        shared_xaxes=True,
+        shared_xaxes=False,
         vertical_spacing=0.11,
         subplot_titles=(
             t("results_plot_phase_title"),
             t("results_plot_group_delay_title"),
         ),
     )
+    corrected_band_mask = (
+        np.isfinite(data.freq_hz)
+        & (data.freq_hz >= 10.0)
+        & (data.freq_hz <= float(data.phase_display_max_hz))
+    )
     fig.add_trace(
         go.Scatter(
-            x=data.freq_hz,
-            y=data.filter_phase_deg,
-            name=t("results_plot_filter_phase"),
-            line=dict(color=_TIMING, width=1.4),
-            showlegend=False,
+            x=data.freq_hz[corrected_band_mask],
+            y=data.system_phase_before_deg[corrected_band_mask],
+            name=t("results_plot_system_before"),
+            line=dict(color=_LEFT, width=1.2, dash="dot"),
+            showlegend=True,
         ),
         row=1,
         col=1,
     )
     fig.add_trace(
         go.Scatter(
-            x=data.freq_hz,
-            y=data.filter_group_delay_ms,
-            name=t("results_plot_filter_group_delay"),
+            x=data.freq_hz[corrected_band_mask],
+            y=data.system_phase_after_deg[corrected_band_mask],
+            name=t("results_plot_system_after"),
+            line=dict(color=_TIMING, width=1.4),
+            showlegend=True,
+        ),
+        row=1,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=data.freq_hz[corrected_band_mask],
+            y=data.system_group_delay_before_ms[corrected_band_mask],
+            name=t("results_plot_system_before"),
+            line=dict(color=_LEFT, width=1.2, dash="dot"),
+            showlegend=False,
+        ),
+        row=2,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=data.freq_hz[corrected_band_mask],
+            y=data.system_group_delay_after_ms[corrected_band_mask],
+            name=t("results_plot_system_after"),
             line=dict(color=_TIMING, width=1.4),
             showlegend=False,
         ),
         row=2,
         col=1,
     )
-    full_range = _full_range(data)
     _base_layout(
         fig,
         title=_title_with_filter_metadata(title, data),
         dark=dark,
         height=650,
-        show_legend=False,
+        show_legend=True,
     )
-    for row in (1, 2):
-        _apply_log_x_axis(
-            fig,
-            range_hz=full_range,
-            full_max_hz=full_range[1],
-            row=row,
-        )
+    _apply_log_x_axis(
+        fig,
+        range_hz=(10.0, float(data.phase_display_max_hz)),
+        full_max_hz=float(data.phase_display_max_hz),
+        row=1,
+    )
+    _apply_log_x_axis(
+        fig,
+        range_hz=(10.0, float(data.phase_display_max_hz)),
+        full_max_hz=float(data.phase_display_max_hz),
+        row=2,
+    )
     fig.update_yaxes(title_text=t("results_plot_phase_axis"), row=1, col=1)
     fig.update_yaxes(title_text=t("results_plot_group_delay_axis"), row=2, col=1)
     return fig

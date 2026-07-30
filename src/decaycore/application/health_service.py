@@ -16,6 +16,7 @@ from dataclasses import dataclass
 import os
 from typing import Any, Literal
 
+from ..features import has_packaged_bass_engine
 from ..resources.i8n.decaycore_i18n import t
 
 Level = Literal["ok", "warn", "crit"]
@@ -150,6 +151,14 @@ def _has_any_measurement_source(data: dict[str, Any], *, file_key: str, path_key
 
 def _health_bass_integration_issues(data: dict[str, Any], mode_u: str) -> list[Issue]:
     issues: list[Issue] = []
+    if not has_packaged_bass_engine():
+        issues.append(
+            Issue(
+                "crit",
+                _tr("health_bass_engine_unavailable"),
+                _tr("bass_integration_packaged_only_help"),
+            )
+        )
     bi_mode = str(data.get("bass_integration_mode", "direct_dac") or "direct_dac")
     is_direct_dac = bi_mode == "direct_dac"
 

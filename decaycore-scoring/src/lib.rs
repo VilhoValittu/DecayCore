@@ -53,6 +53,8 @@ const RANK_SCORE_BATCH_FIELDS: [&str; 31] = [
 ];
 const RANK_SCORE_BATCH_WIDTH: usize = RANK_SCORE_BATCH_FIELDS.len();
 const GIL_RELEASE_MIN_BATCH_ROWS: usize = 64;
+const RANK_SCORE_LOWER_BOUND_POLICY: &str = "soft_floor_v1";
+const RANK_SCORE_SOFT_FLOOR_KNEE: f64 = 20.0;
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -70,6 +72,22 @@ fn safe_f64(v: f64) -> f64 {
 #[inline]
 fn clamp(v: f64, lo: f64, hi: f64) -> f64 {
     v.max(lo).min(hi)
+}
+
+#[inline]
+fn bounded_rank_score(value: f64, lo: f64, hi: f64) -> f64 {
+    let span = hi - lo;
+    if span <= 0.0 {
+        return lo;
+    }
+    let knee = RANK_SCORE_SOFT_FLOOR_KNEE.min(span);
+    let relative = value - lo;
+    let bounded_relative = if relative < knee {
+        knee * ((relative - knee) / knee).clamp(-745.0, 0.0).exp()
+    } else {
+        relative
+    };
+    clamp(lo + bounded_relative, lo, hi)
 }
 
 #[inline]
@@ -286,7 +304,7 @@ fn compute_rank_score_components(
         shared_pen,
     ]);
 
-    let rank_score = clamp(g * rank_raw + b, lo, hi);
+    let rank_score = bounded_rank_score(g * rank_raw + b, lo, hi);
 
     let official_ctx = "preset_objective_score";
     let score_kind = context.unwrap_or(official_ctx).trim();
@@ -343,6 +361,11 @@ fn compute_rank_score_components(
     ctx_d.set_item("score_label", score_label)?;
     ctx_d.set_item("score_min", lo)?;
     ctx_d.set_item("score_max", hi)?;
+    ctx_d.set_item("lower_bound_policy", RANK_SCORE_LOWER_BOUND_POLICY)?;
+    ctx_d.set_item(
+        "soft_floor_knee",
+        RANK_SCORE_SOFT_FLOOR_KNEE.min((hi - lo).max(0.0)),
+    )?;
     d.set_item("context", ctx_d)?;
 
     Ok(d.into())
@@ -386,7 +409,7 @@ fn compute_rank_scores_batch<'py>(
     let compute = move || {
         values
             .chunks_exact(RANK_SCORE_BATCH_WIDTH)
-            .map(|row| clamp(gain * rank_raw_from_values(row) + bias, lo, hi))
+            .map(|row| bounded_rank_score(gain * rank_raw_from_values(row) + bias, lo, hi))
             .collect::<Vec<_>>()
     };
     let scores = if rows >= GIL_RELEASE_MIN_BATCH_ROWS {
@@ -432,14 +455,25 @@ fn calibrated_auto_quality(rank_score_0_100: f64, metrics: Option<&Bound<'_, PyD
         if let Ok(Some(v)) = m.get_item("stereo_policy_gate_failed") {
             hard_gate_failed |= v.is_truthy().unwrap_or(false);
         }
-        if let (Ok(Some(rp_v)), Ok(Some(rg_v))) = (
-            m.get_item("worst_residual_peak_db"),
-            m.get_item("residual_peak_hard_gate_db"),
-        ) {
-            if let (Some(rp), Some(rg)) = (metric_f64(&rp_v), metric_f64(&rg_v)) {
-                if rp > rg {
-                    hard_gate_failed = true;
-                }
+        let residual_peak = m
+            .get_item("worst_residual_peak_db")
+            .ok()
+            .flatten()
+            .and_then(|value| metric_f64(&value));
+        let residual_gate = m
+            .get_item("residual_peak_hard_gate_effective_db")
+            .ok()
+            .flatten()
+            .and_then(|value| metric_f64(&value))
+            .or_else(|| {
+                m.get_item("residual_peak_hard_gate_db")
+                    .ok()
+                    .flatten()
+                    .and_then(|value| metric_f64(&value))
+            });
+        if let (Some(rp), Some(rg)) = (residual_peak, residual_gate) {
+            if rp > rg {
+                hard_gate_failed = true;
             }
         }
         if hard_gate_failed {
@@ -489,7 +523,9 @@ fn decaycore_scoring(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{clamp, rank_raw_from_values, safe_f64, RANK_SCORE_BATCH_WIDTH};
+    use super::{
+        bounded_rank_score, clamp, rank_raw_from_values, safe_f64, RANK_SCORE_BATCH_WIDTH,
+    };
 
     #[test]
     fn safe_float_neutralizes_non_finite_values() {
@@ -503,6 +539,16 @@ mod tests {
         assert_eq!(clamp(-1.0, 0.0, 100.0), 0.0);
         assert_eq!(clamp(101.0, 0.0, 100.0), 100.0);
         assert_eq!(clamp(42.0, 0.0, 100.0), 42.0);
+    }
+
+    #[test]
+    fn soft_floor_preserves_poor_candidate_order_without_changing_normal_scores() {
+        let worse = bounded_rank_score(-12.0, 0.0, 100.0);
+        let better = bounded_rank_score(-7.0, 0.0, 100.0);
+        assert!(worse > 0.0);
+        assert!(better > worse);
+        assert_eq!(bounded_rank_score(20.0, 0.0, 100.0), 20.0);
+        assert_eq!(bounded_rank_score(72.5, 0.0, 100.0), 72.5);
     }
 
     #[test]

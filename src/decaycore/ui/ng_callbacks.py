@@ -33,7 +33,7 @@ def register_callbacks(*, t: Callable, get_val: Callable, max_safe_boost: float)
     """Register all reactive callbacks on form elements."""
     _register_mode_callbacks(t=t)
     _register_bass_integration_callbacks(t=t)
-    _register_target_callbacks(t=t)
+    _register_target_callbacks(t=t, max_safe_boost=max_safe_boost)
     _register_lvl_callbacks(t=t)
     _register_ir_window_callbacks(t=t)
     _register_bass_callbacks(t=t)
@@ -66,7 +66,7 @@ def _register_mode_callbacks(*, t: Callable) -> None:
     ctrl.on_change("mode", _on_mode_change)
 
 
-def _register_target_callbacks(*, t: Callable) -> None:
+def _register_target_callbacks(*, t: Callable, max_safe_boost: float) -> None:
     """hc_mode, hc_custom_file, auto_goal, auto_target_mode -> target preview."""
     _ensure_manual_hc_mode_holder()
 
@@ -152,9 +152,15 @@ def _register_target_callbacks(*, t: Callable) -> None:
         update_target_curve_controls_ui()
         _update_target_preview()
 
+    def _on_max_boost_change(v: Any) -> None:
+        from .ng_health import toast_max_boost_over_cap  # noqa: PLC0415
+
+        toast_max_boost_over_cap(v, max_safe_boost)
+
     ctrl.on_change("hc_mode", _on_hc_mode_change)
     ctrl.on_change("auto_goal", _sync_auto_target_mode_for_goal)
     ctrl.on_change("auto_target_mode", _on_auto_target_mode_change)
+    ctrl.on_change("max_boost", _on_max_boost_change)
     _restore_manual_hc_mode_if_needed()
     _sync_hc_upload_visibility(ctrl.value("hc_mode", _MANUAL_HC_DEFAULT))
 

@@ -15,6 +15,7 @@ from typing import Any
 
 import numpy as np
 
+from ...features import require_packaged_bass_engine
 from ...auto_mode.shared_parts import (
     AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO,
     AUTO_MODE_BASS_INTEGRATION_GUARD_LO_RATIO,
@@ -39,8 +40,22 @@ from ._realized_response import (
     ROBUST_PERTURBATION_POLICY_VERSION,
     build_realized_bass_integration_bundle,
 )
-from ._sub_combine import build_bundle_combined_sub_transfer, sum_complex_responses
-from ._utils import _build_transfer_like, _safe_float, normalize_sub_combine_mode
+from ._sub_combine import build_bundle_combined_sub_transfer
+from ._utils import (
+    _build_transfer_like,
+    _interp_complex_response,
+    _safe_float,
+    normalize_sub_combine_mode,
+)
+
+try:
+    from decaycore_bass_engine import (
+        robust_score_rs as _robust_score_rs,
+        transform_sub_and_sum_rs as _transform_sub_and_sum_rs,
+    )
+except ImportError:
+    _robust_score_rs = None
+    _transform_sub_and_sum_rs = None
 
 
 # Reject reasons that indicate a hardware-safety issue (speaker/hearing).
@@ -278,20 +293,40 @@ def _branch_bundle(
             base_cache.clear()
         base_cache[base_key] = cached
     l_main, r_main, l_sub_base, r_sub_base, l_combine_diag, r_combine_diag = cached
-    l_sub = apply_direct_dac_export_branch_model(
+    if _transform_sub_and_sum_rs is None:
+        require_packaged_bass_engine()
+        raise RuntimeError("Packaged bass engine did not expose transform_sub_and_sum_rs")
+
+    def _transform_channel(main, sub_base, *, sub_label: str, total_label: str):
+        freqs = np.asarray(main.freqs_hz, dtype=np.float64)
+        main_spec = _interp_complex_response(main, freqs)
+        sub_spec = _interp_complex_response(sub_base, freqs)
+        # Polarity is already folded into sub_base by the export branch model, so
+        # the engine must not invert again.
+        transformed, total = _transform_sub_and_sum_rs(
+            np.ascontiguousarray(freqs, dtype=np.float64),
+            np.ascontiguousarray(main_spec, dtype=np.complex128),
+            np.ascontiguousarray(sub_spec, dtype=np.complex128),
+            float(candidate.sub_gain_trim_db),
+            float(candidate.sub_delay_ms),
+        )
+        return (
+            _build_transfer_like(main, np.asarray(transformed), label=sub_label),
+            _build_transfer_like(main, np.asarray(total), label=total_label),
+        )
+
+    l_sub, l_total = _transform_channel(
+        l_main,
         l_sub_base,
-        gain_trim_db=float(candidate.sub_gain_trim_db),
-        delay_ms=float(candidate.sub_delay_ms),
-        label="L sub CamillaDSP Direct-DAC branch",
+        sub_label="L sub CamillaDSP Direct-DAC branch",
+        total_label="L Direct-DAC canonical predicted total",
     )
-    r_sub = apply_direct_dac_export_branch_model(
+    r_sub, r_total = _transform_channel(
+        r_main,
         r_sub_base,
-        gain_trim_db=float(candidate.sub_gain_trim_db),
-        delay_ms=float(candidate.sub_delay_ms),
-        label="R sub CamillaDSP Direct-DAC branch",
+        sub_label="R sub CamillaDSP Direct-DAC branch",
+        total_label="R Direct-DAC canonical predicted total",
     )
-    l_total = sum_complex_responses(l_main, l_sub, label="L Direct-DAC canonical predicted total")
-    r_total = sum_complex_responses(r_main, r_sub, label="R Direct-DAC canonical predicted total")
     diagnostics = dict(getattr(bundle, "diagnostics", {}) or {})
     diagnostics.update(dict(l_combine_diag or {}))
     diagnostics.update({f"r_{k}": v for k, v in dict(r_combine_diag or {}).items()})
@@ -600,6 +635,7 @@ def evaluate_direct_dac_candidate(
     robust: bool | None = None,
 ) -> DirectDacCandidateMetrics:
     """Evaluate the exported chain, with deterministic acoustic perturbations when FIRs exist."""
+    require_packaged_bass_engine()
     has_realized_firs = any(value is not None for value in (l_fir, r_fir, sub_fir))
     eval_bundle = bundle
     if has_realized_firs:
@@ -691,15 +727,13 @@ def evaluate_direct_dac_candidate(
         scenario_results.append(scenario)
 
     scores = np.asarray([result.score for result in scenario_results], dtype=float)
-    finite_scores = scores[np.isfinite(scores)]
-    p90_score = (
-        float(np.percentile(finite_scores, ROBUST_P90_PERCENTILE))
-        if finite_scores.size == scores.size and scores.size
-        else float("inf")
-    )
-    robust_score = (
-        float(ROBUST_NOMINAL_WEIGHT) * float(nominal.score)
-        + (1.0 - float(ROBUST_NOMINAL_WEIGHT)) * float(p90_score)
+    if _robust_score_rs is None:
+        raise RuntimeError("Packaged bass engine did not expose robust_score_rs")
+    p90_score, robust_score = _robust_score_rs(
+        float(nominal.score),
+        np.ascontiguousarray(scores, dtype=np.float64),
+        float(ROBUST_NOMINAL_WEIGHT),
+        float(ROBUST_P90_PERCENTILE),
     )
     cancellation = np.asarray(
         [result.summary.get("cancellation_risk", float("nan")) for result in scenario_results],

@@ -112,16 +112,26 @@ def _append_hybrid_iir(summary_content: str, side: str, st: dict) -> str:
     biquads = [dict(item) for item in list(st.get("hybrid_iir_biquads", []) or []) if isinstance(item, dict)]
     rejected = [dict(item) for item in list(st.get("hybrid_iir_rejected", []) or []) if isinstance(item, dict)]
     summary_content += f"State: {'ON' if enabled else 'OFF'}\n"
-    summary_content += "Mode: magnitude preconditioning only\n"
+    summary_content += (
+        f"Mode: {st.get('hybrid_iir_mode', 'residual_aware_magnitude_preconditioning')!s}\n"
+    )
     if biquads:
-        summary_content += "IIR modal cuts reduce excitation of selected minimum-phase-like bass peaks.\n"
+        summary_content += (
+            "IIR modal cuts transfer supported FIR cuts and add only gated residual reduction.\n"
+        )
         for idx, biquad in enumerate(biquads, start=1):
+            fitted_peak_db = float(biquad.get("fitted_peak_db", 0.0) or 0.0)
             summary_content += (
                 f"- #{idx}: {float(biquad.get('freq', 0.0) or 0.0):.1f} Hz, "
                 f"Q {float(biquad.get('q', 0.0) or 0.0):.2f}, "
                 f"gain {float(biquad.get('gain', 0.0) or 0.0):+.2f} dB, "
                 f"confidence {float(biquad.get('confidence', 0.0) or 0.0):.2f}, "
-                f"safe_cut {float(biquad.get('safe_cut_db', 0.0) or 0.0):.2f} dB\n"
+                f"source_peak {float(biquad.get('source_peak_db', 0.0) or 0.0):.2f} dB, "
+                f"fitted_peak {fitted_peak_db:.2f} dB, "
+                f"FIR_transfer {float(biquad.get('transfer_cut_db', 0.0) or 0.0):.2f} dB, "
+                f"residual_extra {float(biquad.get('residual_cut_db', 0.0) or 0.0):.2f} dB, "
+                f"residual_cap {float(biquad.get('residual_authority_cap_db', 0.0) or 0.0):.2f} dB, "
+                f"total_safe_cut {float(biquad.get('safe_cut_db', 0.0) or 0.0):.2f} dB\n"
             )
     elif enabled:
         summary_content += "Selected cuts: none\n"
@@ -349,4 +359,3 @@ def _append_lr_difference_summary(summary_content: str, l_st: dict, r_st: dict) 
 
 
 __all__ = ['_append_acoustic_events', '_append_lr_difference_summary']
-

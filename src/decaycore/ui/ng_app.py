@@ -41,6 +41,40 @@ _BRAND_LOGO_DARK_URL = "/static/DecayCore_logo.svg"
 _BRAND_LOGO_LIGHT_URL = "/static/DecayCore_logo_light.svg"
 
 
+def _build_top_navigation(*, ui, measurement_available: bool):
+    """Build sticky navigation followed by non-sticky run status."""
+    from . import ng_controls
+    from .ng_run_section import build_global_progress_bar
+
+    with ui.column().classes("w-full gap-2 cf-tabs-shell"):
+        with ui.column().classes("w-full cf-tabs-shell-inner"):
+            with ui.tabs().classes("w-full") as tabs:
+                tab_files = ui.tab(t("tab_files"))
+                tab_measurement = ui.tab(t("tab_measurement")) if measurement_available else None
+                tab_basic = ui.tab(t("tab_basic"))
+                tab_target = ui.tab(t("tab_target"))
+                tab_advanced = ui.tab(t("tab_adv"))
+                tab_export = ui.tab(t("tab_window_tdc"))
+                tab_xo = ng_controls.register("tab_xo", ui.tab(t("tab_xo")))
+                tab_run = ui.tab(t("tab_run"))
+
+    with ui.column().classes("w-full cf-run-status-outer"):
+        with ui.column().classes("w-full cf-run-status-shell"):
+            build_global_progress_bar()
+
+    return (
+        tabs,
+        tab_files,
+        tab_measurement,
+        tab_basic,
+        tab_target,
+        tab_advanced,
+        tab_export,
+        tab_xo,
+        tab_run,
+    )
+
+
 def _register_static_assets() -> None:
     """Expose packaged UI assets for browser metadata such as favicon."""
     global _STATIC_ASSETS_REGISTERED
@@ -186,20 +220,17 @@ def register_main_page() -> None:
             _build_brand_header(version=VERSION, dark_mode=dark_mode, initial_theme_dark=theme_dark)
             _build_rust_warning_banner()
 
-        with ui.column().classes("w-full gap-0 cf-tabs-shell"):
-            with ui.column().classes("w-full cf-tabs-shell-inner"):
-                from .ng_run_section import build_global_progress_bar  # noqa: PLC0415
-
-                build_global_progress_bar()
-                with ui.tabs().classes("w-full") as tabs:
-                    tab_files = ui.tab(t("tab_files"))
-                    tab_measurement = ui.tab(t("tab_measurement")) if measurement_available else None
-                    tab_basic = ui.tab(t("tab_basic"))
-                    tab_target = ui.tab(t("tab_target"))
-                    tab_advanced = ui.tab(t("tab_adv"))
-                    tab_export = ui.tab(t("tab_window_tdc"))
-                    tab_xo = ng_controls.register("tab_xo", ui.tab(t("tab_xo")))
-                    tab_run = ui.tab(t("tab_run"))
+        (
+            tabs,
+            tab_files,
+            tab_measurement,
+            tab_basic,
+            tab_target,
+            tab_advanced,
+            tab_export,
+            tab_xo,
+            tab_run,
+        ) = _build_top_navigation(ui=ui, measurement_available=measurement_available)
 
         with ui.tab_panels(tabs, value=tab_files).classes("w-full cf-tab-panels-shell"):
             with ui.tab_panel(tab_files):
@@ -216,7 +247,7 @@ def register_main_page() -> None:
             with ui.tab_panel(tab_basic):
                 from .ng_tab_basic import build_basic_tab  # noqa: PLC0415
 
-                build_basic_tab(t=t, get_val=get_val, max_safe_boost=float(MAX_SAFE_BOOST))
+                build_basic_tab(t=t, get_val=get_val)
 
             with ui.tab_panel(tab_target):
                 from .ng_tab_target_parts import build_target_tab  # noqa: PLC0415
@@ -226,7 +257,7 @@ def register_main_page() -> None:
             with ui.tab_panel(tab_advanced):
                 from .ng_tab_advanced import build_advanced_tab  # noqa: PLC0415
 
-                build_advanced_tab(t=t, get_val=get_val, max_safe_boost=float(MAX_SAFE_BOOST))
+                build_advanced_tab(t=t, get_val=get_val)
 
             with ui.tab_panel(tab_export):
                 from .ng_tab_window import build_window_tab  # noqa: PLC0415

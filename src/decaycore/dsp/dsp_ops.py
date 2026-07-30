@@ -190,16 +190,29 @@ def _limit_gd_gradient_ms_per_oct(
     gd_ms = np.nan_to_num((-np.gradient(pp_u, omega)) * 1000.0, nan=0.0, posinf=0.0, neginf=0.0)
     log2f = np.log2(np.maximum(ff, 1e-12))
     base_lim = float(max(0.1, max_grad_ms_per_oct))
-    lim_arr = np.where(
-        ff < 100.0,
-        base_lim * 0.67,
-        np.where(ff < 500.0, base_lim, base_lim * 1.5),
-    )
+    # Bass modes need more room while upper-band GD ripple must be contained
+    # more tightly. Interpolate the same 50/30/15 ms/oct zone policy used by
+    # phase_ir_phase_gradient, normalized to the configured mid-band limit.
+    zone_factor = np.empty_like(ff, dtype=float)
+    bass = ff < 120.0
+    low_mid = (ff >= 120.0) & (ff <= 300.0)
+    high_mid = (ff > 300.0) & (ff <= 500.0)
+    high = ff > 500.0
+    zone_factor[bass] = 50.0 / 30.0
+    if np.any(low_mid):
+        t = (ff[low_mid] - 120.0) / 180.0
+        zone_factor[low_mid] = (50.0 + t * (30.0 - 50.0)) / 30.0
+    if np.any(high_mid):
+        t = (ff[high_mid] - 300.0) / 200.0
+        zone_factor[high_mid] = (30.0 + t * (15.0 - 30.0)) / 30.0
+    zone_factor[high] = 15.0 / 30.0
+    lim_arr = base_lim * zone_factor
     # Kaarevuusraja (d2GD/d(log2 f)^2) estaa teravat GD-piikit, jotka
     # soittavat minimivaihe-IR:ssa vaikka gradientti pysyisi rajoissa.
-    # Oletus 4x gradienttiraja puuttuu peliin vain selvissa "kinkeissa".
+    # Basson valjempi gradienttibudjetti ei saa samalla sallia teravampia
+    # kinkkeja; yläkaistan tiukempi budjetti sen sijaan kiristaa myös niitä.
     if max_curv_ms_per_oct2 is None:
-        curv_lim_arr = 4.0 * lim_arr
+        curv_lim_arr = 4.0 * np.minimum(lim_arr, base_lim)
     else:
         try:
             curv = float(max_curv_ms_per_oct2)

@@ -351,12 +351,15 @@ def _iir_report_biquad_lines(name_prefix: str, biquads: list[dict]) -> list[str]
             gain = float(biquad.get("gain", 0.0) or 0.0)
             confidence = float(biquad.get("confidence", 0.0) or 0.0)
             safe_cut = float(biquad.get("safe_cut_db", 0.0) or 0.0)
+            transfer_cut = float(biquad.get("transfer_cut_db", 0.0) or 0.0)
+            residual_cut = float(biquad.get("residual_cut_db", 0.0) or 0.0)
         except _RECOVERABLE_JSON_SAFE_EXCEPTIONS:
             continue
         lines.append(
             f"{name_prefix}_hybrid_iir_{idx}: Peaking, "
             f"freq={freq:.3f} Hz, q={q:.6f}, gain={gain:.3f} dB, "
-            f"confidence={confidence:.3f}, safe_cut={safe_cut:.3f} dB"
+            f"confidence={confidence:.3f}, safe_cut={safe_cut:.3f} dB, "
+            f"fir_transfer={transfer_cut:.3f} dB, residual_extra={residual_cut:.3f} dB"
         )
     return lines
 

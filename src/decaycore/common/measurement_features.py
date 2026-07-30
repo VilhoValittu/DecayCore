@@ -28,6 +28,41 @@ if TYPE_CHECKING:
 # RT60 normalize / serialize
 # ---------------------------------------------------------------------------
 
+_RT60_ANALYSIS_PRE_PEAK_S = 1.0
+_RT60_ANALYSIS_POST_PEAK_S = 6.0
+
+
+def prepare_rt60_analysis_ir(
+    ir: np.ndarray,
+    fs: int,
+    peak_index: object,
+) -> np.ndarray:
+    """Return a bounded, peak-anchored IR for RT60 analysis."""
+    ir_arr = np.asarray(ir, dtype=float).reshape(-1)
+    fs_i = int(fs)
+    if ir_arr.size == 0 or fs_i <= 0:
+        return ir_arr
+
+    pre_peak_samples = max(0, int(round(_RT60_ANALYSIS_PRE_PEAK_S * fs_i)))
+    post_peak_samples = max(0, int(round(_RT60_ANALYSIS_POST_PEAK_S * fs_i)))
+    max_window_samples = pre_peak_samples + post_peak_samples + 1
+    if ir_arr.size <= max_window_samples:
+        return ir_arr
+
+    try:
+        peak = int(peak_index)
+    except (TypeError, ValueError, OverflowError):
+        peak = -1
+    if peak < 0 or peak >= ir_arr.size:
+        abs_ir = np.abs(ir_arr)
+        finite = np.isfinite(abs_ir)
+        peak = int(np.argmax(np.where(finite, abs_ir, -np.inf))) if np.any(finite) else 0
+
+    start = max(0, peak - pre_peak_samples)
+    stop = min(ir_arr.size, peak + post_peak_samples + 1)
+    return ir_arr[start:stop]
+
+
 def normalize_rt60_value(value) -> float | None:
     """Convert any RT60 value representation to float, or None if invalid."""
     try:
@@ -814,6 +849,7 @@ def estimate_schroeder_hz(
 
 
 __all__ = [
+    "prepare_rt60_analysis_ir",
     "normalize_rt60_value",
     "normalize_rt60_bands",
     "serialize_rt60_bands",

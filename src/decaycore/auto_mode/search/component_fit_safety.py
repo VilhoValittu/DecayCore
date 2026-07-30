@@ -198,6 +198,7 @@ def score_phase_quality(l_st, r_st, *, base_data) -> dict:
         (0.80, "useful_lf"),
         (0.60, "useful_xo"),
         (0.30, "useful_audible"),
+        (1.00, "realized_improvement"),
     ):
         lv = shared._auto_safe_float(phase_dbg_l.get(key, float("nan")), float("nan"))
         rv = shared._auto_safe_float(phase_dbg_r.get(key, float("nan")), float("nan"))
@@ -220,12 +221,26 @@ def score_phase_quality(l_st, r_st, *, base_data) -> dict:
         )
     )
     phase_net_score = float(phase_benefit_bonus - phase_risk_penalty)
+    realized_values = [
+        shared._auto_safe_float(
+            dbg.get("realized_improvement", float("nan")),
+            float("nan"),
+        )
+        for dbg in (phase_dbg_l, phase_dbg_r)
+    ]
+    realized_values = [float(value) for value in realized_values if np.isfinite(value)]
+    phase_realized_gd_improvement = (
+        float(np.mean(np.asarray(realized_values, dtype=float)))
+        if realized_values
+        else float("nan")
+    )
     return {
         "phase_limit_used_hz": phase_limit_used_hz,
         "phase_limit_penalty": phase_limit_penalty,
         "phase_benefit_bonus": phase_benefit_bonus,
         "phase_risk_penalty": phase_risk_penalty,
         "phase_net_score": phase_net_score,
+        "phase_realized_gd_improvement": phase_realized_gd_improvement,
         "phase_lr_consistency_penalty": phase_lr_consistency_penalty,
         "phase_dbg_l": phase_dbg_l,
         "phase_dbg_r": phase_dbg_r,

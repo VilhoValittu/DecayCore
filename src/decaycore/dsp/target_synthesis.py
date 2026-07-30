@@ -9,7 +9,7 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 import numpy as np
-from .smoothing import smooth_meas_freq_dep
+from .smoothing import smooth_gain_fractional_octave
 
 _SYNTH_FREQS = np.array([
     0., 20., 25., 31.5, 40., 50., 63., 80., 100., 125.,
@@ -74,30 +74,14 @@ def _slope_db_oct(f_hz, mag_db, f_lo=None, f_hi=None) -> float:
         return float("nan")
 
 
-# Precompute Harman6 slope the same way we will estimate measurements
-_SYNTH_HARMAN6_SLOPE_DB_OCT = _slope_db_oct(_SYNTH_FREQS[1:], _SYNTH_BASE_MAGS[1:])
-_RT60_TARGET_DELTA_LIMIT_DB = 4.0
-
-
-def _adaptive_rt60_delta_limit(bands: dict[float, float]) -> float:
-    """Scale the RT60 delta clip by how consistent the measured RT60 bands are.
-
-    Consistent bands (low CV) → measurement is reliable → allow up to the
-    full 4.0 dB delta.  Highly variable bands → be conservative → cap at 2.0 dB.
-    Falls back to the full limit when fewer than 3 valid bands are present.
-    """
-    if not bands:
-        return float(_RT60_TARGET_DELTA_LIMIT_DB)
-    vals = [float(v) for v in bands.values() if np.isfinite(v) and v > 0.0]
-    if len(vals) < 3:
-        return float(_RT60_TARGET_DELTA_LIMIT_DB)
-    mean_rt = float(np.mean(vals))
-    if mean_rt <= 0.0:
-        return float(_RT60_TARGET_DELTA_LIMIT_DB)
-    cv = float(np.std(vals) / mean_rt)
-    lo_limit = float(_RT60_TARGET_DELTA_LIMIT_DB) * 0.5   # 2.0 dB at high CV
-    hi_limit = float(_RT60_TARGET_DELTA_LIMIT_DB)          # 4.0 dB at low CV
-    return float(np.clip(np.interp(cv, [0.05, 0.6], [hi_limit, lo_limit]), lo_limit, hi_limit))
+_SYNTH_POLICY_VERSION = 3
+_SYNTH_BASS_CUT_LIMIT_DB = 2.0
+_SYNTH_BASS_BOOST_LIMIT_DB = 0.75
+_SYNTH_HF_DELTA_LIMIT_DB = 0.50
+_SYNTH_CHANNEL_DISAGREE_FULL_DB = 4.0
+_SYNTH_ADAPT_FADE_START_HZ = 250.0
+_SYNTH_ADAPT_MAX_HZ = 500.0
+_SYNTH_HF_ADAPT_MIN_SNR_DB = 30.0
 
 
 def _coerce_rt60_bands(value) -> dict[float, float]:
@@ -115,21 +99,13 @@ def _coerce_rt60_bands(value) -> dict[float, float]:
     return out
 
 
-def _combined_rt60_bands(measurements: dict | None) -> dict[float, float]:
-    if not isinstance(measurements, dict):
-        return {}
-    values: dict[float, list[float]] = {}
-    for key in ("measured_rt60_bands_l", "measured_rt60_bands_r"):
-        for f_hz, rt_s in _coerce_rt60_bands(measurements.get(key)).items():
-            values.setdefault(float(f_hz), []).append(float(rt_s))
-    return {
-        f_hz: float(np.mean(rt_vals))
-        for f_hz, rt_vals in values.items()
-        if rt_vals
-    }
-
-
-def _rt60_band_mean(bands: dict[float, float], f_lo: float, f_hi: float, *, min_count: int = 2) -> float:
+def _rt60_band_median(
+    bands: dict[float, float],
+    f_lo: float,
+    f_hi: float,
+    *,
+    min_count: int = 2,
+) -> tuple[float, int]:
     vals = [
         float(rt_s)
         for f_hz, rt_s in bands.items()
@@ -137,7 +113,10 @@ def _rt60_band_mean(bands: dict[float, float], f_lo: float, f_hi: float, *, min_
         and np.isfinite(float(rt_s))
         and float(f_lo) <= float(f_hz) <= float(f_hi)
     ]
-    return float(np.mean(vals)) if len(vals) >= int(min_count) else float("nan")
+    count = int(len(vals))
+    if count < int(min_count):
+        return float("nan"), count
+    return float(np.median(np.asarray(vals, dtype=float))), count
 
 
 def _interp_clamped(x: float, x0: float, x1: float, y0: float, y1: float) -> float:
@@ -149,34 +128,72 @@ def _interp_clamped(x: float, x0: float, x1: float, y0: float, y1: float) -> flo
     return float(y0 + (y1 - y0) * t)
 
 
-def _rt60_adjusted_compensation(
-    measurements: dict | None,
-    *,
-    bass_comp_frac: float,
-    tilt_comp_frac: float,
-) -> tuple[float, float]:
-    bands = _combined_rt60_bands(measurements)
-    if not bands:
-        return float(bass_comp_frac), float(tilt_comp_frac)
+def _adaptive_rt60_guard(measurements: dict | None) -> dict:
+    """Return conservative RT60 confidence and a bass-to-mid decay ratio.
 
-    bass_rt = _rt60_band_mean(bands, 20.0, 125.0)
-    mid_rt = _rt60_band_mean(bands, 400.0, 2000.0)
-    treble_rt = _rt60_band_mean(bands, 2000.0, 8000.0)
+    Spectral RT60 variation is physical evidence, not measurement consistency.
+    Confidence therefore comes from band coverage and L/R agreement.  The
+    result is only used to prevent extra bass target lift in slow-decay rooms;
+    it never creates a target adjustment on its own.
+    """
+    if not isinstance(measurements, dict):
+        return {
+            "confidence": 0.0,
+            "bass_to_mid_ratio": float("nan"),
+            "channel_ratio_disagreement": float("nan"),
+            "reason": "missing_metadata",
+        }
 
-    bass_eff = float(bass_comp_frac)
-    tilt_eff = float(tilt_comp_frac)
-    if abs(bass_eff) > 1e-9 and np.isfinite(bass_rt) and np.isfinite(mid_rt) and mid_rt > 1e-6:
-        bass_to_mid = float(bass_rt / mid_rt)
-        bass_target = _interp_clamped(bass_to_mid, 0.8, 1.5, 0.05, 0.40)
-        if np.isfinite(bass_target):
-            bass_eff = bass_target
-    if abs(tilt_eff) > 1e-9 and np.isfinite(treble_rt) and np.isfinite(mid_rt) and mid_rt > 1e-6:
-        treble_to_mid = float(treble_rt / mid_rt)
-        tilt_target = _interp_clamped(treble_to_mid, 0.70, 1.10, 0.18, 0.42)
-        if np.isfinite(tilt_target):
-            tilt_eff = tilt_target
+    bands_l = _coerce_rt60_bands(measurements.get("measured_rt60_bands_l"))
+    bands_r = _coerce_rt60_bands(measurements.get("measured_rt60_bands_r"))
+    bass_l, bass_count_l = _rt60_band_median(bands_l, 20.0, 125.0)
+    mid_l, mid_count_l = _rt60_band_median(bands_l, 400.0, 2000.0)
+    bass_r, bass_count_r = _rt60_band_median(bands_r, 20.0, 125.0)
+    mid_r, mid_count_r = _rt60_band_median(bands_r, 400.0, 2000.0)
 
-    return float(bass_eff), float(tilt_eff)
+    valid_l = bool(np.isfinite(bass_l) and np.isfinite(mid_l) and mid_l > 1e-6)
+    valid_r = bool(np.isfinite(bass_r) and np.isfinite(mid_r) and mid_r > 1e-6)
+    if not valid_l or not valid_r:
+        return {
+            "confidence": 0.0,
+            "bass_to_mid_ratio": float("nan"),
+            "channel_ratio_disagreement": float("nan"),
+            "reason": "insufficient_stereo_bands",
+            "band_count_l": int(min(bass_count_l, mid_count_l)),
+            "band_count_r": int(min(bass_count_r, mid_count_r)),
+        }
+
+    ratio_l = float(bass_l / mid_l)
+    ratio_r = float(bass_r / mid_r)
+    ratio = float(np.sqrt(max(ratio_l, 1e-9) * max(ratio_r, 1e-9)))
+    ratio_disagreement = float(abs(np.log(max(ratio_l, 1e-9) / max(ratio_r, 1e-9))))
+    coverage = float(
+        np.clip(
+            min(bass_count_l, mid_count_l, bass_count_r, mid_count_r) / 3.0,
+            0.0,
+            1.0,
+        )
+    )
+    agreement = float(
+        np.clip(
+            np.interp(
+                ratio_disagreement,
+                [np.log(1.10), np.log(1.60)],
+                [1.0, 0.0],
+            ),
+            0.0,
+            1.0,
+        )
+    )
+    confidence = float(coverage * agreement)
+    return {
+        "confidence": float(confidence),
+        "bass_to_mid_ratio": float(ratio),
+        "channel_ratio_disagreement": float(ratio_disagreement),
+        "reason": "ok" if confidence > 0.0 else "channel_disagreement",
+        "band_count_l": int(min(bass_count_l, mid_count_l)),
+        "band_count_r": int(min(bass_count_r, mid_count_r)),
+    }
 
 
 def _target_synthesis_to_arr(x):
@@ -203,9 +220,194 @@ def _target_synthesis_sort_finite(f, m):
     return ff[mask], mm[mask]
 
 
-def _target_synthesis_band_mean(arr, fg, flo, fhi):
+def _target_synthesis_band_median(arr, fg, flo, fhi):
     mask = np.isfinite(arr) & (fg >= float(flo)) & (fg <= float(fhi))
-    return float(np.mean(arr[mask])) if int(np.count_nonzero(mask)) >= 4 else float("nan")
+    return float(np.median(arr[mask])) if int(np.count_nonzero(mask)) >= 4 else float("nan")
+
+
+def _target_synthesis_smooth_macro(mag_db, freq_hz, smooth_oct: float) -> np.ndarray:
+    try:
+        octave_width = float(smooth_oct)
+    except (TypeError, ValueError, OverflowError):
+        octave_width = 1.0 / 3.0
+    if not np.isfinite(octave_width) or octave_width <= 0.0:
+        octave_width = 1.0 / 3.0
+    octave_width = float(np.clip(octave_width, 1.0 / 12.0, 1.0))
+    fraction = float(1.0 / octave_width)
+    try:
+        return np.asarray(
+            smooth_gain_fractional_octave(freq_hz, mag_db, fraction),
+            dtype=float,
+        )
+    except (TypeError, ValueError, OverflowError, FloatingPointError):
+        return np.asarray(mag_db, dtype=float).copy()
+
+
+def _target_synthesis_hf_snr_confidence(measurements: dict | None) -> float:
+    if not isinstance(measurements, dict):
+        return 0.0
+
+    values = []
+    for side in ("l", "r"):
+        raw = None
+        for key in (
+            f"measurement_snr_db_{side}",
+            f"measured_snr_db_{side}",
+            f"snr_db_{side}",
+        ):
+            if measurements.get(key) is not None:
+                raw = measurements.get(key)
+                break
+        try:
+            value = float(raw)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if np.isfinite(value):
+            values.append(value)
+    if len(values) < 2:
+        return 0.0
+    snr_db = float(min(values))
+    return float(
+        np.clip(
+            np.interp(snr_db, [_SYNTH_HF_ADAPT_MIN_SNR_DB, 40.0], [0.0, 1.0]),
+            0.0,
+            1.0,
+        )
+    )
+
+
+def _target_synthesis_prepare_analysis(
+    f_l,
+    m_l,
+    f_r,
+    m_r,
+    *,
+    smooth_oct: float,
+    bass_ref_lo_hz: float,
+    bass_ref_hi_hz: float,
+    mid_ref_lo_hz: float,
+    mid_ref_hi_hz: float,
+    measurements: dict | None,
+) -> dict | None:
+    fl, ml = _target_synthesis_to_arr(f_l), _target_synthesis_to_arr(m_l)
+    fr, mr = _target_synthesis_to_arr(f_r), _target_synthesis_to_arr(m_r)
+
+    l_ok = bool(fl.size >= 32 and ml.size == fl.size)
+    r_ok = bool(fr.size >= 32 and mr.size == fr.size)
+    if not l_ok and not r_ok:
+        return None
+    stereo_input = bool(l_ok and r_ok)
+    if not l_ok:
+        fl, ml = fr.copy(), mr.copy()
+    if not r_ok:
+        fr, mr = fl.copy(), ml.copy()
+
+    fl, ml = _target_synthesis_sort_finite(fl, ml)
+    fr, mr = _target_synthesis_sort_finite(fr, mr)
+    if fl.size < 32 or fr.size < 32:
+        return None
+
+    f_lo = max(20.0, float(np.min(fl)), float(np.min(fr)))
+    f_hi = min(20000.0, float(np.max(fl)), float(np.max(fr)))
+    if not np.isfinite(f_lo) or not np.isfinite(f_hi) or f_hi <= f_lo * 1.5:
+        return None
+
+    fg = np.logspace(np.log10(f_lo), np.log10(f_hi), 320)
+    ml_g = np.interp(fg, fl, ml)
+    mr_g = np.interp(fg, fr, mr)
+    ml_sm = _target_synthesis_smooth_macro(ml_g, fg, smooth_oct)
+    mr_sm = _target_synthesis_smooth_macro(mr_g, fg, smooth_oct)
+    base_g = np.interp(fg, _SYNTH_FREQS[1:], _SYNTH_BASE_MAGS[1:])
+
+    mid_mask = (
+        np.isfinite(fg)
+        & (fg >= float(mid_ref_lo_hz))
+        & (fg <= float(mid_ref_hi_hz))
+    )
+    if int(np.count_nonzero(mid_mask)) < 8:
+        return None
+    offset_l = float(np.median((ml_sm - base_g)[mid_mask]))
+    offset_r = float(np.median((mr_sm - base_g)[mid_mask]))
+    residual_l = ml_sm - (base_g + offset_l)
+    residual_r = mr_sm - (base_g + offset_r)
+
+    bass_l = _target_synthesis_band_median(
+        residual_l,
+        fg,
+        bass_ref_lo_hz,
+        bass_ref_hi_hz,
+    )
+    bass_r = _target_synthesis_band_median(
+        residual_r,
+        fg,
+        bass_ref_lo_hz,
+        bass_ref_hi_hz,
+    )
+    bass_residual = (
+        0.5 * (float(bass_l) + float(bass_r))
+        if np.isfinite(bass_l) and np.isfinite(bass_r)
+        else 0.0
+    )
+    channel_disagreement = (
+        abs(float(bass_l) - float(bass_r))
+        if np.isfinite(bass_l) and np.isfinite(bass_r)
+        else float(_SYNTH_CHANNEL_DISAGREE_FULL_DB)
+    )
+    if stereo_input:
+        channel_confidence = float(
+            np.clip(
+                1.0 - channel_disagreement / float(_SYNTH_CHANNEL_DISAGREE_FULL_DB),
+                0.0,
+                1.0,
+            )
+        )
+    else:
+        channel_confidence = 0.50
+
+    tilt_l = _slope_db_oct(fg, residual_l, f_lo=200.0, f_hi=1000.0)
+    tilt_r = _slope_db_oct(fg, residual_r, f_lo=200.0, f_hi=1000.0)
+    tilt_residual = (
+        0.5 * (float(tilt_l) + float(tilt_r))
+        if np.isfinite(tilt_l) and np.isfinite(tilt_r)
+        else 0.0
+    )
+    hf_l = _slope_db_oct(fg, residual_l, f_lo=2000.0, f_hi=_SYNTH_HF_SLOPE_CAP_HZ)
+    hf_r = _slope_db_oct(fg, residual_r, f_lo=2000.0, f_hi=_SYNTH_HF_SLOPE_CAP_HZ)
+    hf_residual = (
+        0.5 * (float(hf_l) + float(hf_r))
+        if np.isfinite(hf_l) and np.isfinite(hf_r)
+        else 0.0
+    )
+    hf_slope_disagreement = (
+        abs(float(hf_l) - float(hf_r))
+        if np.isfinite(hf_l) and np.isfinite(hf_r)
+        else float("inf")
+    )
+    hf_channel_confidence = float(
+        np.clip(1.0 - hf_slope_disagreement / 1.0, 0.0, 1.0)
+    )
+    hf_confidence = float(
+        channel_confidence
+        * hf_channel_confidence
+        * _target_synthesis_hf_snr_confidence(measurements)
+    )
+
+    return {
+        "fg": fg,
+        "base_g": base_g,
+        "residual_l": residual_l,
+        "residual_r": residual_r,
+        "bass_residual_db": float(bass_residual),
+        "bass_residual_l_db": float(bass_l),
+        "bass_residual_r_db": float(bass_r),
+        "tilt_residual_db_per_oct": float(tilt_residual),
+        "hf_residual_db_per_oct": float(hf_residual),
+        "channel_disagreement_db": float(channel_disagreement),
+        "channel_confidence": float(channel_confidence),
+        "hf_confidence": float(hf_confidence),
+        "stereo_input": bool(stereo_input),
+        "rt60_guard": _adaptive_rt60_guard(measurements),
+    }
 
 
 def _target_synthesis_hf_slope_hi_hz(hf_break_hz: float) -> float | None:
@@ -224,10 +426,12 @@ def _target_synthesis_hf_slope_hi_hz(hf_break_hz: float) -> float | None:
 def _target_synthesis_build_work(
     *,
     f_work: np.ndarray,
-    fg: np.ndarray,
-    bass_excess_db: float,
-    meas_slope: float,
-    hf_slope: float,
+    bass_residual_db: float,
+    tilt_residual_db_per_oct: float,
+    hf_residual_db_per_oct: float,
+    channel_confidence: float,
+    hf_confidence: float,
+    rt60_guard: dict,
     bass_comp_ref_db: float,
     bass_ref_lo_hz: float,
     hf_break_hz: float,
@@ -235,61 +439,102 @@ def _target_synthesis_build_work(
     tilt_frac: float,
     hf_comp_frac: float,
 ) -> np.ndarray:
-    m_out = _SYNTH_BASE_MAGS[1:].copy()
-
-    bass_adj = (
+    base = _SYNTH_BASE_MAGS[1:].copy()
+    bass_adj_db = (
         -float(bass_frac)
-        * np.tanh(bass_excess_db / float(bass_comp_ref_db))
+        * np.tanh(float(bass_residual_db) / float(bass_comp_ref_db))
         * float(bass_comp_ref_db)
     )
-    if np.isfinite(bass_adj) and abs(bass_adj) > 1e-4:
-        log_lo = np.log10(max(float(bass_ref_lo_hz), 1.0))
-        log_hi = np.log10(400.0)
-        log_f = np.log10(np.maximum(f_work, 1.0))
-        shelf_w = np.where(
-            f_work <= float(bass_ref_lo_hz),
-            1.0,
-            np.where(
-                f_work >= 400.0,
-                0.0,
-                1.0 - (log_f - log_lo) / (log_hi - log_lo),
-            ),
-        )
-        shelf_w = np.clip(shelf_w, 0.0, 1.0)
-        m_out += float(bass_adj) * shelf_w
+    if not np.isfinite(bass_adj_db):
+        bass_adj_db = 0.0
+    bass_adj_db *= float(np.clip(channel_confidence, 0.0, 1.0))
 
-    if np.isfinite(meas_slope) and np.isfinite(_SYNTH_HARMAN6_SLOPE_DB_OCT):
-        tilt_adj_per_oct = float(tilt_frac) * float(meas_slope - _SYNTH_HARMAN6_SLOPE_DB_OCT)
-        if abs(tilt_adj_per_oct) > 1e-4:
-            log2_f_over_1k = np.log2(np.maximum(f_work, 1.0) / 1000.0)
-            m_out += tilt_adj_per_oct * log2_f_over_1k
-
-    harman6_hf_ref = np.interp(fg, _SYNTH_FREQS[1:], _SYNTH_BASE_MAGS[1:])
-    hf_slope_hi_hz = _target_synthesis_hf_slope_hi_hz(float(hf_break_hz))
-    harman6_hf_slope = (
-        _slope_db_oct(
-            fg,
-            harman6_hf_ref,
-            f_lo=float(hf_break_hz),
-            f_hi=float(hf_slope_hi_hz),
-        )
-        if hf_slope_hi_hz is not None else float("nan")
+    rt60_confidence = float(
+        np.clip(float((rt60_guard or {}).get("confidence", 0.0) or 0.0), 0.0, 1.0)
     )
-    if np.isfinite(hf_slope) and np.isfinite(harman6_hf_slope) and abs(hf_slope - harman6_hf_slope) > 0.5:
-        hf_excess_slope = float(hf_slope - harman6_hf_slope)
-        hf_adj_per_oct = float(hf_comp_frac) * hf_excess_slope
-        if abs(hf_adj_per_oct) > 1e-4:
-            mask_hf = f_work > float(hf_break_hz)
-            # Cap the log2 accumulation at the slope estimation ceiling so the
-            # adjustment becomes a shelf above _SYNTH_HF_SLOPE_CAP_HZ rather
-            # than continuing to grow with frequency.
-            log2_cap = np.log2(float(hf_slope_hi_hz) / float(hf_break_hz))
-            log2_f_over_break = np.minimum(
-                np.log2(np.maximum(f_work[mask_hf], 1.0) / float(hf_break_hz)),
-                log2_cap,
+    rt60_ratio = float((rt60_guard or {}).get("bass_to_mid_ratio", float("nan")))
+    if bass_adj_db > 0.0 and rt60_confidence > 0.0 and np.isfinite(rt60_ratio):
+        decay_guard = _interp_clamped(rt60_ratio, 0.9, 1.5, 1.0, 0.0)
+        bass_adj_db *= float(
+            (1.0 - rt60_confidence)
+            + rt60_confidence * float(decay_guard)
+        )
+
+    log_lo = np.log10(max(float(bass_ref_lo_hz), 1.0))
+    log_hi = np.log10(float(_SYNTH_ADAPT_MAX_HZ))
+    log_f = np.log10(np.maximum(f_work, 1.0))
+    shelf_w = np.where(
+        f_work <= float(bass_ref_lo_hz),
+        1.0,
+        np.where(
+            f_work >= float(_SYNTH_ADAPT_MAX_HZ),
+            0.0,
+            1.0 - (log_f - log_lo) / (log_hi - log_lo),
+        ),
+    )
+    shelf_w = np.clip(shelf_w, 0.0, 1.0)
+    bass_delta = float(bass_adj_db) * shelf_w
+
+    tilt_per_oct = (
+        float(tilt_frac)
+        * float(tilt_residual_db_per_oct)
+        * float(np.clip(channel_confidence, 0.0, 1.0))
+    )
+    if not np.isfinite(tilt_per_oct):
+        tilt_per_oct = 0.0
+    tilt_per_oct = float(np.clip(tilt_per_oct, -0.25, 0.25))
+    tilt_delta = tilt_per_oct * np.log2(
+        np.maximum(f_work, 1.0) / float(_SYNTH_ADAPT_MAX_HZ)
+    )
+    tilt_delta *= np.where(
+        f_work <= float(_SYNTH_ADAPT_FADE_START_HZ),
+        1.0,
+        np.clip(
+            (
+                np.log(float(_SYNTH_ADAPT_MAX_HZ))
+                - np.log(np.maximum(f_work, 1.0))
             )
-            m_out[mask_hf] += hf_adj_per_oct * log2_f_over_break
-    return m_out
+            / (
+                np.log(float(_SYNTH_ADAPT_MAX_HZ))
+                - np.log(float(_SYNTH_ADAPT_FADE_START_HZ))
+            ),
+            0.0,
+            1.0,
+        ),
+    )
+    tilt_delta = np.where(f_work < float(_SYNTH_ADAPT_MAX_HZ), tilt_delta, 0.0)
+    low_delta = np.clip(
+        bass_delta + tilt_delta,
+        -float(_SYNTH_BASS_CUT_LIMIT_DB) * shelf_w,
+        float(_SYNTH_BASS_BOOST_LIMIT_DB) * shelf_w,
+    )
+
+    hf_delta = np.zeros_like(f_work, dtype=float)
+    hf_slope_hi_hz = _target_synthesis_hf_slope_hi_hz(float(hf_break_hz))
+    if (
+        float(hf_comp_frac) > 0.0
+        and float(hf_confidence) > 0.0
+        and hf_slope_hi_hz is not None
+        and np.isfinite(hf_residual_db_per_oct)
+    ):
+        mask_hf = f_work > float(hf_break_hz)
+        hf_per_oct = (
+            float(hf_comp_frac)
+            * float(hf_residual_db_per_oct)
+            * float(np.clip(hf_confidence, 0.0, 1.0))
+        )
+        log2_cap = np.log2(float(hf_slope_hi_hz) / float(hf_break_hz))
+        log2_f_over_break = np.minimum(
+            np.log2(np.maximum(f_work[mask_hf], 1.0) / float(hf_break_hz)),
+            log2_cap,
+        )
+        hf_delta[mask_hf] = np.clip(
+            hf_per_oct * log2_f_over_break,
+            -float(_SYNTH_HF_DELTA_LIMIT_DB),
+            float(_SYNTH_HF_DELTA_LIMIT_DB),
+        )
+
+    return base + low_delta + hf_delta
 
 
 def synthesize_target_from_measurements(
@@ -309,78 +554,37 @@ def synthesize_target_from_measurements(
 ):
     """Synthesize a custom target curve from L/R room measurements.
 
-    Derives a Harman6-based target adjusted for the room's bass buildup,
-    broadband tilt, and HF roll-off.
+    Derives a Harman6-based target from broad, base-relative room evidence.
+    Adaptation is confidence-weighted across channels, bounded in the modal
+    region, and does not use RT60 to create tonal changes by itself.
 
     Returns (freq_array, mag_array) on the standard 20-point grid,
     or None if inputs are insufficient.
     """
-    fl, ml = _target_synthesis_to_arr(f_l), _target_synthesis_to_arr(m_l)
-    fr, mr = _target_synthesis_to_arr(f_r), _target_synthesis_to_arr(m_r)
-
-    l_ok = bool(fl.size >= 32 and ml.size == fl.size)
-    r_ok = bool(fr.size >= 32 and mr.size == fr.size)
-    if not l_ok and not r_ok:
-        return None
-    if not l_ok:
-        fl, ml = fr.copy(), mr.copy()
-    if not r_ok:
-        fr, mr = fl.copy(), ml.copy()
-
-    fl, ml = _target_synthesis_sort_finite(fl, ml)
-    fr, mr = _target_synthesis_sort_finite(fr, mr)
-    if fl.size < 32 or fr.size < 32:
-        return None
-
-    # Common frequency range
-    f_lo = max(20., float(np.min(fl)), float(np.min(fr)))
-    f_hi = min(20000., float(np.max(fl)), float(np.max(fr)))
-    if not np.isfinite(f_lo) or not np.isfinite(f_hi) or f_hi <= f_lo * 1.5:
-        return None
-
-    # 320-pt log grid, average L+R in dB
-    fg = np.logspace(np.log10(f_lo), np.log10(f_hi), 320)
-    m_avg = 0.5 * (np.interp(fg, fl, ml) + np.interp(fg, fr, mr))
-
-    # freq-dep smooth → macro spectral envelope
-    try:
-        m_sm = smooth_meas_freq_dep(m_avg, fg)
-    except (
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-    ):
-        m_sm = m_avg.copy()
-
-    # Band averages
-    bass_avg = _target_synthesis_band_mean(m_sm, fg, bass_ref_lo_hz, bass_ref_hi_hz)
-    mid_avg = _target_synthesis_band_mean(m_sm, fg, mid_ref_lo_hz, mid_ref_hi_hz)
-    bass_excess_db = float(bass_avg - mid_avg) if (np.isfinite(bass_avg) and np.isfinite(mid_avg)) else 0.0
-
-    # Slope estimates — use mid-range only to avoid bass-room-mode bias.
-    # HF slope is capped at _SYNTH_HF_SLOPE_CAP_HZ to exclude frequencies
-    # where measurement noise floor can dominate and create a falsely shallow
-    # (or even positive) slope that would inflate the target at high frequencies.
-    meas_slope = _slope_db_oct(fg, m_sm, f_lo=200.0, f_hi=1000.0)
-    hf_slope_hi_hz = _target_synthesis_hf_slope_hi_hz(float(hf_break_hz))
-    hf_slope = (
-        _slope_db_oct(fg, m_sm, f_lo=float(hf_break_hz), f_hi=float(hf_slope_hi_hz))
-        if hf_slope_hi_hz is not None else float("nan")
+    analysis = _target_synthesis_prepare_analysis(
+        f_l,
+        m_l,
+        f_r,
+        m_r,
+        smooth_oct=float(smooth_oct),
+        bass_ref_lo_hz=float(bass_ref_lo_hz),
+        bass_ref_hi_hz=float(bass_ref_hi_hz),
+        mid_ref_lo_hz=float(mid_ref_lo_hz),
+        mid_ref_hi_hz=float(mid_ref_hi_hz),
+        measurements=measurements,
     )
+    if analysis is None:
+        return None
 
-    f_work = _SYNTH_FREQS[1:].copy()   # 19 points: 20..20000 Hz
-    m_base = _target_synthesis_build_work(
+    f_work = _SYNTH_FREQS[1:].copy()
+    m_work = _target_synthesis_build_work(
         f_work=f_work,
-        fg=fg,
-        bass_excess_db=bass_excess_db,
-        meas_slope=meas_slope,
-        hf_slope=hf_slope,
+        bass_residual_db=float(analysis["bass_residual_db"]),
+        tilt_residual_db_per_oct=float(analysis["tilt_residual_db_per_oct"]),
+        hf_residual_db_per_oct=float(analysis["hf_residual_db_per_oct"]),
+        channel_confidence=float(analysis["channel_confidence"]),
+        hf_confidence=float(analysis["hf_confidence"]),
+        rt60_guard=dict(analysis["rt60_guard"]),
         bass_comp_ref_db=bass_comp_ref_db,
         bass_ref_lo_hz=bass_ref_lo_hz,
         hf_break_hz=hf_break_hz,
@@ -388,31 +592,6 @@ def synthesize_target_from_measurements(
         tilt_frac=float(tilt_comp_frac),
         hf_comp_frac=float(hf_comp_frac),
     )
-    rt60_bands = _combined_rt60_bands(measurements)
-    bass_eff, tilt_eff = _rt60_adjusted_compensation(
-        measurements,
-        bass_comp_frac=float(bass_comp_frac),
-        tilt_comp_frac=float(tilt_comp_frac),
-    )
-    if abs(bass_eff - float(bass_comp_frac)) > 1e-9 or abs(tilt_eff - float(tilt_comp_frac)) > 1e-9:
-        m_rt60 = _target_synthesis_build_work(
-            f_work=f_work,
-            fg=fg,
-            bass_excess_db=bass_excess_db,
-            meas_slope=meas_slope,
-            hf_slope=hf_slope,
-            bass_comp_ref_db=bass_comp_ref_db,
-            bass_ref_lo_hz=bass_ref_lo_hz,
-            hf_break_hz=hf_break_hz,
-            bass_frac=float(bass_eff),
-            tilt_frac=float(tilt_eff),
-            hf_comp_frac=float(hf_comp_frac),
-        )
-        delta_limit = _adaptive_rt60_delta_limit(rt60_bands)
-        rt60_delta = np.clip(m_rt60 - m_base, -delta_limit, delta_limit)
-        m_work = m_base + rt60_delta
-    else:
-        m_work = m_base
 
     # Clip and assemble output
     m_work = np.clip(m_work, -12., 14.)
@@ -422,3 +601,90 @@ def synthesize_target_from_measurements(
     out_mags[1:] = m_work
 
     return out_freqs, out_mags
+
+
+def adaptive_target_diagnostics(
+    f_l,
+    m_l,
+    f_r,
+    m_r,
+    *,
+    target_f,
+    target_m,
+    smooth_oct: float = 1.0 / 3.0,
+    bass_ref_lo_hz: float = 50.0,
+    bass_ref_hi_hz: float = 200.0,
+    mid_ref_lo_hz: float = 500.0,
+    mid_ref_hi_hz: float = 2000.0,
+    measurements: dict | None = None,
+) -> dict:
+    """Return compact, JSON-friendly evidence for an adaptive target."""
+    analysis = _target_synthesis_prepare_analysis(
+        f_l,
+        m_l,
+        f_r,
+        m_r,
+        smooth_oct=float(smooth_oct),
+        bass_ref_lo_hz=float(bass_ref_lo_hz),
+        bass_ref_hi_hz=float(bass_ref_hi_hz),
+        mid_ref_lo_hz=float(mid_ref_lo_hz),
+        mid_ref_hi_hz=float(mid_ref_hi_hz),
+        measurements=measurements,
+    )
+    if analysis is None:
+        return {
+            "policy_version": int(_SYNTH_POLICY_VERSION),
+            "valid": False,
+            "fallback_reason": "insufficient_measurement",
+        }
+
+    tf = _target_synthesis_to_arr(target_f)
+    tm = _target_synthesis_to_arr(target_m)
+    if tf.size != tm.size or tf.size < 2:
+        return {
+            "policy_version": int(_SYNTH_POLICY_VERSION),
+            "valid": False,
+            "fallback_reason": "invalid_target",
+        }
+    tf, tm = _target_synthesis_sort_finite(tf, tm)
+    base_t = np.interp(tf, _SYNTH_FREQS[1:], _SYNTH_BASE_MAGS[1:])
+    target_delta = tm - base_t
+    fg = np.asarray(analysis["fg"], dtype=float)
+    target_delta_g = np.interp(fg, tf, target_delta)
+    fit_mask = (fg >= 20.0) & (fg <= float(_SYNTH_ADAPT_MAX_HZ))
+    fit_l = np.asarray(analysis["residual_l"], dtype=float) - target_delta_g
+    fit_r = np.asarray(analysis["residual_r"], dtype=float) - target_delta_g
+    fit_rms_db = 0.5 * (
+        float(np.sqrt(np.mean(np.square(fit_l[fit_mask]))))
+        + float(np.sqrt(np.mean(np.square(fit_r[fit_mask]))))
+    )
+    channel_confidence = float(analysis["channel_confidence"])
+    rt60_guard = dict(analysis["rt60_guard"])
+    rt60_ratio = float(rt60_guard.get("bass_to_mid_ratio", float("nan")))
+    if channel_confidence <= 0.05:
+        fallback_reason = "channel_disagreement"
+    elif float(np.max(np.abs(target_delta))) <= 0.05:
+        fallback_reason = "base_target_preserved"
+    else:
+        fallback_reason = ""
+
+    return {
+        "policy_version": int(_SYNTH_POLICY_VERSION),
+        "valid": True,
+        "adaptive_applied": bool(float(np.max(np.abs(target_delta))) > 0.05),
+        "fallback_reason": str(fallback_reason),
+        "fit_rms_db": float(fit_rms_db),
+        "bass_residual_db": float(analysis["bass_residual_db"]),
+        "bass_residual_l_db": float(analysis["bass_residual_l_db"]),
+        "bass_residual_r_db": float(analysis["bass_residual_r_db"]),
+        "tilt_residual_db_per_oct": float(analysis["tilt_residual_db_per_oct"]),
+        "channel_disagreement_db": float(analysis["channel_disagreement_db"]),
+        "channel_confidence": float(channel_confidence),
+        "hf_confidence": float(analysis["hf_confidence"]),
+        "rt60_confidence": float(rt60_guard.get("confidence", 0.0) or 0.0),
+        "rt60_bass_to_mid_ratio": float(rt60_ratio) if np.isfinite(rt60_ratio) else None,
+        "rt60_reason": str(rt60_guard.get("reason", "") or ""),
+        "target_delta_min_db": float(np.min(target_delta)),
+        "target_delta_max_db": float(np.max(target_delta)),
+        "target_delta_abs_max_db": float(np.max(np.abs(target_delta))),
+    }

@@ -82,26 +82,8 @@ def _auto_safe_int(value, default: int = 0) -> int:
         return int(default)
 
 def _auto_output_tilt_bounds(base_data: dict | None) -> tuple[float, float]:
-    try:
-        auto_target_mode = (
-            str((base_data or {}).get("auto_target_mode", "") or "").strip().lower()
-        )
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-    ):
-        auto_target_mode = ""
-    if auto_target_mode == "adaptive":
-        return 0.0, 2.0
-    return -2.0, 2.0
+    del base_data
+    return 0.0, 0.0
 
 def _clip(v, lo, hi):
     vlo = _auto_safe_float(lo, 0.0)

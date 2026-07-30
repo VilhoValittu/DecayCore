@@ -24,6 +24,7 @@ import scipy.fft
 import scipy.ndimage
 
 from ...dsp.hybrid_iir import peaking_eq_response
+from ...dsp.smoothing import apply_smoothing_std
 from ..plot_common import (
     GD_SMOOTH_OCT,
     PHASE_SMOOTH_OCT,
@@ -34,6 +35,11 @@ from ..plot_common import (
     remove_ir_peak_delay,
     smooth_complex,
 )
+
+_SYSTEM_PHASE_SMOOTH_LOW_OCT = 1.0 / 2.0
+_SYSTEM_PHASE_SMOOTH_HIGH_OCT = 1.0
+_SYSTEM_PHASE_SMOOTH_BLEND_LO_HZ = 300.0
+_SYSTEM_PHASE_SMOOTH_BLEND_HI_HZ = 1000.0
 
 _PLOT_EXCEPTIONS = (
     RuntimeError,
@@ -51,6 +57,16 @@ _PLOT_EXCEPTIONS = (
 
 
 @dataclass(frozen=True)
+class HybridIIRPlotCut:
+    """Display-ready response and parameters for one active modal cut."""
+
+    freq_hz: float
+    q: float
+    gain_db: float
+    response_db: np.ndarray
+
+
+@dataclass(frozen=True)
 class ChannelPlotData:
     """Finite, display-ready curves for one output channel."""
 
@@ -64,6 +80,11 @@ class ChannelPlotData:
     filter_compensated_db: np.ndarray
     filter_phase_deg: np.ndarray
     filter_group_delay_ms: np.ndarray
+    system_phase_before_deg: np.ndarray
+    system_phase_after_deg: np.ndarray
+    system_group_delay_before_ms: np.ndarray
+    system_group_delay_after_ms: np.ndarray
+    phase_display_max_hz: float
     confidence: np.ndarray | None
     afdw_bw_oct: np.ndarray | None
     target_freq_hz: np.ndarray
@@ -75,6 +96,7 @@ class ChannelPlotData:
     filter_delay_ms: float
     auto_global_gain_db: float
     auto_headroom_db: float
+    hybrid_iir_cuts: tuple[HybridIIRPlotCut, ...]
 
     @property
     def full_max_hz(self) -> float:
@@ -95,19 +117,164 @@ def _build_hybrid_iir_response(
     fs: float,
 ) -> np.ndarray:
     """Return the stored hybrid-IIR response, or unity when unavailable."""
+    response, _ = _build_hybrid_iir_plot_cuts(
+        biquads,
+        f_lin,
+        fs,
+        enabled=True,
+    )
+    return response
+
+
+def _build_hybrid_iir_plot_cuts(
+    biquads: list[dict],
+    f_lin: np.ndarray,
+    fs: float,
+    *,
+    enabled: bool,
+) -> tuple[np.ndarray, tuple[HybridIIRPlotCut, ...]]:
+    """Return the active cumulative response and each valid modal cut."""
     response = np.ones(len(f_lin), dtype=complex)
+    cuts: list[HybridIIRPlotCut] = []
+    if not enabled:
+        return response, ()
+
     for biquad in biquads or []:
         try:
-            response *= peaking_eq_response(
-                f_lin,
-                fs,
-                float(biquad["freq"]),
-                float(biquad["q"]),
-                float(biquad["gain"]),
+            freq_hz = float(biquad["freq"])
+            q = float(biquad["q"])
+            gain_db = float(biquad["gain"])
+            if not (
+                np.isfinite(freq_hz)
+                and np.isfinite(q)
+                and np.isfinite(gain_db)
+                and 0.0 < freq_hz < 0.5 * float(fs)
+                and q > 0.0
+                and gain_db < 0.0
+            ):
+                continue
+            cut_response = np.asarray(
+                peaking_eq_response(f_lin, fs, freq_hz, q, gain_db),
+                dtype=complex,
             )
+            if cut_response.shape != f_lin.shape or not np.all(np.isfinite(cut_response)):
+                continue
         except _PLOT_EXCEPTIONS:
             continue
-    return response
+        response *= cut_response
+        cuts.append(
+            HybridIIRPlotCut(
+                freq_hz=freq_hz,
+                q=q,
+                gain_db=gain_db,
+                response_db=20.0 * np.log10(np.abs(cut_response) + 1e-12),
+            )
+        )
+    return response, tuple(cuts)
+
+
+def _phase_bulk_delay_ms(freqs: np.ndarray, spec: np.ndarray) -> float:
+    f = np.asarray(freqs, dtype=float)
+    phase = np.unwrap(np.angle(np.asarray(spec, dtype=complex)))
+    ref = np.isfinite(f) & np.isfinite(phase) & (f >= 1000.0) & (f <= 10000.0)
+    if int(np.count_nonzero(ref)) < 32:
+        ref = np.isfinite(f) & np.isfinite(phase) & (f >= 300.0) & (f <= 1000.0)
+    if int(np.count_nonzero(ref)) < 8:
+        return 0.0
+    x = f[ref]
+    y = phase[ref]
+    x_centered = x - float(np.mean(x))
+    denominator = float(np.dot(x_centered, x_centered))
+    if denominator <= 1e-12:
+        return 0.0
+    slope_rad_per_hz = float(
+        np.dot(x_centered, y - float(np.mean(y))) / denominator
+    )
+    delay_ms = -slope_rad_per_hz * 1000.0 / (2.0 * np.pi)
+    return float(delay_ms) if np.isfinite(delay_ms) else 0.0
+
+
+def _system_phase_for_display(freqs: np.ndarray, spec: np.ndarray) -> np.ndarray:
+    """Return a strongly smoothed, bulk-delay-normalized unwrapped phase trend."""
+    f = np.asarray(freqs, dtype=float)
+    response = np.asarray(spec, dtype=complex)
+    if f.size < 16 or response.size != f.size:
+        return np.zeros_like(f)
+
+    delay_ms = _phase_bulk_delay_ms(f, response)
+    delay_normalized = response * np.exp(
+        1j * 2.0 * np.pi * f * (delay_ms / 1000.0)
+    )
+    phase_unwrapped_deg = np.rad2deg(np.unwrap(np.angle(delay_normalized)))
+    zeros = np.zeros_like(f)
+    _, phase_low = apply_smoothing_std(
+        f,
+        zeros,
+        phase_unwrapped_deg,
+        _SYSTEM_PHASE_SMOOTH_LOW_OCT,
+    )
+    _, phase_high = apply_smoothing_std(
+        f,
+        zeros,
+        phase_unwrapped_deg,
+        _SYSTEM_PHASE_SMOOTH_HIGH_OCT,
+    )
+    log_f = np.log(np.maximum(f, 1.0))
+    log_lo = np.log(_SYSTEM_PHASE_SMOOTH_BLEND_LO_HZ)
+    log_hi = np.log(_SYSTEM_PHASE_SMOOTH_BLEND_HI_HZ)
+    blend = np.clip((log_f - log_lo) / (log_hi - log_lo), 0.0, 1.0)
+    phase_smoothed_deg = (1.0 - blend) * phase_low + blend * phase_high
+    return np.asarray(phase_smoothed_deg, dtype=float)
+
+
+def _align_system_phase_pair_for_display(
+    freqs: np.ndarray,
+    before_deg: np.ndarray,
+    after_deg: np.ndarray,
+    *,
+    phase_max_hz: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    f = np.asarray(freqs, dtype=float)
+    before = np.asarray(before_deg, dtype=float).copy()
+    after = np.asarray(after_deg, dtype=float).copy()
+    ref = (
+        np.isfinite(f)
+        & np.isfinite(before)
+        & np.isfinite(after)
+        & (f >= max(10.0, 0.75 * float(phase_max_hz)))
+        & (f <= float(phase_max_hz))
+    )
+    if int(np.count_nonzero(ref)) < 8:
+        ref = (
+            np.isfinite(f)
+            & np.isfinite(before)
+            & np.isfinite(after)
+            & (f >= 20.0)
+            & (f <= float(phase_max_hz))
+        )
+    if not np.any(ref):
+        return before, after
+    before_ref = float(np.median(before[ref]))
+    after_ref = float(np.median(after[ref]))
+    after += 360.0 * round((before_ref - after_ref) / 360.0)
+    return before - before_ref, after - before_ref
+
+
+def _phase_display_max_hz(stats: dict, fs_hz: float) -> float:
+    full_max_hz = float(min(20000.0, 0.5 * float(fs_hz)))
+    for key in (
+        "phase_limit_hz",
+        "phase_realized_band_hi_hz",
+        "phase_limit",
+        "phase_c_max",
+    ):
+        try:
+            value = float(stats.get(key, np.nan))
+        except _PLOT_EXCEPTIONS:
+            continue
+        if np.isfinite(value) and value > 20.0:
+            return float(np.clip(value, 20.0, full_max_hz))
+    return float(min(1000.0, full_max_hz))
 
 
 def _prediction_plot_fft_context(*, filt_ir, fs, target_stats) -> dict:
@@ -339,18 +506,26 @@ def compute_channel_plot_data(
     elif np.isfinite(auto_global_gain_db):
         level_compensation_db = -auto_global_gain_db
 
-    phase_interp = np.interp(f_lin, orig_freqs, orig_phases)
-    h_iir = _build_hybrid_iir_response(
-        stats.get("hybrid_iir_biquads", []),
+    orig_phase_unwrapped_deg = np.rad2deg(
+        np.unwrap(np.deg2rad(np.asarray(orig_phases, dtype=float)))
+    )
+    phase_interp = np.interp(f_lin, orig_freqs, orig_phase_unwrapped_deg)
+    hybrid_iir_biquads = stats.get("hybrid_iir_biquads", [])
+    h_iir, hybrid_iir_cuts = _build_hybrid_iir_plot_cuts(
+        hybrid_iir_biquads,
         f_lin,
         float(fs),
+        enabled=bool(stats.get("hybrid_iir_enabled", bool(hybrid_iir_biquads))),
     )
-    total_spec = (
-        10 ** (np.asarray(measured_smoothed, dtype=float) / 20.0)
-        * np.exp(1j * np.deg2rad(phase_interp))
-        * h_filt
-        * h_iir
+    measured_spec = 10 ** (np.asarray(measured_smoothed, dtype=float) / 20.0) * np.exp(
+        1j * np.deg2rad(phase_interp)
     )
+    total_spec = measured_spec * h_filt * h_iir
+    measurement_delay_ms = _phase_bulk_delay_ms(f_lin, measured_spec)
+    measurement_timing_spec = measured_spec * np.exp(
+        1j * 2.0 * np.pi * f_lin * (measurement_delay_ms / 1000.0)
+    )
+    corrected_timing_spec = measurement_timing_spec * h_filt_display * h_iir
 
     if direct_pred_export is not None:
         predicted_exported = np.asarray(direct_pred_export, dtype=float)
@@ -371,6 +546,33 @@ def compute_channel_plot_data(
     filter_phase_deg = (np.rad2deg(np.angle(phase_smoothed)) + 180.0) % 360.0 - 180.0
     gd_smoothed = smooth_complex(f_lin, h_filt_display, GD_SMOOTH_OCT)
     filter_group_delay_ms = calculate_clean_gd(f_lin, gd_smoothed)
+    phase_display_max_hz = _phase_display_max_hz(stats, float(fs))
+    system_phase_before_deg, system_phase_after_deg = (
+        _align_system_phase_pair_for_display(
+            f_lin,
+            _system_phase_for_display(f_lin, measurement_timing_spec),
+            _system_phase_for_display(f_lin, corrected_timing_spec),
+            phase_max_hz=phase_display_max_hz,
+        )
+    )
+    system_before_gd_spec = smooth_complex(
+        f_lin,
+        measurement_timing_spec,
+        GD_SMOOTH_OCT,
+    )
+    system_after_gd_spec = smooth_complex(
+        f_lin,
+        corrected_timing_spec,
+        GD_SMOOTH_OCT,
+    )
+    system_group_delay_before_ms = calculate_clean_gd(
+        f_lin,
+        system_before_gd_spec,
+    )
+    system_group_delay_after_ms = calculate_clean_gd(
+        f_lin,
+        system_after_gd_spec,
+    )
     filter_exported_db = 20.0 * np.log10(np.abs(h_filt) + 1e-12)
     filter_compensated_db = filter_exported_db + float(level_compensation_db)
 
@@ -429,6 +631,27 @@ def compute_channel_plot_data(
             f_lin,
             filter_group_delay_ms,
         ),
+        system_phase_before_deg=np.interp(
+            display_freq_hz,
+            f_lin,
+            system_phase_before_deg,
+        ),
+        system_phase_after_deg=np.interp(
+            display_freq_hz,
+            f_lin,
+            system_phase_after_deg,
+        ),
+        system_group_delay_before_ms=np.interp(
+            display_freq_hz,
+            f_lin,
+            system_group_delay_before_ms,
+        ),
+        system_group_delay_after_ms=np.interp(
+            display_freq_hz,
+            f_lin,
+            system_group_delay_after_ms,
+        ),
+        phase_display_max_hz=phase_display_max_hz,
         confidence=confidence,
         afdw_bw_oct=_afdw_curve_on_display_grid(
             target_stats=stats,
@@ -455,12 +678,29 @@ def compute_channel_plot_data(
         filter_delay_ms=float(fft_ctx["filt_delay_ms"]),
         auto_global_gain_db=auto_global_gain_db,
         auto_headroom_db=auto_headroom_db,
+        hybrid_iir_cuts=tuple(
+            HybridIIRPlotCut(
+                freq_hz=cut.freq_hz,
+                q=cut.q,
+                gain_db=cut.gain_db,
+                response_db=np.interp(
+                    display_freq_hz,
+                    f_lin,
+                    cut.response_db,
+                ),
+            )
+            for cut in hybrid_iir_cuts
+        ),
     )
 
 
 __all__ = [
     "ChannelPlotData",
+    "HybridIIRPlotCut",
     "_prediction_plot_fft_context",
     "_resolve_magnitude_display_offset_db",
+    "_align_system_phase_pair_for_display",
+    "_phase_display_max_hz",
+    "_system_phase_for_display",
     "compute_channel_plot_data",
 ]

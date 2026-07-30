@@ -173,6 +173,7 @@ DEFAULT_CONFIG_ITEMS: tuple[tuple[str, Any], ...] = (
     ("mag_c_min", 10.0),
     ("mag_c_max", 200.0),
     ("max_boost", 5.0),
+    ("min_boost_peak_db", 2.0),
     ("lvl_mode", LVL_MODE_AUTO),
     ("lvl_algo", LVL_ALGO_MEDIAN),
     ("lvl_manual_db", 0.0),
@@ -291,6 +292,7 @@ AUTO_MODE_DEFAULT_CFG_TO_UI: dict[str, str] = {
     "mag_c_min": "mag_c_min",
     "mag_c_max": "mag_c_max",
     "max_boost_db": "max_boost",
+    "min_boost_peak_db": "min_boost_peak_db",
     "max_cut_db": "max_cut_db",
     "phase_limit": "phase_limit",
     "reg_strength": "reg_strength",
@@ -345,73 +347,208 @@ AUTO_MODE_DEFAULT_CFG_TO_UI: dict[str, str] = {
 }
 
 UI_PIN_KEYS: tuple[str, ...] = (
-    "mode", "auto_goal", "auto_target_mode", "auto_mode_workers", "fs", "taps", "filter_type", "mixed_freq", "gain", "hc_mode",
-    "bass_integration_enable", "bass_integration_mode", "bass_integration_profile", "bass_integration_sub_combine_mode", "avr_crossover_hz",
-    "bass_integration_sub_delay_ms", "bass_integration_sub_array_delay_ms",
-    "bass_integration_sub1_delay_ms", "bass_integration_sub2_delay_ms",
-    "bass_integration_main_l_delay_ms", "bass_integration_main_r_delay_ms",
-    "bass_integration_sub_polarity_invert", "bass_integration_sub_gain_trim_db",
-    "bass_integration_alignment_auto_applied", "bass_integration_alignment_reason",
-    "bass_integration_allpass_auto_enable", "bass_integration_allpass_freq_hz", "bass_integration_allpass_q", "bass_integration_allpass_auto_applied",
-    "sub_crossover_hz", "sub_crossover_slope", "sub_crossover_manual_override", "direct_dac_sub_lpf_hz", "sub_hpf_freq", "sub_hpf_slope",
-    "mag_c_min", "mag_c_max", "max_boost", "max_cut_db", "max_slope_db_per_oct",
-    "max_slope_boost_db_per_oct", "max_slope_cut_db_per_oct", "phase_limit", "mag_correct",
-    "excess_phase_strength", "low_freq_full_correction_hz", "high_freq_no_correction_hz",
-    "mixed_phase_budget_lf_deg", "mixed_phase_budget_hf_deg",
-    "phase_budget_mode", "linear_excess_strength",
-    "phase_conf_gain_floor", "phase_conf_gain_power",
-    "phase_corr_clamp_lf_deg", "phase_corr_clamp_hf_deg", "max_excess_delay_cycles",
-    "enable_ir_pre_energy_guard", "pre_energy_ratio_max", "pre_energy_guard_strength",
-    "max_pre_ringing_db", "max_excess_delay_ms", "gd_grad_limit_ms_per_oct",
-    "ir_anchor_mode", "min_causal_ms", "auto_asym_left_ratio", "auto_asym_left_max_ms",
-    "lvl_mode", "reg_strength", "normalize_opt", "align_opt",
-    "stereo_link", "stereo_link_strategy", "exc_prot", "exc_freq", "low_bass_cut_hz", "low_bass_cut_enable", "hpf_enable", "hpf_freq",
-    "hpf_slope", "multi_rate_opt", "multi_rate_ultra_high_opt", "ir_window", "ir_window_left", "ir_window_right", "ir_export_window_mode", "ir_window_mode",
-    "ir_export_window_shape", "ir_export_tukey_alpha",
+    "mode",
+    "auto_goal",
+    "auto_target_mode",
+    "auto_mode_workers",
+    "fs",
+    "taps",
+    "filter_type",
+    "mixed_freq",
+    "gain",
+    "hc_mode",
+    "bass_integration_enable",
+    "bass_integration_mode",
+    "bass_integration_profile",
+    "bass_integration_sub_combine_mode",
+    "avr_crossover_hz",
+    "bass_integration_sub_delay_ms",
+    "bass_integration_sub_array_delay_ms",
+    "bass_integration_sub1_delay_ms",
+    "bass_integration_sub2_delay_ms",
+    "bass_integration_main_l_delay_ms",
+    "bass_integration_main_r_delay_ms",
+    "bass_integration_sub_polarity_invert",
+    "bass_integration_sub_gain_trim_db",
+    "bass_integration_alignment_auto_applied",
+    "bass_integration_alignment_reason",
+    "bass_integration_allpass_auto_enable",
+    "bass_integration_allpass_freq_hz",
+    "bass_integration_allpass_q",
+    "bass_integration_allpass_auto_applied",
+    "sub_crossover_hz",
+    "sub_crossover_slope",
+    "sub_crossover_manual_override",
+    "direct_dac_sub_lpf_hz",
+    "sub_hpf_freq",
+    "sub_hpf_slope",
+    "mag_c_min",
+    "mag_c_max",
+    "max_boost",
+    "min_boost_peak_db",
+    "max_cut_db",
+    "max_slope_db_per_oct",
+    "max_slope_boost_db_per_oct",
+    "max_slope_cut_db_per_oct",
+    "phase_limit",
+    "mag_correct",
+    "excess_phase_strength",
+    "low_freq_full_correction_hz",
+    "high_freq_no_correction_hz",
+    "mixed_phase_budget_lf_deg",
+    "mixed_phase_budget_hf_deg",
+    "phase_budget_mode",
+    "linear_excess_strength",
+    "phase_conf_gain_floor",
+    "phase_conf_gain_power",
+    "phase_corr_clamp_lf_deg",
+    "phase_corr_clamp_hf_deg",
+    "max_excess_delay_cycles",
+    "enable_ir_pre_energy_guard",
+    "pre_energy_ratio_max",
+    "pre_energy_guard_strength",
+    "max_pre_ringing_db",
+    "max_excess_delay_ms",
+    "gd_grad_limit_ms_per_oct",
+    "ir_anchor_mode",
+    "min_causal_ms",
+    "auto_asym_left_ratio",
+    "auto_asym_left_max_ms",
+    "lvl_mode",
+    "reg_strength",
+    "normalize_opt",
+    "align_opt",
+    "stereo_link",
+    "stereo_link_strategy",
+    "exc_prot",
+    "exc_freq",
+    "low_bass_cut_hz",
+    "low_bass_cut_enable",
+    "hpf_enable",
+    "hpf_freq",
+    "hpf_slope",
+    "multi_rate_opt",
+    "multi_rate_ultra_high_opt",
+    "ir_window",
+    "ir_window_left",
+    "ir_window_right",
+    "ir_export_window_mode",
+    "ir_window_mode",
+    "ir_export_window_shape",
+    "ir_export_tukey_alpha",
     "measurement_library_dir",
-    "local_path_l", "local_path_r",
-    "measurement_input_device", "measurement_output_device", "measurement_input_channel", "measurement_output_channel",
-    "measurement_samplerate", "measurement_sweep_start_hz", "measurement_sweep_end_hz",
-    "measurement_sweep_length_s", "measurement_output_gain_db", "measurement_dither_level_db", "measurement_source_path", "measurement_role",
+    "local_path_l",
+    "local_path_r",
+    "measurement_input_device",
+    "measurement_output_device",
+    "measurement_input_channel",
+    "measurement_output_channel",
+    "measurement_samplerate",
+    "measurement_sweep_start_hz",
+    "measurement_sweep_end_hz",
+    "measurement_sweep_length_s",
+    "measurement_output_gain_db",
+    "measurement_dither_level_db",
+    "measurement_source_path",
+    "measurement_role",
     "measurement_use_wasapi",
-    "measurement_mic_calibration_path", "measurement_mic_calibration_label",
-    "generated_measurement_l", "generated_measurement_r",
-    "local_path_l_main", "local_path_r_main", "local_path_l_sub", "local_path_r_sub",
-    "fmt", "layout", "lvl_manual_db",
-    "manual_target_tilt_db_per_oct", "output_tilt_source", "output_tilt_db_per_oct",
-    "lvl_min", "lvl_max", "lvl_algo", "fdw_cycles",
-    "trans_width", "smoothing_level", "filter_smooth", "plot_smoothing_level",
-    "bass_smooth_adaptive", "bass_smooth_hz", "bass_smooth_sigma_scale", "bass_smooth_conf_floor",
+    "measurement_mic_calibration_path",
+    "measurement_mic_calibration_label",
+    "generated_measurement_l",
+    "generated_measurement_r",
+    "local_path_l_main",
+    "local_path_r_main",
+    "local_path_l_sub",
+    "local_path_r_sub",
+    "fmt",
+    "layout",
+    "lvl_manual_db",
+    "manual_target_tilt_db_per_oct",
+    "output_tilt_source",
+    "output_tilt_db_per_oct",
+    "lvl_min",
+    "lvl_max",
+    "lvl_algo",
+    "fdw_cycles",
+    "trans_width",
+    "smoothing_level",
+    "filter_smooth",
+    "plot_smoothing_level",
+    "bass_smooth_adaptive",
+    "bass_smooth_hz",
+    "bass_smooth_sigma_scale",
+    "bass_smooth_conf_floor",
     "bass_adaptive_isolation_mode",
-    "bass_boost_cap_enable", "bass_boost_cap_hz", "bass_boost_cap_extra_db", "bass_boost_cap_conf_min",
-    "bass_boost_post_restore_enable", "bass_boost_post_restore_strength",
-    "enable_tdc", "tdc_strength", "tdc_max_reduction_db",
-    "tdc_slope_db_per_oct", "enable_afdw", "df_smoothing", "comparison_mode",
-    "bass_first_ai", "bass_first_mode_max_hz",
-    "enable_channel_specific_auto_policy", "channel_specific_policy_max_hz",
-    "hybrid_iir_enabled", "hybrid_iir_max_filters_per_channel",
-    "hybrid_iir_min_freq_hz", "hybrid_iir_max_freq_hz", "hybrid_iir_min_peak_db",
-    "hybrid_iir_min_q", "hybrid_iir_max_q", "hybrid_iir_max_cut_db",
-    "hybrid_iir_min_confidence", "hybrid_iir_min_gd_excess_ms",
+    "bass_boost_cap_enable",
+    "bass_boost_cap_hz",
+    "bass_boost_cap_extra_db",
+    "bass_boost_cap_conf_min",
+    "bass_boost_post_restore_enable",
+    "bass_boost_post_restore_strength",
+    "enable_tdc",
+    "tdc_strength",
+    "tdc_max_reduction_db",
+    "tdc_slope_db_per_oct",
+    "enable_afdw",
+    "df_smoothing",
+    "comparison_mode",
+    "bass_first_ai",
+    "bass_first_mode_max_hz",
+    "enable_channel_specific_auto_policy",
+    "channel_specific_policy_max_hz",
+    "hybrid_iir_enabled",
+    "hybrid_iir_max_filters_per_channel",
+    "hybrid_iir_min_freq_hz",
+    "hybrid_iir_max_freq_hz",
+    "hybrid_iir_min_peak_db",
+    "hybrid_iir_min_q",
+    "hybrid_iir_max_q",
+    "hybrid_iir_max_cut_db",
+    "hybrid_iir_min_confidence",
+    "hybrid_iir_min_gd_excess_ms",
     "local_path_house",
-    "conf_pull_floor", "conf_pull_ceil", "conf_pull_max_hz",
-    "conf_pull_gamma_cut", "conf_pull_gamma_boost",
+    "conf_pull_floor",
+    "conf_pull_ceil",
+    "conf_pull_max_hz",
+    "conf_pull_gamma_cut",
+    "conf_pull_gamma_boost",
     "conf_pull_conf_smooth_sigma",
-    "conf_pull_bass_floor_hz", "conf_pull_bass_floor_min",
-    "conf_pull_bass_boost_floor_hz", "conf_pull_bass_boost_floor_min",
+    "conf_pull_bass_floor_hz",
+    "conf_pull_bass_floor_min",
+    "conf_pull_bass_boost_floor_hz",
+    "conf_pull_bass_boost_floor_min",
     "conf_pull_bass_boost_restore",
-    "low_bass_cut_strength", "auto_optimize_low_bass_cut", "hc_custom_file",
-    "file_l", "file_r",
-    "file_l_main", "file_r_main", "file_l_sub", "file_r_sub",
+    "low_bass_cut_strength",
+    "auto_optimize_low_bass_cut",
+    "hc_custom_file",
+    "file_l",
+    "file_r",
+    "file_l_main",
+    "file_r_main",
+    "file_l_sub",
+    "file_r_sub",
     "unsafe_raw_dsp",
     CAMILLAFIR_AUTO_MODE,
 )
 
 LIST_BOOL_KEYS: tuple[str, ...] = (
-    "mag_correct", "normalize_opt", "align_opt", "multi_rate_opt", "multi_rate_ultra_high_opt",
-    "stereo_link", "exc_prot", "hpf_enable", "df_smoothing",
-    "comparison_mode", "bass_first_ai", "phase_safe_2058",
-    "enable_tdc", "enable_afdw", "low_bass_cut_enable", "auto_optimize_low_bass_cut", "enable_ir_pre_energy_guard",
+    "mag_correct",
+    "normalize_opt",
+    "align_opt",
+    "multi_rate_opt",
+    "multi_rate_ultra_high_opt",
+    "stereo_link",
+    "exc_prot",
+    "hpf_enable",
+    "df_smoothing",
+    "comparison_mode",
+    "bass_first_ai",
+    "phase_safe_2058",
+    "enable_tdc",
+    "enable_afdw",
+    "low_bass_cut_enable",
+    "auto_optimize_low_bass_cut",
+    "enable_ir_pre_energy_guard",
     "bass_smooth_adaptive",
     "bass_adaptive_isolation_mode",
     "bass_boost_cap_enable",
@@ -622,7 +759,9 @@ class FilterConfigProjection:
     values: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_run_config(cls, snapshot: RunConfigSnapshot | FilterConfigProjection | dict[str, Any]) -> FilterConfigProjection:
+    def from_run_config(
+        cls, snapshot: RunConfigSnapshot | FilterConfigProjection | dict[str, Any]
+    ) -> FilterConfigProjection:
         if isinstance(snapshot, FilterConfigProjection):
             return snapshot
         if isinstance(snapshot, RunConfigSnapshot):
@@ -696,14 +835,27 @@ def _default_specs() -> list[ConfigFieldSpec]:
 
 
 def _filter_attr_for_key(key: str) -> str | None:
-    reverse = {ui_key: cfg_key for cfg_key, ui_key in AUTO_MODE_DEFAULT_CFG_TO_UI.items()}
-    return reverse.get(key, key if key in {cfg_key for cfg_key in AUTO_MODE_DEFAULT_CFG_TO_UI} else None)
+    reverse = {
+        ui_key: cfg_key for cfg_key, ui_key in AUTO_MODE_DEFAULT_CFG_TO_UI.items()
+    }
+    return reverse.get(
+        key,
+        key if key in {cfg_key for cfg_key in AUTO_MODE_DEFAULT_CFG_TO_UI} else None,
+    )
 
 
 def _cache_relevance_for_key(key: str) -> CacheRelevance:
-    if key.startswith("measurement_") or key.startswith("local_path") or key.startswith("file_"):
+    if (
+        key.startswith("measurement_")
+        or key.startswith("local_path")
+        or key.startswith("file_")
+    ):
         return "measurement"
-    if key.startswith("auto_mode_") or key in {"auto_goal", "auto_target_mode", CAMILLAFIR_AUTO_MODE}:
+    if key.startswith("auto_mode_") or key in {
+        "auto_goal",
+        "auto_target_mode",
+        CAMILLAFIR_AUTO_MODE,
+    }:
         return "auto"
     if key.startswith("ui_") or key in {"layout", "fmt"}:
         return "ui"
@@ -724,7 +876,9 @@ def _is_runtime_only_key(key: str) -> bool:
 
 
 FIELD_SPECS: tuple[ConfigFieldSpec, ...] = tuple(_default_specs())
-FIELD_SPECS_BY_KEY: dict[str, ConfigFieldSpec] = {spec.key: spec for spec in FIELD_SPECS}
+FIELD_SPECS_BY_KEY: dict[str, ConfigFieldSpec] = {
+    spec.key: spec for spec in FIELD_SPECS
+}
 
 MODE_DEFAULTS: dict[str, dict[str, Any]] = {
     "BASIC": dict(MODE_DEFAULTS_BASE["BASIC"]),
@@ -747,7 +901,15 @@ def default_config_dict() -> dict[str, Any]:
 def normalize_filter_type(value: Any) -> str:
     try:
         ft = str(value or "").strip()
-    except (AttributeError, TypeError, ValueError, KeyError, IndexError, RuntimeError, OSError):
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        IndexError,
+        RuntimeError,
+        OSError,
+    ):
         ft = ""
     ft_l = ft.lower()
     if "asym" in ft_l:
@@ -811,7 +973,9 @@ def _coerce_by_spec(value: Any, spec: ConfigFieldSpec) -> Any:
     return value
 
 
-def normalize_flat_config(data: dict[str, Any], *, include_runtime: bool = False) -> dict[str, Any]:
+def normalize_flat_config(
+    data: dict[str, Any], *, include_runtime: bool = False
+) -> dict[str, Any]:
     out = default_config_dict()
     if include_runtime:
         out.update(REQUEST_RUNTIME_DEFAULTS)
@@ -863,7 +1027,9 @@ def _parse_legacy_choice_index(value: Any) -> int | None:
         return None
 
 
-def normalize_choice_value(value: Any, *, options: tuple[Any, ...], default: Any) -> Any:
+def normalize_choice_value(
+    value: Any, *, options: tuple[Any, ...], default: Any
+) -> Any:
     if value in options:
         return value
     try:
@@ -885,19 +1051,25 @@ def normalize_choice_fields(data: dict[str, Any], default_conf: dict[str, Any]) 
         data[key] = normalize_choice_value(
             data.get(key, default_conf.get(key)),
             options=options,
-            default=default_conf.get(key, FIELD_SPECS_BY_KEY.get(key, ConfigFieldSpec(key)).default),
+            default=default_conf.get(
+                key, FIELD_SPECS_BY_KEY.get(key, ConfigFieldSpec(key)).default
+            ),
         )
 
 
 def app_config_snapshot(data: dict[str, Any] | None = None) -> AppConfigSnapshot:
-    return AppConfigSnapshot(values=normalize_flat_config(data or {}, include_runtime=False))
+    return AppConfigSnapshot(
+        values=normalize_flat_config(data or {}, include_runtime=False)
+    )
 
 
 def run_config_snapshot(data: dict[str, Any] | None = None) -> RunConfigSnapshot:
     return RunConfigSnapshot.from_flat_dict(data or {})
 
 
-def snapshot_field_names(snapshot: AppConfigSnapshot | RunConfigSnapshot | FilterConfigProjection) -> tuple[str, ...]:
+def snapshot_field_names(
+    snapshot: AppConfigSnapshot | RunConfigSnapshot | FilterConfigProjection,
+) -> tuple[str, ...]:
     return tuple(field_obj.name for field_obj in fields(snapshot))
 
 

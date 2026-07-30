@@ -203,12 +203,20 @@ def _auto_winner_add_fit_and_phase_signals(best: dict, *, summary_bits: list[str
 
     phase_benefit = _auto_winner_metric(best, "phase_benefit_bonus")
     phase_risk = _auto_winner_metric(best, "phase_risk_penalty")
+    phase_realized = _auto_winner_metric(best, "phase_realized_gd_improvement")
+    if np.isfinite(phase_realized):
+        _auto_winner_push(
+            summary_bits,
+            reasons,
+            f"realized GD change {float(phase_realized) * 100.0:+.0f}%",
+            f"Final-FIR corrected-system GD change {float(phase_realized) * 100.0:+.1f}%.",
+        )
     if np.isfinite(phase_benefit) and float(phase_benefit) > 0.5:
         _auto_winner_push(
             summary_bits,
             reasons,
             "phase benefit " + _auto_winner_fmt(phase_benefit),
-            f"Phase benefit bonus {_auto_winner_fmt(phase_benefit)} (positive phase correction contribution).",
+            f"Phase benefit bonus {_auto_winner_fmt(phase_benefit)} (verified final-FIR timing contribution).",
         )
     if np.isfinite(phase_risk) and float(phase_risk) > 0.5:
         _auto_winner_push(

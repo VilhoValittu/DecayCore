@@ -189,6 +189,12 @@ def _render_bass_integration(*, data: dict) -> None:
         translated = t(key)
         return translated if translated != key else str(value or "unknown")
 
+    def _translate_metric_channel_mode(value: str) -> str:
+        normalized = str(value or "unknown").strip().lower()
+        key = f"results_value_bass_metric_channel_mode_{normalized}"
+        translated = t(key)
+        return translated if translated != key else str(value or "unknown")
+
     bi_mode = "direct_dac"
     bi_mode_label = t("bi_mode_direct_dac")
     xo_metric_label = t("results_metric_main_hpf")
@@ -358,8 +364,8 @@ def _render_bass_integration(*, data: dict) -> None:
             ),
             metric_row(
                 t("results_metric_bass_metric_channel_mode"),
-                str(metric_channel_mode),
-                str(metric_channel_mode),
+                _translate_metric_channel_mode(metric_channel_mode),
+                _translate_metric_channel_mode(metric_channel_mode),
             ),
             metric_row(
                 t("results_metric_bass_feasibility"),

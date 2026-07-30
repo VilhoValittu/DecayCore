@@ -12,6 +12,51 @@ All notable changes to **DecayCore** are documented in this file.
 
 ## DecayCore
 
+## [1.2.1]
+
+Adaptive Target now treats Harman6 as a stable reference instead of counting its own bass shelf as room buildup. Room evidence is evaluated per channel, channel disagreement reduces adaptation, target changes are bounded below 500 Hz, and RT60 is used only as a confidence guard against extra bass lift. AUTO no longer applies a separate full-band output tilt or measurement-derived high-frequency target rise.
+
+Navigointi 1–8 on nyt aina Automatic mode details -osion yläpuolella ja omassa erillisessä palkissaan. Ajon eteneminen, valittu ratkaisu ja yksityiskohdat näkyvät navigoinnin alla.
+
+Syy varmistui: sahalaita syntyy magnitudikorjauksessa, ei vaihetyypissä tai IR-ikkunassa. Auto-gain siirtää käyrän alas, joten vanha boost-raja ei tunnistanut negatiiviselle siirtyneitä paikallisia korostuksia.
+Lisäsin toimivan, paikalliseen tasoitettuun vasteeseen perustuvan rajan:
+Advanced → Shaping → Fine tune → “Ohita tätä pienemmät paikalliskorjaukset (dB)”
+Nykyinen arvo 2,0 dB on varmennettu myös DSP-konfiguraatioon asti.
+0,0 poistaa rajan.
+
+Päivitin [User_Manual.md (line 152)](/home/ville/dev/DecayCore-source/docs/User_Manual.md:152) -oppaan.
+Lisätty AUTO-moodin Advanced-sivusta:
+mitkä säädöt jäävät käyttäjän muokattaviksi
+lukittujen kenttien ja presetien toiminta
+Ignore local correction below -asetuksen alue, oletusarvo ja vaikutus
+excess phase- ja GD-säätöjen kuvaukset
+viittaus Hybrid IIR -asetuksiin
+huomautus, että lopulliset arvot tarkistetaan vientiyhteenvedosta
+
+Hybrid IIR toimii nyt näin:
+FIR:ltä IIR:lle siirretty leikkaus kompensoidaan edelleen FIR:ssä.
+FIR-rajoitusten jälkeen jäljelle jäävä moodi analysoidaan uudelleen.
+Vain varmennettu residual-moodi saa kompensoimattoman lisäleikkauksen.
+Kokonaisleikkaus noudattaa Max cut-, confidence-, GD-, priority-, voice-risk- ja residual-authority-rajoja.
+Min cut priority koskee nyt myös room_mode-tapahtumia.
+Mittaussovituksen löytämä huippuvoimakkuus osallistuu turvallisen kokonaisrajan määrittämiseen.
+Keskeiset muutokset ovat [hybrid_iir.py (line 167)](/home/ville/dev/DecayCore-source/src/decaycore/dsp/hybrid_iir.py:167) ja [filter_pipeline.py (line 181)](/home/ville/dev/DecayCore-source/src/decaycore/dsp/filter_pipeline.py:181). Yhteenveto raportoi nyt erikseen FIR_transfer, residual_extra, authority-rajan ja kokonaisleikkauksen: [events.py (line 109)](/home/ville/dev/DecayCore-source/src/decaycore/ui/export_summary/events.py:109).
+
+Adaptive Target v2 -korjaukset.
+Keskeiset muutokset:
+Harman6 on nyt vakaa kiintopiste ja kanavien tasosiirrot ovat neutraaleja.
+Bassoevidenssi lasketaan pohjakäyrään suhteutettuna ja kanavakohtaisesti.
+L/R-erimielisyys pienentää adaptointia tai palauttaa Harman6-pohjaan.
+Target-muutos on rajattu −2,0…+0,75 dB ja häivytetään pois 500 Hz:iin mennessä.
+RT60 toimii vain basson lisäystä rajoittavana confidence-signaalina.
+AUTO:n mittausperäinen HF-nousu ja erillinen full-band output tilt poistettiin.
+smooth_oct vaikuttaa nyt oikeasti synteesiin.
+Diagnostiikka ja fallback-syy näkyvät lokissa ja vientiyhteenvedossa.
+Cache-versiot nostettiin: schema 31, compat am45, synth-algoritmi 3.
+
+
+---
+
 ## [1.2.0] - 27-7-2026
 
 ### Keep your target curves ready to use
