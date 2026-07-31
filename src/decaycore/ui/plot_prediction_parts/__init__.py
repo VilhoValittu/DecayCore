@@ -10,6 +10,7 @@
 
 from .prediction_plot import (
     ChannelPlotData,
+    FILTER_IMPULSE_VIEW_RANGE_MS,
     HybridIIRPlotCut,
     _prediction_plot_fft_context,
     _resolve_magnitude_display_offset_db,
@@ -18,6 +19,7 @@ from .prediction_plot import (
 
 __all__ = [
     "ChannelPlotData",
+    "FILTER_IMPULSE_VIEW_RANGE_MS",
     "HybridIIRPlotCut",
     "_prediction_plot_fft_context",
     "_resolve_magnitude_display_offset_db",

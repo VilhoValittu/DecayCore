@@ -20,7 +20,7 @@ from plotly.subplots import make_subplots
 
 from ..resources.i8n.decaycore_i18n import t
 from .plot_common import _robust_axis_range
-from .plot_prediction_parts import ChannelPlotData
+from .plot_prediction_parts import ChannelPlotData, FILTER_IMPULSE_VIEW_RANGE_MS
 
 _LEFT = "#38bdf8"
 _RIGHT = "#c084fc"
@@ -650,13 +650,14 @@ def build_timing_figure(
     dark: bool,
 ) -> go.Figure:
     fig = make_subplots(
-        rows=2,
+        rows=3,
         cols=1,
         shared_xaxes=False,
-        vertical_spacing=0.11,
+        vertical_spacing=0.09,
         subplot_titles=(
             t("results_plot_phase_title"),
             t("results_plot_group_delay_title"),
+            t("results_plot_impulse_title"),
         ),
     )
     corrected_band_mask = (
@@ -708,11 +709,22 @@ def build_timing_figure(
         row=2,
         col=1,
     )
+    fig.add_trace(
+        go.Scatter(
+            x=data.filter_impulse_time_ms,
+            y=data.filter_impulse_normalized,
+            name=t("results_plot_filter_impulse"),
+            line=dict(color=_FILTER, width=1.3),
+            showlegend=False,
+        ),
+        row=3,
+        col=1,
+    )
     _base_layout(
         fig,
         title=_title_with_filter_metadata(title, data),
         dark=dark,
-        height=650,
+        height=850,
         show_legend=True,
     )
     _apply_log_x_axis(
@@ -729,6 +741,26 @@ def build_timing_figure(
     )
     fig.update_yaxes(title_text=t("results_plot_phase_axis"), row=1, col=1)
     fig.update_yaxes(title_text=t("results_plot_group_delay_axis"), row=2, col=1)
+    fig.update_xaxes(
+        title_text=t("results_plot_impulse_time_axis"),
+        range=list(FILTER_IMPULSE_VIEW_RANGE_MS),
+        row=3,
+        col=1,
+    )
+    fig.update_yaxes(
+        title_text=t("results_plot_impulse_amplitude_axis"),
+        range=[-1.05, 1.05],
+        row=3,
+        col=1,
+    )
+    fig.add_vline(
+        x=0.0,
+        line_width=1.0,
+        line_dash="dot",
+        line_color=plot_theme(dark=dark).muted,
+        row=3,
+        col=1,
+    )
     return fig
 
 

@@ -40,6 +40,7 @@ _SYSTEM_PHASE_SMOOTH_LOW_OCT = 1.0 / 2.0
 _SYSTEM_PHASE_SMOOTH_HIGH_OCT = 1.0
 _SYSTEM_PHASE_SMOOTH_BLEND_LO_HZ = 300.0
 _SYSTEM_PHASE_SMOOTH_BLEND_HI_HZ = 1000.0
+FILTER_IMPULSE_VIEW_RANGE_MS = (-25.0, 50.0)
 
 _PLOT_EXCEPTIONS = (
     RuntimeError,
@@ -84,6 +85,8 @@ class ChannelPlotData:
     system_phase_after_deg: np.ndarray
     system_group_delay_before_ms: np.ndarray
     system_group_delay_after_ms: np.ndarray
+    filter_impulse_time_ms: np.ndarray
+    filter_impulse_normalized: np.ndarray
     phase_display_max_hz: float
     confidence: np.ndarray | None
     afdw_bw_oct: np.ndarray | None
@@ -291,6 +294,34 @@ def _prediction_plot_fft_context(*, filt_ir, fs, target_stats) -> dict:
         "h_filt_display": h_filt_display,
         "filt_delay_ms": float(filt_delay_ms),
     }
+
+
+def _filter_impulse_near_peak(
+    filt_ir,
+    *,
+    fs_hz: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return the final FIR normalized and tightly windowed around its main peak."""
+    impulse = np.asarray(filt_ir, dtype=float).reshape(-1)
+    if impulse.size == 0 or not np.isfinite(fs_hz) or fs_hz <= 0.0:
+        return np.asarray([], dtype=float), np.asarray([], dtype=float)
+
+    finite_impulse = np.where(np.isfinite(impulse), impulse, 0.0)
+    peak_index = int(np.argmax(np.abs(finite_impulse)))
+    peak_amplitude = float(np.abs(finite_impulse[peak_index]))
+    if peak_amplitude > np.finfo(float).eps:
+        normalized = finite_impulse / peak_amplitude
+    else:
+        normalized = np.zeros_like(finite_impulse)
+
+    time_ms = (
+        np.arange(finite_impulse.size, dtype=float) - float(peak_index)
+    ) * 1000.0 / float(fs_hz)
+    focus_mask = (
+        (time_ms >= FILTER_IMPULSE_VIEW_RANGE_MS[0])
+        & (time_ms <= FILTER_IMPULSE_VIEW_RANGE_MS[1])
+    )
+    return time_ms[focus_mask], normalized[focus_mask]
 
 
 def _resolve_magnitude_display_offset_db(
@@ -575,6 +606,10 @@ def compute_channel_plot_data(
     )
     filter_exported_db = 20.0 * np.log10(np.abs(h_filt) + 1e-12)
     filter_compensated_db = filter_exported_db + float(level_compensation_db)
+    filter_impulse_time_ms, filter_impulse_normalized = _filter_impulse_near_peak(
+        filt_ir,
+        fs_hz=float(fs),
+    )
 
     display_freq_hz = np.geomspace(10.0, float(fs) / 2.0, int(fft_ctx["vis_points"]))
     measured_display = np.interp(display_freq_hz, f_lin, measured_smoothed)
@@ -651,6 +686,8 @@ def compute_channel_plot_data(
             f_lin,
             system_group_delay_after_ms,
         ),
+        filter_impulse_time_ms=filter_impulse_time_ms,
+        filter_impulse_normalized=filter_impulse_normalized,
         phase_display_max_hz=phase_display_max_hz,
         confidence=confidence,
         afdw_bw_oct=_afdw_curve_on_display_grid(
@@ -696,7 +733,9 @@ def compute_channel_plot_data(
 
 __all__ = [
     "ChannelPlotData",
+    "FILTER_IMPULSE_VIEW_RANGE_MS",
     "HybridIIRPlotCut",
+    "_filter_impulse_near_peak",
     "_prediction_plot_fft_context",
     "_resolve_magnitude_display_offset_db",
     "_align_system_phase_pair_for_display",

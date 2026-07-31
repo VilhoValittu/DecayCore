@@ -12,7 +12,7 @@ All notable changes to **DecayCore** are documented in this file.
 
 ## DecayCore
 
-## [1.2.1]
+## [1.2.1] 31-7-2026
 
 ### Adaptive Target v2 — a target that stays a target
 
@@ -41,6 +41,10 @@ The export summary reports FIR transfer, residual extra, the authority limit and
 ### A clearer view of the AUTO run
 
 Steps 1–8 now always sit above the Automatic mode details section, in their own separate bar. Run progress, the selected solution and the details appear below the navigation, so a long AUTO run is easy to follow without losing your place.
+
+### Inspect the final FIR around its impulse peak
+
+The Timing view now includes the actual final FIR impulse for each output channel. The impulse is normalized to its main peak, with the peak aligned to `0 ms` and a focused default range of `−25…+50 ms`. This makes pre-ringing and the immediate post-impulse behaviour visible without the full filter length compressing the interesting part of the graph.
 
 ### User Manual updated
 
@@ -75,6 +79,10 @@ Vientiyhteenveto raportoi erikseen FIR-siirron, residual-lisäleikkauksen, autho
 ### Selkeämpi näkymä AUTO-ajoon
 
 Navigointi 1–8 on nyt aina Automatic mode details -osion yläpuolella ja omassa erillisessä palkissaan. Ajon eteneminen, valittu ratkaisu ja yksityiskohdat näkyvät navigoinnin alla, joten pitkääkin AUTO-ajoa on helppo seurata paikkaa kadottamatta.
+
+### Lopullinen FIR-impulssi tarkasti huipun ympäriltä
+
+Timing-näkymä näyttää nyt jokaiselle lähtökanavalle todellisen lopullisen FIR-suodattimen impulssin. Impulssi normalisoidaan päähuippuun, huippu kohdistetaan kohtaan `0 ms` ja oletusnäkymä rajataan alueelle `−25…+50 ms`. Näin pre-ringing ja impulssin jälkeinen käyttäytyminen erottuvat ilman, että suodattimen koko pituus litistää kuvaajan olennaisenosan.
 
 ### Käyttöopas päivitetty
 
