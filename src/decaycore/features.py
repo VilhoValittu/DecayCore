@@ -26,9 +26,18 @@ def has_measurement_module() -> bool:
         return False
 
 
-# Native Rust acceleration modules. When these are missing the program still
-# runs using the pure-Python fallbacks, but noticeably slower.
-RUST_EXTENSION_MODULES = ("decaycore_scoring", "decaycore_dsp")
+# Publicly buildable native acceleration modules. When these are missing the
+# manual filtering path still runs using the pure-Python fallbacks, but slower.
+RUST_EXTENSION_MODULES = ("decaycore_dsp",)
+
+# The automatic-mode scoring and winner-selection engine is intentionally
+# bundled only with packaged DecayCore releases. Keep it separate from the
+# public acceleration set: source installs must never silently fall back to the
+# Python automatic search when this product capability is unavailable.
+PACKAGED_AUTO_ENGINE_MODULE = "decaycore_scoring"
+PACKAGED_AUTO_ENGINE_POLICY_VERSION = 1
+PACKAGED_AUTO_ENGINE_MIN_POLICY_VERSION = PACKAGED_AUTO_ENGINE_POLICY_VERSION
+PACKAGED_AUTO_ENGINE_MAX_POLICY_VERSION = PACKAGED_AUTO_ENGINE_POLICY_VERSION
 
 # This engine is intentionally built only for packaged DecayCore releases.  It
 # is kept separate from RUST_EXTENSION_MODULES because source installs cannot
@@ -85,6 +94,25 @@ def has_packaged_bass_engine() -> bool:
         return False
 
 
+def has_packaged_auto_engine() -> bool:
+    """Return True when the packaged-only automatic-mode engine is compatible."""
+    try:
+        if importlib.util.find_spec(PACKAGED_AUTO_ENGINE_MODULE) is None:
+            return False
+        module = importlib.import_module(PACKAGED_AUTO_ENGINE_MODULE)
+        policy_version = int(getattr(module, "ENGINE_POLICY_VERSION", 0) or 0)
+        return bool(
+            PACKAGED_AUTO_ENGINE_MIN_POLICY_VERSION
+            <= policy_version
+            <= PACKAGED_AUTO_ENGINE_MAX_POLICY_VERSION
+            and callable(getattr(module, "compute_rank_score_components", None))
+            and callable(getattr(module, "compute_rank_scores_batch", None))
+            and callable(getattr(module, "select_best_index_rs", None))
+        )
+    except (ImportError, OSError, AttributeError, TypeError, ValueError):
+        return False
+
+
 def require_packaged_bass_engine() -> None:
     """Fail explicitly when package-only automatic bass integration is unavailable."""
     if not has_packaged_bass_engine():
@@ -93,12 +121,27 @@ def require_packaged_bass_engine() -> None:
         )
 
 
+def require_packaged_auto_engine() -> None:
+    """Fail explicitly when packaged-only automatic mode is unavailable."""
+    if not has_packaged_auto_engine():
+        raise PackagedFeatureUnavailableError(
+            "Automatic mode requires the packaged DecayCore application. "
+            "Basic and Advanced manual filtering remain available."
+        )
+
+
 __all__ = [
     "has_measurement_module",
+    "has_packaged_auto_engine",
     "has_packaged_bass_engine",
     "has_rust_acceleration",
     "missing_rust_modules",
+    "require_packaged_auto_engine",
     "require_packaged_bass_engine",
+    "PACKAGED_AUTO_ENGINE_MAX_POLICY_VERSION",
+    "PACKAGED_AUTO_ENGINE_MIN_POLICY_VERSION",
+    "PACKAGED_AUTO_ENGINE_MODULE",
+    "PACKAGED_AUTO_ENGINE_POLICY_VERSION",
     "PACKAGED_BASS_ENGINE_MAX_POLICY_VERSION",
     "PACKAGED_BASS_ENGINE_MIN_POLICY_VERSION",
     "PACKAGED_BASS_ENGINE_MODULE",

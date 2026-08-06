@@ -16,13 +16,17 @@ from typing import Any
 import numpy as np
 
 from .shared_parts import _auto_safe_float
+from ..features import PACKAGED_AUTO_ENGINE_POLICY_VERSION
 
 logger = logging.getLogger("DecayCore")
 
 try:
     import decaycore_scoring as _rust_scoring
-    _RUST_SCORING_AVAILABLE = True
-except ImportError:
+    _RUST_SCORING_AVAILABLE = bool(
+        int(getattr(_rust_scoring, "ENGINE_POLICY_VERSION", 0) or 0)
+        == int(PACKAGED_AUTO_ENGINE_POLICY_VERSION)
+    )
+except (ImportError, OSError, AttributeError, TypeError, ValueError):
     _rust_scoring = None  # type: ignore[assignment]
     _RUST_SCORING_AVAILABLE = False
 _RUST_SCORING_SUPPORTS_VOICE: bool | None = None
@@ -376,7 +380,10 @@ def compute_rank_score_components(
             legacy["voice_clarity_penalty"] = float(voice_pen_rust)
             return legacy
         except TypeError:
-            logger.warning("decaycore_scoring extension is older than Python rank scorer; using Python fallback.")
+            logger.warning(
+                "Packaged automatic-mode engine is incompatible with this rank contract; "
+                "using the Python reporting helper."
+            )
     avg = float(_auto_safe_float(avg_score, 0.0))
     phase_bonus = float(max(0.0, _auto_safe_float(phase_benefit_bonus, 0.0)))
     boost = float(max(0.0, _auto_safe_float(boost_penalty, 0.0)))

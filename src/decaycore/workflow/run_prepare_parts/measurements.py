@@ -33,6 +33,8 @@ from ...config.decaycore_config import save_config
 from ...config.pipeline_parts import (
     filter_type_short,
 )
+from ...config.legacy_keys import is_auto_mode
+from ...features import require_packaged_auto_engine
 from ...io.generated_measurement_source import generated_source_matches_upload, parse_generated_source
 from ...dsp.decaycore_analysis import calculate_rt60, calculate_rt60_bands
 from ...io.measurements_loader_parts import (
@@ -530,6 +532,9 @@ def _prepare_ui_and_measurements(
 
     source_ui_data = copy_source_ui_data(request.raw_ui_data)
     data = copy_resolved_data(source_ui_data)
+    mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
+    if is_auto_mode(data, mode_u) or bool(data.get("bass_integration_enable", False)):
+        require_packaged_auto_engine()
     run_started_at = float(request.run_started_at or time.perf_counter())
     callbacks.set_auto_selected_bar("")
 

@@ -326,20 +326,29 @@ def select_best_safe_candidate(
     pool = [dict(x or {}) for x in list(candidates or []) if isinstance(x, dict)]
     if not pool:
         return None
-    safe, diagnostics = filter_hard_failed_candidates(pool, goal=goal)
-    choose_from = safe
-    if not choose_from:
+    from ..native_engine import select_best_index  # noqa: PLC0415
+
+    _, diagnostics = filter_hard_failed_candidates(pool, goal=goal)
+    rank_keys = np.asarray(
+        [
+            tuple(_rank_key_for_safe_select(dict(item.get("metrics", _auto_candidate_metrics(item)) or {})))
+            for item in pool
+        ],
+        dtype=np.float64,
+    )
+    hard_gate_failed = np.asarray(
+        [bool(diag.get("hard_gate_failed", False)) for diag in diagnostics],
+        dtype=np.bool_,
+    )
+    selection = select_best_index(rank_keys, hard_gate_failed)
+    if bool(selection.get("all_hard_failed", False)):
         logger.warning(
             "Auto-mode selection has no non-hard-failed candidates; fallback selected least-bad hard-failed candidate (n=%d).",
             int(len(pool)),
         )
-        choose_from = pool
-    return dict(
-        sorted(
-            choose_from,
-            key=lambda it: _rank_key_for_safe_select(dict(it.get("metrics", _auto_candidate_metrics(it)) or {})),
-        )[0]
-    )
+    winner = dict(pool[int(selection["winner_index"])])
+    winner["_auto_native_selection"] = dict(selection)
+    return winner
 
 
 def maybe_override_hard_failed_winner(

@@ -28,7 +28,7 @@ Current dependency baselines from the repository requirement files are:
 
 - `requirements.txt`: `numpy==2.4.6`, `scipy==1.17.1`, `nicegui==3.13.0`, `plotly==6.8.0`, `optuna==4.9.0`
 
-From v1.1.6 onwards `numba` is no longer used. The hot DSP and scoring paths it previously accelerated are now provided by two optional Rust extensions (`decaycore-dsp` and `decaycore-scoring`). They are bundled and prebuilt in the packaged releases. If you run from source, see [Optional Rust acceleration extensions](#optional-rust-acceleration-extensions) below — DecayCore still runs without them using a pure-Python fallback, but they are strongly recommended for acceptable performance.
+From v1.1.6 onwards `numba` is no longer used. The public manual-filtering DSP hot paths can be accelerated by the optional `decaycore-dsp` Rust extension. Automatic mode uses a separate native decision engine bundled only in packaged releases. A source checkout therefore supports Basic and Advanced manual filtering, but does not enable Automatic mode.
 
 ## Run from release package
 
@@ -132,19 +132,14 @@ git pull
 
 ---
 
-### Optional Rust acceleration extensions
+### Optional public Rust DSP acceleration
 
-DecayCore ships two optional Rust extensions that accelerate the DSP and scoring
-paths that previously relied on `numba`:
-
-- `decaycore-dsp` (Rust DSP extension)
-- `decaycore-scoring` (Rust scoring extension)
-
-These are **prebuilt and bundled in the packaged releases**, so release users do
-not need them. When you run from source they are **not** installed by
-`requirements.txt`. DecayCore will still start and produce correct results
-without them through a pure-Python fallback, but the fallback is significantly
-slower. Building the extensions is strongly recommended for source runs.
+The public `decaycore-dsp` extension accelerates manual-filtering DSP paths that
+previously relied on `numba`. It is **prebuilt and bundled in packaged releases**.
+For source runs it is not installed by `requirements.txt`; manual filtering still
+works through the pure-Python fallback, but more slowly. The packaged-only
+automatic-mode engine is not distributed as source and has no Python fallback
+that enables Automatic mode.
 
 Building them requires a Rust toolchain. Install it once with
 [rustup](https://rustup.rs/):
@@ -165,22 +160,20 @@ cargo --version
 ```
 
 With your DecayCore virtual environment activated (see the per-platform steps
-below), build and install both extensions from the source tree. `pip` reads the
-`maturin` build backend declared by each crate and compiles them automatically:
+below), build and install the public DSP extension from the source tree. `pip`
+reads its `maturin` build backend and compiles it automatically:
 
 ```bash
-python -m pip install ./decaycore-scoring
 python -m pip install ./decaycore-dsp
 ```
 
-On Windows, run the same two commands from PowerShell after activating the
+On Windows, run the same command from PowerShell after activating the
 virtual environment. The Rust toolchain on Windows also needs the MSVC build
 tools (the `rustup-init.exe` installer prompts to install them if they are
 missing).
 
-You can confirm the extensions loaded after starting DecayCore: when an
-extension is missing, a fallback warning is logged and the Python implementation
-is used instead.
+You can confirm the extension loaded after starting DecayCore: when it is
+missing, a fallback warning is logged and the Python DSP implementation is used.
 
 ---
 
@@ -202,10 +195,9 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-5. (Recommended) Build the optional Rust extensions. This requires a Rust toolchain — see [Optional Rust acceleration extensions](#optional-rust-acceleration-extensions):
+5. (Recommended) Build the optional public Rust DSP extension. This requires a Rust toolchain — see [Optional public Rust DSP acceleration](#optional-public-rust-dsp-acceleration):
 
 ```powershell
-python -m pip install ./decaycore-scoring
 python -m pip install ./decaycore-dsp
 ```
 
@@ -252,10 +244,9 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-5. (Recommended) Build the optional Rust extensions. This requires a Rust toolchain — see [Optional Rust acceleration extensions](#optional-rust-acceleration-extensions):
+5. (Recommended) Build the optional public Rust DSP extension. This requires a Rust toolchain — see [Optional public Rust DSP acceleration](#optional-public-rust-dsp-acceleration):
 
 ```bash
-python -m pip install ./decaycore-scoring
 python -m pip install ./decaycore-dsp
 ```
 
@@ -299,10 +290,9 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-6. (Recommended) Build the optional Rust extensions. This requires a Rust toolchain — see [Optional Rust acceleration extensions](#optional-rust-acceleration-extensions):
+6. (Recommended) Build the optional public Rust DSP extension. This requires a Rust toolchain — see [Optional public Rust DSP acceleration](#optional-public-rust-dsp-acceleration):
 
 ```bash
-python -m pip install ./decaycore-scoring
 python -m pip install ./decaycore-dsp
 ```
 

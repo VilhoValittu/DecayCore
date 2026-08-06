@@ -77,6 +77,7 @@ from .shared_parts import (
 )
 from ..dsp.hybrid_iir import HYBRID_IIR_POLICY_VERSION
 from ..dsp.hpf_policy import HPF_IIR_TAP_THRESHOLD, hpf_settings_should_use_iir
+from ..features import PACKAGED_AUTO_ENGINE_POLICY_VERSION
 
 logger = logging.getLogger("DecayCore")
 
@@ -272,6 +273,7 @@ def _auto_signature_payload(
             ),
         },
         "signature_policy_versions": {
+            "packaged_auto_engine_policy_v": int(PACKAGED_AUTO_ENGINE_POLICY_VERSION),
             "gain_authority_policy_v": int(_AUTO_GAIN_AUTHORITY_POLICY_V),
             "confidence_model_policy_v": int(_AUTO_CONFIDENCE_MODEL_POLICY_V),
             "residual_peak_scorer_v": int(_AUTO_BROAD_RESIDUAL_PEAK_SCORING_ALGO_V),

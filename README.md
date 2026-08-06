@@ -85,19 +85,19 @@ The main source environment currently documented by `requirements.txt` uses thes
 - `plotly==6.8.0`
 - `optuna==4.9.0`
 
-> `numba` was removed in v1.1.6. The DSP and scoring hot paths it used are now
-> provided by two optional Rust extensions (`decaycore-dsp`, `decaycore-scoring`),
-> prebuilt in the packaged releases. When running from source they are optional
-> (a pure-Python fallback exists) but strongly recommended; building them needs a
-> Rust toolchain. See the [Installation guide](https://vilhovalittu.github.io/DecayCore/installation/) for steps.
+> `numba` was removed in v1.1.6. Public source builds may optionally compile the
+> `decaycore-dsp` Rust extension for faster manual filtering. Automatic mode uses
+> a separate native decision engine that is available only in packaged releases;
+> source builds provide the full Basic and Advanced manual-filtering workflow.
+> See the [Installation guide](https://vilhovalittu.github.io/DecayCore/installation/) for steps.
 
 ## License
 
 DecayCore is source-available for personal, educational, research, and other
 non-commercial use under the terms of the LICENSE file.
 
-The measurement engine and related acquisition workflow are not included in this
-repository and remain proprietary.
+The measurement engine, automatic-mode decision engine, and related packaged
+workflows are not included in this repository and remain proprietary.
 
 Commercial use, integration into commercial audio/DSP products, hosted services,
 paid filtering services, or paid measurement/calibration workflows requires

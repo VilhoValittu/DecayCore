@@ -12,6 +12,13 @@ All notable changes to **DecayCore** are documented in this file.
 
 ## DecayCore
 
+## [1.2.2]
+
+Automaattimoodi on nyt packaged-only, ja julkisessa lähdeversiossa toimivat vain Basic- ja Advanced-manuaalitilat.
+
+
+---
+
 ## [1.2.1] 31-7-2026
 
 ### Adaptive Target v2 — a target that stays a target

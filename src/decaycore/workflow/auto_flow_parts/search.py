@@ -31,6 +31,7 @@ from ...auto_mode.api import (
 )
 from ...auto_mode.rank_score import attach_official_rank_score, official_rank_score
 from ...application.run_contracts import apply_auto_mode_result
+from ...features import PACKAGED_AUTO_ENGINE_POLICY_VERSION
 from ...ui.decaycore_utils import scale_taps_with_fs
 from ..bridge_types import ProcessRunCallbacks
 
@@ -183,6 +184,7 @@ def _auto_mode_store_search_meta(
     sel_basis = str(auto_res.get("selection_basis", "rank_score") or "rank_score")
     data["_auto_mode_meta"] = {
         "enabled": True,
+        "auto_engine_policy_version": int(PACKAGED_AUTO_ENGINE_POLICY_VERSION),
         "auto_goal": str(sel_goal),
         "selection_basis": str(sel_basis),
         "optimizer_backend": str(optimizer_backend),

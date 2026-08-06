@@ -60,6 +60,9 @@ def _run_auto_mode_search(
     status_cb,
     n_trials: int = auto_api.AUTO_MODE_TRIALS,
 ) -> dict | None:
+    from ..features import require_packaged_auto_engine  # noqa: PLC0415
+
+    require_packaged_auto_engine()
     return _run_auto_search_v2(
         base_data=base_data,
         measurements=measurements,

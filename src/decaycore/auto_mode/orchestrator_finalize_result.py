@@ -29,6 +29,7 @@ from .orchestrator_finalize_cache_parts import (
     _build_modal_intelligence_debug,
     _override_candidates,
 )
+from ..features import PACKAGED_AUTO_ENGINE_POLICY_VERSION
 
 logger = logging.getLogger("DecayCore")
 
@@ -746,6 +747,7 @@ def _build_final_search_result(
             "rank_score_breakdown": dict(best_metrics.get("rank_score_breakdown", {}) or {}),
         },
         "auto_mode_debug": {
+            "auto_engine_policy_version": int(PACKAGED_AUTO_ENGINE_POLICY_VERSION),
             "cache_schema_version": int(AUTO_MODE_CACHE_SCHEMA_VERSION),
             "cache_stats": dict(cache_info.get("cache_stats", {}) or {}),
             "winning_score_breakdown": dict(best_metrics.get("rank_score_breakdown", {}) or {}),

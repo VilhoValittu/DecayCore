@@ -323,9 +323,9 @@ def _persist_theme_preference(*, dark: bool) -> None:
 
 
 def _build_rust_warning_banner() -> None:
-    """Show a prominent warning when the native Rust extensions are missing.
+    """Show a warning when the optional public Rust DSP extension is missing.
 
-    DecayCore still runs on the pure-Python fallbacks, but noticeably slower, so
+    Manual filtering still runs on the pure-Python fallback, but slower, so
     we point the user at the installation guide.
     """
     from nicegui import ui

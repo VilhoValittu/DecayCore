@@ -77,7 +77,7 @@ The normal workflow inside DecayCore is:
 For most systems, start simple:
 
 - load measurements
-- choose `DecayCore automatic mode (recommended)` or `Basic`
+- in a packaged release, choose `DecayCore automatic mode (recommended)`; in a source checkout, choose `Basic` or `Advanced`
 - choose `Asymmetric` or `Mixed Phase`
 - generate filters
 - listen and re-measure before making more aggressive changes
@@ -134,6 +134,10 @@ DecayCore has three main operating modes. The DSP engine is the same, but the wo
 ### 5.1 DecayCore automatic mode (recommended)
 
 Use this when you want the program to search for a technically strong preset automatically.
+
+Automatic mode requires the packaged DecayCore application and its native
+decision engine. Public source checkouts keep this mode disabled; Basic and
+Advanced manual filtering remain available.
 
 What it does:
 

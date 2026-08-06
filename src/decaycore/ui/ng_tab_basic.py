@@ -19,7 +19,7 @@ from typing import Callable
 from . import ng_controls as ctrl
 from .ng_sections import page_shell, section_card
 from ..config.legacy_keys import CAMILLAFIR_AUTO_MODE
-from ..features import has_packaged_bass_engine
+from ..features import has_packaged_auto_engine, has_packaged_bass_engine
 
 _FS_OPTS = [44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000]
 _TAPS_OPTS = [512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576]
@@ -72,17 +72,30 @@ def _bass_integration_control_state(saved_value, *, engine_available: bool) -> t
     return (bool(saved_value) if available else False, not available)
 
 
+def _mode_options(*, t: Callable, auto_engine_available: bool) -> dict[str, str]:
+    options = {
+        "BASIC": t("mode_basic_label"),
+        "ADVANCED": t("mode_advanced_label"),
+    }
+    if auto_engine_available:
+        return {"AUTO": t("mode_auto_label"), **options}
+    return options
+
+
 def build_basic_tab(*, t: Callable, get_val: Callable) -> None:
     from nicegui import ui
 
+    auto_engine_available = has_packaged_auto_engine()
     bass_engine_available = has_packaged_bass_engine()
     mode_value = str(get_val("mode", "AUTO") or "AUTO").strip().upper()
     if mode_value not in ("BASIC", "ADVANCED", "AUTO"):
         mode_value = "AUTO"
     if bool(get_val(CAMILLAFIR_AUTO_MODE, False)):
         mode_value = "AUTO"
-    if bass_engine_available and bool(get_val("bass_integration_enable", False)):
+    if auto_engine_available and bass_engine_available and bool(get_val("bass_integration_enable", False)):
         mode_value = "AUTO"
+    if not auto_engine_available and mode_value == "AUTO":
+        mode_value = "BASIC"
 
     auto_goal_value = str(get_val("auto_goal", "balanced") or "balanced").strip().lower()
     if auto_goal_value not in ("room-safe", "balanced", "low-ripple", "flat", "subwoofers"):
@@ -99,11 +112,7 @@ def build_basic_tab(*, t: Callable, get_val: Callable) -> None:
                 ctrl.register(
                     "mode",
                     ui.select(
-                        options={
-                            "AUTO":     t("mode_auto_label"),
-                            "BASIC":    t("mode_basic_label"),
-                            "ADVANCED": t("mode_advanced_label"),
-                        },
+                        options=_mode_options(t=t, auto_engine_available=auto_engine_available),
                         value=mode_value,
                         label=t("mode_label"),
                     ).props("dense outlined").classes("flex-1"),
@@ -112,6 +121,9 @@ def build_basic_tab(*, t: Callable, get_val: Callable) -> None:
                     t("mode_apply_defaults_btn"),
                     on_click=lambda: _apply_mode_defaults(t=t, get_val=get_val),
                 ).props('color="secondary" outline')
+
+            if not auto_engine_available:
+                ui.label(t("auto_mode_packaged_only_help")).classes("text-sm text-amber-400")
 
             mode_desc = ui.column().classes("w-full")
             ctrl.register_container("mode_desc_scope", mode_desc)
@@ -146,7 +158,7 @@ def build_basic_tab(*, t: Callable, get_val: Callable) -> None:
                     )
                     bass_value, bass_disabled = _bass_integration_control_state(
                         get_val("bass_integration_enable", False),
-                        engine_available=bass_engine_available,
+                        engine_available=bool(auto_engine_available and bass_engine_available),
                     )
                     bass_integration_checkbox = ui.checkbox(
                         t("bass_integration_enable"),

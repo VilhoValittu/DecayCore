@@ -27,7 +27,11 @@ from ..shared_parts import (
 logger = logging.getLogger("DecayCore")
 AUTO_MODE_PREFER_BASS_MAX_NET_BOOST_HARD_GATE_DB = 12.0
 
-from .ranking_gates import _auto_hard_gate_reasons, _auto_rank_value, filter_hard_failed_candidates
+from .ranking_gates import (
+    _auto_hard_gate_reasons,
+    _auto_rank_value,
+    filter_hard_failed_candidates,
+)
 from .ranking_refine import _auto_rank_key_goal
 from .ranking_phase2 import _auto_phase2_pareto_front, _auto_phase2_pick_pareto_winner
 from .ranking_target import _auto_target_bass_forward_candidates, _auto_target_result_rank_key, _auto_target_result_tie_key
@@ -146,6 +150,43 @@ def _select_phase2_pareto_winner(pool: list[dict]) -> dict | None:
     return None
 
 
+def _select_rank_metrics_winner(pool: list[dict], *, goal: str) -> dict:
+    """Delegate deterministic hard-gate-aware rank-key selection to Rust."""
+    from ..native_engine import select_best_index  # noqa: PLC0415
+
+    _, diagnostics = filter_hard_failed_candidates(pool, goal=goal)
+    rank_keys = np.asarray(
+        [
+            tuple(_auto_rank_key_goal(dict(item.get("metrics", {}) or {}), goal=goal))
+            for item in pool
+        ],
+        dtype=np.float64,
+    )
+    hard_gate_failed = np.asarray(
+        [bool(diag.get("hard_gate_failed", False)) for diag in diagnostics],
+        dtype=np.bool_,
+    )
+    selection = select_best_index(rank_keys, hard_gate_failed)
+    winner_index = int(selection["winner_index"])
+    dropped = int(selection.get("hard_failed_count", 0) or 0)
+    if bool(selection.get("all_hard_failed", False)):
+        logger.warning(
+            "Auto-mode native selection has no non-hard-gated candidates; "
+            "using deterministic ranked fallback (n=%d, policy=%d).",
+            int(len(pool)),
+            int(selection.get("engine_policy_version", 0) or 0),
+        )
+    elif dropped > 0:
+        logger.info(
+            "Auto-mode native selection skipped %d hard-gated candidate(s) (policy=%d).",
+            dropped,
+            int(selection.get("engine_policy_version", 0) or 0),
+        )
+    winner = dict(pool[winner_index])
+    winner["_auto_native_selection"] = dict(selection)
+    return winner
+
+
 def _auto_select_best_scored(scored: list[dict], *, goal: str = AUTO_MODE_GOAL_DEFAULT) -> dict | None:
     pool = [dict(x or {}) for x in (scored or []) if isinstance(x, dict)]
     if not pool:
@@ -153,23 +194,19 @@ def _auto_select_best_scored(scored: list[dict], *, goal: str = AUTO_MODE_GOAL_D
 
     pool = _select_apply_mag_c_floor(pool)
     pool = _select_apply_finite_rank_filter(pool)
-    pool = _select_apply_hard_gate_filter(pool, goal=goal)
 
     select_kind = str(pool[0].get("_auto_select_kind", "rank_metrics") or "rank_metrics").strip().lower()
     if select_kind == "target_curve":
+        pool = _select_apply_hard_gate_filter(pool, goal=goal)
         return _select_target_curve_winner(pool)
 
     if select_kind == "phase2_pareto":
+        pool = _select_apply_hard_gate_filter(pool, goal=goal)
         winner = _select_phase2_pareto_winner(pool)
         if isinstance(winner, dict):
             return winner
 
-    return dict(
-        sorted(
-            pool,
-            key=lambda it: _auto_rank_key_goal(dict(it.get("metrics", {}) or {}), goal=goal),
-        )[0]
-    )
+    return _select_rank_metrics_winner(pool, goal=goal)
 
 
 def _auto_reject(metrics: dict, st_l: dict | None, st_r: dict | None, goal: str) -> bool:

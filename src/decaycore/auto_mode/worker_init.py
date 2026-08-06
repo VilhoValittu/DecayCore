@@ -17,7 +17,7 @@ def _auto_worker_init() -> None:
     """Pre-import the DSP hot-path modules in a fresh worker process.
 
     Called once per worker process at startup. The DSP kernels are native
-    Rust (with pure-Python fallbacks), so no JIT warm-up is required; importing
+    packaged Rust engine, so no JIT warm-up is required; importing
     the modules here just moves their one-time import cost out of the first
     trial executed in each worker.
     """

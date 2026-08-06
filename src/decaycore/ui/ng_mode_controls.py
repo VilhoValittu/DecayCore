@@ -27,6 +27,7 @@ from ..config.pipeline_parts import (
     filter_type_supports_xo_phase_model,
     multi_rate_target_rates,
 )
+from ..features import has_packaged_auto_engine
 from ..ui_i18n import (
     LVL_MODE_AUTO,
     LVL_MODE_MANUAL,
@@ -50,6 +51,9 @@ def on_mode_change(*, mode: str, t: Callable) -> None:
     Mirrors PyWebIO _on_mode_change() from callbacks.py.
     """
     mode_u = str(mode or "BASIC").strip().upper()
+    if mode_u == "AUTO" and not has_packaged_auto_engine():
+        mode_u = "BASIC"
+        ctrl.set_value("mode", mode_u, emit=False)
     is_auto = mode_u == "AUTO"
     is_advanced = mode_u == "ADVANCED"
 
