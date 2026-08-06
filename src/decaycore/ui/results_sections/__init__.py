@@ -11,6 +11,10 @@
 from .bass_integration import _render_bass_integration
 from .overview import (
     _format_recommended_xo_hz,
+    _download_filter_bundle,
+    _filter_download_filename,
+    _filter_download_payload,
+    _render_filter_download,
     render_results,
     _esc,
     _metric_table_html,
@@ -42,6 +46,9 @@ __all__ = [
     '_esc',
     '_fmt_biquad',
     '_fmt_external_iir_hpf',
+    '_download_filter_bundle',
+    '_filter_download_filename',
+    '_filter_download_payload',
     '_format_recommended_xo_hz',
     '_metric_table_html',
     '_rejected_reasons',
@@ -51,6 +58,7 @@ __all__ = [
     '_render_hybrid_iir_cuts',
     '_render_ir_alignment',
     '_render_lr_difference',
+    '_render_filter_download',
     '_render_plots_and_export',
     'clear_plot_render_cache',
     '_render_run_overview',

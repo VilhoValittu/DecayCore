@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import time
 from typing import Any
 
@@ -113,6 +114,66 @@ def _publish_done_status(done_msg: str, done_status: str, run_started_at) -> Non
         ui_state.update_status(f"{done_status} | {total_s:.1f} s")
     except _RECOVERABLE_UI_EXCEPTIONS:
         ui_state.update_status(done_status)
+
+
+def _filter_download_payload(zip_buffer) -> bytes | None:
+    try:
+        raw_payload = (
+            zip_buffer
+            if isinstance(zip_buffer, (bytes, bytearray, memoryview))
+            else zip_buffer.getvalue()
+        )
+        payload = bytes(raw_payload)
+    except (AttributeError, TypeError, ValueError, BufferError, OSError):
+        logger.warning("Filter ZIP payload is unavailable", exc_info=True)
+        return None
+    return payload or None
+
+
+def _filter_download_filename(fname) -> str:
+    filename = os.path.basename(str(fname or "").replace("\\", "/")).strip()
+    return filename if filename.lower().endswith(".zip") else "DecayCore_filters.zip"
+
+
+def _download_filter_bundle(*, payload: bytes | None, filename: str) -> None:
+    from nicegui import ui  # noqa: PLC0415
+
+    if not payload:
+        ui.notify(
+            t("results_download_unavailable"),
+            type="warning",
+            position="top",
+        )
+        return
+    ui.download(
+        payload,
+        filename=_filter_download_filename(filename),
+        media_type="application/zip",
+    )
+
+
+def _render_filter_download(*, fname, zip_buffer) -> None:
+    from nicegui import ui  # noqa: PLC0415
+
+    payload = _filter_download_payload(zip_buffer)
+    if payload is None:
+        return
+    filename = _filter_download_filename(fname)
+    with ui.card().classes("w-full mt-4 items-center text-center"):
+        ui.label(t("results_download_title")).classes("text-lg font-semibold")
+        ui.label(t("results_download_description")).classes(
+            "text-sm text-gray-400 max-w-2xl"
+        )
+        ui.button(
+            t("results_download_button"),
+            icon="download",
+            on_click=lambda: _download_filter_bundle(
+                payload=payload,
+                filename=filename,
+            ),
+        ).props("color=primary no-caps").classes("mt-2").tooltip(
+            t("results_download_tooltip")
+        )
 
 
 def _update_last_run_info(l_st_f, r_st_f) -> None:
@@ -223,6 +284,7 @@ def render_results(
         _render_ir_alignment(l_st_f=l_st_f)
         _render_dsp_quality(data=data, l_st_f=l_st_f, r_st_f=r_st_f, psl_str=psl_str)
         _render_lr_difference(l_st_f=l_st_f, r_st_f=r_st_f)
+        _render_filter_download(fname=fname, zip_buffer=zip_buffer)
 
     done_msg = t("done_msg")
     done_status = _format_done_status(t("stat_done"), saved_filters_dir)
