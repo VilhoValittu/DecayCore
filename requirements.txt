@@ -4,5 +4,5 @@ numpy==2.4.6
 scipy==1.17.1
 nicegui==3.13.0
 plotly==6.8.0
-optuna==4.9.0
+
 

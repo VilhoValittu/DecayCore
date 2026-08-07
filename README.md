@@ -83,7 +83,6 @@ The main source environment currently documented by `requirements.txt` uses thes
 - `scipy==1.17.1`
 - `nicegui==3.13.0`
 - `plotly==6.8.0`
-- `optuna==4.9.0`
 
 > `numba` was removed in v1.1.6. Public source builds may optionally compile the
 > `decaycore-dsp` Rust extension for faster manual filtering. Automatic mode uses

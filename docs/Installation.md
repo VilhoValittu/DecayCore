@@ -26,7 +26,7 @@ All DecayCore versions released and documented in this repository are based on P
 
 Current dependency baselines from the repository requirement files are:
 
-- `requirements.txt`: `numpy==2.4.6`, `scipy==1.17.1`, `nicegui==3.13.0`, `plotly==6.8.0`, `optuna==4.9.0`
+- `requirements.txt`: `numpy==2.4.6`, `scipy==1.17.1`, `nicegui==3.13.0`, `plotly==6.8.0`
 
 From v1.1.6 onwards `numba` is no longer used. The public manual-filtering DSP hot paths can be accelerated by the optional `decaycore-dsp` Rust extension. Automatic mode uses a separate native decision engine bundled only in packaged releases. A source checkout therefore supports Basic and Advanced manual filtering, but does not enable Automatic mode.
 
