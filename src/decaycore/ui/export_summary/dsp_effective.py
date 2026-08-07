@@ -26,10 +26,17 @@ from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
 logger = logging.getLogger(__name__)
 from ...dsp.smoothing import AFDW_BW_MAX_OCT, AFDW_BW_MIN_OCT
 from ...auto_mode.audit_trail import build_auto_mode_audit_trail
-from ...auto_mode.rank_score import attach_official_rank_score, calibrated_auto_quality, display_rank_score, official_rank_score, _quality_band
+from ...auto_mode.rank_score import (
+    attach_official_rank_score,
+    calibrated_auto_quality,
+    display_rank_score,
+    official_rank_score,
+    _quality_band,
+)
 from ..export_scoring import _pick_metric, _safe_float
 
 _AUTO_ASYM_PHASE1_SEARCH_SPACE_EST = 1877500016615829065655090169509480
+
 
 def _decision_fmt_hz(value, *, decimals: int = 1) -> str:
     v = _safe_float(value, float("nan"))
@@ -39,6 +46,7 @@ def _decision_fmt_hz(value, *, decimals: int = 1) -> str:
         return f"{float(v):.0f} Hz"
     return f"{float(v):.{int(decimals)}f} Hz"
 
+
 def _decision_fmt_db(value, *, signed: bool = False) -> str:
     v = _safe_float(value, float("nan"))
     if not math.isfinite(float(v)):
@@ -46,9 +54,11 @@ def _decision_fmt_db(value, *, signed: bool = False) -> str:
     sign = "+" if bool(signed) else ""
     return f"{float(v):{sign}.2f} dB"
 
+
 def _decision_fmt_ms(value) -> str:
     v = _safe_float(value, float("nan"))
     return f"{float(v):+.3f} ms" if math.isfinite(float(v)) else "n/a"
+
 
 def _decision_pick_float(*values) -> float:
     for value in values:
@@ -57,38 +67,59 @@ def _decision_pick_float(*values) -> float:
             return float(v)
     return float("nan")
 
+
 def _decision_value(data: dict, best_preset: dict, key: str, default=float("nan")):
     for src in (data, best_preset):
         if isinstance(src, dict) and key in src:
             return src.get(key)
     return default
 
+
 def _decision_filter_label(data: dict) -> str:
     raw = str(data.get("filter_type", data.get("filter_type_str", "")) or "").strip()
     return raw or "n/a"
 
+
 def _decision_label(value) -> str:
     return str(value).replace("_", " ").strip()
+
 
 def _decision_correction_range(data: dict, best_preset: dict) -> list[str]:
     mag_min = _decision_pick_float(_decision_value(data, best_preset, "mag_c_min"))
     mag_max = _decision_pick_float(_decision_value(data, best_preset, "mag_c_max"))
     lines = []
     if math.isfinite(mag_min) or math.isfinite(mag_max):
-        lines.append(f"Magnitude correction band: {_decision_fmt_hz(mag_min)} - {_decision_fmt_hz(mag_max)}")
+        lines.append(
+            f"Magnitude correction band: {_decision_fmt_hz(mag_min)} - {_decision_fmt_hz(mag_max)}"
+        )
 
-    full_hz = _decision_pick_float(_decision_value(data, best_preset, "low_freq_full_correction_hz"))
-    no_hz = _decision_pick_float(_decision_value(data, best_preset, "high_freq_no_correction_hz"))
+    full_hz = _decision_pick_float(
+        _decision_value(data, best_preset, "low_freq_full_correction_hz")
+    )
+    no_hz = _decision_pick_float(
+        _decision_value(data, best_preset, "high_freq_no_correction_hz")
+    )
     if math.isfinite(full_hz) or math.isfinite(no_hz):
-        lines.append(f"Correction taper: full <= {_decision_fmt_hz(full_hz)}, off by {_decision_fmt_hz(no_hz)}")
+        lines.append(
+            f"Correction taper: full <= {_decision_fmt_hz(full_hz)}, off by {_decision_fmt_hz(no_hz)}"
+        )
 
-    low_cut_enabled = bool(_decision_value(data, best_preset, "low_bass_cut_enable", False))
-    low_cut_hz = _decision_pick_float(_decision_value(data, best_preset, "low_bass_cut_hz"))
+    low_cut_enabled = bool(
+        _decision_value(data, best_preset, "low_bass_cut_enable", False)
+    )
+    low_cut_hz = _decision_pick_float(
+        _decision_value(data, best_preset, "low_bass_cut_hz")
+    )
     if low_cut_enabled and math.isfinite(low_cut_hz) and low_cut_hz > 0.0:
-        lines.append(f"Low-bass boost lock: cuts only below {_decision_fmt_hz(low_cut_hz)}")
+        lines.append(
+            f"Low-bass boost lock: cuts only below {_decision_fmt_hz(low_cut_hz)}"
+        )
     return lines
 
-def _decision_gain_limits(data: dict, best_preset: dict, l_st: dict, r_st: dict) -> list[str]:
+
+def _decision_gain_limits(
+    data: dict, best_preset: dict, l_st: dict, r_st: dict
+) -> list[str]:
     max_boost = _decision_pick_float(
         l_st.get("max_boost_db_effective"),
         r_st.get("max_boost_db_effective"),
@@ -102,15 +133,21 @@ def _decision_gain_limits(data: dict, best_preset: dict, l_st: dict, r_st: dict)
             _decision_value(data, best_preset, "max_cut_db"),
         )
     )
-    boost_l = _decision_pick_float(l_st.get("boost_peak_db"), l_st.get("net_boost_peak_db"))
-    boost_r = _decision_pick_float(r_st.get("boost_peak_db"), r_st.get("net_boost_peak_db"))
+    boost_l = _decision_pick_float(
+        l_st.get("boost_peak_db"), l_st.get("net_boost_peak_db")
+    )
+    boost_r = _decision_pick_float(
+        r_st.get("boost_peak_db"), r_st.get("net_boost_peak_db")
+    )
     cut_l = _decision_pick_float(l_st.get("cut_peak_db"))
     cut_r = _decision_pick_float(r_st.get("cut_peak_db"))
     net_l = _decision_pick_float(l_st.get("net_boost_peak_db"))
     net_r = _decision_pick_float(r_st.get("net_boost_peak_db"))
 
     cut_limit = f"-{max_cut:.2f} dB" if math.isfinite(float(max_cut)) else "n/a"
-    lines = [f"Limits: boost <= {_decision_fmt_db(max_boost)}, attenuation >= {cut_limit}"]
+    lines = [
+        f"Limits: boost <= {_decision_fmt_db(max_boost)}, attenuation >= {cut_limit}"
+    ]
     if any(math.isfinite(v) for v in (boost_l, boost_r, cut_l, cut_r)):
         lines.append(
             "Realized correction: "
@@ -118,21 +155,34 @@ def _decision_gain_limits(data: dict, best_preset: dict, l_st: dict, r_st: dict)
             f"cut L/R {_decision_fmt_db(cut_l)} / {_decision_fmt_db(cut_r)}"
         )
     if any(math.isfinite(v) for v in (net_l, net_r)):
-        lines.append(f"Post-gain net boost peak L/R: {_decision_fmt_db(net_l, signed=True)} / {_decision_fmt_db(net_r, signed=True)}")
+        lines.append(
+            f"Post-gain net boost peak L/R: {_decision_fmt_db(net_l, signed=True)} / {_decision_fmt_db(net_r, signed=True)}"
+        )
     return lines
 
-def _decision_phase_tdc(data: dict, best_preset: dict, bm: dict, l_st: dict, r_st: dict) -> list[str]:
+
+def _decision_phase_tdc(
+    data: dict, best_preset: dict, bm: dict, l_st: dict, r_st: dict
+) -> list[str]:
     filter_type = _decision_filter_label(data)
     phase_bits = [f"Filter type: {filter_type}"]
     ft_l = filter_type.lower()
     if "mixed" in ft_l:
-        mixed_freq = _decision_pick_float(_decision_value(data, best_preset, "mixed_freq"))
+        mixed_freq = _decision_pick_float(
+            _decision_value(data, best_preset, "mixed_freq")
+        )
         phase_bits.append(f"mixed transition {_decision_fmt_hz(mixed_freq)}")
     elif "linear" in ft_l or "asym" in ft_l:
-        phase_limit = _decision_pick_float(_decision_value(data, best_preset, "phase_limit"))
+        phase_limit = _decision_pick_float(
+            _decision_value(data, best_preset, "phase_limit")
+        )
         realized = [
-            _decision_pick_float(l_st.get("mixed_phase_no_correction_hz"), l_st.get("phase_limit_hz")),
-            _decision_pick_float(r_st.get("mixed_phase_no_correction_hz"), r_st.get("phase_limit_hz")),
+            _decision_pick_float(
+                l_st.get("mixed_phase_no_correction_hz"), l_st.get("phase_limit_hz")
+            ),
+            _decision_pick_float(
+                r_st.get("mixed_phase_no_correction_hz"), r_st.get("phase_limit_hz")
+            ),
         ]
         if any(math.isfinite(v) for v in realized):
             phase_bits.append(
@@ -146,16 +196,22 @@ def _decision_phase_tdc(data: dict, best_preset: dict, bm: dict, l_st: dict, r_s
     gd_after_l = _decision_pick_float(l_st.get("phase_realized_gd_after_rms_ms"))
     gd_before_r = _decision_pick_float(r_st.get("phase_realized_gd_before_rms_ms"))
     gd_after_r = _decision_pick_float(r_st.get("phase_realized_gd_after_rms_ms"))
-    if any(math.isfinite(v) for v in (gd_before_l, gd_after_l, gd_before_r, gd_after_r)):
+    if any(
+        math.isfinite(v) for v in (gd_before_l, gd_after_l, gd_before_r, gd_after_r)
+    ):
         lines.append(
             "Final-FIR system GD RMS before -> after: "
             f"L {_decision_fmt_ms(gd_before_l)} -> {_decision_fmt_ms(gd_after_l)}, "
             f"R {_decision_fmt_ms(gd_before_r)} -> {_decision_fmt_ms(gd_after_r)}"
         )
     if bool(data.get("enable_tdc", False)):
-        strength = _decision_pick_float(_decision_value(data, best_preset, "tdc_strength"))
+        strength = _decision_pick_float(
+            _decision_value(data, best_preset, "tdc_strength")
+        )
         decision = str(bm.get("tdc_decision", "") or "").replace("_", " ").strip()
-        decay_penalty = _decision_pick_float(bm.get("tdc_decay_penalty"), bm.get("decay_penalty"))
+        decay_penalty = _decision_pick_float(
+            bm.get("tdc_decay_penalty"), bm.get("decay_penalty")
+        )
         tdc_line = f"TDC: ON, strength {strength:.1f}%"
         if decision:
             tdc_line += f", decision {decision}"
@@ -166,6 +222,7 @@ def _decision_phase_tdc(data: dict, best_preset: dict, bm: dict, l_st: dict, r_s
         lines.append("TDC: OFF")
     return lines
 
+
 def _decision_bass_status(data: dict, bm: dict) -> list[str]:
     if not bool(data.get("bass_integration_enable", False)):
         return ["Bass integration: OFF"]
@@ -173,11 +230,23 @@ def _decision_bass_status(data: dict, bm: dict) -> list[str]:
     diag = dict(bi_meta.get("diagnostics", {}) or {})
     align = dict(bi_meta.get("alignment", {}) or {})
     mode = str(data.get("bass_integration_mode", "direct_dac") or "direct_dac")
-    feasibility = str(diag.get("feasibility_class", bm.get("bass_feasibility_class", "")) or "").strip()
-    reason = str(diag.get("feasibility_reason", bm.get("bass_feasibility_reason", "")) or "").strip()
-    delay = _decision_pick_float(align.get("delay_ms"), data.get("bass_integration_sub_delay_ms"))
-    gain = _decision_pick_float(align.get("gain_trim_db"), data.get("bass_integration_sub_gain_trim_db"))
-    polarity = "inverted" if bool(data.get("bass_integration_sub_polarity_invert", False)) else "normal"
+    feasibility = str(
+        diag.get("feasibility_class", bm.get("bass_feasibility_class", "")) or ""
+    ).strip()
+    reason = str(
+        diag.get("feasibility_reason", bm.get("bass_feasibility_reason", "")) or ""
+    ).strip()
+    delay = _decision_pick_float(
+        align.get("delay_ms"), data.get("bass_integration_sub_delay_ms")
+    )
+    gain = _decision_pick_float(
+        align.get("gain_trim_db"), data.get("bass_integration_sub_gain_trim_db")
+    )
+    polarity = (
+        "inverted"
+        if bool(data.get("bass_integration_sub_polarity_invert", False))
+        else "normal"
+    )
     line = f"Bass integration: ON ({mode})"
     if feasibility:
         line += f", feasibility {feasibility.upper()}"
@@ -186,33 +255,67 @@ def _decision_bass_status(data: dict, bm: dict) -> list[str]:
     settings = f"Sub alignment: delay {_decision_fmt_ms(delay)}, gain {_decision_fmt_db(gain, signed=True)}, polarity {polarity}"
     return [line, settings]
 
+
 def _decision_rejected_risks(auto_meta: dict, bm: dict) -> list[str]:
     audit = _audit_dict(auto_meta.get("audit_trail"))
     hard_gates = _audit_dict(audit.get("hard_gates"))
     failures = [
         str(item).strip()
-        for item in _audit_list(hard_gates.get("hard_gate_failures", bm.get("hard_gate_failures", bm.get("hard_gate_reasons", []))))
+        for item in _audit_list(
+            hard_gates.get(
+                "hard_gate_failures",
+                bm.get("hard_gate_failures", bm.get("hard_gate_reasons", [])),
+            )
+        )
         if str(item).strip()
     ]
     risks: list[str] = []
     if failures:
-        risks.append("Hard gates: " + ", ".join(dict.fromkeys(_decision_label(item) for item in failures)))
+        risks.append(
+            "Hard gates: "
+            + ", ".join(dict.fromkeys(_decision_label(item) for item in failures))
+        )
     override = _audit_dict(hard_gates.get("winner_override"))
     if override:
         state = "applied" if bool(override.get("applied", False)) else "not applied"
         reason = str(override.get("reason", "") or "").strip()
-        risks.append(f"Winner safety override: {state}" + (f" ({reason})" if reason else ""))
+        risks.append(
+            f"Winner safety override: {state}" + (f" ({reason})" if reason else "")
+        )
     p6_severity = str(bm.get("final_ir_validation_severity", "") or "").strip()
-    p6_reasons = [_decision_label(item) for item in list(bm.get("final_ir_validation_reasons", []) or []) if str(item or "").strip()]
+    p6_reasons = [
+        _decision_label(item)
+        for item in list(bm.get("final_ir_validation_reasons", []) or [])
+        if str(item or "").strip()
+    ]
     if p6_severity:
-        risks.append(f"Final IR validation: {p6_severity}" + (f" ({', '.join(p6_reasons[:4])})" if p6_reasons else ""))
-    bass_gate = bool(bm.get("bass_integration_hard_gate_failed", False) or "bass_integration_infeasible_hard_gate" in failures)
+        risks.append(
+            f"Final IR validation: {p6_severity}"
+            + (f" ({', '.join(p6_reasons[:4])})" if p6_reasons else "")
+        )
+    bass_gate = bool(
+        bm.get("bass_integration_hard_gate_failed", False)
+        or "bass_integration_infeasible_hard_gate" in failures
+    )
     if bass_gate:
-        reason = str(bm.get("bass_integration_hard_gate_reason", bm.get("bass_feasibility_reason", "")) or "").strip()
+        reason = str(
+            bm.get(
+                "bass_integration_hard_gate_reason",
+                bm.get("bass_feasibility_reason", ""),
+            )
+            or ""
+        ).strip()
         risks.append("Bass integration hard gate" + (f": {reason}" if reason else ""))
     return risks or ["No rejected hard-gate risks reported."]
 
-def _append_export_decision_summary(summary_content: str, data: dict | None, fs_v: int, l_st: dict | None, r_st: dict | None) -> str:
+
+def _append_export_decision_summary(
+    summary_content: str,
+    data: dict | None,
+    fs_v: int,
+    l_st: dict | None,
+    r_st: dict | None,
+) -> str:
     try:
         ui_data = dict(data or {})
         auto_meta = dict(ui_data.get("_auto_mode_meta", {}) or {})
@@ -220,7 +323,10 @@ def _append_export_decision_summary(summary_content: str, data: dict | None, fs_
         bm = attach_official_rank_score(auto_meta.get("best_metrics", {}) or {})
         left = dict(l_st or {})
         right = dict(r_st or {})
-        lines: list[str] = ["\n=== DECISION SUMMARY ===", f"Sample rate: {int(fs_v)} Hz"]
+        lines: list[str] = [
+            "\n=== DECISION SUMMARY ===",
+            f"Sample rate: {int(fs_v)} Hz",
+        ]
         for group in (
             _decision_correction_range(ui_data, best_preset),
             _decision_gain_limits(ui_data, best_preset, left, right),
@@ -228,7 +334,10 @@ def _append_export_decision_summary(summary_content: str, data: dict | None, fs_
             _decision_bass_status(ui_data, bm),
         ):
             lines.extend(group)
-        lines.append("Rejected / contained risks: " + "; ".join(_decision_rejected_risks(auto_meta, bm)))
+        lines.append(
+            "Rejected / contained risks: "
+            + "; ".join(_decision_rejected_risks(auto_meta, bm))
+        )
         return summary_content + "\n".join(lines) + "\n"
     except (
         AttributeError,
@@ -243,7 +352,11 @@ def _append_export_decision_summary(summary_content: str, data: dict | None, fs_
         NameError,
     ) as exc:
         logger.exception("decision summary section")
-        return summary_content + f"\n=== DECISION SUMMARY ===\nCould not build decision summary: {type(exc).__name__}: {exc}\n"
+        return (
+            summary_content
+            + f"\n=== DECISION SUMMARY ===\nCould not build decision summary: {type(exc).__name__}: {exc}\n"
+        )
+
 
 def _append_dsp_effective_base_summary(summary_content, data, fs_v):
     enable_afdw = bool(data.get("enable_afdw", False))
@@ -254,7 +367,9 @@ def _append_dsp_effective_base_summary(summary_content, data, fs_v):
     afdw_min = max(3.0, fdw_cycles / 3.0)
     afdw_min_oct_width = (2.0 / afdw_min) if afdw_min > 0 else 0.0
     fdw_oct_width = float(max(AFDW_BW_MIN_OCT, min(AFDW_BW_MAX_OCT, fdw_oct_width)))
-    afdw_min_oct_width = float(max(AFDW_BW_MIN_OCT, min(AFDW_BW_MAX_OCT, afdw_min_oct_width)))
+    afdw_min_oct_width = float(
+        max(AFDW_BW_MIN_OCT, min(AFDW_BW_MAX_OCT, afdw_min_oct_width))
+    )
 
     df_on = bool(data.get("df_smoothing", False))
     df_ref = 44100.0 / 65536.0
@@ -284,7 +399,9 @@ def _append_dsp_effective_base_summary(summary_content, data, fs_v):
     ):
         logger.exception("output tilt summary line")
     try:
-        psl = str(data.get("plot_smoothing_level", "Psychoacoustic") or "Psychoacoustic").strip()
+        psl = str(
+            data.get("plot_smoothing_level", "Psychoacoustic") or "Psychoacoustic"
+        ).strip()
         psl_display = "DecayCore Reference" if "psy" in psl.lower() else psl
         summary_content += f"Plot smoothing: {psl_display}\n"
     except (
@@ -303,49 +420,70 @@ def _append_dsp_effective_base_summary(summary_content, data, fs_v):
 
     if enable_afdw:
         summary_content += "FDW mode: Adaptive (A-FDW)\n"
-        summary_content += f"FDW base cycles: {fdw_cycles:.2f}  (oct width -> {fdw_oct_width:.3f})\n"
+        summary_content += (
+            f"FDW base cycles: {fdw_cycles:.2f}  (oct width -> {fdw_oct_width:.3f})\n"
+        )
         summary_content += f"FDW min cycles:  {afdw_min:.2f}  (oct width -> {afdw_min_oct_width:.3f})\n"
         summary_content += "Note: A-FDW adapts per frequency/confidence; values above are the configured baseline.\n"
     else:
         summary_content += "FDW mode: Fixed\n"
-        summary_content += f"FDW cycles: {fdw_cycles:.2f}  (oct width -> {fdw_oct_width:.3f})\n"
+        summary_content += (
+            f"FDW cycles: {fdw_cycles:.2f}  (oct width -> {fdw_oct_width:.3f})\n"
+        )
 
     summary_content += f"TDC: {'ON' if enable_tdc else 'OFF'}\n"
     if enable_tdc:
         summary_content += f"TDC strength: {tdc_strength:.1f}% (base_strength = {tdc_strength / 100.0:.3f})\n"
-        tdc_peak = _safe_float(data.get("tdc_peak_reduction_db", float("nan")), float("nan"))
+        tdc_peak = _safe_float(
+            data.get("tdc_peak_reduction_db", float("nan")), float("nan")
+        )
         if math.isfinite(tdc_peak) and tdc_peak > 0.0:
-            tdc_peak_hz = _safe_float(data.get("tdc_peak_reduction_hz", float("nan")), float("nan"))
+            tdc_peak_hz = _safe_float(
+                data.get("tdc_peak_reduction_hz", float("nan")), float("nan")
+            )
             tdc_events = int(round(_safe_float(data.get("tdc_events_used", 0.0), 0.0)))
             if math.isfinite(tdc_peak_hz) and tdc_peak_hz > 0.0:
                 summary_content += f"TDC applied peak: {tdc_peak:.2f} dB @ {tdc_peak_hz:.1f} Hz ({tdc_events} events)\n"
             else:
-                summary_content += f"TDC applied peak: {tdc_peak:.2f} dB ({tdc_events} events)\n"
+                summary_content += (
+                    f"TDC applied peak: {tdc_peak:.2f} dB ({tdc_events} events)\n"
+                )
 
     summary_content += f"DF smoothing: {'ON' if df_on else 'OFF'}\n"
     if df_on:
-        summary_content += f"DF smoothing sigma: {sigma_bins:.1f} bins -> {sigma_hz:.2f} Hz\n"
+        summary_content += (
+            f"DF smoothing sigma: {sigma_bins:.1f} bins -> {sigma_hz:.2f} Hz\n"
+        )
 
     summary_content = _append_main_speaker_xo_hpf_summary(summary_content, data)
     summary_content = _append_bass_integration_summary(summary_content, data)
-    summary_content = _append_bass_integration_allpass_auto_summary(summary_content, data)
+    summary_content = _append_bass_integration_allpass_auto_summary(
+        summary_content, data
+    )
     return summary_content
+
 
 def _audit_dict(value) -> dict:
     return dict(value or {}) if isinstance(value, dict) else {}
 
+
 def _audit_list(value) -> list:
     return list(value or []) if isinstance(value, (list, tuple)) else []
+
 
 def _audit_fmt_score(value) -> str:
     v = _safe_float(value, float("nan"))
     return f"{float(v):.3f}" if math.isfinite(float(v)) else "n/a"
 
+
 def _audit_fmt_avg(value) -> str:
     v = _safe_float(value, float("nan"))
     return f"{float(v):.3f}" if math.isfinite(float(v)) else "n/a"
 
-def _auto_audit_from_meta(data: dict, auto_meta: dict, bm: dict, bp: dict, optimizer_backend: str) -> dict:
+
+def _auto_audit_from_meta(
+    data: dict, auto_meta: dict, bm: dict, bp: dict, optimizer_backend: str
+) -> dict:
     audit = _audit_dict(auto_meta.get("audit_trail"))
     if audit:
         return dict(audit)
@@ -353,11 +491,24 @@ def _auto_audit_from_meta(data: dict, auto_meta: dict, bm: dict, bp: dict, optim
         best_metrics=bm,
         best_preset=bp,
         winner_explanation=_audit_dict(auto_meta.get("winner_explanation")),
-        residual_peak_safety_override_meta=_audit_dict(auto_meta.get("residual_peak_safety_override")),
-        optimizer_backend=str(optimizer_backend or auto_meta.get("optimizer_backend", "builtin") or "builtin"),
-        goal=str(auto_meta.get("auto_goal", data.get("auto_goal", "balanced")) or "balanced"),
-        selection_basis=str(auto_meta.get("selection_basis", "rank_score") or "rank_score"),
-        target_name=str(_audit_dict(auto_meta.get("winner_explanation")).get("target_name", "") or ""),
+        residual_peak_safety_override_meta=_audit_dict(
+            auto_meta.get("residual_peak_safety_override")
+        ),
+        optimizer_backend=str(
+            optimizer_backend
+            or auto_meta.get("optimizer_backend", "builtin")
+            or "builtin"
+        ),
+        goal=str(
+            auto_meta.get("auto_goal", data.get("auto_goal", "balanced")) or "balanced"
+        ),
+        selection_basis=str(
+            auto_meta.get("selection_basis", "rank_score") or "rank_score"
+        ),
+        target_name=str(
+            _audit_dict(auto_meta.get("winner_explanation")).get("target_name", "")
+            or ""
+        ),
         target_meta=_audit_dict(data.get("_auto_target_curve_meta")),
         top=_audit_list(auto_meta.get("top")),
         cache_info={},
@@ -378,6 +529,7 @@ def _auto_audit_from_meta(data: dict, auto_meta: dict, bm: dict, bp: dict, optim
         source="summary_reconstructed",
     )
 
+
 def _append_dsp_effective_auto_audit_summary(
     summary_content: str,
     data: dict,
@@ -395,9 +547,16 @@ def _append_dsp_effective_auto_audit_summary(
     search = _audit_dict(audit.get("search"))
     cache = _audit_dict(audit.get("cache"))
 
-    goal = str(selection.get("goal", auto_meta.get("auto_goal", "balanced")) or "balanced")
-    basis = str(selection.get("basis", auto_meta.get("selection_basis", "rank_score")) or "rank_score")
-    backend = str(selection.get("optimizer_backend", optimizer_backend or "builtin") or "builtin")
+    goal = str(
+        selection.get("goal", auto_meta.get("auto_goal", "balanced")) or "balanced"
+    )
+    basis = str(
+        selection.get("basis", auto_meta.get("selection_basis", "rank_score"))
+        or "rank_score"
+    )
+    backend = str(
+        selection.get("optimizer_backend", optimizer_backend or "builtin") or "builtin"
+    )
     summary_content += "AUTO audit trail:\n"
     summary_content += (
         f"- Winner: rank {_audit_fmt_score(winner.get('rank_score_official'))}/100, "
@@ -408,13 +567,19 @@ def _append_dsp_effective_auto_audit_summary(
         summary_content += f"- Why: {why}\n"
 
     gate_status = str(hard_gates.get("status", "passed") or "passed").replace("_", " ")
-    failures = [str(item) for item in _audit_list(hard_gates.get("hard_gate_failures")) if str(item or "").strip()]
+    failures = [
+        str(item)
+        for item in _audit_list(hard_gates.get("hard_gate_failures"))
+        if str(item or "").strip()
+    ]
     failure_txt = f" ({', '.join(failures)})" if failures else ""
     summary_content += f"- Safety gates: {gate_status}{failure_txt}\n"
 
     override = _audit_dict(hard_gates.get("winner_override"))
     if override:
-        override_state = "applied" if bool(override.get("applied", False)) else "not applied"
+        override_state = (
+            "applied" if bool(override.get("applied", False)) else "not applied"
+        )
         override_reason = str(override.get("reason", "") or "").strip()
         reason_txt = f" ({override_reason})" if override_reason else ""
         summary_content += f"- Winner override: {override_state}{reason_txt}\n"
@@ -423,7 +588,9 @@ def _append_dsp_effective_auto_audit_summary(
         summary_content += f"- Fallback: {fallback_reason}\n"
 
     trials_ok = int(search.get("trials_ok", auto_meta.get("trials_ok", 0)) or 0)
-    trials_total = int(search.get("trials_total", auto_meta.get("trials_total", 0)) or 0)
+    trials_total = int(
+        search.get("trials_total", auto_meta.get("trials_total", 0)) or 0
+    )
     phase4 = _audit_dict(search.get("phase4_steps"))
     phase4_used = any(bool(v) for v in phase4.values())
     summary_content += (
@@ -431,7 +598,11 @@ def _append_dsp_effective_auto_audit_summary(
         f"phase4={'on' if phase4_used else 'off'}\n"
     )
 
-    target_name = str(selection.get("target_name", "") or _audit_dict(audit.get("target")).get("name", "") or "").strip()
+    target_name = str(
+        selection.get("target_name", "")
+        or _audit_dict(audit.get("target")).get("name", "")
+        or ""
+    ).strip()
     if target_name:
         summary_content += f"- Target: {target_name}\n"
 
@@ -445,6 +616,7 @@ def _append_dsp_effective_auto_audit_summary(
         )
     return summary_content
 
+
 def _append_dsp_effective_auto_mode_summary(summary_content, data):
     try:
         auto_meta = data.get("_auto_mode_meta", None)
@@ -453,15 +625,19 @@ def _append_dsp_effective_auto_mode_summary(summary_content, data):
             bp = dict(auto_meta.get("best_preset", {}) or {})
             tc = dict(data.get("_auto_target_curve_meta", {}) or {})
             best_rank = official_rank_score(bm)
-            summary_content += "\n=== CAMILLAFIR AUTOMATIC MODE ===\n"
+            summary_content += "\n=== DECAYCORE AUTOMATIC MODE ===\n"
             summary_content += (
                 f"Trials: {int(auto_meta.get('trials_ok', 0))}/{int(auto_meta.get('trials_total', 0))} "
                 f"(search grid: {int(auto_meta.get('search_fs', 0))} Hz, {int(auto_meta.get('search_taps', 0))} taps)\n"
             )
-            optimizer_backend = str(auto_meta.get("optimizer_backend", "") or "").strip()
+            optimizer_backend = str(
+                auto_meta.get("optimizer_backend", "") or ""
+            ).strip()
             if optimizer_backend:
                 summary_content += f"Optimizer backend: {optimizer_backend}\n"
-            residual_peak_polish = dict(auto_meta.get("residual_peak_winner_polish", {}) or {})
+            residual_peak_polish = dict(
+                auto_meta.get("residual_peak_winner_polish", {}) or {}
+            )
             summary_content = _append_dsp_effective_auto_audit_summary(
                 summary_content,
                 data,
@@ -470,10 +646,18 @@ def _append_dsp_effective_auto_mode_summary(summary_content, data):
                 bp,
                 optimizer_backend,
             )
-            summary_content = _append_dsp_effective_auto_tdc_summary(summary_content, data, auto_meta, bm, bp)
-            summary_content = _append_dsp_effective_auto_modal_summary(summary_content, bm)
-            summary_content = _append_dsp_effective_auto_winner_polish_summary(summary_content, auto_meta)
-            summary_content = _append_dsp_effective_auto_target_summary(summary_content, tc)
+            summary_content = _append_dsp_effective_auto_tdc_summary(
+                summary_content, data, auto_meta, bm, bp
+            )
+            summary_content = _append_dsp_effective_auto_modal_summary(
+                summary_content, bm
+            )
+            summary_content = _append_dsp_effective_auto_winner_polish_summary(
+                summary_content, auto_meta
+            )
+            summary_content = _append_dsp_effective_auto_target_summary(
+                summary_content, tc
+            )
             summary_content = _append_dsp_effective_auto_score_summary(
                 summary_content,
                 data,
@@ -482,8 +666,12 @@ def _append_dsp_effective_auto_mode_summary(summary_content, data):
                 best_rank,
                 residual_peak_polish,
             )
-            summary_content = _append_dsp_effective_auto_tracking_summary(summary_content, bm)
-            summary_content = _append_dsp_effective_auto_overfit_summary(summary_content, bm, residual_peak_polish)
+            summary_content = _append_dsp_effective_auto_tracking_summary(
+                summary_content, bm
+            )
+            summary_content = _append_dsp_effective_auto_overfit_summary(
+                summary_content, bm, residual_peak_polish
+            )
             summary_content = _append_dsp_effective_auto_tail_summary(
                 summary_content,
                 data,
@@ -959,28 +1147,54 @@ def _append_dsp_effective_auto_mode_summary(summary_content, data):
         logger.exception("best preset summary line")
     return summary_content
 
-def _append_dsp_effective_lines(summary_content: str, lines: list[tuple[bool, str]]) -> str:
+
+def _append_dsp_effective_lines(
+    summary_content: str, lines: list[tuple[bool, str]]
+) -> str:
     for enabled, line in lines:
         if enabled:
             summary_content += line
     return summary_content
 
-def _append_dsp_effective_auto_tdc_summary(summary_content: str, data, auto_meta: dict, bm: dict, bp: dict) -> str:
-    tdc_decay_pen = _safe_float(bm.get("tdc_decay_penalty", bm.get("decay_penalty", float("nan"))), float("nan"))
+
+def _append_dsp_effective_auto_tdc_summary(
+    summary_content: str, data, auto_meta: dict, bm: dict, bp: dict
+) -> str:
+    tdc_decay_pen = _safe_float(
+        bm.get("tdc_decay_penalty", bm.get("decay_penalty", float("nan"))), float("nan")
+    )
     if not math.isfinite(tdc_decay_pen):
         return summary_content
 
-    tdc_sel = _safe_float(bp.get("tdc_strength", data.get("tdc_strength", float("nan"))), float("nan"))
+    tdc_sel = _safe_float(
+        bp.get("tdc_strength", data.get("tdc_strength", float("nan"))), float("nan")
+    )
     tdc_need = _safe_float(bm.get("tdc_decay_need", float("nan")), float("nan"))
-    tdc_opt = _safe_float(bm.get("tdc_decay_optimum_strength", float("nan")), float("nan"))
+    tdc_opt = _safe_float(
+        bm.get("tdc_decay_optimum_strength", float("nan")), float("nan")
+    )
     tdc_weak = _safe_float(bm.get("tdc_weak_penalty", float("nan")), float("nan"))
-    tdc_overdamp = _safe_float(bm.get("tdc_overdamping_penalty", float("nan")), float("nan"))
-    tdc_overreach = _safe_float(bm.get("tdc_overreach_penalty", float("nan")), float("nan"))
-    tdc_imp = _safe_float(bm.get("modal_decay_improvement_estimate", float("nan")), float("nan"))
-    tdc_modal_excess = _safe_float(bm.get("modal_decay_excess_s", float("nan")), float("nan"))
-    tdc_modal_peak_excess = _safe_float(bm.get("strongest_modal_decay_excess_s", float("nan")), float("nan"))
-    tdc_mag_cost = _safe_float(bm.get("realized_rms_20_200_db", float("nan")), float("nan"))
-    tdc_modal_hz = _safe_float(bm.get("strongest_modal_decay_hz", float("nan")), float("nan"))
+    tdc_overdamp = _safe_float(
+        bm.get("tdc_overdamping_penalty", float("nan")), float("nan")
+    )
+    tdc_overreach = _safe_float(
+        bm.get("tdc_overreach_penalty", float("nan")), float("nan")
+    )
+    tdc_imp = _safe_float(
+        bm.get("modal_decay_improvement_estimate", float("nan")), float("nan")
+    )
+    tdc_modal_excess = _safe_float(
+        bm.get("modal_decay_excess_s", float("nan")), float("nan")
+    )
+    tdc_modal_peak_excess = _safe_float(
+        bm.get("strongest_modal_decay_excess_s", float("nan")), float("nan")
+    )
+    tdc_mag_cost = _safe_float(
+        bm.get("realized_rms_20_200_db", float("nan")), float("nan")
+    )
+    tdc_modal_hz = _safe_float(
+        bm.get("strongest_modal_decay_hz", float("nan")), float("nan")
+    )
     tdc_decision = str(bm.get("tdc_decision", "") or "").replace("_", " ").strip()
     tdc_hint = str(bm.get("tdc_action_hint", "") or "").replace("_", " ").strip()
     tdc_extreme = bool(bm.get("tdc_extreme_overreach", False))
@@ -992,7 +1206,9 @@ def _append_dsp_effective_auto_tdc_summary(summary_content: str, data, auto_meta
     if any(math.isfinite(v) for v in (tdc_weak, tdc_overdamp, tdc_overreach)):
         weak_txt = f"{tdc_weak:.2f}" if math.isfinite(tdc_weak) else "n/a"
         overdamp_txt = f"{tdc_overdamp:.2f}" if math.isfinite(tdc_overdamp) else "n/a"
-        overreach_txt = f"{tdc_overreach:.2f}" if math.isfinite(tdc_overreach) else "n/a"
+        overreach_txt = (
+            f"{tdc_overreach:.2f}" if math.isfinite(tdc_overreach) else "n/a"
+        )
         lines.append(
             (
                 True,
@@ -1002,12 +1218,30 @@ def _append_dsp_effective_auto_tdc_summary(summary_content: str, data, auto_meta
     lines.extend(
         [
             (math.isfinite(tdc_need), f"- Decay need: {tdc_need:.2f}\n"),
-            (math.isfinite(tdc_opt), f"- Estimated optimum strength: {tdc_opt * 100.0:.0f}%\n"),
-            (math.isfinite(tdc_modal_excess), f"- Modal decay excess: {tdc_modal_excess:.3f} s\n"),
-            (math.isfinite(tdc_imp), f"- Modal decay improvement estimate: {tdc_imp * 100.0:.0f}%\n"),
-            (math.isfinite(tdc_mag_cost), f"- Magnitude tradeoff estimate: {tdc_mag_cost:.2f} dB RMS (20-200 Hz)\n"),
-            (math.isfinite(tdc_modal_hz) and tdc_modal_hz > 0.0, f"- Strongest modal decay frequency: {tdc_modal_hz:.1f} Hz\n"),
-            (math.isfinite(tdc_modal_peak_excess), f"- Strongest modal decay excess: {tdc_modal_peak_excess:.3f} s\n"),
+            (
+                math.isfinite(tdc_opt),
+                f"- Estimated optimum strength: {tdc_opt * 100.0:.0f}%\n",
+            ),
+            (
+                math.isfinite(tdc_modal_excess),
+                f"- Modal decay excess: {tdc_modal_excess:.3f} s\n",
+            ),
+            (
+                math.isfinite(tdc_imp),
+                f"- Modal decay improvement estimate: {tdc_imp * 100.0:.0f}%\n",
+            ),
+            (
+                math.isfinite(tdc_mag_cost),
+                f"- Magnitude tradeoff estimate: {tdc_mag_cost:.2f} dB RMS (20-200 Hz)\n",
+            ),
+            (
+                math.isfinite(tdc_modal_hz) and tdc_modal_hz > 0.0,
+                f"- Strongest modal decay frequency: {tdc_modal_hz:.1f} Hz\n",
+            ),
+            (
+                math.isfinite(tdc_modal_peak_excess),
+                f"- Strongest modal decay excess: {tdc_modal_peak_excess:.3f} s\n",
+            ),
             (bool(tdc_decision), f"- Decision: {tdc_decision}\n"),
             (bool(tdc_hint), f"- Action hint: {tdc_hint}\n"),
             (tdc_extreme, "- Safety diagnostic: extreme TDC overreach\n"),
@@ -1016,16 +1250,25 @@ def _append_dsp_effective_auto_tdc_summary(summary_content: str, data, auto_meta
     summary_content += "AUTO TDC optimization:\n"
     return _append_dsp_effective_lines(summary_content, lines)
 
+
 def _append_dsp_effective_auto_modal_summary(summary_content: str, bm: dict) -> str:
     modal_count = int(bm.get("modal_mode_count", 0) or 0)
-    modal_events = [dict(item) for item in list(bm.get("modal_events", []) or []) if isinstance(item, dict)]
+    modal_events = [
+        dict(item)
+        for item in list(bm.get("modal_events", []) or [])
+        if isinstance(item, dict)
+    ]
     if modal_count <= 0 and not modal_events:
         return summary_content
 
     summary_content += "Modal intelligence:\n"
     summary_content += f"- Detected modal events: {modal_count}\n"
-    residual_modal_support = _safe_float(bm.get("residual_peak_modal_support", 0.0), 0.0)
-    residual_modal_penalty = _safe_float(bm.get("residual_peak_modal_penalty", 0.0), 0.0)
+    residual_modal_support = _safe_float(
+        bm.get("residual_peak_modal_support", 0.0), 0.0
+    )
+    residual_modal_penalty = _safe_float(
+        bm.get("residual_peak_modal_penalty", 0.0), 0.0
+    )
     residual_modal_hz = bm.get("residual_peak_modal_dominant_freq_hz")
     if residual_modal_support > 0.0:
         hz_txt = ""
@@ -1054,9 +1297,13 @@ def _append_dsp_effective_auto_modal_summary(summary_content: str, bm: dict) -> 
             )
     for reduction in tdc_modal_reductions[:3]:
         freq = _safe_float(reduction.get("freq_hz", float("nan")), float("nan"))
-        applied = _safe_float(reduction.get("applied_reduction_db", float("nan")), float("nan"))
+        applied = _safe_float(
+            reduction.get("applied_reduction_db", float("nan")), float("nan")
+        )
         if math.isfinite(freq) and math.isfinite(applied) and applied > 0.05:
-            sev = _safe_float(reduction.get("modal_severity", float("nan")), float("nan"))
+            sev = _safe_float(
+                reduction.get("modal_severity", float("nan")), float("nan")
+            )
             conf = _safe_float(reduction.get("confidence", float("nan")), float("nan"))
             summary_content += (
                 f"- TDC modal reduction: {freq:.1f} Hz by -{applied:.1f} dB "
@@ -1064,16 +1311,33 @@ def _append_dsp_effective_auto_modal_summary(summary_content: str, bm: dict) -> 
             )
     return summary_content
 
-def _append_dsp_effective_phase_limit_polish_summary(summary_content: str, auto_meta: dict) -> str:
+
+def _append_dsp_effective_phase_limit_polish_summary(
+    summary_content: str, auto_meta: dict
+) -> str:
     polish = dict(auto_meta.get("phase_limit_winner_polish", {}) or {})
     if not bool(polish.get("applicable", False)):
         return summary_content
-    polish_start = _safe_float(polish.get("start_phase_limit_hz", float("nan")), float("nan"))
-    polish_final = _safe_float(polish.get("final_phase_limit_hz", float("nan")), float("nan"))
-    polish_rank_before = _polish_display_rank(polish, "rank_before", "rank_before_official")
-    polish_rank_after = _polish_display_rank(polish, "rank_after", "rank_after_official")
-    polish_tested = [float(v) for v in list(polish.get("tested_phase_limits_hz", []) or [])]
-    polish_tested_txt = ", ".join([f"{float(v):.1f}" for v in polish_tested]) if polish_tested else "n/a"
+    polish_start = _safe_float(
+        polish.get("start_phase_limit_hz", float("nan")), float("nan")
+    )
+    polish_final = _safe_float(
+        polish.get("final_phase_limit_hz", float("nan")), float("nan")
+    )
+    polish_rank_before = _polish_display_rank(
+        polish, "rank_before", "rank_before_official"
+    )
+    polish_rank_after = _polish_display_rank(
+        polish, "rank_after", "rank_after_official"
+    )
+    polish_tested = [
+        float(v) for v in list(polish.get("tested_phase_limits_hz", []) or [])
+    ]
+    polish_tested_txt = (
+        ", ".join([f"{float(v):.1f}" for v in polish_tested])
+        if polish_tested
+        else "n/a"
+    )
     if bool(polish.get("applied", False)):
         summary_content += (
             f"Phase-limit winner polish: applied "
@@ -1088,16 +1352,33 @@ def _append_dsp_effective_phase_limit_polish_summary(summary_content: str, auto_
         )
     return summary_content
 
-def _append_dsp_effective_mag_c_min_polish_summary(summary_content: str, auto_meta: dict) -> str:
+
+def _append_dsp_effective_mag_c_min_polish_summary(
+    summary_content: str, auto_meta: dict
+) -> str:
     polish = dict(auto_meta.get("mag_c_min_winner_polish", {}) or {})
     if not bool(polish.get("applicable", False)):
         return summary_content
-    polish_start = _safe_float(polish.get("start_mag_c_min_hz", float("nan")), float("nan"))
-    polish_final = _safe_float(polish.get("final_mag_c_min_hz", float("nan")), float("nan"))
-    polish_rank_before = _polish_display_rank(polish, "rank_before", "rank_before_official")
-    polish_rank_after = _polish_display_rank(polish, "rank_after", "rank_after_official")
-    polish_tested = [float(v) for v in list(polish.get("tested_mag_c_min_hz", []) or [])]
-    polish_tested_txt = ", ".join([f"{float(v):.1f}" for v in polish_tested]) if polish_tested else "n/a"
+    polish_start = _safe_float(
+        polish.get("start_mag_c_min_hz", float("nan")), float("nan")
+    )
+    polish_final = _safe_float(
+        polish.get("final_mag_c_min_hz", float("nan")), float("nan")
+    )
+    polish_rank_before = _polish_display_rank(
+        polish, "rank_before", "rank_before_official"
+    )
+    polish_rank_after = _polish_display_rank(
+        polish, "rank_after", "rank_after_official"
+    )
+    polish_tested = [
+        float(v) for v in list(polish.get("tested_mag_c_min_hz", []) or [])
+    ]
+    polish_tested_txt = (
+        ", ".join([f"{float(v):.1f}" for v in polish_tested])
+        if polish_tested
+        else "n/a"
+    )
     if bool(polish.get("applied", False)):
         summary_content += (
             f"Mag-c-min winner polish: applied "
@@ -1112,16 +1393,33 @@ def _append_dsp_effective_mag_c_min_polish_summary(summary_content: str, auto_me
         )
     return summary_content
 
-def _append_dsp_effective_low_bass_cut_polish_summary(summary_content: str, auto_meta: dict) -> str:
+
+def _append_dsp_effective_low_bass_cut_polish_summary(
+    summary_content: str, auto_meta: dict
+) -> str:
     polish = dict(auto_meta.get("low_bass_cut_winner_polish", {}) or {})
     if not bool(polish.get("applicable", False)):
         return summary_content
-    polish_start = _safe_float(polish.get("start_low_bass_cut_hz", float("nan")), float("nan"))
-    polish_final = _safe_float(polish.get("final_low_bass_cut_hz", float("nan")), float("nan"))
-    polish_rank_before = _polish_display_rank(polish, "rank_before", "rank_before_official")
-    polish_rank_after = _polish_display_rank(polish, "rank_after", "rank_after_official")
-    polish_tested = [float(v) for v in list(polish.get("tested_low_bass_cut_hz", []) or [])]
-    polish_tested_txt = ", ".join([f"{float(v):.1f}" for v in polish_tested]) if polish_tested else "n/a"
+    polish_start = _safe_float(
+        polish.get("start_low_bass_cut_hz", float("nan")), float("nan")
+    )
+    polish_final = _safe_float(
+        polish.get("final_low_bass_cut_hz", float("nan")), float("nan")
+    )
+    polish_rank_before = _polish_display_rank(
+        polish, "rank_before", "rank_before_official"
+    )
+    polish_rank_after = _polish_display_rank(
+        polish, "rank_after", "rank_after_official"
+    )
+    polish_tested = [
+        float(v) for v in list(polish.get("tested_low_bass_cut_hz", []) or [])
+    ]
+    polish_tested_txt = (
+        ", ".join([f"{float(v):.1f}" for v in polish_tested])
+        if polish_tested
+        else "n/a"
+    )
     if bool(polish.get("applied", False)):
         summary_content += (
             f"Low-bass-cut winner polish: applied "
@@ -1136,18 +1434,29 @@ def _append_dsp_effective_low_bass_cut_polish_summary(summary_content: str, auto
         )
     return summary_content
 
-def _append_dsp_effective_hpf_polish_summary(summary_content: str, auto_meta: dict) -> str:
+
+def _append_dsp_effective_hpf_polish_summary(
+    summary_content: str, auto_meta: dict
+) -> str:
     polish = dict(auto_meta.get("hpf_winner_polish", {}) or {})
     if not bool(polish.get("applicable", False)):
         return summary_content
     start_enabled = bool(polish.get("start_enabled", False))
     start_freq_hz = _safe_float(polish.get("start_freq_hz", float("nan")), float("nan"))
-    start_slope_db_oct = int(round(_safe_float(polish.get("start_slope_db_oct", 0.0), 0.0)))
+    start_slope_db_oct = int(
+        round(_safe_float(polish.get("start_slope_db_oct", 0.0), 0.0))
+    )
     final_enabled = bool(polish.get("final_enabled", False))
     final_freq_hz = _safe_float(polish.get("final_freq_hz", float("nan")), float("nan"))
-    final_slope_db_oct = int(round(_safe_float(polish.get("final_slope_db_oct", 0.0), 0.0)))
-    polish_rank_before = _polish_display_rank(polish, "rank_before", "rank_before_official")
-    polish_rank_after = _polish_display_rank(polish, "rank_after", "rank_after_official")
+    final_slope_db_oct = int(
+        round(_safe_float(polish.get("final_slope_db_oct", 0.0), 0.0))
+    )
+    polish_rank_before = _polish_display_rank(
+        polish, "rank_before", "rank_before_official"
+    )
+    polish_rank_after = _polish_display_rank(
+        polish, "rank_after", "rank_after_official"
+    )
     tested_candidates = [
         str(dict(item).get("label", "") or "").strip()
         for item in list(polish.get("tested_candidates", []) or [])
@@ -1176,13 +1485,18 @@ def _append_dsp_effective_hpf_polish_summary(summary_content: str, auto_meta: di
         )
     return summary_content
 
-def _append_dsp_effective_excess_phase_strength_polish_summary(summary_content: str, auto_meta: dict) -> str:
+
+def _append_dsp_effective_excess_phase_strength_polish_summary(
+    summary_content: str, auto_meta: dict
+) -> str:
     polish = dict(auto_meta.get("excess_phase_strength_winner_polish", {}) or {})
     if not bool(polish.get("applicable", False)):
         return summary_content
     eps_start = _safe_float(polish.get("start_value", float("nan")), float("nan"))
     eps_final = _safe_float(polish.get("final_value", float("nan")), float("nan"))
-    eps_rank_before = _polish_display_rank(polish, "rank_before", "rank_before_official")
+    eps_rank_before = _polish_display_rank(
+        polish, "rank_before", "rank_before_official"
+    )
     eps_rank_after = _polish_display_rank(polish, "rank_after", "rank_after_official")
     eps_tested = int(polish.get("tested_count", 0) or 0)
     if bool(polish.get("applied", False)):
@@ -1199,17 +1513,28 @@ def _append_dsp_effective_excess_phase_strength_polish_summary(summary_content: 
         )
     return summary_content
 
-def _append_dsp_effective_residual_peak_polish_summary(summary_content: str, auto_meta: dict) -> str:
+
+def _append_dsp_effective_residual_peak_polish_summary(
+    summary_content: str, auto_meta: dict
+) -> str:
     polish = dict(auto_meta.get("residual_peak_winner_polish", {}) or {})
     if not bool(polish.get("applicable", False)):
         return summary_content
-    peak_before = _safe_float(polish.get("worst_peak_before_db", float("nan")), float("nan"))
-    peak_after = _safe_float(polish.get("worst_peak_after_db", float("nan")), float("nan"))
+    peak_before = _safe_float(
+        polish.get("worst_peak_before_db", float("nan")), float("nan")
+    )
+    peak_after = _safe_float(
+        polish.get("worst_peak_after_db", float("nan")), float("nan")
+    )
     peak_hz = _safe_float(polish.get("worst_peak_freq_hz", float("nan")), float("nan"))
-    width_oct = _safe_float(polish.get("worst_peak_width_oct", float("nan")), float("nan"))
+    width_oct = _safe_float(
+        polish.get("worst_peak_width_oct", float("nan")), float("nan")
+    )
     tested_count = int(polish.get("tested_count", 0) or 0)
     peak_pos = f" @ {float(peak_hz):.1f} Hz" if math.isfinite(float(peak_hz)) else ""
-    width_txt = f", width={float(width_oct):.3f} oct" if math.isfinite(float(width_oct)) else ""
+    width_txt = (
+        f", width={float(width_oct):.3f} oct" if math.isfinite(float(width_oct)) else ""
+    )
     if bool(polish.get("applied", False)):
         summary_content += (
             f"Residual-peak winner polish: applied "
@@ -1223,14 +1548,21 @@ def _append_dsp_effective_residual_peak_polish_summary(summary_content: str, aut
         )
     return summary_content
 
-def _append_dsp_effective_tdc_strength_polish_summary(summary_content: str, auto_meta: dict) -> str:
+
+def _append_dsp_effective_tdc_strength_polish_summary(
+    summary_content: str, auto_meta: dict
+) -> str:
     polish = dict(auto_meta.get("tdc_strength_winner_polish", {}) or {})
     if not bool(polish.get("applicable", False)):
         return summary_content
     tdc_start = _safe_float(polish.get("start_strength", float("nan")), float("nan"))
     tdc_final = _safe_float(polish.get("final_strength", float("nan")), float("nan"))
-    tdc_hint = _safe_float(polish.get("optimum_strength_hint", float("nan")), float("nan"))
-    tdc_rank_before = _polish_display_rank(polish, "rank_before", "rank_before_official")
+    tdc_hint = _safe_float(
+        polish.get("optimum_strength_hint", float("nan")), float("nan")
+    )
+    tdc_rank_before = _polish_display_rank(
+        polish, "rank_before", "rank_before_official"
+    )
     tdc_rank_after = _polish_display_rank(polish, "rank_after", "rank_after_official")
     tdc_tested = [float(v) for v in list(polish.get("tested_strengths", []) or [])]
     tdc_tested_txt = ", ".join(f"{v:.1f}" for v in tdc_tested) if tdc_tested else "n/a"
@@ -1249,7 +1581,10 @@ def _append_dsp_effective_tdc_strength_polish_summary(summary_content: str, auto
         )
     return summary_content
 
-def _append_dsp_effective_auto_winner_polish_summary(summary_content: str, auto_meta: dict) -> str:
+
+def _append_dsp_effective_auto_winner_polish_summary(
+    summary_content: str, auto_meta: dict
+) -> str:
     for helper in (
         _append_dsp_effective_phase_limit_polish_summary,
         _append_dsp_effective_mag_c_min_polish_summary,
@@ -1261,6 +1596,7 @@ def _append_dsp_effective_auto_winner_polish_summary(summary_content: str, auto_
     ):
         summary_content = helper(summary_content, auto_meta)
     return summary_content
+
 
 def _append_dsp_effective_auto_target_summary(summary_content: str, tc: dict) -> str:
     if not tc:
@@ -1298,7 +1634,11 @@ def _append_dsp_effective_auto_target_summary(summary_content: str, tc: dict) ->
     if top_n > 0 and tr_n > 0:
         summary_content += f"Target selection grid: top-{top_n} x {tr_n} trials\n"
     if seed:
-        summary_content += "Target seed preset: " + ", ".join([f"{k}={seed[k]}" for k in sorted(seed.keys())]) + "\n"
+        summary_content += (
+            "Target seed preset: "
+            + ", ".join([f"{k}={seed[k]}" for k in sorted(seed.keys())])
+            + "\n"
+        )
     for i, row in enumerate(ev[:3], start=1):
         bm_t = attach_official_rank_score(row.get("best_metrics", {}))
         summary_content += (
@@ -1309,26 +1649,49 @@ def _append_dsp_effective_auto_target_summary(summary_content: str, tc: dict) ->
         )
     return summary_content
 
-def _append_dsp_effective_auto_score_summary(summary_content: str, data, auto_meta: dict, bm: dict, best_rank: float, residual_peak_polish: dict) -> str:
+
+def _append_dsp_effective_auto_score_summary(
+    summary_content: str,
+    data,
+    auto_meta: dict,
+    bm: dict,
+    best_rank: float,
+    residual_peak_polish: dict,
+) -> str:
     _bass_pen = float(bm.get("bass_integration_penalty", 0.0))
     _bass_pen_txt = (
         f", bass_pen={_bass_pen:.2f}"
         if bool(data.get("bass_integration_enable", False)) and _bass_pen > 0.0
         else ""
     )
-    _optimizer_backend = str(auto_meta.get("optimizer_backend", "builtin") or "builtin").strip().lower()
-    _exc_pen_txt = "" if str(_optimizer_backend) == "optuna" else f", exc_pen={float(bm.get('exc_penalty', 0.0)):.2f}"
+    _optimizer_backend = (
+        str(auto_meta.get("optimizer_backend", "builtin") or "builtin").strip().lower()
+    )
+    _exc_pen_txt = (
+        ""
+        if str(_optimizer_backend) == "optuna"
+        else f", exc_pen={float(bm.get('exc_penalty', 0.0)):.2f}"
+    )
     _bass_feas_pen = float(bm.get("bass_feasibility_penalty", 0.0))
     _bass_feas_pen_txt = (
         f", bass_feas_pen={_bass_feas_pen:.2f}"
         if bool(data.get("bass_integration_enable", False)) and _bass_feas_pen > 0.0
         else ""
     )
-    _bass_boost_db = _safe_float(bm.get("bass_boost_20_200_db", float("nan")), float("nan"))
-    _bass_boost_txt = f"bass_boost={float(_bass_boost_db):.2f} dB, " if math.isfinite(float(_bass_boost_db)) else ""
-    _hard_gates = list(bm.get("hard_gate_failures", bm.get("hard_gate_reasons", [])) or [])
+    _bass_boost_db = _safe_float(
+        bm.get("bass_boost_20_200_db", float("nan")), float("nan")
+    )
+    _bass_boost_txt = (
+        f"bass_boost={float(_bass_boost_db):.2f} dB, "
+        if math.isfinite(float(_bass_boost_db))
+        else ""
+    )
+    _hard_gates = list(
+        bm.get("hard_gate_failures", bm.get("hard_gate_reasons", [])) or []
+    )
     _bass_hard_gate = bool(
-        bm.get("bass_integration_hard_gate_failed", False) or "bass_integration_infeasible_hard_gate" in _hard_gates
+        bm.get("bass_integration_hard_gate_failed", False)
+        or "bass_integration_infeasible_hard_gate" in _hard_gates
     )
     if _bass_hard_gate:
         _bass_gate_reason = str(
@@ -1339,7 +1702,9 @@ def _append_dsp_effective_auto_score_summary(summary_content: str, data, auto_me
             or ""
         ).strip()
         _bass_gate_suffix = f": {_bass_gate_reason}" if _bass_gate_reason else ""
-        summary_content += f"Auto-mode safety gate: Bass Integration infeasible{_bass_gate_suffix}\n"
+        summary_content += (
+            f"Auto-mode safety gate: Bass Integration infeasible{_bass_gate_suffix}\n"
+        )
     _display_q = _safe_float(bm.get("display_score_100", float("nan")), float("nan"))
     if not math.isfinite(_display_q):
         _display_q = calibrated_auto_quality(best_rank, bm)
@@ -1360,13 +1725,22 @@ def _append_dsp_effective_auto_score_summary(summary_content: str, data, auto_me
     )
     return summary_content
 
+
 def _append_dsp_effective_auto_tracking_summary(summary_content: str, bm: dict) -> str:
     _tt_pen = _safe_float(bm.get("target_tracking_penalty", 0.0), 0.0)
-    _tt_rms_20_200 = _safe_float(bm.get("target_tracking_rms_20_200_db", float("nan")), float("nan"))
-    _tt_rms_100_500 = _safe_float(bm.get("target_tracking_rms_100_500_db", float("nan")), float("nan"))
+    _tt_rms_20_200 = _safe_float(
+        bm.get("target_tracking_rms_20_200_db", float("nan")), float("nan")
+    )
+    _tt_rms_100_500 = _safe_float(
+        bm.get("target_tracking_rms_100_500_db", float("nan")), float("nan")
+    )
     _tt_max_vals = [
-        _safe_float(bm.get("target_tracking_max_20_200_db", float("nan")), float("nan")),
-        _safe_float(bm.get("target_tracking_max_100_500_db", float("nan")), float("nan")),
+        _safe_float(
+            bm.get("target_tracking_max_20_200_db", float("nan")), float("nan")
+        ),
+        _safe_float(
+            bm.get("target_tracking_max_100_500_db", float("nan")), float("nan")
+        ),
     ]
     _tt_max_vals = [float(v) for v in _tt_max_vals if math.isfinite(float(v))]
     _tt_max = max(_tt_max_vals) if _tt_max_vals else float("nan")
@@ -1381,16 +1755,31 @@ def _append_dsp_effective_auto_tracking_summary(summary_content: str, bm: dict) 
         f"100-500={_fmt_auto_tracking_db(_tt_rms_100_500)}, "
         f"max={_fmt_auto_tracking_db(_tt_max)})\n"
     )
-    _rp_raw = _safe_float(bm.get("worst_residual_peak_raw_db", float("nan")), float("nan"))
-    _rp_sev = _safe_float(bm.get("residual_peak_severity", bm.get("worst_residual_peak_db", float("nan"))), float("nan"))
+    _rp_raw = _safe_float(
+        bm.get("worst_residual_peak_raw_db", float("nan")), float("nan")
+    )
+    _rp_sev = _safe_float(
+        bm.get(
+            "residual_peak_severity", bm.get("worst_residual_peak_db", float("nan"))
+        ),
+        float("nan"),
+    )
     _rp_hz = _safe_float(bm.get("worst_residual_peak_hz", float("nan")), float("nan"))
-    _rp_width_oct = _safe_float(bm.get("worst_residual_peak_width_oct", float("nan")), float("nan"))
+    _rp_width_oct = _safe_float(
+        bm.get("worst_residual_peak_width_oct", float("nan")), float("nan")
+    )
     _rp_thr = _safe_float(bm.get("residual_peak_threshold_db", 3.0), 3.0)
     _rp_pen = _safe_float(bm.get("residual_peak_penalty", 0.0), 0.0)
     _rp_count = int(bm.get("residual_peak_count", 0) or 0)
     if math.isfinite(float(_rp_raw)) or _rp_count > 0:
-        _rp_hz_txt = f" @ {float(_rp_hz):.1f} Hz" if math.isfinite(float(_rp_hz)) else ""
-        _rp_width_txt = f", width={float(_rp_width_oct):.3f} oct" if math.isfinite(float(_rp_width_oct)) else ""
+        _rp_hz_txt = (
+            f" @ {float(_rp_hz):.1f} Hz" if math.isfinite(float(_rp_hz)) else ""
+        )
+        _rp_width_txt = (
+            f", width={float(_rp_width_oct):.3f} oct"
+            if math.isfinite(float(_rp_width_oct))
+            else ""
+        )
         summary_content += (
             f"Residual peaks: worst={_fmt_auto_tracking_db(_rp_raw)}{_rp_hz_txt}, "
             f"severity={float(_rp_sev):.2f}, threshold={float(_rp_thr):.2f} dB, "
@@ -1398,7 +1787,10 @@ def _append_dsp_effective_auto_tracking_summary(summary_content: str, bm: dict) 
         )
     return summary_content
 
-def _append_dsp_effective_auto_overfit_summary(summary_content: str, bm: dict, residual_peak_polish: dict) -> str:
+
+def _append_dsp_effective_auto_overfit_summary(
+    summary_content: str, bm: dict, residual_peak_polish: dict
+) -> str:
     _rp_area = _safe_float(bm.get("residual_peak_area_db_oct", 0.0), 0.0)
     _sharp_pen = _safe_float(bm.get("correction_sharpness_penalty", 0.0), 0.0)
     _slope_max = _safe_float(bm.get("correction_max_abs_slope_db_per_oct", 0.0), 0.0)
@@ -1427,12 +1819,24 @@ def _append_dsp_effective_auto_overfit_summary(summary_content: str, bm: dict, r
     )
     return summary_content
 
-def _append_dsp_effective_auto_tail_summary(summary_content: str, data, auto_meta: dict, bm: dict, bp: dict, optimizer_backend: str) -> str:
-    summary_content = _append_auto_stereo_policy_summary(summary_content, data, auto_meta)
+
+def _append_dsp_effective_auto_tail_summary(
+    summary_content: str,
+    data,
+    auto_meta: dict,
+    bm: dict,
+    bp: dict,
+    optimizer_backend: str,
+) -> str:
+    summary_content = _append_auto_stereo_policy_summary(
+        summary_content, data, auto_meta
+    )
     exc_seed_hz = _safe_float(
         auto_meta.get(
             "auto_exc_seed_freq_hz",
-            data.get("_auto_exc_seed_freq_hz", data.get("_auto_exc_freq_hz", float("nan"))),
+            data.get(
+                "_auto_exc_seed_freq_hz", data.get("_auto_exc_freq_hz", float("nan"))
+            ),
         ),
         float("nan"),
     )
@@ -1452,11 +1856,19 @@ def _append_dsp_effective_auto_tail_summary(summary_content: str, data, auto_met
                 f"final {float(exc_final_hz):.1f} Hz\n"
             )
         elif final_ok:
-            summary_content += f"Excursion protection (AUTO): final {float(exc_final_hz):.1f} Hz\n"
+            summary_content += (
+                f"Excursion protection (AUTO): final {float(exc_final_hz):.1f} Hz\n"
+            )
         elif seed_ok:
-            summary_content += f"Excursion protection (AUTO): seed {float(exc_seed_hz):.1f} Hz\n"
+            summary_content += (
+                f"Excursion protection (AUTO): seed {float(exc_seed_hz):.1f} Hz\n"
+            )
     if bp:
-        filter_type = str(bp.get("filter_type", data.get("filter_type", "")) or "").strip().lower()
+        filter_type = (
+            str(bp.get("filter_type", data.get("filter_type", "")) or "")
+            .strip()
+            .lower()
+        )
         keys = [
             "fdw_cycles",
             "tdc_strength",
@@ -1485,12 +1897,14 @@ def _append_dsp_effective_auto_tail_summary(summary_content: str, data, auto_met
             summary_content += "Best preset: " + ", ".join(picked) + "\n"
     return summary_content
 
+
 def _append_dsp_effective_params(summary_content, data, fs_v):
     try:
-        summary_content = _append_dsp_effective_base_summary(summary_content, data, fs_v)
+        summary_content = _append_dsp_effective_base_summary(
+            summary_content, data, fs_v
+        )
         summary_content = _append_dsp_effective_auto_mode_summary(summary_content, data)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -1503,14 +1917,19 @@ def _append_dsp_effective_params(summary_content, data, fs_v):
         NameError,
     ) as e:
         summary_content += "\n=== DSP EFFECTIVE PARAMS (THIS SAMPLE RATE) ===\n"
-        summary_content += f"Could not compute effective params: {type(e).__name__}: {e}\n"
+        summary_content += (
+            f"Could not compute effective params: {type(e).__name__}: {e}\n"
+        )
 
     return summary_content
+
 
 def _append_realized_phase_limit(summary_content: str, data, l_st, r_st) -> str:
     try:
         summary_content += "\n=== PHASE CORRECTION LIMIT (REALIZED) ===\n"
-        cfg_lim = _safe_float((data or {}).get("phase_limit", float("nan")), float("nan"))
+        cfg_lim = _safe_float(
+            (data or {}).get("phase_limit", float("nan")), float("nan")
+        )
         if cfg_lim == cfg_lim and abs(cfg_lim) != float("inf") and cfg_lim > 0.0:
             summary_content += f"Configured phase_limit: {float(cfg_lim):.1f} Hz\n"
 
@@ -1526,7 +1945,11 @@ def _append_realized_phase_limit(summary_content: str, data, l_st, r_st) -> str:
                 nonneg=True,
             )
             source = "n/a"
-            for key in ("mixed_phase_no_correction_hz", "linear_phase_blend_end_hz", "phase_limit_hz"):
+            for key in (
+                "mixed_phase_no_correction_hz",
+                "linear_phase_blend_end_hz",
+                "phase_limit_hz",
+            ):
                 v = _pick_metric(st, (key,), nonneg=True)
                 if v is not None:
                     source = key
@@ -1537,7 +1960,6 @@ def _append_realized_phase_limit(summary_content: str, data, l_st, r_st) -> str:
             else:
                 summary_content += f"[{side}] Realized upper limit: n/a\n"
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -1553,4 +1975,8 @@ def _append_realized_phase_limit(summary_content: str, data, l_st, r_st) -> str:
     return summary_content
 
 
-__all__ = ['_append_dsp_effective_params', '_append_export_decision_summary', '_append_realized_phase_limit']
+__all__ = [
+    "_append_dsp_effective_params",
+    "_append_export_decision_summary",
+    "_append_realized_phase_limit",
+]
