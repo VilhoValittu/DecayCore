@@ -12,10 +12,25 @@ All notable changes to **DecayCore** are documented in this file.
 
 ## DecayCore
 
-## [1.2.2]
+## [1.2.2] - 7-8-2026
 
-Automaattimoodi on nyt packaged-only, ja julkisessa lähdeversiossa toimivat vain Basic- ja Advanced-manuaalitilat.
+### Automatic mode
 
+Automatic mode is exclusive to packaged releases; source builds continue to offer the complete Basic and Advanced manual workflows.
+
+### Take your filters anywhere with one click
+
+The **Download filters (.zip)** button returns at the very bottom of the results page, letting you download all filters and configuration files directly from there — especially useful when DecayCore is running on another computer or device.
+
+---
+
+### Automaattitila
+
+Automaattitila sisältyy julkaisupaketteihin; lähdeversiossa Basic- ja Advanced-tilat toimivat edelleen kokonaisuudessaan.
+
+### Filtterit mukaan yhdellä klikkauksella
+
+**Lataa filtterit (.zip)** -painike tekee paluun aivan tulokset sivun pohjalle, lataa kaikki suodattimet ja asetustiedostot suoraan tulossivulta — kätevää erityisesti silloin, kun DecayCore toimii toisella tietokoneella tai laitteella.
 
 ---
 

@@ -269,6 +269,7 @@ def _build_metrics(status: str, data: dict, ctx: dict | None, metadata: dict, rt
             "real_mag_error_max",
             "pred_mag_error_max_20_200",
             "pred_mag_error_max",
+            "target_tracking_max_20_200_db",
             "target_tracking_peak_abs_20_200_db",
             "max_abs_error_db",
         ],
