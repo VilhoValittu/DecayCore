@@ -11,12 +11,20 @@
 from __future__ import annotations
 
 import logging
+import math
 
 import numpy as np
 
 from ..resources.i8n.decaycore_i18n import t
 
 logger = logging.getLogger("DecayCore")
+
+
+def format_recommended_xo_hz(value: float) -> str:
+    hz = float(value)
+    if math.isclose(hz, round(hz), abs_tol=1e-6):
+        return f"{hz:.0f} Hz"
+    return f"{hz:.1f} Hz"
 
 
 def plot_smoothing_label(psl) -> str:
@@ -28,6 +36,8 @@ def plot_smoothing_label(psl) -> str:
 
 
 def safe_float(v, default=float("nan")) -> float:
+    if v is None:
+        return float(default)
     try:
         x = float(v)
         if x == x and abs(x) != float("inf"):

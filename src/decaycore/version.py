@@ -11,11 +11,11 @@
 import os
 import re
 
-DEFAULT_VERSION = "v1.2.2"
+DEFAULT_VERSION = "1.2.3"
 
 
 def normalize_version(value: str | None, *, default: str = DEFAULT_VERSION) -> str:
-    """Normalize runtime/build version text to the UI/export format `v.X.Y.Z`."""
+    """Normalize runtime/build version text to the UI/export format `vX.Y.Z`."""
     try:
         raw = str(value or "").strip()
     except (
@@ -43,7 +43,7 @@ def normalize_version(value: str | None, *, default: str = DEFAULT_VERSION) -> s
     body = re.sub(r"[^0-9A-Za-z._-]+", "-", str(body or "")).strip(".-_")
     if not body:
         return str(default)
-    return f"v.{body}"
+    return f"v{body}"
 
 
 def resolve_version(*, default: str = DEFAULT_VERSION) -> str:

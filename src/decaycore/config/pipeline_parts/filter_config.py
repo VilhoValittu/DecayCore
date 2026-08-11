@@ -18,76 +18,17 @@ import numpy as np
 from ...config.legacy_keys import is_auto_mode
 from ...config.models import StereoAutoPolicyConfig
 from ...config.schema import AUTO_MODE_DEFAULT_CFG_TO_UI
-from ...dsp.bass_integration import normalize_sub_combine_mode
-from ...ui_i18n import (
+from ..value_normalization import (
     LVL_ALGO_MEDIAN,
     LVL_MODE_AUTO,
     lvl_algo_legacy_name,
     lvl_mode_legacy_name,
+    normalize_sub_combine_mode,
 )
 from .managed_settings import _effective_output_tilt_source, _resolve_output_tilt_db_per_oct
 
 logger = logging.getLogger("DecayCore")
 
-
-_AUTO_MODE_DEFAULT_CFG_TO_UI = {
-    "global_gain_db": "gain",
-    "mag_c_min": "mag_c_min",
-    "mag_c_max": "mag_c_max",
-    "max_boost_db": "max_boost",
-    "min_boost_peak_db": "min_boost_peak_db",
-    "max_cut_db": "max_cut_db",
-    "phase_limit": "phase_limit",
-    "reg_strength": "reg_strength",
-    "fdw_cycles": "fdw_cycles",
-    "filter_smooth": "filter_smooth",
-    "tdc_strength": "tdc_strength",
-    "tdc_max_reduction_db": "tdc_max_reduction_db",
-    "tdc_slope_db_per_oct": "tdc_slope_db_per_oct",
-    "low_bass_cut_hz": "low_bass_cut_hz",
-    "hpf_enable": "hpf_enable",
-    "hpf_freq": "hpf_freq",
-    "hpf_slope": "hpf_slope",
-    "ir_window_ms": "ir_window",
-    "ir_window_ms_left": "ir_window_left",
-    "ir_window_right": "ir_window",
-    "ir_window_left": "ir_window_left",
-    "mixed_split_freq": "mixed_freq",
-    "trans_width": "trans_width",
-    "bass_first_mode_max_hz": "bass_first_mode_max_hz",
-    "max_slope_db_per_oct": "max_slope_db_per_oct",
-    "max_slope_boost_db_per_oct": "max_slope_boost_db_per_oct",
-    "max_slope_cut_db_per_oct": "max_slope_cut_db_per_oct",
-    "lvl_manual_db": "lvl_manual_db",
-    "manual_target_tilt_db_per_oct": "manual_target_tilt_db_per_oct",
-    "output_tilt_db_per_oct": "output_tilt_db_per_oct",
-    "lvl_min": "lvl_min",
-    "lvl_max": "lvl_max",
-    "conf_pull_floor": "conf_pull_floor",
-    "conf_pull_ceil": "conf_pull_ceil",
-    "conf_pull_max_hz": "conf_pull_max_hz",
-    "conf_pull_gamma_cut": "conf_pull_gamma_cut",
-    "conf_pull_gamma_boost": "conf_pull_gamma_boost",
-    "conf_pull_bass_boost_floor_min": "conf_pull_bass_boost_floor_min",
-    "conf_pull_bass_boost_restore": "conf_pull_bass_boost_restore",
-    "low_bass_cut_strength": "low_bass_cut_strength",
-    "filter_type_str": "filter_type",
-    "plot_smoothing_level": "plot_smoothing_level",
-    "lvl_mode": "lvl_mode",
-    "lvl_algo": "lvl_algo",
-    "stereo_link_strategy": "stereo_link_strategy",
-    "enable_mag_correction": "mag_correct",
-    "unsafe_raw_dsp": "unsafe_raw_dsp",
-    "exc_prot": "exc_prot",
-    "enable_tdc": "enable_tdc",
-    "enable_afdw": "enable_afdw",
-    "df_smoothing": "df_smoothing",
-    "comparison_mode": "comparison_mode",
-    "bass_first_ai": "bass_first_ai",
-    "phase_safe_2058": "phase_safe_2058",
-    "stereo_link": "stereo_link",
-    "low_bass_cut_enable": "low_bass_cut_enable",
-}
 
 _AUTO_MODE_DEFAULT_CFG_TO_UI = AUTO_MODE_DEFAULT_CFG_TO_UI
 
@@ -288,6 +229,8 @@ def _filter_config_mixed_kwargs(FilterConfig_cls, data: dict[str, Any]) -> dict:
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "final_ir_validation_mode", final_validation_mode if final_validation_mode in ("warn", "reject") else "warn")
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "final_ir_validation_score_weight", float(max(0.0, _cfg_as_float_allow_zero(data.get("final_ir_validation_score_weight"), 1.0))))
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "final_ir_validation_candidate_count", int(np.clip(_cfg_as_int(data.get("final_ir_validation_candidate_count", 3), 3), 1, 5)))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "phase_realization_feedback_enable", bool(_cfg_as_bool_default(data.get("phase_realization_feedback_enable", True), True)))
+    _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "phase_realization_feedback_candidate_count", int(np.clip(_cfg_as_int(data.get("phase_realization_feedback_candidate_count", 5), 5), 2, 5)))
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "ir_anchor_mode", str(data.get("ir_anchor_mode", "min_causal") or "min_causal").strip().lower() if str(data.get("ir_anchor_mode", "min_causal") or "min_causal").strip().lower() in ("peak", "centroid", "min_causal") else "min_causal")
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "min_causal_ms", float(max(0.0, _cfg_as_float_allow_zero(data.get("min_causal_ms"), 80.0))))
     _filter_config_set_if_hasattr(kwargs, FilterConfig_cls, "auto_asym_left_ratio", float(np.clip(_cfg_as_float_allow_zero(data.get("auto_asym_left_ratio"), 0.35), 0.0, 1.0)))

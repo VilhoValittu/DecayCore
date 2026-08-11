@@ -59,6 +59,7 @@ _BUILD_ALLOWED_KEYS = frozenset(
         "final_phase",
         "mixed_split_hz",
         "mixed_transition_hz",
+        "phase_feedback_static",
     }
 )
 
@@ -192,6 +193,7 @@ def run_phase_ir_stage(
     apply_lpf_to_mags_fn,
     limit_gd_gradient_ms_per_oct_fn,
     cfg_float_allow_zero_fn,
+    phase_feedback_replay: dict | None = None,
 ):
     inputs = PhaseIRInputs(
         cfg=cfg,
@@ -217,13 +219,64 @@ def run_phase_ir_stage(
         apply_lpf_to_mags_fn=apply_lpf_to_mags_fn,
         limit_gd_gradient_ms_per_oct_fn=limit_gd_gradient_ms_per_oct_fn,
         cfg_float_allow_zero_fn=cfg_float_allow_zero_fn,
+        phase_feedback_replay=phase_feedback_replay,
     )
     outputs = _run_phase_ir_stage(inputs)
     apply_residual_telemetry(st=inputs.st, telemetry=outputs.residual_telemetry)
     return outputs
 
 
+def _run_phase_ir_stage_from_feedback_replay(
+    inputs: PhaseIRInputs,
+    replay: dict,
+) -> PhaseIROutputs:
+    st = inputs.st
+    if isinstance(st, dict):
+        st.update(dict(replay.get("stats", {}) or {}))
+    gain_db = np.asarray(replay["gain_db"], dtype=float).copy()
+    p_rad_interp = np.asarray(replay["p_rad_interp"], dtype=float).copy()
+    final_gain_total = np.asarray(replay["final_gain_total"], dtype=float).copy()
+    built = build_phase_and_ir(
+        cfg=inputs.cfg,
+        freq_axis=np.asarray(inputs.freq_axis, dtype=float),
+        n_fft=int(inputs.n_fft),
+        gain_db=gain_db,
+        p_rad_interp=p_rad_interp,
+        conf_mask=inputs.conf_mask,
+        st=st,
+        mask_c=np.asarray(inputs.mask_c, dtype=bool),
+        use_bassfirst=bool(inputs.use_bassfirst),
+        afdw_on=bool(inputs.afdw_on),
+        logger=inputs.logger,
+        theo_xo=np.asarray(replay["theo_xo"], dtype=float),
+        auto_global_gain_db=float(replay["auto_global_gain_db"]),
+        auto_headroom_db=float(replay["auto_headroom_db"]),
+        final_gain_total=final_gain_total,
+        limit_gd_gradient_ms_per_oct_fn=inputs.limit_gd_gradient_ms_per_oct_fn,
+        phase_feedback_static=replay.get("phase_build_static"),
+    )
+    require_allowed_keys("phase_ir_build", built, _BUILD_ALLOWED_KEYS)
+    replay["phase_build_static"] = built["phase_feedback_static"]
+    return PhaseIROutputs(
+        impulse=np.asarray(built["impulse"], dtype=float),
+        gain_db=gain_db,
+        auto_global_gain_db=float(replay["auto_global_gain_db"]),
+        gain_margin_db=float(replay["gain_margin_db"]),
+        auto_headroom_db=float(replay["auto_headroom_db"]),
+        current_peak_gain=float(replay["current_peak_gain"]),
+        final_gain_total=final_gain_total,
+        residual_telemetry=replay.get("residual_telemetry"),
+        phase_feedback_replay=replay,
+    )
+
+
 def _run_phase_ir_stage(inputs: PhaseIRInputs) -> PhaseIROutputs:
+    if isinstance(inputs.phase_feedback_replay, dict):
+        return _run_phase_ir_stage_from_feedback_replay(
+            inputs,
+            inputs.phase_feedback_replay,
+        )
+
     cfg = inputs.cfg
     freq_axis = np.asarray(inputs.freq_axis, dtype=float)
     n_fft = int(inputs.n_fft)
@@ -392,6 +445,18 @@ def _run_phase_ir_stage(inputs: PhaseIRInputs) -> PhaseIROutputs:
     final_gain_total_before_build = final_gain_total.copy()
     auto_global_gain_db_before_build = float(auto_global_gain_db)
     auto_headroom_db_before_build = float(auto_headroom_db)
+    phase_feedback_replay = {
+        "stats": dict(st or {}) if isinstance(st, dict) else {},
+        "gain_db": np.asarray(gain_db, dtype=float).copy(),
+        "p_rad_interp": np.asarray(p_rad_interp, dtype=float).copy(),
+        "theo_xo": np.asarray(theo_xo, dtype=float).copy(),
+        "final_gain_total": np.asarray(final_gain_total, dtype=float).copy(),
+        "auto_global_gain_db": float(auto_global_gain_db),
+        "gain_margin_db": float(gain_margin_db),
+        "auto_headroom_db": float(auto_headroom_db),
+        "current_peak_gain": float(current_peak_gain),
+        "residual_telemetry": residual_telemetry,
+    }
     built = build_phase_and_ir(
         cfg=cfg,
         freq_axis=freq_axis,
@@ -411,6 +476,7 @@ def _run_phase_ir_stage(inputs: PhaseIRInputs) -> PhaseIROutputs:
         limit_gd_gradient_ms_per_oct_fn=_limit_gd_gradient_ms_per_oct,
     )
     require_allowed_keys("phase_ir_build", built, _BUILD_ALLOWED_KEYS)
+    phase_feedback_replay["phase_build_static"] = built["phase_feedback_static"]
     require_unchanged(
         "phase_ir_build",
         "gain_db",
@@ -451,4 +517,5 @@ def _run_phase_ir_stage(inputs: PhaseIRInputs) -> PhaseIROutputs:
         current_peak_gain=float(current_peak_gain),
         final_gain_total=np.asarray(final_gain_total, dtype=float),
         residual_telemetry=residual_telemetry,
+        phase_feedback_replay=phase_feedback_replay,
     )

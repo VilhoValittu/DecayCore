@@ -15,7 +15,7 @@ import sys
 from ...config.pipeline_parts import filter_type_supports_xo_phase_model
 
 logger = logging.getLogger(__name__)
-from ...auto_mode.rank_score import calibrated_auto_quality
+from ...common.auto_reporting import calibrated_auto_quality
 from ..export_scoring import _safe_float
 
 _AUTO_ASYM_PHASE1_SEARCH_SPACE_EST = 1877500016615829065655090169509480

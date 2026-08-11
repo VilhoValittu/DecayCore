@@ -302,7 +302,8 @@ def run_mag_bassfirst_afdw_conf_stage(  # noqa: C901 - bass-first confidence han
                             "bassfirst Schroeder boost: fs=%.1f Hz factor=1.10",
                             _fs_hz,
                         )
-        except (TypeError, ValueError, FloatingPointError, IndexError):
+        except (TypeError, ValueError, FloatingPointError, IndexError) as exc:
+            logger.warning("bass-first confidence computation failed (%s: %s); falling back to conf_mask", type(exc).__name__, exc)
             bf_rel = bf_room_mode = bf_conf_for_smoothing = None
 
     if raw_stage.afdw_on:

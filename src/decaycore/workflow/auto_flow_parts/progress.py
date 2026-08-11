@@ -20,10 +20,11 @@ from ...auto_mode.api import (
     AUTO_MODE_LOCAL_REFINE_TOP_K,
     _auto_safe_float,
 )
+from ...application.run_contracts import RunContext
 from ..bridge_types import ProcessRunCallbacks
 
 if typing.TYPE_CHECKING:
-    from ..process_run_flow import ProcessRunSupport
+    from ..process_run_support import ProcessRunSupport
 
 logger = logging.getLogger("DecayCore")
 
@@ -251,25 +252,24 @@ def _estimate_auto_progress_from_status(msg: str) -> float | None:
             return float(progress)
     return None
 
-def _set_auto_progress(ctx: dict, *, support: ProcessRunSupport, value: float) -> None:
-    state = ctx.setdefault("_auto_progress_state", {})
-    current = _auto_safe_float(state.get("value", 0.0), 0.0)
+def _set_auto_progress(ctx: RunContext, *, support: ProcessRunSupport, value: float) -> None:
+    current = _auto_safe_float(ctx.auto_progress_value, 0.0)
     next_value = float(np.clip(_auto_safe_float(value, current), current, _AUTO_PROGRESS_FINALIZE))
     if next_value <= float(current) + 1e-9:
         return
-    state["value"] = float(next_value)
+    ctx.auto_progress_value = float(next_value)
     try:
         support.ui_bridge.set_progress(float(next_value))
     except Exception:
         logger.exception("auto progress bridge update failed")
 
 def _get_auto_status_callback(
-    ctx: dict,
+    ctx: RunContext,
     *,
     callbacks: ProcessRunCallbacks,
     support: ProcessRunSupport,
 ) -> typing.Callable[[str], None]:
-    cb = ctx.get("_auto_status_callback")
+    cb = ctx.auto_status_callback
     if callable(cb):
         return cb
 
@@ -282,7 +282,7 @@ def _get_auto_status_callback(
         except Exception:
             logger.exception("auto status callback failed")
 
-    ctx["_auto_status_callback"] = _status
+    ctx.auto_status_callback = _status
     return _status
 
 
@@ -306,4 +306,3 @@ __all__ = [
     '_AUTO_PROGRESS_PHASE3_END',
     '_AUTO_PROGRESS_FINALIZE',
 ]
-

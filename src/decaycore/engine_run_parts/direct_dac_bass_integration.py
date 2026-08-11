@@ -139,7 +139,13 @@ def apply_direct_dac_bass_integration_result(
             ),
             "perturbation_policy": str(metrics.summary.get("robust_perturbation_policy", "nominal_only")),
             "sub_scaling_assumption": str(
-                metrics.summary.get("sub_scaling_assumption", "single_bus_average_normalized")
+                metrics.summary.get("sub_scaling_assumption", "measured_physical_pressure_response")
+            ),
+            "metric_channel_mode": str(
+                metrics.summary.get("metric_channel_mode", "worst_case_l_r_mono_center")
+            ),
+            "mono_center_score": float(
+                getattr(metrics.summary.get("mono_center"), "score", float("nan"))
             ),
             "export_verification_match": bool(metrics.summary.get("export_verification_match", False)),
             "_bass_metric_payload": metric_payload,

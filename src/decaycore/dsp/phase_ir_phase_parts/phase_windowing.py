@@ -48,6 +48,7 @@ class _PhaseComponents:
     afdw_on: bool
     logger: Any
     limit_gd_gradient_ms_per_oct_fn: Any
+    static_profiles: dict[str, Any] | None = None
     low_phase: np.ndarray | None = None
     extra_phase: np.ndarray | None = None
     phase_mask: np.ndarray | None = None
@@ -100,4 +101,3 @@ __all__ = [
     '_enforce_linear_tail_decay',
     '_linear_to_minphase_blend_mask',
 ]
-

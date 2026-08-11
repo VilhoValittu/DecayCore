@@ -16,7 +16,7 @@ from typing import Any
 
 import numpy as np
 
-from ..auto_mode.auto_mode_profile import profiled_section
+from ..common.profiling import profiled_section
 from ..common.comparison_stats import _make_comparison_stats
 from ..common.measurement_features import (
     estimate_schroeder_hz,
@@ -35,15 +35,16 @@ from ..config.results import FilterResult
 from ..dsp import decaycore_dsp_parts as dsp
 from ..dsp._measurement_ctx_local import measurement_ctx_scope
 from ..dsp.dsp_telemetry import quiet_dsp_info_logging
-from ..dsp.bass_integration import (
-    apply_direct_dac_export_branch_model,
-    build_bundle_combined_sub_transfer,
-    direct_dac_candidate_from_data,
+from ..dsp.phase_realization_feedback import (
+    assess_phase_feedback_candidate,
+    build_phase_feedback_strengths,
+    phase_feedback_stats,
+    phase_feedback_strength_field,
+    select_phase_feedback_candidate,
 )
 from ..dsp.hybrid_iir import peaking_eq_response as _peaking_eq_response
 from ..engine_build import _as_float
 from ..engine_summary import summarize_run
-from .direct_dac_bass_integration import apply_direct_dac_bass_integration_result
 from .subwoofer_target import build_subwoofer_target_with_lpf, subwoofer_target_metadata
 
 from .measurement_response_helpers import (
@@ -60,7 +61,16 @@ from .measurement_response_helpers import (
 logger = logging.getLogger("DecayCore")
 
 
-def _call_generate_filter(freqs, mags, phases, cfg, *, include_response_arrays: bool):
+def _call_generate_filter(
+    freqs,
+    mags,
+    phases,
+    cfg,
+    *,
+    include_response_arrays: bool,
+    phase_feedback_replay_cache: dict | None = None,
+    phase_feedback_replay_key: str | None = None,
+):
     try:
         return dsp.generate_filter(
             freqs,
@@ -68,11 +78,27 @@ def _call_generate_filter(freqs, mags, phases, cfg, *, include_response_arrays: 
             phases,
             cfg,
             include_response_arrays=bool(include_response_arrays),
+            phase_feedback_replay_cache=phase_feedback_replay_cache,
+            phase_feedback_replay_key=phase_feedback_replay_key,
         )
     except TypeError as exc:
-        if "include_response_arrays" not in str(exc):
+        if not any(
+            key in str(exc)
+            for key in ("include_response_arrays", "phase_feedback_replay_cache")
+        ):
             raise
-        return dsp.generate_filter(freqs, mags, phases, cfg)
+        try:
+            return dsp.generate_filter(
+                freqs,
+                mags,
+                phases,
+                cfg,
+                include_response_arrays=bool(include_response_arrays),
+            )
+        except TypeError as fallback_exc:
+            if "include_response_arrays" not in str(fallback_exc):
+                raise
+            return dsp.generate_filter(freqs, mags, phases, cfg)
 
 
 def _call_generate_filter_pair(
@@ -87,6 +113,7 @@ def _call_generate_filter_pair(
     measurement_ctx_l,
     measurement_ctx_r,
     include_response_arrays: bool,
+    phase_feedback_replay_cache: dict | None = None,
 ):
     try:
         return dsp.generate_filter_pair(
@@ -100,21 +127,41 @@ def _call_generate_filter_pair(
             measurement_ctx_l=measurement_ctx_l,
             measurement_ctx_r=measurement_ctx_r,
             include_response_arrays=bool(include_response_arrays),
+            phase_feedback_replay_cache=phase_feedback_replay_cache,
         )
     except TypeError as exc:
-        if "include_response_arrays" not in str(exc):
+        if not any(
+            key in str(exc)
+            for key in ("include_response_arrays", "phase_feedback_replay_cache")
+        ):
             raise
-        return dsp.generate_filter_pair(
-            f_l,
-            m_l,
-            p_l,
-            f_r,
-            m_r,
-            p_r,
-            cfg,
-            measurement_ctx_l=measurement_ctx_l,
-            measurement_ctx_r=measurement_ctx_r,
-        )
+        try:
+            return dsp.generate_filter_pair(
+                f_l,
+                m_l,
+                p_l,
+                f_r,
+                m_r,
+                p_r,
+                cfg,
+                measurement_ctx_l=measurement_ctx_l,
+                measurement_ctx_r=measurement_ctx_r,
+                include_response_arrays=bool(include_response_arrays),
+            )
+        except TypeError as fallback_exc:
+            if "include_response_arrays" not in str(fallback_exc):
+                raise
+            return dsp.generate_filter_pair(
+                f_l,
+                m_l,
+                p_l,
+                f_r,
+                m_r,
+                p_r,
+                cfg,
+                measurement_ctx_l=measurement_ctx_l,
+                measurement_ctx_r=measurement_ctx_r,
+            )
 
 
 def _stats_level_comp_factor(st: dict | None) -> float:
@@ -315,38 +362,173 @@ def _generate_main_filters(
     *,
     include_response_arrays: bool,
 ):
-    with profiled_section("run_pipeline.generate_filters"):
-        if bool(getattr(cfg, "stereo_link", False)):
-            l_imp, l_st, r_imp, r_st = _call_generate_filter_pair(
+    field = phase_feedback_strength_field(getattr(cfg, "filter_type_str", ""))
+    enabled = bool(getattr(cfg, "phase_realization_feedback_enable", True))
+    phase_feedback_replay_cache: dict | None = {} if enabled and field is not None else None
+
+    def _run_channel(freqs, mags, phases, cfg_run, *, replay_key: str):
+        try:
+            return _call_generate_filter(
+                freqs,
+                mags,
+                phases,
+                cfg_run,
+                include_response_arrays=bool(include_response_arrays),
+                phase_feedback_replay_cache=phase_feedback_replay_cache,
+                phase_feedback_replay_key=replay_key,
+            )
+        except TypeError as exc:
+            if "phase_feedback_replay_cache" not in str(exc):
+                raise
+            return _call_generate_filter(
+                freqs,
+                mags,
+                phases,
+                cfg_run,
+                include_response_arrays=bool(include_response_arrays),
+            )
+
+    def _run_once(cfg_run):
+        if bool(getattr(cfg_run, "stereo_link", False)):
+            return _call_generate_filter_pair(
                 f_l,
                 m_l,
                 p_l,
                 f_r,
                 m_r,
                 p_r,
-                cfg,
+                cfg_run,
                 measurement_ctx_l=_mctx_l,
                 measurement_ctx_r=_mctx_r,
                 include_response_arrays=bool(include_response_arrays),
+                phase_feedback_replay_cache=phase_feedback_replay_cache,
+            )
+        with measurement_ctx_scope(_mctx_l):
+            l_imp, l_st = _run_channel(
+                f_l,
+                m_l,
+                p_l,
+                cfg_run,
+                replay_key="left",
+            )
+        with measurement_ctx_scope(_mctx_r):
+            r_imp, r_st = _run_channel(
+                f_r,
+                m_r,
+                p_r,
+                cfg_run,
+                replay_key="right",
+            )
+        return l_imp, l_st, r_imp, r_st
+
+    with profiled_section("run_pipeline.generate_filters"):
+        initial = _run_once(cfg)
+
+    if not enabled or field is None:
+        if enabled and field is None:
+            minimum_assessment = assess_phase_feedback_candidate(
+                strength=0.0,
+                requested_strength=0.0,
+                impulse_l=initial[0],
+                stats_l=initial[1],
+                impulse_r=initial[2],
+                stats_r=initial[3],
+                cfg=cfg,
+                payload=initial,
+            )
+            status = phase_feedback_stats(
+                field=None,
+                candidates=[minimum_assessment],
+                selected=minimum_assessment,
+                reason="not_applicable_minimum_phase",
+                applicable=False,
             )
         else:
-            with measurement_ctx_scope(_mctx_l):
-                l_imp, l_st = _call_generate_filter(
-                    f_l,
-                    m_l,
-                    p_l,
-                    cfg,
-                    include_response_arrays=bool(include_response_arrays),
-                )
-            with measurement_ctx_scope(_mctx_r):
-                r_imp, r_st = _call_generate_filter(
-                    f_r,
-                    m_r,
-                    p_r,
-                    cfg,
-                    include_response_arrays=bool(include_response_arrays),
-                )
-    return l_imp, l_st, r_imp, r_st
+            status = {
+                "phase_realization_feedback_enabled": False,
+                "phase_realization_feedback_applicable": bool(field is not None),
+                "phase_realization_feedback_applied": False,
+                "phase_realization_feedback_reason": "disabled",
+            }
+        for stats in (initial[1], initial[3]):
+            if isinstance(stats, dict):
+                stats.update(status)
+        return initial
+
+    requested = float(np.clip(float(getattr(cfg, field, 0.9) or 0.0), 0.0, 1.0))
+    candidate_count = int(
+        np.clip(int(getattr(cfg, "phase_realization_feedback_candidate_count", 5) or 5), 2, 5)
+    )
+    strengths = build_phase_feedback_strengths(requested, candidate_count)
+    candidates = [
+        assess_phase_feedback_candidate(
+            strength=requested,
+            requested_strength=requested,
+            impulse_l=initial[0],
+            stats_l=initial[1],
+            impulse_r=initial[2],
+            stats_r=initial[3],
+            cfg=cfg,
+            payload=initial,
+        )
+    ]
+    if not all(
+        np.isfinite(float(channel.get("gd_score", float("nan"))))
+        for channel in candidates[0]["channels"]
+    ):
+        telemetry = phase_feedback_stats(
+            field=field,
+            candidates=candidates,
+            selected=candidates[0],
+            reason="missing_realized_gd_metric",
+        )
+        for stats in (initial[1], initial[3]):
+            if isinstance(stats, dict):
+                stats.update(telemetry)
+        return initial
+
+    for strength in strengths[1:]:
+        cfg_candidate = dataclasses.replace(
+            cfg,
+            **{
+                field: float(strength),
+                "phase_realization_feedback_enable": False,
+            },
+        )
+        with profiled_section("run_pipeline.phase_realization_feedback_candidate"):
+            output = _run_once(cfg_candidate)
+        candidates.append(
+            assess_phase_feedback_candidate(
+                strength=float(strength),
+                requested_strength=requested,
+                impulse_l=output[0],
+                stats_l=output[1],
+                impulse_r=output[2],
+                stats_r=output[3],
+                cfg=cfg_candidate,
+                payload=output,
+            )
+        )
+
+    selected, reason = select_phase_feedback_candidate(candidates)
+    output = selected.get("payload") or initial
+    telemetry = phase_feedback_stats(
+        field=field,
+        candidates=candidates,
+        selected=selected,
+        reason=reason,
+    )
+    for stats in (output[1], output[3]):
+        if isinstance(stats, dict):
+            stats.update(telemetry)
+    logger.info(
+        "Phase realization feedback: field=%s requested=%.3f selected=%.3f reason=%s",
+        field,
+        requested,
+        float(selected.get("strength", requested)),
+        reason,
+    )
+    return output
 
 
 def _generate_sub_ir(  # noqa: C901 - sub path setup preserves the direct-DAC and normal branches together
@@ -818,6 +1000,12 @@ def _build_response_arrays(
             bundle = measurements.get("bass_integration_bundle", None)
             if bundle is not None:
                 try:
+                    from ..dsp.bass_integration import (
+                        apply_direct_dac_export_branch_model,
+                        build_bundle_combined_sub_transfer,
+                        direct_dac_candidate_from_data,
+                    )
+
                     sub_total_transfer, _diag = build_bundle_combined_sub_transfer(
                         bundle,
                         channel="l",
@@ -1065,17 +1253,21 @@ def _run_pipeline_impl(  # noqa: C901 - pipeline orchestration is intentionally 
         _inject_filter_gd_stats(l_st, l_imp, int(cfg.fs))
         _inject_filter_gd_stats(r_st, r_imp, int(cfg.fs))
 
-    direct_dac_result_dict = apply_direct_dac_bass_integration_result(
-        cfg=cfg,
-        measurements=measurements,
-        data=data,
-        l_imp=np.asarray(l_imp, dtype=float),
-        r_imp=np.asarray(r_imp, dtype=float),
-        sub_ir=np.asarray(sub_ir, dtype=float) if sub_ir is not None else None,
-        l_st=l_st,
-        r_st=r_st,
-        sub_st=sub_st if isinstance(sub_st, dict) else None,
-    )
+    direct_dac_result_dict = {}
+    if is_direct_dac_bi:
+        from .direct_dac_bass_integration import apply_direct_dac_bass_integration_result
+
+        direct_dac_result_dict = apply_direct_dac_bass_integration_result(
+            cfg=cfg,
+            measurements=measurements,
+            data=data,
+            l_imp=np.asarray(l_imp, dtype=float),
+            r_imp=np.asarray(r_imp, dtype=float),
+            sub_ir=np.asarray(sub_ir, dtype=float) if sub_ir is not None else None,
+            l_st=l_st,
+            r_st=r_st,
+            sub_st=sub_st if isinstance(sub_st, dict) else None,
+        )
     bass_metric_payload = dict(direct_dac_result_dict.pop("_bass_metric_payload", {}) or {})
     if bool(direct_dac_result_dict.get("rejected", False)) and not bool(direct_dac_result_dict.get("enabled", False)):
         sub_ir = None

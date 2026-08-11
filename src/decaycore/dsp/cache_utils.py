@@ -22,12 +22,37 @@ from typing import Any, Hashable
 __all__ = ["BoundedLruCache"]
 
 
-class BoundedLruCache:
-    """Saikeisturvallinen LRU-valimuisti kiintealla maksimikoolla."""
+def _retained_nbytes(value: Any, seen: set[int] | None = None) -> int:
+    """Estimate bytes retained by NumPy-like arrays inside a cache value."""
+    if seen is None:
+        seen = set()
+    value_id = id(value)
+    if value_id in seen:
+        return 0
+    seen.add(value_id)
 
-    def __init__(self, max_items: int) -> None:
+    nbytes = getattr(value, "nbytes", None)
+    if nbytes is not None:
+        try:
+            return max(0, int(nbytes))
+        except (TypeError, ValueError, OverflowError):
+            return 0
+    if isinstance(value, dict):
+        return sum(_retained_nbytes(item, seen) for item in value.values())
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return sum(_retained_nbytes(item, seen) for item in value)
+    return 0
+
+
+class BoundedLruCache:
+    """Thread-safe LRU bounded by item count and optionally retained bytes."""
+
+    def __init__(self, max_items: int, *, max_bytes: int | None = None) -> None:
         self._max_items = max(1, int(max_items))
+        self._max_bytes = None if max_bytes is None else max(0, int(max_bytes))
         self._data: OrderedDict = OrderedDict()
+        self._weights: dict[Hashable, int] = {}
+        self._retained_bytes = 0
         self._lock = threading.Lock()
         self._hits = 0
         self._misses = 0
@@ -45,15 +70,30 @@ class BoundedLruCache:
 
     def put(self, key: Hashable, value: Any) -> None:
         with self._lock:
+            weight = _retained_nbytes(value)
+            if self._max_bytes is not None and weight > self._max_bytes:
+                if key in self._data:
+                    self._data.pop(key)
+                    self._retained_bytes -= self._weights.pop(key, 0)
+                return
             if key in self._data:
+                self._retained_bytes -= self._weights.pop(key, 0)
                 self._data.move_to_end(key)
             self._data[key] = value
-            while len(self._data) > self._max_items:
-                self._data.popitem(last=False)
+            self._weights[key] = weight
+            self._retained_bytes += weight
+            while len(self._data) > self._max_items or (
+                self._max_bytes is not None
+                and self._retained_bytes > self._max_bytes
+            ):
+                old_key, _old_value = self._data.popitem(last=False)
+                self._retained_bytes -= self._weights.pop(old_key, 0)
 
     def clear(self) -> None:
         with self._lock:
             self._data.clear()
+            self._weights.clear()
+            self._retained_bytes = 0
 
     def stats(self) -> dict:
         with self._lock:
@@ -62,6 +102,8 @@ class BoundedLruCache:
                 "misses": int(self._misses),
                 "size": len(self._data),
                 "max_items": int(self._max_items),
+                "retained_bytes": int(self._retained_bytes),
+                "max_bytes": self._max_bytes,
             }
 
     def __len__(self) -> int:

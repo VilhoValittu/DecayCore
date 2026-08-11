@@ -22,8 +22,8 @@ import numpy as np
 
 from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
 
-from .headless_metrics_output import _f
-from .headless_progress import (
+from .headless_values import (
+    _f,
     _headless_winner_rank_score,
     _safe_filename_token,
 )

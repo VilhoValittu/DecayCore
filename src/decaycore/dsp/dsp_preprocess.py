@@ -25,7 +25,8 @@ from .dsp_types import DspContext, PreprocessResult
 # AFDW). Its key fingerprints the input contents, so recycled NumPy object
 # identities cannot reuse a previous measurement's result. Trials that differ
 # only in fdw_cycles or enable_afdw still hit this cache.
-_MEAS_FIXED_CACHE = BoundedLruCache(8)
+_MEAS_FIXED_CACHE_MAX_BYTES = 128 * 1024 * 1024
+_MEAS_FIXED_CACHE = BoundedLruCache(8, max_bytes=_MEAS_FIXED_CACHE_MAX_BYTES)
 _MEAS_FIXED_STATS: dict = {"hits": 0, "misses": 0}
 
 

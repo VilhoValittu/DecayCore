@@ -14,10 +14,11 @@ Replaces build_filter_section() from layout_builders.py.
 """
 from __future__ import annotations
 
-from typing import Callable
+from typing import Any, Callable
 
 from . import ng_controls as ctrl
 from .ng_sections import page_shell, section_card
+from ..config.auto_mode_policy import auto_goal_is_flat_family
 from ..config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from ..features import has_packaged_auto_engine, has_packaged_bass_engine
 
@@ -40,8 +41,7 @@ def _normalize_filter_type_value(value) -> str:
 
 
 def _auto_goal_is_prefer_bass(value) -> bool:
-    raw = str(value or "").strip().lower().replace("_", "-")
-    return raw in ("flat", "prefer bass", "prefer-bass", "bass")
+    return auto_goal_is_flat_family(value)
 
 
 def _auto_target_mode_options(*, t: Callable, auto_goal) -> dict[str, str]:
@@ -82,7 +82,7 @@ def _mode_options(*, t: Callable, auto_engine_available: bool) -> dict[str, str]
     return options
 
 
-def build_basic_tab(*, t: Callable, get_val: Callable) -> None:
+def build_basic_tab(*, t: Callable, get_val: Callable, files_tab_context: Any | None = None) -> None:
     from nicegui import ui
 
     auto_engine_available = has_packaged_auto_engine()
@@ -175,6 +175,26 @@ def build_basic_tab(*, t: Callable, get_val: Callable) -> None:
                             else "bass_integration_packaged_only_help"
                         )
                     ).classes("text-xs text-gray-400")
+                    if files_tab_context is not None:
+                        with ui.column().classes("w-full gap-3") as sub_measurements_scope:
+                            ui.label(t("bi_direct_sub_help")).classes("text-xs text-gray-400")
+                            with ui.row().classes("w-full gap-4"):
+                                files_tab_context.build_measurement_slot(
+                                    upload_key="file_l_sub",
+                                    path_key="local_path_l_sub",
+                                    slot_variant="basic",
+                                    channel_label_key="upload_l_sub",
+                                    path_label_key="path_l_sub",
+                                )
+                                files_tab_context.build_measurement_slot(
+                                    upload_key="file_r_sub",
+                                    path_key="local_path_r_sub",
+                                    slot_variant="basic",
+                                    channel_label_key="upload_r_sub",
+                                    path_label_key="path_r_sub",
+                                )
+                        ctrl.register_container("bass_integration_sub_measurements_scope", sub_measurements_scope)
+                        sub_measurements_scope.set_visibility(bool(bass_value))
                     with ui.card().classes("w-full gap-2"):
                         ctrl.register(
                             "enable_channel_specific_auto_policy",

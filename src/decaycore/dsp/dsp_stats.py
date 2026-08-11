@@ -38,19 +38,23 @@ def apply_measured_mag_stats(
     m_anal,
     calc_offset_db: float,
     include_raw: bool = True,
+    as_lists: bool = True,
 ) -> None:
-    stats["target_mags"] = np.asarray(target_mags, dtype=float).tolist()
+    target_arr = np.asarray(target_mags, dtype=float)
+    stats["target_mags"] = target_arr.tolist() if as_lists else target_arr
     f_ref = np.asarray(stats.get("freq_axis", freq_axis), dtype=float).reshape(-1)
     n_ref = int(f_ref.size)
 
     m_corr_st = arr_if_valid_for_stats(stats.get("measured_mags"), expected_size=n_ref)
     m_corr = np.asarray(m_anal, dtype=float) - float(calc_offset_db) if m_corr_st is None else np.asarray(m_corr_st, dtype=float)
 
-    stats["measured_mags"] = np.asarray(m_corr, dtype=float).tolist()
+    m_corr_arr = np.asarray(m_corr, dtype=float)
+    stats["measured_mags"] = m_corr_arr.tolist() if as_lists else m_corr_arr
     if bool(include_raw):
         m_raw_st = arr_if_valid_for_stats(stats.get("measured_mags_raw"), expected_size=n_ref)
         m_raw = np.asarray(m_corr, dtype=float) + float(calc_offset_db) if m_raw_st is None else np.asarray(m_raw_st, dtype=float)
-        stats["measured_mags_raw"] = np.asarray(m_raw, dtype=float).tolist()
+        m_raw_arr = np.asarray(m_raw, dtype=float)
+        stats["measured_mags_raw"] = m_raw_arr.tolist() if as_lists else m_raw_arr
 
 
 def apply_afdw_stats(
@@ -63,10 +67,12 @@ def apply_afdw_stats(
     afdw_bw_max_oct,
     afdw_bw_min_hz,
     afdw_bw_max_hz,
+    as_lists: bool = True,
 ) -> None:
     if not bool(afdw_on) or afdw_bw_oct is None:
         return
-    stats["afdw_bw_oct"] = np.asarray(afdw_bw_oct, dtype=float).tolist()
+    bw_arr = np.asarray(afdw_bw_oct, dtype=float)
+    stats["afdw_bw_oct"] = bw_arr.tolist() if as_lists else bw_arr
     stats["afdw_bw_min_oct"] = float(afdw_bw_min_oct) if afdw_bw_min_oct is not None else None
     stats["afdw_bw_mean_oct"] = float(afdw_bw_mean_oct) if afdw_bw_mean_oct is not None else None
     stats["afdw_bw_max_oct"] = float(afdw_bw_max_oct) if afdw_bw_max_oct is not None else None

@@ -31,26 +31,20 @@ import threading
 import time
 
 from . import ui_state
+from . import ng_run_runtime
 from .ng_sections import page_shell, section_card
+from .ng_run_runtime import (
+    get_progress_element,
+    get_results_container,
+    set_progress_visual_state,
+)
 from ..resources.i8n.decaycore_i18n import t
 
 logger = logging.getLogger("DecayCore")
 
-_results_container_ref = None
-_progress_ref = None
-_progress_overlay_refs = []
-_progress_meta_refs = []
 _run_clock: dict = {"started_at": None, "active": False, "elapsed_s": None}
 _start_button_lock = threading.Lock()
 _pending_start_button_enable = None
-
-
-def get_results_container():
-    return _results_container_ref
-
-
-def get_progress_element():
-    return _progress_ref
 
 
 def _queue_start_button_enable(start_btn) -> None:
@@ -92,73 +86,6 @@ def _drain_pending_result_render() -> None:
         NameError,
     ):
         logger.exception("queued results render failed")
-
-
-def _set_progress_overlay_text_dark(enabled: bool) -> None:
-    add_class = "text-black" if enabled else "text-white"
-    remove_class = "text-white" if enabled else "text-black"
-    for label in _progress_overlay_refs:
-        try:
-            label.classes(add=add_class, remove=remove_class)
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            logger.debug("Failed to update progress overlay text color", exc_info=True)
-
-
-def _set_progress_meta_completed(enabled: bool) -> None:
-    add_class = "cf-progress-meta--complete" if enabled else "cf-progress-meta--running"
-    remove_class = "cf-progress-meta--running" if enabled else "cf-progress-meta--complete"
-    for meta in _progress_meta_refs:
-        try:
-            meta.classes(add=add_class, remove=remove_class)
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            logger.debug("Failed to update progress meta visual state", exc_info=True)
-
-
-def set_progress_visual_state(*, completed: bool) -> None:
-    progress = get_progress_element()
-    if progress is not None:
-        try:
-            progress.set_text_color("light-green-4" if completed else "primary")
-        except (
-
-            AttributeError,
-            TypeError,
-            ValueError,
-            KeyError,
-            IndexError,
-            RuntimeError,
-            OSError,
-            ImportError,
-            ModuleNotFoundError,
-            NameError,
-        ):
-            logger.debug("Failed to update progress bar color", exc_info=True)
-    _set_progress_meta_completed(enabled=completed)
-    _set_progress_overlay_text_dark(enabled=completed)
 
 
 def _format_progress_percent(value) -> str:
@@ -275,8 +202,6 @@ def build_global_progress_bar() -> None:
     Must be called inside the cf-top-shell column context (ng_app._build_header).
     Creates the progress bar, status labels, and the 500 ms polling timer.
     """
-    global _progress_ref, _progress_overlay_refs, _progress_meta_refs
-
     from nicegui import ui
     from . import ng_bridge
 
@@ -292,11 +217,11 @@ def build_global_progress_bar() -> None:
                     backward=_format_progress_percent,
                 )
     progress.visible = False
-    _progress_ref = progress
-    _progress_overlay_refs = [progress_phase_label, progress_elapsed_label, progress_percent_label]
-    _progress_meta_refs = [progress_meta_row]
-    _set_progress_overlay_text_dark(False)
-    _set_progress_meta_completed(False)
+    ng_run_runtime.set_progress_elements(
+        progress,
+        overlay_refs=[progress_phase_label, progress_elapsed_label, progress_percent_label],
+        meta_refs=[progress_meta_row],
+    )
 
     ng_bridge.set_progress_element_getter(get_progress_element)
 
@@ -512,8 +437,6 @@ def build_info_panel() -> None:
 
 def build_run_section(*, on_start_click) -> None:
     """Build the Run tab content. Must be called inside a ui.tab_panel context."""
-    global _results_container_ref
-
     from nicegui import ui
 
     with page_shell(title=t("tab_run"), intro=t("run_page_intro"), wide=True):
@@ -525,7 +448,7 @@ def build_run_section(*, on_start_click) -> None:
         )
 
         with section_card(title=t("run_results_section_title"), hero=True):
-            _results_container_ref = ui.column().classes("w-full gap-4")
+            ng_run_runtime.set_results_container(ui.column().classes("w-full gap-4"))
 
 
 def _clear_previous_run_output() -> None:
@@ -560,10 +483,11 @@ def _handle_start(on_start_click, start_btn, run_clock) -> None:
     run_clock["started_at"] = time.perf_counter()
     run_clock["elapsed_s"] = 0.0
     run_clock["active"] = True
-    if _progress_ref is not None:
-        _progress_ref.set_value(0.0)
+    progress = get_progress_element()
+    if progress is not None:
+        progress.set_value(0.0)
         set_progress_visual_state(completed=False)
-        _progress_ref.set_visibility(True)
+        progress.set_visibility(True)
 
     _clear_previous_run_output()
     ui_state.update_status(t("stat_reading"))

@@ -16,12 +16,19 @@ import typing
 
 
 from ...config.legacy_keys import is_auto_mode
-from ...dsp.bass_integration._utils import _safe_float
 
 if typing.TYPE_CHECKING:
     pass
 
 logger = logging.getLogger("DecayCore")
+
+
+def _safe_float(value: object, default: float = 0.0) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return float(default)
+    return parsed if math.isfinite(parsed) else float(default)
 
 def _status(callbacks, msg: str) -> None:
     """Send a status message to UI callbacks, silently ignoring any errors."""
@@ -200,7 +207,13 @@ def _compute_selected_bass_integration_diagnostics(bundle: object, data: dict) -
         gd_cont = dict(out.get("gd_continuity", {}) or {})
         out.update(
             {
-                "metric_channel_mode": str(metrics.get("bass_metric_channel_mode", out.get("metric_channel_mode", "worst_case")) or "worst_case"),
+                "metric_channel_mode": str(
+                    metrics.get(
+                        "bass_metric_channel_mode",
+                        out.get("metric_channel_mode", "worst_case_l_r_mono_center"),
+                    )
+                    or "worst_case_l_r_mono_center"
+                ),
                 "xo_gd_rms_mismatch_ms": float(
                     _safe_float(
                         metrics.get(
@@ -267,4 +280,3 @@ __all__ = [
     '_compute_direct_dac_prepare_recommendation',
     '_compute_selected_bass_integration_diagnostics',
 ]
-

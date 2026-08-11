@@ -10,6 +10,12 @@
 
 from __future__ import annotations
 
+from ..common.bass_routing import (
+    DIRECT_DAC_BASS_ROUTING_POLICY_VERSION,
+    DIRECT_DAC_SUB_MIX_LEFT_GAIN_DB,
+    DIRECT_DAC_SUB_MIX_RIGHT_GAIN_DB,
+)
+
 _BUTTER_RESPONSE_CACHE: dict = {}
 
 
@@ -68,6 +74,9 @@ def _metrics_cache_key(
         round(float(guard_hi_ratio), 4),
         tuple(realized_fir_signature or ()),
         bool(robust),
+        int(DIRECT_DAC_BASS_ROUTING_POLICY_VERSION),
+        round(float(DIRECT_DAC_SUB_MIX_LEFT_GAIN_DB), 4),
+        round(float(DIRECT_DAC_SUB_MIX_RIGHT_GAIN_DB), 4),
     )
 
 

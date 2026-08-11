@@ -14,6 +14,7 @@ from typing import Any
 import logging
 import math
 
+from ...config.auto_mode_policy import auto_goal_is_flat_family
 from ...config.legacy_keys import is_auto_mode as _is_auto_mode_active_helper
 from ...config.schema import AUTO_MODE_DEFAULT_CFG_TO_UI
 
@@ -27,64 +28,6 @@ _RECOVERABLE_XO_EXCEPTIONS = (
     RuntimeError,
 )
 
-
-_AUTO_MODE_DEFAULT_CFG_TO_UI = {
-    "global_gain_db": "gain",
-    "mag_c_min": "mag_c_min",
-    "mag_c_max": "mag_c_max",
-    "max_boost_db": "max_boost",
-    "max_cut_db": "max_cut_db",
-    "phase_limit": "phase_limit",
-    "reg_strength": "reg_strength",
-    "fdw_cycles": "fdw_cycles",
-    "filter_smooth": "filter_smooth",
-    "tdc_strength": "tdc_strength",
-    "tdc_max_reduction_db": "tdc_max_reduction_db",
-    "tdc_slope_db_per_oct": "tdc_slope_db_per_oct",
-    "low_bass_cut_hz": "low_bass_cut_hz",
-    "hpf_enable": "hpf_enable",
-    "hpf_freq": "hpf_freq",
-    "hpf_slope": "hpf_slope",
-    "ir_window_ms": "ir_window",
-    "ir_window_ms_left": "ir_window_left",
-    "ir_window_right": "ir_window",
-    "ir_window_left": "ir_window_left",
-    "mixed_split_freq": "mixed_freq",
-    "trans_width": "trans_width",
-    "bass_first_mode_max_hz": "bass_first_mode_max_hz",
-    "max_slope_db_per_oct": "max_slope_db_per_oct",
-    "max_slope_boost_db_per_oct": "max_slope_boost_db_per_oct",
-    "max_slope_cut_db_per_oct": "max_slope_cut_db_per_oct",
-    "lvl_manual_db": "lvl_manual_db",
-    "manual_target_tilt_db_per_oct": "manual_target_tilt_db_per_oct",
-    "output_tilt_db_per_oct": "output_tilt_db_per_oct",
-    "lvl_min": "lvl_min",
-    "lvl_max": "lvl_max",
-    "conf_pull_floor": "conf_pull_floor",
-    "conf_pull_ceil": "conf_pull_ceil",
-    "conf_pull_max_hz": "conf_pull_max_hz",
-    "conf_pull_gamma_cut": "conf_pull_gamma_cut",
-    "conf_pull_gamma_boost": "conf_pull_gamma_boost",
-    "conf_pull_bass_boost_floor_min": "conf_pull_bass_boost_floor_min",
-    "conf_pull_bass_boost_restore": "conf_pull_bass_boost_restore",
-    "low_bass_cut_strength": "low_bass_cut_strength",
-    "filter_type_str": "filter_type",
-    "plot_smoothing_level": "plot_smoothing_level",
-    "lvl_mode": "lvl_mode",
-    "lvl_algo": "lvl_algo",
-    "stereo_link_strategy": "stereo_link_strategy",
-    "enable_mag_correction": "mag_correct",
-    "unsafe_raw_dsp": "unsafe_raw_dsp",
-    "exc_prot": "exc_prot",
-    "enable_tdc": "enable_tdc",
-    "enable_afdw": "enable_afdw",
-    "df_smoothing": "df_smoothing",
-    "comparison_mode": "comparison_mode",
-    "bass_first_ai": "bass_first_ai",
-    "phase_safe_2058": "phase_safe_2058",
-    "stereo_link": "stereo_link",
-    "low_bass_cut_enable": "low_bass_cut_enable",
-}
 
 _AUTO_MODE_DEFAULT_CFG_TO_UI = AUTO_MODE_DEFAULT_CFG_TO_UI
 
@@ -183,8 +126,7 @@ def _apply_auto_hpf_runtime_override(
 
     base_hpf = dict(hpf or {}) if isinstance(hpf, dict) else {}
     enabled = bool(override.get("enabled", False))
-    auto_goal = _safe_mode_lower(data, key="auto_goal", default="").replace("_", "-")
-    if auto_goal in {"flat", "prefer bass", "prefer-bass", "bass"}:
+    if auto_goal_is_flat_family(data.get("auto_goal")):
         enabled = True
 
     freq_fallback = base_hpf.get("freq", data.get("hpf_freq", 20.0))

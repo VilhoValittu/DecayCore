@@ -15,7 +15,7 @@ from typing import Any, Callable
 import numpy as np
 import scipy.ndimage
 
-from decaycore.auto_mode.auto_mode_profile import profiled_section as profiled_section
+from decaycore.common.profiling import profiled_section as profiled_section
 
 from .. import bassfirst as bf
 bf = bf

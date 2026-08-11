@@ -51,6 +51,11 @@ def resolve_gain_policy(
     if not np.isfinite(exc_freq) or exc_freq <= 0.0:
         exc_freq = 0.0
     exc_soft_hz = float(exc_freq * 1.41) if exc_freq > 0.0 else 0.0
+    if exc_freq <= 0.0:
+        # An invalid/zero excursion frequency makes the feature meaningless;
+        # keep exc_prot consistent with exc_freq/exc_soft_hz instead of
+        # leaving it "on" with a degenerate (zero-width) protection band.
+        exc_prot = False
 
     return GainPolicy(
         max_cut_db=float(max_cut_db),

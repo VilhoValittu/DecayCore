@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from decaycore.auto_mode.auto_mode_profile import profiled_section
+from decaycore.common.profiling import profiled_section
 
 from .acoustic_authority import acoustic_authority_to_stats, build_acoustic_authority_map
 from .correction_baseline import _prepare_correction_baseline

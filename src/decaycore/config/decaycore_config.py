@@ -34,7 +34,7 @@ from .schema import (
     normalize_filter_type,
     persistable_config_dict,
 )
-from ..ui_i18n import (
+from .value_normalization import (
     LAYOUT_MONO,
     LVL_ALGO_MEDIAN,
     LVL_MODE_AUTO,

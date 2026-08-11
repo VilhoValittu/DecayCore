@@ -11,7 +11,7 @@
 import logging
 
 logger = logging.getLogger(__name__)
-from ...auto_mode.rank_score import attach_official_rank_score
+from ...common.auto_reporting import attach_official_rank_score
 from ...resources.i8n.decaycore_i18n import t
 from ..bass_integration_dsp_settings import build_bass_integration_dsp_settings
 from ..export_scoring import _safe_float
@@ -45,8 +45,16 @@ def _append_bass_integration_summary(
             )
             or "average"
         ).strip().lower()
-        is_dual_sub_shared = bool(dual_sub_diag.get("dual_sub_preprocessing_applied", False)) or combine_mode == "dual_sub_peak_aligned_average"
+        is_dual_sub_shared = bool(dual_sub_diag.get("dual_sub_preprocessing_applied", False)) or combine_mode in {
+            "dual_sub_peak_aligned_average",
+            "dual_sub_single_bus_complex_sum",
+        }
         if bool(dual_sub_diag.get("dual_sub_preprocessing_applied", False)):
+            dual_sub_method = str(dual_sub_diag.get("dual_sub_combined_method", "") or "")
+            measured_pressure_sum = bool(
+                combine_mode == "dual_sub_single_bus_complex_sum"
+                or dual_sub_method == "single_bus_measured_complex_pressure_sum"
+            )
             sub1_peak_ms = _safe_float(
                 dual_sub_diag.get("dual_sub_sub1_peak_ms", float("nan")), float("nan")
             )
@@ -58,14 +66,20 @@ def _append_bass_integration_summary(
                 float("nan"),
             )
             summary_content += "Bass Integration dual-sub preprocessing:\n"
-            summary_content += "Sub topology: dual-sub vector-average reference\n"
+            summary_content += (
+                "Sub topology: shared-bus measured complex pressure sum\n"
+                if measured_pressure_sum
+                else "Sub topology: dual-sub vector-average reference\n"
+            )
             if sub1_peak_ms == sub1_peak_ms and abs(sub1_peak_ms) != float("inf"):
                 summary_content += f"- SUB1 peak: {float(sub1_peak_ms):.3f} ms\n"
             if sub2_peak_ms == sub2_peak_ms and abs(sub2_peak_ms) != float("inf"):
                 summary_content += f"- SUB2 peak: {float(sub2_peak_ms):.3f} ms\n"
             if delay_ms == delay_ms and abs(delay_ms) != float("inf"):
                 summary_content += (
-                    f"- Applied peak-alignment delay: {float(delay_ms):+.3f} ms\n"
+                    f"- Measured SUB2-to-SUB1 timing delta: {float(delay_ms):+.3f} ms\n"
+                    if measured_pressure_sum
+                    else f"- Applied peak-alignment delay: {float(delay_ms):+.3f} ms\n"
                 )
             sub1_delay_ms = _safe_float(
                 dual_sub_diag.get(
@@ -85,12 +99,12 @@ def _append_bass_integration_summary(
                 summary_content += f"- SUB1 preprocessing delay: {float(sub1_delay_ms):+.3f} ms\n"
             if sub2_delay_ms == sub2_delay_ms and abs(sub2_delay_ms) != float("inf"):
                 summary_content += f"- SUB2 preprocessing delay: {float(sub2_delay_ms):+.3f} ms\n"
-            summary_content += (
-                "- Combined sub reference: peak-aligned vector average of SUB1 + SUB2\n"
-            )
-            summary_content += (
-                "- Combined method: complex vector average after peak alignment\n"
-            )
+            if measured_pressure_sum:
+                summary_content += "- Combined sub reference: measured complex pressure sum of SUB1 + SUB2\n"
+                summary_content += "- Combined method: phase-preserving superposition; no virtual per-sub delay\n"
+            else:
+                summary_content += "- Combined sub reference: peak-aligned vector average of SUB1 + SUB2\n"
+                summary_content += "- Combined method: complex vector average after peak alignment\n"
             summary_content += "- Output filter: one shared mono Sub FIR for both subwoofers\n"
             summary_content += "- Per-sub optimization: no\n"
             summary_content += "- Reported delay, polarity, gain trim, and allpass values apply to the shared combined sub branch.\n"
@@ -162,6 +176,22 @@ def _append_bass_integration_summary(
             )
             if worst_channel:
                 summary_content += f"Worst channel: {worst_channel}\n"
+            metric_channel_mode = str(
+                diag.get(
+                    "metric_channel_mode",
+                    bm.get("bass_metric_channel_mode", "worst_case_l_r_mono_center"),
+                )
+                or "worst_case_l_r_mono_center"
+            )
+            summary_content += f"Acoustic scenarios: {metric_channel_mode}\n"
+            summary_content += (
+                "Sub scaling assumption: "
+                f"{diag.get('sub_scaling_assumption', bm.get('bass_sub_scaling_assumption', 'measured_physical_pressure_response'))}\n"
+            )
+            summary_content += (
+                "Sub coherence assumption: "
+                f"{diag.get('sub_coherence_assumption', bm.get('bass_sub_coherence_assumption', 'measured_complex_phase_preserving'))}\n"
+            )
         cancel = _first_finite(
             diag.get("cancellation_risk", float("nan")),
             bm.get("bass_cancellation_risk", float("nan")),
@@ -276,4 +306,3 @@ def _append_bass_integration_allpass_auto_summary(
 
 
 __all__ = ['_append_bass_integration_summary', '_append_bass_integration_allpass_auto_summary']
-

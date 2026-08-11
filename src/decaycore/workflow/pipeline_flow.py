@@ -14,14 +14,14 @@ import logging
 import time
 import typing
 
-from ..application.run_contracts import DSPRunInput, build_dsp_measurements
+from ..application.run_contracts import DSPRunInput, RunContext, build_dsp_measurements
+from ..common.filter_lengths import scale_taps_with_fs
 from ..engine import build_config, run_pipeline, summarize_run
 from ..resources.i8n.decaycore_i18n import t
-from ..ui.decaycore_utils import scale_taps_with_fs
 from .bridge_types import ProcessRunCallbacks
 
 if typing.TYPE_CHECKING:
-    from .process_run_flow import ProcessRunSupport
+    from .process_run_support import ProcessRunSupport
 
 logger = logging.getLogger("DecayCore")
 
@@ -30,24 +30,23 @@ _PIPELINE_PROGRESS_START_AUTO = 0.88
 _PIPELINE_PROGRESS_END = 0.96
 
 
-def _run_pipeline(ctx: dict, *, callbacks: ProcessRunCallbacks, support: ProcessRunSupport) -> bool:
-    data = ctx.get("resolved_data", ctx["data"])
-    ctx["resolved_data"] = data
-    ctx["data"] = data
-    measurements = ctx["measurements"]
-    target_rates = ctx["target_rates"]
-    xos = ctx["xos"]
-    hpf = ctx["hpf"]
-    hc_f = ctx["hc_f"]
-    hc_m = ctx["hc_m"]
-    taps_base = int(ctx["taps_base"])
-    dash_fs = int(ctx["dash_fs"])
-    results_by_fs = ctx["results_by_fs"]
-    perf_stats = ctx["perf_stats"]
-    per_fs_stats = ctx["per_fs_stats"]
+def _run_pipeline(ctx: RunContext, *, callbacks: ProcessRunCallbacks, support: ProcessRunSupport) -> bool:
+    resolved = ctx.require_resolved_config()
+    data = resolved.resolved_data
+    measurements = resolved.measurements
+    target_rates = resolved.target_rates
+    xos = resolved.xos
+    hpf = resolved.hpf
+    hc_f = resolved.hc_f
+    hc_m = resolved.hc_m
+    taps_base = int(ctx.taps_base)
+    dash_fs = int(resolved.dash_fs)
+    results_by_fs = ctx.results_by_fs
+    perf_stats = ctx.perf_stats
+    per_fs_stats = ctx.per_fs_stats
     pipeline_start = (
         _PIPELINE_PROGRESS_START_AUTO
-        if bool(ctx.get("auto_mode_enabled", False))
+        if ctx.auto_mode_enabled
         else _PIPELINE_PROGRESS_START
     )
     pipeline_span = float(max(0.0, _PIPELINE_PROGRESS_END - pipeline_start))
@@ -100,13 +99,13 @@ def _run_pipeline(ctx: dict, *, callbacks: ProcessRunCallbacks, support: Process
         results_by_fs.append(result)
 
         if int(fs_v) == dash_fs:
-            ctx["l_st_f"] = result.l_st
-            ctx["r_st_f"] = result.r_st
-            ctx["l_imp_f"] = result.l_ir
-            ctx["r_imp_f"] = result.r_ir
-            ctx["sub_ir_f"] = result.sub_ir
-            ctx["sub_st_f"] = result.sub_st
-            ctx["sub_meas_f"] = {
+            ctx.l_st_f = result.l_st
+            ctx.r_st_f = result.r_st
+            ctx.l_imp_f = result.l_ir
+            ctx.r_imp_f = result.r_ir
+            ctx.sub_ir_f = result.sub_ir
+            ctx.sub_st_f = result.sub_st
+            ctx.sub_meas_f = {
                 k: result.measurements[k]
                 for k in ("f_sub", "m_sub", "p_sub")
                 if k in result.measurements

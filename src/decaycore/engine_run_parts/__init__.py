@@ -8,35 +8,10 @@
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
-from .direct_dac_bass_integration import apply_direct_dac_bass_integration_result
-from .measurement_response_helpers import (
-    _build_measurement_side_ctx,
-    _phase_from_ir,
-    _to_axis,
-    _extract_lr_measurement_axes,
-    _resample_to_axis,
-    _resolve_sub_measurement_for_filter,
-    _interp_complex_to_axis,
-    _ir_fft_on_axis,
-)
-from .pipeline_execution import (
-    _call_generate_filter,
-    _call_generate_filter_pair,
-    _stats_level_comp_factor,
-    _apply_measured_rt60_override,
-    _inject_direct_dac_summed_prediction_for_plot,
-    dsp,
-    run_pipeline,
-)
-from .subwoofer_target import (
-    SUB_TARGET_LPF_HZ,
-    SUB_TARGET_LPF_MAX_ATTENUATION_DB,
-    SUB_TARGET_LPF_SLOPE_DB_PER_OCT,
-    SUB_TARGET_POLICY,
-    SubwooferTarget,
-    build_subwoofer_target_with_lpf,
-    subwoofer_target_metadata,
-)
+from __future__ import annotations
+
+from importlib import import_module
+from typing import Any
 
 __all__ = [
     'SUB_TARGET_LPF_HZ',
@@ -63,3 +38,41 @@ __all__ = [
     'run_pipeline',
     'subwoofer_target_metadata',
 ]
+
+_DIRECT_DAC_EXPORTS = {"apply_direct_dac_bass_integration_result"}
+_MEASUREMENT_EXPORTS = {
+    "_build_measurement_side_ctx",
+    "_phase_from_ir",
+    "_to_axis",
+    "_extract_lr_measurement_axes",
+    "_resample_to_axis",
+    "_resolve_sub_measurement_for_filter",
+    "_interp_complex_to_axis",
+    "_ir_fft_on_axis",
+}
+_PIPELINE_EXPORTS = {
+    "_call_generate_filter",
+    "_call_generate_filter_pair",
+    "_stats_level_comp_factor",
+    "_apply_measured_rt60_override",
+    "_inject_direct_dac_summed_prediction_for_plot",
+    "dsp",
+    "run_pipeline",
+}
+_SUBWOOFER_EXPORTS = set(__all__) - _DIRECT_DAC_EXPORTS - _MEASUREMENT_EXPORTS - _PIPELINE_EXPORTS
+
+
+def __getattr__(name: str) -> Any:
+    if name in _DIRECT_DAC_EXPORTS:
+        module_name = "direct_dac_bass_integration"
+    elif name in _MEASUREMENT_EXPORTS:
+        module_name = "measurement_response_helpers"
+    elif name in _PIPELINE_EXPORTS:
+        module_name = "pipeline_execution"
+    elif name in _SUBWOOFER_EXPORTS:
+        module_name = "subwoofer_target"
+    else:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module(f"{__name__}.{module_name}"), name)
+    globals()[name] = value
+    return value

@@ -12,7 +12,7 @@ from typing import Any
 
 from . import decaycore_plot as plots
 from ..config.results import FilterResult
-from ..auto_mode.rank_score import (
+from ..common.auto_reporting import (
     compute_run_ranking_score_components,
 )
 
@@ -249,4 +249,3 @@ def _append_export_ranking(summary_content: str, fs_v: int, ranking_context: dic
             f"{_safe_float(e.get('lr_delta_score'), 0.0):<10.3f}\n"
         )
     return summary_content
-

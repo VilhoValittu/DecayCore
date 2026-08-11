@@ -14,7 +14,7 @@ from typing import Any
 import logging
 import math
 
-from ...auto_mode.shared_parts import _auto_bass_integration_profile_norm, _auto_goal_is_flat_family
+from ..auto_mode_policy import auto_goal_is_flat_family
 from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from ...config.schema import (
     AUTO_MODE_DEFAULT_CFG_TO_UI,
@@ -25,14 +25,15 @@ from ...config.schema import (
     RunConfigSnapshot,
     normalize_list_backed_booleans,
 )
-from ...dsp.bass_integration import normalize_sub_combine_mode
-from ...ui_i18n import (
+from ..value_normalization import (
     LAYOUT_MONO,
     LVL_ALGO_MEDIAN,
     LVL_MODE_AUTO,
+    normalize_bass_integration_profile,
     normalize_layout_value,
     normalize_lvl_algo_value,
     normalize_lvl_mode_value,
+    normalize_sub_combine_mode,
 )
 from .managed_settings import (
     _apply_auto_mode_managed_settings,
@@ -43,171 +44,6 @@ from .xo_hpf import filter_type_short
 
 logger = logging.getLogger("DecayCore")
 
-
-_AUTO_MODE_DEFAULT_CFG_TO_UI = {
-    "global_gain_db": "gain",
-    "mag_c_min": "mag_c_min",
-    "mag_c_max": "mag_c_max",
-    "max_boost_db": "max_boost",
-    "max_cut_db": "max_cut_db",
-    "phase_limit": "phase_limit",
-    "reg_strength": "reg_strength",
-    "fdw_cycles": "fdw_cycles",
-    "filter_smooth": "filter_smooth",
-    "tdc_strength": "tdc_strength",
-    "tdc_max_reduction_db": "tdc_max_reduction_db",
-    "tdc_slope_db_per_oct": "tdc_slope_db_per_oct",
-    "low_bass_cut_hz": "low_bass_cut_hz",
-    "hpf_enable": "hpf_enable",
-    "hpf_freq": "hpf_freq",
-    "hpf_slope": "hpf_slope",
-    "ir_window_ms": "ir_window",
-    "ir_window_ms_left": "ir_window_left",
-    "ir_window_right": "ir_window",
-    "ir_window_left": "ir_window_left",
-    "mixed_split_freq": "mixed_freq",
-    "trans_width": "trans_width",
-    "bass_first_mode_max_hz": "bass_first_mode_max_hz",
-    "max_slope_db_per_oct": "max_slope_db_per_oct",
-    "max_slope_boost_db_per_oct": "max_slope_boost_db_per_oct",
-    "max_slope_cut_db_per_oct": "max_slope_cut_db_per_oct",
-    "lvl_manual_db": "lvl_manual_db",
-    "manual_target_tilt_db_per_oct": "manual_target_tilt_db_per_oct",
-    "output_tilt_db_per_oct": "output_tilt_db_per_oct",
-    "lvl_min": "lvl_min",
-    "lvl_max": "lvl_max",
-    "conf_pull_floor": "conf_pull_floor",
-    "conf_pull_ceil": "conf_pull_ceil",
-    "conf_pull_max_hz": "conf_pull_max_hz",
-    "conf_pull_gamma_cut": "conf_pull_gamma_cut",
-    "conf_pull_gamma_boost": "conf_pull_gamma_boost",
-    "conf_pull_bass_boost_floor_min": "conf_pull_bass_boost_floor_min",
-    "conf_pull_bass_boost_restore": "conf_pull_bass_boost_restore",
-    "low_bass_cut_strength": "low_bass_cut_strength",
-    "filter_type_str": "filter_type",
-    "plot_smoothing_level": "plot_smoothing_level",
-    "lvl_mode": "lvl_mode",
-    "lvl_algo": "lvl_algo",
-    "stereo_link_strategy": "stereo_link_strategy",
-    "enable_mag_correction": "mag_correct",
-    "unsafe_raw_dsp": "unsafe_raw_dsp",
-    "exc_prot": "exc_prot",
-    "enable_tdc": "enable_tdc",
-    "enable_afdw": "enable_afdw",
-    "df_smoothing": "df_smoothing",
-    "comparison_mode": "comparison_mode",
-    "bass_first_ai": "bass_first_ai",
-    "phase_safe_2058": "phase_safe_2058",
-    "stereo_link": "stereo_link",
-    "low_bass_cut_enable": "low_bass_cut_enable",
-}
-
-_UI_PIN_KEYS = [
-    "mode", "auto_goal", "auto_target_mode", "auto_mode_workers", "fs", "taps", "filter_type", "mixed_freq", "gain", "hc_mode",
-    "bass_integration_enable", "bass_integration_mode", "bass_integration_profile", "bass_integration_sub_combine_mode", "avr_crossover_hz",
-    "bass_integration_sub_delay_ms", "bass_integration_sub_array_delay_ms",
-    "bass_integration_sub1_delay_ms", "bass_integration_sub2_delay_ms",
-    "bass_integration_main_l_delay_ms", "bass_integration_main_r_delay_ms",
-    "bass_integration_sub_polarity_invert", "bass_integration_sub_gain_trim_db",
-    "bass_integration_alignment_auto_applied", "bass_integration_alignment_reason",
-    "bass_integration_allpass_auto_enable", "bass_integration_allpass_freq_hz", "bass_integration_allpass_q", "bass_integration_allpass_auto_applied",
-    "sub_crossover_hz", "sub_crossover_slope", "sub_crossover_manual_override", "direct_dac_sub_lpf_hz", "sub_hpf_freq", "sub_hpf_slope",
-    "mag_c_min", "mag_c_max", "max_boost", "max_cut_db", "max_slope_db_per_oct",
-    "max_slope_boost_db_per_oct", "max_slope_cut_db_per_oct", "phase_limit", "mag_correct",
-    "excess_phase_strength", "low_freq_full_correction_hz", "high_freq_no_correction_hz",
-    "mixed_phase_budget_lf_deg", "mixed_phase_budget_hf_deg",
-    "phase_budget_mode", "linear_excess_strength",
-    "phase_conf_gain_floor", "phase_conf_gain_power",
-    "phase_corr_clamp_lf_deg", "phase_corr_clamp_hf_deg", "max_excess_delay_cycles",
-    "enable_ir_pre_energy_guard", "pre_energy_ratio_max", "pre_energy_guard_strength",
-    "max_pre_ringing_db", "max_excess_delay_ms", "gd_grad_limit_ms_per_oct",
-    "ir_anchor_mode", "min_causal_ms", "auto_asym_left_ratio", "auto_asym_left_max_ms",
-    "lvl_mode", "reg_strength", "normalize_opt", "align_opt",
-    "stereo_link", "stereo_link_strategy", "exc_prot", "exc_freq", "low_bass_cut_hz", "low_bass_cut_enable", "hpf_enable", "hpf_freq",
-    "hpf_slope", "multi_rate_opt", "multi_rate_ultra_high_opt", "ir_window", "ir_window_left", "ir_window_right", "ir_export_window_mode", "ir_window_mode",
-    "ir_export_window_shape", "ir_export_tukey_alpha",
-    "measurement_library_dir",
-    "local_path_l", "local_path_r",
-    "measurement_input_device", "measurement_output_device",
-    "measurement_input_channel", "measurement_output_channel",
-    "measurement_samplerate", "measurement_sweep_start_hz", "measurement_sweep_end_hz",
-    "measurement_sweep_length_s", "measurement_output_gain_db", "measurement_dither_level_db", "measurement_source_path", "measurement_role",
-    "measurement_use_wasapi",
-    "measurement_mic_calibration_path", "measurement_mic_calibration_label",
-    "generated_measurement_l", "generated_measurement_r",
-    "local_path_l_main", "local_path_r_main", "local_path_l_sub", "local_path_r_sub",
-    "fmt", "layout", "lvl_manual_db",
-    "manual_target_tilt_db_per_oct", "output_tilt_source", "output_tilt_db_per_oct",
-    "lvl_min", "lvl_max", "lvl_algo", "fdw_cycles",
-    "trans_width", "smoothing_level", "filter_smooth", "plot_smoothing_level",
-    "bass_smooth_adaptive", "bass_smooth_hz", "bass_smooth_sigma_scale", "bass_smooth_conf_floor",
-    "bass_adaptive_isolation_mode",
-    "bass_boost_cap_enable", "bass_boost_cap_hz", "bass_boost_cap_extra_db", "bass_boost_cap_conf_min",
-    "bass_boost_post_restore_enable", "bass_boost_post_restore_strength",
-    "enable_tdc", "tdc_strength", "tdc_max_reduction_db",
-    "tdc_slope_db_per_oct", "enable_afdw", "df_smoothing", "comparison_mode",
-    "bass_first_ai", "bass_first_mode_max_hz",
-    "enable_channel_specific_auto_policy", "channel_specific_policy_max_hz",
-    "hybrid_iir_enabled", "hybrid_iir_max_filters_per_channel",
-    "hybrid_iir_min_freq_hz", "hybrid_iir_max_freq_hz", "hybrid_iir_min_peak_db",
-    "hybrid_iir_min_q", "hybrid_iir_max_q", "hybrid_iir_max_cut_db",
-    "hybrid_iir_min_confidence", "hybrid_iir_min_gd_excess_ms",
-    "local_path_house",
-    "conf_pull_floor", "conf_pull_ceil", "conf_pull_max_hz",
-    "conf_pull_gamma_cut", "conf_pull_gamma_boost",
-    "conf_pull_conf_smooth_sigma",
-    "conf_pull_bass_floor_hz", "conf_pull_bass_floor_min",
-    "conf_pull_bass_boost_floor_hz", "conf_pull_bass_boost_floor_min",
-    "conf_pull_bass_boost_restore",
-    "low_bass_cut_strength", "auto_optimize_low_bass_cut", "hc_custom_file",
-    "file_l", "file_r",
-    "file_l_main", "file_r_main", "file_l_sub", "file_r_sub",
-    "unsafe_raw_dsp",
-    CAMILLAFIR_AUTO_MODE,
-]
-
-_LIST_BOOL_KEYS = [
-    "mag_correct", "normalize_opt", "align_opt", "multi_rate_opt", "multi_rate_ultra_high_opt",
-    "stereo_link", "exc_prot", "hpf_enable", "df_smoothing",
-    "comparison_mode", "bass_first_ai", "phase_safe_2058",
-    "enable_tdc", "enable_afdw", "low_bass_cut_enable", "auto_optimize_low_bass_cut", "enable_ir_pre_energy_guard",
-    "bass_smooth_adaptive",
-    "bass_adaptive_isolation_mode",
-    "bass_boost_cap_enable",
-    "bass_boost_post_restore_enable",
-    "enable_channel_specific_auto_policy",
-    "hybrid_iir_enabled",
-    "unsafe_raw_dsp",
-    "bass_integration_enable",
-    "bass_integration_sub_polarity_invert",
-    "bass_integration_alignment_auto_applied",
-    "bass_integration_allpass_auto_enable",
-    "bass_integration_allpass_auto_applied",
-    "sub_crossover_manual_override",
-    CAMILLAFIR_AUTO_MODE,
-]
-
-_HIDDEN_CONF_DEFAULTS_ADVANCED = {
-    "conf_pull_floor": 0.05,
-    "conf_pull_ceil": 0.85,
-    "conf_pull_max_hz": 180.0,
-    "conf_pull_gamma_cut": 0.45,
-    "conf_pull_gamma_boost": 0.35,
-    "conf_pull_bass_boost_floor_min": 0.55,
-    "conf_pull_bass_boost_restore": 0.70,
-    "low_bass_cut_strength": 0.0,
-}
-
-_HIDDEN_CONF_DEFAULTS_BASIC_AUTO = {
-    "conf_pull_floor": 0.05,
-    "conf_pull_ceil": 0.85,
-    "conf_pull_max_hz": 200.0,
-    "conf_pull_gamma_cut": 0.45,
-    "conf_pull_gamma_boost": 0.35,
-    "conf_pull_bass_boost_floor_min": 0.55,
-    "conf_pull_bass_boost_restore": 0.70,
-    "low_bass_cut_strength": 0.0,
-}
 
 _AUTO_MODE_DEFAULT_CFG_TO_UI = AUTO_MODE_DEFAULT_CFG_TO_UI
 _UI_PIN_KEYS = UI_PIN_KEYS
@@ -372,7 +208,7 @@ def _normalize_bass_integration_mode_and_profile(data: dict[str, Any]) -> None:
         bi_profile = str(data.get("bass_integration_profile", "safe") or "safe").strip().lower()
     except _UI_PARSE_EXCEPTIONS:
         bi_profile = "safe"
-    data["bass_integration_profile"] = _auto_bass_integration_profile_norm(bi_profile)
+    data["bass_integration_profile"] = normalize_bass_integration_profile(bi_profile)
 
 
 def _normalize_bass_integration_alignment_fields(data: dict[str, Any], is_auto_mode: bool) -> None:
@@ -496,7 +332,7 @@ def collect_ui_data(pin) -> dict[str, Any]:
 
     auto_prefer_bass = bool(
         is_auto_mode
-        and _auto_goal_is_flat_family(str(data.get("auto_goal", "balanced") or "balanced"))
+        and auto_goal_is_flat_family(str(data.get("auto_goal", "balanced") or "balanced"))
     )
     if auto_prefer_bass:
         data["auto_target_mode"] = "selected"

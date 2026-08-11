@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from ..config.models import FilterConfig
 
@@ -49,6 +49,8 @@ class PreparedRunInput:
     harmonic_magnitudes_db_l: Any = None
     harmonic_freq_hz_r: Any = None
     harmonic_magnitudes_db_r: Any = None
+    measured_snr_db_l: float | None = None
+    measured_snr_db_r: float | None = None
 
 
 @dataclass
@@ -65,6 +67,58 @@ class ResolvedRunConfig:
     target_curve_tag: str = ""
     auto_applied_preset: dict[str, Any] = field(default_factory=dict)
     auto_result_meta: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class RunContext:
+    """Typed mutable state carried through one workflow run."""
+
+    prepared_input: PreparedRunInput
+    run_started_at: float
+    taps_base: int
+    perf_stats: dict[str, float]
+    per_fs_stats: dict[int, dict[str, float]]
+    resolved_config: ResolvedRunConfig | None = None
+    auto_mode_preview: bool = False
+    auto_mode_enabled: bool = False
+    auto_goal: str = "balanced"
+    auto_basis: str = "preset_objective_score"
+    auto_applied_preset: dict[str, Any] = field(default_factory=dict)
+    auto_progress_value: float = 0.0
+    auto_status_callback: Callable[[str], None] | None = None
+    ts: str = ""
+    file_ts: str = ""
+    ft_short: str = ""
+    irw_tag: str = ""
+    results_by_fs: list[Any] = field(default_factory=list)
+    l_st_f: Any = None
+    r_st_f: Any = None
+    l_imp_f: Any = None
+    r_imp_f: Any = None
+    sub_ir_f: Any = None
+    sub_st_f: Any = None
+    sub_meas_f: dict[str, Any] = field(default_factory=dict)
+    export_filename: str | None = None
+    saved_filters_dir: Any = None
+
+    @property
+    def source_ui_data(self) -> dict[str, Any]:
+        return self.prepared_input.source_ui_data
+
+    @property
+    def data(self) -> dict[str, Any]:
+        if self.resolved_config is not None:
+            return self.resolved_config.resolved_data
+        return self.prepared_input.resolved_data
+
+    @property
+    def measurements(self) -> dict[str, Any]:
+        return self.require_resolved_config().measurements
+
+    def require_resolved_config(self) -> ResolvedRunConfig:
+        if self.resolved_config is None:
+            raise RuntimeError("RunContext has not reached the resolved-config stage")
+        return self.resolved_config
 
 
 @dataclass
@@ -133,6 +187,7 @@ __all__ = [
     "DSPRunInput",
     "PreparedRunInput",
     "ResolvedRunConfig",
+    "RunContext",
     "RunRequest",
     "apply_auto_mode_result",
     "build_dsp_measurements",

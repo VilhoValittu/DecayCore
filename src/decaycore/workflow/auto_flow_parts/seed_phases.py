@@ -40,21 +40,22 @@ from ...auto_mode.api import (
     _estimate_auto_mag_c_min,
     _resolve_auto_hpf_application,
 )
-from ...auto_mode.shared_parts import _auto_goal_forced_level_window
+from ...application.run_contracts import RunContext
+from ...config.auto_mode_policy import auto_goal_forced_level_window
 from ...config.legacy_keys import is_auto_mode
 from ...config.pipeline_parts import (
     build_xos_hpf,
     choose_target_rates,
     detect_is_wav_source,
 )
-from ...ui.decaycore_utils import scale_taps_with_fs
+from ...common.filter_lengths import scale_taps_with_fs
 from ..bridge_types import ProcessRunCallbacks
 
 from .progress import _get_auto_status_callback
 from .status_text import _resolve_auto_hpf_seed_source
 
 if typing.TYPE_CHECKING:
-    from ..process_run_flow import ProcessRunSupport
+    from ..process_run_support import ProcessRunSupport
 
 logger = logging.getLogger("DecayCore")
 
@@ -424,7 +425,7 @@ def _seed_phases_prepare_preview_state(
     if auto_mode_preview and _auto_goal_is_flat_family(auto_goal):
         data["unsafe_raw_dsp"] = True
 
-    forced_level_window = _auto_goal_forced_level_window(auto_goal) if auto_mode_preview else None
+    forced_level_window = auto_goal_forced_level_window(auto_goal) if auto_mode_preview else None
     if forced_level_window is not None:
         data["lvl_min"] = float(forced_level_window[0])
         data["lvl_max"] = float(forced_level_window[1])
@@ -627,17 +628,17 @@ def _seed_phases_should_use_user_target(
 
 
 def _seed_phases_extract_direct_dac_pre_measurements(
-    ctx: dict,
+    ctx: RunContext,
     pre_f_l,
     pre_m_l,
     pre_f_r,
     pre_m_r,
 ):
-    if not bool(ctx.get("data", {}).get("bass_integration_enable", False)):
+    if not bool(ctx.data.get("bass_integration_enable", False)):
         return pre_f_l, pre_m_l, pre_f_r, pre_m_r
 
     try:
-        _bi_bundle = ctx.get("bass_integration_bundle")
+        _bi_bundle = ctx.prepared_input.bass_integration_bundle
         if _bi_bundle is None:
             return pre_f_l, pre_m_l, pre_f_r, pre_m_r
         _lt = getattr(_bi_bundle, "l_total", None)
@@ -669,7 +670,7 @@ def _seed_phases_extract_direct_dac_pre_measurements(
 
 
 def _seed_phases_build_pre_target_measurements(
-    ctx: dict,
+    ctx: RunContext,
     *,
     data: dict,
     taps_base: int,
@@ -694,7 +695,7 @@ def _seed_phases_build_pre_target_measurements(
         f_r,
         m_r,
     )
-    pre_measurements = dict(ctx.get("measurements", {}) or {})
+    pre_measurements: dict = {}
     pre_measurements.update(
         {
             "f_l": np.asarray(pre_f_l, dtype=float),
@@ -846,7 +847,7 @@ def _seed_phases_apply_target_curve_selection(
 
 
 def _seed_phases_run_auto_mode_preview(
-    ctx: dict,
+    ctx: RunContext,
     *,
     data: dict,
     taps_base: int,
@@ -991,21 +992,20 @@ def _seed_phases_run_auto_mode_preview(
 
 
 def _run_auto_mode_seed_phases(
-    ctx: dict,
+    ctx: RunContext,
     *,
     callbacks: ProcessRunCallbacks,
     support: ProcessRunSupport,
 ):
-    data = ctx.get("resolved_data", ctx["data"])
-    ctx["resolved_data"] = data
-    ctx["data"] = data
-    taps_base = int(ctx["taps_base"])
-    f_l = ctx["f_l"]
-    m_l = ctx["m_l"]
-    f_r = ctx["f_r"]
-    m_r = ctx["m_r"]
-    p_l = ctx["p_l"]
-    p_r = ctx["p_r"]
+    data = ctx.data
+    prepared = ctx.prepared_input
+    taps_base = int(ctx.taps_base)
+    f_l = prepared.f_l
+    m_l = prepared.m_l
+    f_r = prepared.f_r
+    m_r = prepared.m_r
+    p_l = prepared.p_l
+    p_r = prepared.p_r
 
     try:
         _mode_preview_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
@@ -1051,9 +1051,9 @@ def _run_auto_mode_seed_phases(
             support=support,
         )
 
-    ctx["auto_mode_preview"] = auto_mode_preview
-    ctx["auto_goal"] = auto_goal
-    ctx["auto_basis"] = auto_basis
+    ctx.auto_mode_preview = auto_mode_preview
+    ctx.auto_goal = auto_goal
+    ctx.auto_basis = auto_basis
 
 
 __all__ = ['_run_auto_mode_seed_phases']

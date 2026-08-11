@@ -236,7 +236,7 @@ def register_main_page() -> None:
             with ui.tab_panel(tab_files):
                 from .ng_tab_files_parts import build_files_tab  # noqa: PLC0415
 
-                build_files_tab(t=t, get_val=get_val)
+                files_tab_context = build_files_tab(t=t, get_val=get_val)
 
             if measurement_available and tab_measurement is not None:
                 with ui.tab_panel(tab_measurement):
@@ -247,7 +247,7 @@ def register_main_page() -> None:
             with ui.tab_panel(tab_basic):
                 from .ng_tab_basic import build_basic_tab  # noqa: PLC0415
 
-                build_basic_tab(t=t, get_val=get_val)
+                build_basic_tab(t=t, get_val=get_val, files_tab_context=files_tab_context)
 
             with ui.tab_panel(tab_target):
                 from .ng_tab_target_parts import build_target_tab  # noqa: PLC0415

@@ -21,6 +21,7 @@ import numpy as np
 from ...application.house_curve_service import load_house_curve
 from ...application.run_contracts import (
     ResolvedRunConfig,
+    RunContext,
     copy_source_ui_data,
 )
 from ...common.result_postprocess import _irwin_tag
@@ -36,16 +37,27 @@ from ...config.pipeline_parts import (
 from ...io.measurements_txt import parse_measurements_from_path
 from ..bridge_types import ProcessRunCallbacks
 
-from .bass_diagnostics import (
-    _compute_direct_dac_prepare_recommendation,
-    _compute_selected_bass_integration_diagnostics,
-    _status,
-)
-
 if typing.TYPE_CHECKING:
-    from ..process_run_flow import ProcessRunSupport
+    from ..process_run_support import ProcessRunSupport
 
 logger = logging.getLogger("DecayCore")
+
+
+def _status(callbacks: ProcessRunCallbacks | None, message: str) -> None:
+    if callbacks is not None:
+        callbacks.status(message)
+
+
+def _compute_direct_dac_prepare_recommendation(*args, **kwargs):
+    from .bass_diagnostics import _compute_direct_dac_prepare_recommendation as implementation
+
+    return implementation(*args, **kwargs)
+
+
+def _compute_selected_bass_integration_diagnostics(*args, **kwargs):
+    from .bass_diagnostics import _compute_selected_bass_integration_diagnostics as implementation
+
+    return implementation(*args, **kwargs)
 
 
 def _safe_float(value: object, default: float, *, positive: bool = False) -> float:
@@ -164,7 +176,7 @@ def _prepare_house_curve_context(data: dict, support: ProcessRunSupport) -> tupl
 
 def _prepare_bass_integration_state(
     *,
-    ctx: dict,
+    ctx: RunContext,
     data: dict,
     callbacks: ProcessRunCallbacks | None,
 ) -> dict:
@@ -346,42 +358,43 @@ def _build_bass_integration_metadata_unified(
 
 def _build_measurements_dict(
     *,
-    ctx: dict,
+    ctx: RunContext,
     data: dict,
     hc_f,
     hc_m,
     bi_state: dict,
 ) -> dict:
+    prepared = ctx.prepared_input
     is_wav_source = detect_is_wav_source(data)
     data["_is_wav_source"] = bool(is_wav_source)
     measurements = {
-        "f_l": np.asarray(ctx["f_l"], dtype=float),
-        "m_l": np.asarray(ctx["m_l"], dtype=float),
-        "p_l": np.asarray(ctx["p_l"], dtype=float),
-        "f_r": np.asarray(ctx["f_r"], dtype=float),
-        "m_r": np.asarray(ctx["m_r"], dtype=float),
-        "p_r": np.asarray(ctx["p_r"], dtype=float),
+        "f_l": np.asarray(prepared.f_l, dtype=float),
+        "m_l": np.asarray(prepared.m_l, dtype=float),
+        "p_l": np.asarray(prepared.p_l, dtype=float),
+        "f_r": np.asarray(prepared.f_r, dtype=float),
+        "m_r": np.asarray(prepared.m_r, dtype=float),
+        "p_r": np.asarray(prepared.p_r, dtype=float),
         "hc_f": hc_f,
         "hc_m": hc_m,
         "ui_data": data,
         "is_wav_source": bool(is_wav_source),
-        "raw_ir_l": ctx.get("raw_ir_l"),
-        "raw_ir_fs_l": ctx.get("raw_ir_fs_l", 0),
-        "raw_ir_r": ctx.get("raw_ir_r"),
-        "raw_ir_fs_r": ctx.get("raw_ir_fs_r", 0),
-        "raw_ir_sub": ctx.get("raw_ir_sub"),
-        "raw_ir_fs_sub": ctx.get("raw_ir_fs_sub", 0),
-        "measured_rt60_l": ctx.get("measured_rt60_l"),
-        "measured_rt60_bands_l": ctx.get("measured_rt60_bands_l"),
-        "measured_rt60_r": ctx.get("measured_rt60_r"),
-        "measured_rt60_bands_r": ctx.get("measured_rt60_bands_r"),
-        "harmonic_freq_hz_l": ctx.get("harmonic_freq_hz_l"),
-        "harmonic_magnitudes_db_l": ctx.get("harmonic_magnitudes_db_l"),
-        "harmonic_freq_hz_r": ctx.get("harmonic_freq_hz_r"),
-        "harmonic_magnitudes_db_r": ctx.get("harmonic_magnitudes_db_r"),
+        "raw_ir_l": prepared.raw_ir_l,
+        "raw_ir_fs_l": prepared.raw_ir_fs_l,
+        "raw_ir_r": prepared.raw_ir_r,
+        "raw_ir_fs_r": prepared.raw_ir_fs_r,
+        "raw_ir_sub": prepared.raw_ir_sub,
+        "raw_ir_fs_sub": prepared.raw_ir_fs_sub,
+        "measured_rt60_l": prepared.measured_rt60_l,
+        "measured_rt60_bands_l": prepared.measured_rt60_bands_l,
+        "measured_rt60_r": prepared.measured_rt60_r,
+        "measured_rt60_bands_r": prepared.measured_rt60_bands_r,
+        "harmonic_freq_hz_l": prepared.harmonic_freq_hz_l,
+        "harmonic_magnitudes_db_l": prepared.harmonic_magnitudes_db_l,
+        "harmonic_freq_hz_r": prepared.harmonic_freq_hz_r,
+        "harmonic_magnitudes_db_r": prepared.harmonic_magnitudes_db_r,
     }
     if bool(data.get("bass_integration_enable", False)):
-        bundle = ctx.get("bass_integration_bundle")
+        bundle = prepared.bass_integration_bundle
         bundle_diagnostics = dict(getattr(bundle, "diagnostics", {}) or {})
         meta_dict, measurements_updates = _build_bass_integration_metadata_unified(
             data=data,
@@ -396,7 +409,7 @@ def _build_measurements_dict(
 
 def _finalize_target_context(
     *,
-    ctx: dict,
+    ctx: RunContext,
     data: dict,
     hc_f,
     hc_m,
@@ -407,7 +420,7 @@ def _finalize_target_context(
     measurements: dict,
 ) -> None:
     resolved_config = ResolvedRunConfig(
-        source_ui_data=copy_source_ui_data(ctx.get("source_ui_data", {})),
+        source_ui_data=copy_source_ui_data(ctx.source_ui_data),
         resolved_data=data,
         measurements=measurements,
         hc_f=hc_f,
@@ -419,41 +432,29 @@ def _finalize_target_context(
         target_curve_tag=str(target_curve_tag),
     )
 
-    ctx.update(
-        {
-            "hc_f": hc_f,
-            "hc_m": hc_m,
-            "xos": xos,
-            "hpf": hpf,
-            "target_curve_tag": target_curve_tag,
-            "target_rates": export_state["target_rates"],
-            "dash_fs": export_state["dash_fs"],
-            "auto_mode_enabled": export_state["auto_mode_enabled"],
-            "ts": export_state["ts"],
-            "file_ts": export_state["file_ts"],
-            "ft_short": export_state["ft_short"],
-            "irw_tag": export_state["irw_tag"],
-            "measurements": measurements,
-            "resolved_config": resolved_config,
-            "results_by_fs": [],
-            "l_st_f": None,
-            "r_st_f": None,
-            "sub_ir_f": None,
-            "sub_st_f": None,
-            "sub_meas_f": {},
-            "l_imp_f": None,
-            "r_imp_f": None,
-        }
-    )
+    ctx.resolved_config = resolved_config
+    ctx.auto_mode_enabled = bool(export_state["auto_mode_enabled"])
+    ctx.ts = str(export_state["ts"])
+    ctx.file_ts = str(export_state["file_ts"])
+    ctx.ft_short = str(export_state["ft_short"])
+    ctx.irw_tag = str(export_state["irw_tag"])
+    ctx.results_by_fs = []
+    ctx.l_st_f = None
+    ctx.r_st_f = None
+    ctx.l_imp_f = None
+    ctx.r_imp_f = None
+    ctx.sub_ir_f = None
+    ctx.sub_st_f = None
+    ctx.sub_meas_f = {}
 
 
 def _prepare_target_curve_bass_integration_context(
     *,
-    ctx: dict,
+    ctx: RunContext,
     data: dict,
     callbacks: ProcessRunCallbacks | None,
 ) -> dict:
-    bundle = ctx.get("bass_integration_bundle")
+    bundle = ctx.prepared_input.bass_integration_bundle
     bi_mode = "direct_dac"
     data["bass_integration_mode"] = bi_mode
     _mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
@@ -663,14 +664,12 @@ def _refresh_target_curve_bass_integration_diagnostics(
 
 
 def _prepare_target_curve_and_run_context(
-    ctx: dict,
+    ctx: RunContext,
     *,
     support: ProcessRunSupport,
     callbacks: ProcessRunCallbacks | None = None,
 ):
-    data = ctx.get("resolved_data", ctx["data"])
-    ctx["resolved_data"] = data
-    ctx["data"] = data
+    data = ctx.data
     hc_f, hc_m, _hc_source, target_curve_tag = _prepare_house_curve_context(data, support)
     bi_state = _prepare_bass_integration_state(
         ctx=ctx,

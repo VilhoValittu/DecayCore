@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import logging
-import math
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +21,7 @@ from ...auto_mode.rank_score import attach_official_rank_score, official_rank_sc
 from ...version import VERSION
 
 from .headless_progress import _git_commit
+from .headless_values import _f
 
 logger = logging.getLogger("DecayCore")
 
@@ -99,27 +99,6 @@ def _load_optional_metadata(config_dir: Path, config: dict) -> tuple[dict, dict,
     if harm_path.exists():
         harmonics.update(_read_json(harm_path))
     return metadata, rt60, harmonics
-
-def _f(value: Any, default: float | None = None) -> float | None:
-    try:
-        out = float(value)
-        if math.isfinite(out):
-            return out
-    except (
-
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-        NameError,
-    ):
-        return default
-    return default
 
 def _pick(stats: list[dict], keys: list[str], default: float | None = None) -> float | None:
     vals: list[float] = []
@@ -220,7 +199,10 @@ def _extract_harmonics(harmonics: dict) -> dict[str, float]:
     }
 
 def _build_metrics(status: str, data: dict, ctx: dict | None, metadata: dict, rt60_src: dict, harmonics_src: dict, *, started_at: str, finished_at: str, runtime_s: float, warnings: list[str], errors: list[str]) -> dict:
-    results = list((ctx or {}).get("results_by_fs", []) or [])
+    if isinstance(ctx, dict):
+        results = list(ctx.get("results_by_fs", []) or [])
+    else:
+        results = list(getattr(ctx, "results_by_fs", []) or [])
     result = results[-1] if results else None
     stats = []
     if result is not None:
@@ -287,6 +269,15 @@ def _build_metrics(status: str, data: dict, ctx: dict | None, metadata: dict, rt
         "gd_before_rms_ms": _pick(stats, ["phase_realized_gd_before_rms_ms"]),
         "gd_after_rms_ms": _pick(stats, ["phase_realized_gd_after_rms_ms"]),
         "gd_improvement_frac": _pick(stats, ["phase_realized_gd_improvement_score"]),
+        "phase_feedback_requested_strength": _pick(
+            stats, ["phase_realization_feedback_requested_strength"]
+        ),
+        "phase_feedback_selected_strength": _pick(
+            stats, ["phase_realization_feedback_selected_strength"]
+        ),
+        "phase_feedback_applied": bool(
+            _pick(stats, ["phase_realization_feedback_applied"], False)
+        ),
         "max_boost_db": _pick(stats, ["net_boost_peak_db", "max_net_boost_db", "max_boost_db"], _f(data.get("max_boost"), None)),
         "max_cut_db": -abs(float(_f(data.get("max_cut_db"), 0.0) or 0.0)),
         "bass_ripple_20_200_db": _pick(stats, ["bass_ripple_20_200_db", "ripple_rms"], None),

@@ -20,7 +20,7 @@ from ...application.run_request import RunRequest
 from ...version import VERSION
 from ...workflow.auto_flow_parts import _run_auto_mode_search_if_needed, _run_auto_mode_seed_phases
 from ...workflow.pipeline_flow import _run_pipeline
-from ...workflow.process_run_flow import ProcessRunSupport
+from ...workflow.process_run_support import ProcessRunSupport
 from ...workflow.process_support import (
     auto_target_mode_norm,
     auto_target_selection_method_text,
@@ -165,8 +165,8 @@ def run_batch(config: dict, output_dir: Path, headless: bool = True) -> dict:
             status = "partial"
             raise RuntimeError("filter generation produced no results")
         _finalize_run_outputs(ctx, callbacks=callbacks, support=support)
-        data = dict(ctx.get("data", data) or {})
-        saved_filters_dir = str(ctx.get("saved_filters_dir", "") or "")
+        data = dict(ctx.data or {})
+        saved_filters_dir = str(ctx.saved_filters_dir or "")
         status = "success"
     except Exception as exc:
         errors.append(f"{type(exc).__name__}: {exc}")

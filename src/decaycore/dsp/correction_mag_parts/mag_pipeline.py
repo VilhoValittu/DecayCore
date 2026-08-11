@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from decaycore.auto_mode.auto_mode_profile import profiled_section
+from decaycore.common.profiling import profiled_section
 
 from ..correction_types import (
     _MagAdaptiveStageOutputs,

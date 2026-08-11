@@ -17,7 +17,7 @@ from typing import Any, Callable
 
 import numpy as np
 
-from decaycore.auto_mode.auto_mode_profile import profiled_section
+from decaycore.common.profiling import profiled_section
 from decaycore.common.measurement_features import estimate_schroeder_hz, median_rt60_mid_band
 
 from ._measurement_ctx_local import get_measurement_ctx

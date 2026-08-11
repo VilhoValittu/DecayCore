@@ -13,7 +13,7 @@ import logging
 
 import numpy as np
 logger = logging.getLogger("DecayCore.dsp")
-from decaycore.auto_mode.auto_mode_profile import profiled_section
+from decaycore.common.profiling import profiled_section
 from decaycore.config.models import FilterConfig
 from ..acoustic_authority import acoustic_authority_to_stats, build_acoustic_authority_map
 from ..dsp_correction import run_correction_stage as run_correction_stage
@@ -106,7 +106,7 @@ def _add_response_payload_fields(
 
 
 def _authority_array_mode(include_response_arrays: bool) -> bool | str:
-    return True if bool(include_response_arrays) else "scoring"
+    return True if bool(include_response_arrays) else "scoring_array"
 
 
 def _strip_ui_authority_arrays_for_score_only(stats: dict, *, include_response_arrays: bool) -> None:
@@ -123,6 +123,26 @@ def _strip_ui_authority_arrays_for_score_only(stats: dict, *, include_response_a
         stats.pop(key, None)
 
 
+def _curve_payload(values, *, include_response_arrays: bool):
+    arr = np.asarray(values, dtype=float)
+    return arr.tolist() if bool(include_response_arrays) else arr
+
+
+def _compact_score_only_curve_payloads(stats: dict, *, include_response_arrays: bool) -> None:
+    """Keep trial-only numeric curves as arrays instead of boxed Python floats."""
+    if bool(include_response_arrays):
+        return
+    for key, value in tuple(stats.items()):
+        if not isinstance(value, list) or len(value) < 32:
+            continue
+        try:
+            arr = np.asarray(value)
+        except (TypeError, ValueError):
+            continue
+        if arr.ndim == 1 and arr.dtype.kind in "biufc":
+            stats[key] = np.asarray(arr, dtype=float)
+
+
 def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limits, and stats in one place
     freqs,
     meas_mags,
@@ -131,7 +151,12 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
     *,
     stereo_link_ctx: StereoLinkContext | None = None,
     include_response_arrays: bool = True,
+    phase_feedback_replay_cache: dict | None = None,
+    phase_feedback_replay_key: str | None = None,
 ):
+    replay = None
+    if isinstance(phase_feedback_replay_cache, dict) and phase_feedback_replay_key is not None:
+        replay = phase_feedback_replay_cache.get(str(phase_feedback_replay_key))
     with profiled_section("generate_filter.pipeline"):
         pipeline = _run_generate_filter_pipeline(
             freqs,
@@ -139,6 +164,12 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
             raw_phases,
             cfg,
             stereo_link_ctx=stereo_link_ctx,
+            phase_feedback_replay=replay if isinstance(replay, dict) else None,
+        )
+    if isinstance(phase_feedback_replay_cache, dict) and phase_feedback_replay_key is not None:
+        phase_feedback_replay_cache.setdefault(
+            str(phase_feedback_replay_key),
+            pipeline["phase_feedback_replay"],
         )
     freq_axis = pipeline["freq_axis"]
     st = pipeline["st"]
@@ -204,16 +235,16 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
     stats = {
 
         'analysis_mode': analysis_mode,
-        'freq_axis': freq_axis.tolist(),
+        'freq_axis': _curve_payload(freq_axis, include_response_arrays=bool(include_response_arrays)),
         'mag_c_min': float(getattr(cfg, 'mag_c_min', 0.0) or 0.0),
         'mag_c_max': float(getattr(cfg, 'mag_c_max', 0.0) or 0.0),
-        'target_mags': target_mags.tolist(),
-        'measured_mags': (m_anal - calc_offset_db).tolist(),
-        'predicted_filter_mags': combined_gain_db.tolist(),
+        'target_mags': _curve_payload(target_mags, include_response_arrays=bool(include_response_arrays)),
+        'measured_mags': _curve_payload(m_anal - calc_offset_db, include_response_arrays=bool(include_response_arrays)),
+        'predicted_filter_mags': _curve_payload(combined_gain_db, include_response_arrays=bool(include_response_arrays)),
         'predicted_filter_mags_source': "hybrid_iir_plus_mag_post_limits_pre_ir" if hybrid_iir_active else "mag_post_limits_pre_ir",
-        'filter_mags': combined_gain_db.tolist(),
+        'filter_mags': _curve_payload(combined_gain_db, include_response_arrays=bool(include_response_arrays)),
         'filter_mags_source': "hybrid_iir_plus_mag_post_limits_pre_ir" if hybrid_iir_active else "mag_post_limits_pre_ir",
-        'confidence_mask': conf_mask.tolist(),
+        'confidence_mask': _curve_payload(conf_mask, include_response_arrays=bool(include_response_arrays)),
         'afdw_active': bool(afdw_on),
         'reflections': reflections,
         'smart_scan_range': [float(s_min), float(s_max)],
@@ -398,6 +429,7 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
         m_anal=m_anal,
         calc_offset_db=float(calc_offset_db),
         include_raw=bool(include_response_arrays),
+        as_lists=bool(include_response_arrays),
     )
     apply_afdw_stats(
         stats,
@@ -408,6 +440,7 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
         afdw_bw_max_oct=pipeline.get("afdw_bw_max_oct"),
         afdw_bw_min_hz=pipeline.get("afdw_bw_min_hz"),
         afdw_bw_max_hz=pipeline.get("afdw_bw_max_hz"),
+        as_lists=bool(include_response_arrays),
     )
     stats["stage_probes"] = safe_stage_probes(stage_probes)
     apply_lf_guard_stats(stats, cfg=cfg, freq_axis=freq_axis, gain_db=gain_db)
@@ -425,23 +458,50 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
     apply_boost_blocked_reason(stats, cfg=cfg)
 
     try:
-        authority_gd_ms = stats.get("group_delay_ms")
-        if authority_gd_ms is None:
-            authority_gd_ms = stats.get("gd_ms")
-        authority = build_acoustic_authority_map(
-            freq_axis,
-            m_anal - calc_offset_db,
-            target_mag_db=target_mags,
-            corrected_mag_db=gain_db,
-            confidence_mask=conf_mask,
-            group_delay_ms=authority_gd_ms,
-            reflection_nodes=reflections,
-            rt60_by_band=rt60_bands,
-            mag_c_min=float(getattr(cfg, "mag_c_min", 20.0) or 20.0),
-            mag_c_max=float(getattr(cfg, "mag_c_max", 300.0) or 300.0),
-            phase_limit_hz=float(getattr(cfg, "phase_c_max", 600.0) or 600.0),
+        authority_array_mode = _authority_array_mode(bool(include_response_arrays))
+        authority_cache_key = (
+            f"{phase_feedback_replay_key}:authority:{authority_array_mode}"
+            if phase_feedback_replay_key is not None
+            else None
         )
-        stats.update(acoustic_authority_to_stats(authority, include_arrays=_authority_array_mode(bool(include_response_arrays))))
+        cached_authority_stats = (
+            phase_feedback_replay_cache.get(authority_cache_key)
+            if isinstance(phase_feedback_replay_cache, dict)
+            and authority_cache_key is not None
+            else None
+        )
+        if isinstance(cached_authority_stats, dict):
+            stats.update(cached_authority_stats)
+        else:
+            authority_gd_ms = stats.get("group_delay_ms")
+            if authority_gd_ms is None:
+                authority_gd_ms = stats.get("gd_ms")
+            authority = build_acoustic_authority_map(
+                freq_axis,
+                m_anal - calc_offset_db,
+                target_mag_db=target_mags,
+                corrected_mag_db=gain_db,
+                confidence_mask=conf_mask,
+                group_delay_ms=authority_gd_ms,
+                reflection_nodes=reflections,
+                rt60_by_band=rt60_bands,
+                mag_c_min=float(getattr(cfg, "mag_c_min", 20.0) or 20.0),
+                mag_c_max=float(getattr(cfg, "mag_c_max", 300.0) or 300.0),
+                phase_limit_hz=float(getattr(cfg, "phase_c_max", 600.0) or 600.0),
+            )
+            authority_stats = acoustic_authority_to_stats(
+                authority,
+                include_arrays=authority_array_mode,
+            )
+            stats.update(authority_stats)
+            if (
+                isinstance(phase_feedback_replay_cache, dict)
+                and authority_cache_key is not None
+            ):
+                phase_feedback_replay_cache.setdefault(
+                    authority_cache_key,
+                    authority_stats,
+                )
     except (
 
         AttributeError,
@@ -618,6 +678,7 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
         pass
 
     _strip_ui_authority_arrays_for_score_only(stats, include_response_arrays=bool(include_response_arrays))
+    _compact_score_only_curve_payloads(stats, include_response_arrays=bool(include_response_arrays))
     return _assemble_generate_filter_result(impulse, stats)
 
 

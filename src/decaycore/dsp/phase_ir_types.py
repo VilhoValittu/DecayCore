@@ -43,6 +43,7 @@ class PhaseIRInputs:
     apply_lpf_to_mags_fn: Callable[..., np.ndarray]
     limit_gd_gradient_ms_per_oct_fn: Callable[..., np.ndarray]
     cfg_float_allow_zero_fn: Callable[[Any, str, float], float]
+    phase_feedback_replay: dict | None = None
 
 
 @dataclass
@@ -57,6 +58,7 @@ class PhaseIROutputs:
     current_peak_gain: float
     final_gain_total: np.ndarray
     residual_telemetry: ResidualTelemetry | None = None
+    phase_feedback_replay: dict | None = None
 
 
 @dataclass

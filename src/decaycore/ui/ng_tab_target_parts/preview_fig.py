@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import logging
 
+from ...features import has_packaged_bass_engine
+
 logger = logging.getLogger("DecayCore")
 
 from .. import ng_controls as ctrl
@@ -35,8 +37,8 @@ def _build_target_preview_fig():  # noqa: C901 - target preview figure is assemb
     """
     try:
         import math  # noqa: PLC0415
-        from ...auto_mode.shared_parts import _auto_goal_forced_level_window  # noqa: PLC0415
-        from ...dsp.bass_integration import normalize_sub_combine_mode  # noqa: PLC0415
+        from ...config.auto_mode_policy import auto_goal_forced_level_window  # noqa: PLC0415
+        from ...config.value_normalization import normalize_sub_combine_mode  # noqa: PLC0415
 
 
         def _cv(name, default=None):
@@ -76,7 +78,9 @@ def _build_target_preview_fig():  # noqa: C901 - target preview figure is assemb
         pre_ms = _to_float(_cv("ir_window_left", 85.0), 85.0)
         post_ms = _to_float(_cv("ir_window_right") or _cv("ir_window", 500.0), 500.0)
         smoothing_level = 96
-        bass_integration_enabled = bool(_cv("bass_integration_enable", False))
+        bass_integration_enabled = bool(
+            _cv("bass_integration_enable", False)
+        ) and has_packaged_bass_engine()
         bass_integration_sub_combine_mode = normalize_sub_combine_mode(
             _cv("bass_integration_sub_combine_mode", "average")
         )
@@ -86,7 +90,7 @@ def _build_target_preview_fig():  # noqa: C901 - target preview figure is assemb
 
         # AUTO mode forced level window
         if app_mode in ("BASIC", "AUTO"):
-            forced = _auto_goal_forced_level_window(auto_goal)
+            forced = auto_goal_forced_level_window(auto_goal)
             if forced is not None:
                 lvl_min, lvl_max = float(forced[0]), float(forced[1])
 
@@ -340,7 +344,6 @@ def _build_target_preview_speaker_curves(
 ):
     """Load + align speaker/sub measurement curves for the target preview."""
     import numpy as np  # noqa: PLC0415
-    from ...dsp.bass_integration import build_combined_sub_transfer, sum_complex_responses  # noqa: PLC0415
     from ...io.generated_measurement_source import generated_source_matches_upload, parse_generated_source  # noqa: PLC0415
     from ...dsp.smoothing import psychoacoustic_smoothing as _psycho_smooth  # noqa: PLC0415
     from ..target_preview_cache import (  # noqa: PLC0415
@@ -396,6 +399,11 @@ def _build_target_preview_speaker_curves(
     _speaker_align_offset: dict[str, float] = {}
     _harmonic_sources: dict[str, tuple] = {}
     if bass_integration_enabled:
+        from ...dsp.bass_integration import (  # noqa: PLC0415
+            build_combined_sub_transfer,
+            sum_complex_responses,
+        )
+
         def _load_transfer(up_key: str, path_key: str, label: str):
             tr = load_upload_measurement_transfer(
                 _cv(up_key, None),

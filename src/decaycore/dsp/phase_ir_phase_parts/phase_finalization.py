@@ -16,7 +16,7 @@ import numpy as np
 import scipy.ndimage
 
 from ..phase import combine_mixed_phase
-from ..phase_ir_ir import _build_complex_spectrum, _ifft_to_ir
+from ..phase_ir_ir import _phase_to_ir
 from ..phase_ir_phase_models import (
     phase_clamp_limit_deg as _phase_clamp_limit_deg_impl,
 )
@@ -291,23 +291,34 @@ def _apply_phase_model(  # noqa: C901 - phase containment and spike suppression 
     except (TypeError, ValueError, FloatingPointError):
         w_hi = np.ones_like(f, dtype=float)
 
-    phase_regions = _phase_region_profiles(f, phase_lim_hz, cfg)
-    try:
-        conf_arr = (
-            np.asarray(phase_components.conf_mask, dtype=float)
-            if phase_components.conf_mask is not None
-            else np.ones_like(f, dtype=float)
-        )
-    except (TypeError, ValueError):
-        conf_arr = np.ones_like(f, dtype=float)
-    phase_conf = _phase_confidence_profile(
-        f,
-        conf_arr,
-        phase_lim_hz,
-        cfg,
-        bassfirst=bool(phase_components.use_bassfirst),
-        afdw_on=bool(phase_components.afdw_on),
+    static_profiles = (
+        phase_components.static_profiles
+        if isinstance(phase_components.static_profiles, dict)
+        else {}
     )
+    phase_regions = static_profiles.get("phase_regions")
+    if not isinstance(phase_regions, dict):
+        phase_regions = _phase_region_profiles(f, phase_lim_hz, cfg)
+        static_profiles["phase_regions"] = phase_regions
+    phase_conf = np.asarray(static_profiles.get("phase_confidence", []), dtype=float)
+    if phase_conf.size != f.size:
+        try:
+            conf_arr = (
+                np.asarray(phase_components.conf_mask, dtype=float)
+                if phase_components.conf_mask is not None
+                else np.ones_like(f, dtype=float)
+            )
+        except (TypeError, ValueError):
+            conf_arr = np.ones_like(f, dtype=float)
+        phase_conf = _phase_confidence_profile(
+            f,
+            conf_arr,
+            phase_lim_hz,
+            cfg,
+            bassfirst=bool(phase_components.use_bassfirst),
+            afdw_on=bool(phase_components.afdw_on),
+        )
+        static_profiles["phase_confidence"] = np.asarray(phase_conf, dtype=float)
 
     budget_mode = str(getattr(cfg, "phase_budget_mode", "unified") or "unified").strip().lower()
     use_unified = budget_mode != "legacy"
@@ -329,16 +340,23 @@ def _apply_phase_model(  # noqa: C901 - phase containment and spike suppression 
             fs_unified = float(cfg.fs) if hasattr(cfg, "fs") else 48000.0
         except (AttributeError, TypeError, ValueError):
             fs_unified = 48000.0
-        try:
-            spike_suppress = _spike_suppression_profile_impl(
-                f,
-                excess_phase,
-                phase_regions,
-                n_fft=phase_components.n_fft,
-                fs=fs_unified,
+        spike_suppress = np.asarray(
+            static_profiles.get("spike_suppression", []), dtype=float
+        )
+        if spike_suppress.size != f.size:
+            try:
+                spike_suppress = _spike_suppression_profile_impl(
+                    f,
+                    excess_phase,
+                    phase_regions,
+                    n_fft=phase_components.n_fft,
+                    fs=fs_unified,
+                )
+            except (TypeError, ValueError, FloatingPointError):
+                spike_suppress = np.ones_like(f, dtype=float)
+            static_profiles["spike_suppression"] = np.asarray(
+                spike_suppress, dtype=float
             )
-        except (TypeError, ValueError, FloatingPointError):
-            spike_suppress = np.ones_like(f, dtype=float)
         unified_gain = _unified_correction_gain_impl(
             f,
             cfg,
@@ -712,17 +730,20 @@ def _apply_phase_model(  # noqa: C901 - phase containment and spike suppression 
             pre_after_db = None
             guard_scale_total = np.ones_like(extra_guard)
             protection_floor = _pre_ringing_band_protection_floor(f)
-            h_min = _build_complex_spectrum(phase_components.total_mag, min_p)
-            ir_min = _ifft_to_ir(h_min, n=phase_components.n_fft)
+            ir_min = _phase_to_ir(
+                phase_components.total_mag,
+                min_p,
+                n=phase_components.n_fft,
+            )
             if not is_mixed:
                 # Baseline-compensated target: the linear-phase baseline itself
                 # carries pre-ringing the guard must not try to remove.
                 try:
-                    h_base = _build_complex_spectrum(
+                    ir_base = _phase_to_ir(
                         phase_components.total_mag,
                         _merge_minphase_and_excess(correction_baseline, np.zeros_like(extra_guard)),
+                        n=phase_components.n_fft,
                     )
-                    ir_base = _ifft_to_ir(h_base, n=phase_components.n_fft)
                     _bm = _compute_pre_post_energy_metrics(
                         ir_base,
                         fs=float(cfg.fs),
@@ -735,11 +756,11 @@ def _apply_phase_model(  # noqa: C901 - phase containment and spike suppression 
                 except (TypeError, ValueError, FloatingPointError, IndexError):
                     pass
             for i in range(3):
-                h_lin_guard = _build_complex_spectrum(
+                ir_lin_guard = _phase_to_ir(
                     phase_components.total_mag,
                     _merge_minphase_and_excess(correction_baseline, extra_guard),
+                    n=phase_components.n_fft,
                 )
-                ir_lin_guard = _ifft_to_ir(h_lin_guard, n=phase_components.n_fft)
                 if is_mixed:
                     ir_probe_guard = combine_mixed_phase(
                         ir_lin_guard,
@@ -773,6 +794,33 @@ def _apply_phase_model(  # noqa: C901 - phase containment and spike suppression 
                 )
                 extra_guard *= effective_scale
                 guard_scale_total *= effective_scale
+
+            # The final loop iteration may apply one last scale after the last
+            # probe. Rebuild the realized probe so `after` telemetry describes
+            # the phase that is actually passed to the remaining guards/IR build.
+            if not np.allclose(extra_guard, extra_phase, rtol=0.0, atol=1e-15):
+                ir_lin_guard = _phase_to_ir(
+                    phase_components.total_mag,
+                    _merge_minphase_and_excess(correction_baseline, extra_guard),
+                    n=phase_components.n_fft,
+                )
+                if is_mixed:
+                    ir_probe_guard = combine_mixed_phase(
+                        ir_lin_guard,
+                        ir_min,
+                        fs=float(cfg.fs),
+                        split_freq=phase_components.mixed_split_hz,
+                        transition_hz=phase_components.mixed_transition_hz,
+                    )
+                else:
+                    ir_probe_guard = ir_lin_guard
+                _prm = _compute_pre_post_energy_metrics(
+                    ir_probe_guard,
+                    fs=float(cfg.fs),
+                    filter_type=getattr(cfg, "filter_type_str", None),
+                    phase_mode=probe_phase_mode,
+                )
+                pre_after_db = float(_prm.get("pre_ringing_db", float("nan")))
 
             guard_scale_mean = float(np.mean(guard_scale_total))
             bass_mask = (f >= 20.0) & (f <= 80.0)

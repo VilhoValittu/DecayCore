@@ -24,7 +24,10 @@ from .config.pipeline_parts import (
 from .config.mode_policy import apply_mode_to_cfg
 from .config.models import FilterConfig, StereoResolvedAutoPolicies
 from .config.schema import FilterConfigProjection, RunConfigSnapshot
-from .auto_mode.shared_parts import _auto_goal_is_flat_family, _auto_goal_norm
+from .config.auto_mode_policy import (
+    auto_goal_is_flat_family as _auto_goal_is_flat_family,
+    normalize_auto_goal as _auto_goal_norm,
+)
 
 logger = logging.getLogger("DecayCore")
 

@@ -19,6 +19,7 @@ from ...auto_mode.api import (
     _auto_safe_float,
 )
 from ...auto_mode.rank_score import attach_official_rank_score, official_rank_score
+from ...application.run_contracts import RunContext
 from ...config.pipeline_parts import (
     filter_type_short,
 )
@@ -124,7 +125,7 @@ def _build_auto_selected_text(run_data: dict) -> str:
     )
 
 def _resolve_auto_hpf_seed_source(
-    ctx: dict,
+    ctx: RunContext,
     data: dict,
     f_l: np.ndarray,
     m_l: np.ndarray,
@@ -134,7 +135,7 @@ def _resolve_auto_hpf_seed_source(
     bi_mode = "direct_dac"
     is_direct_dac = bool(data.get("bass_integration_enable", False) and bi_mode == "direct_dac")
     if is_direct_dac:
-        bundle = ctx.get("bass_integration_bundle")
+        bundle = ctx.prepared_input.bass_integration_bundle
         try:
             if bundle is not None:
                 sub_f_l = np.asarray(getattr(bundle.l_sub, "freqs_hz", []), dtype=float)

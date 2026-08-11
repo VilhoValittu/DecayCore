@@ -425,14 +425,16 @@ def acoustic_authority_to_stats(authority: AcousticAuthority, *, include_arrays:
         "authority_decay_need_peak_20_300": _peak(_band_values(decay, freq, 20.0, 300.0)),
     }
     if include_arrays:
-        scoring_only = str(include_arrays).strip().lower() == "scoring"
+        array_mode = str(include_arrays).strip().lower()
+        scoring_only = array_mode in ("scoring", "scoring_array")
         if scoring_only:
+            as_array = array_mode == "scoring_array"
             stats.update(
                 {
-                    "authority_modal_support": modal.tolist(),
-                    "authority_decay_need": decay.tolist(),
-                    "authority_null_risk": null.tolist(),
-                    "authority_voice_risk": voice.tolist(),
+                    "authority_modal_support": modal if as_array else modal.tolist(),
+                    "authority_decay_need": decay if as_array else decay.tolist(),
+                    "authority_null_risk": null if as_array else null.tolist(),
+                    "authority_voice_risk": voice if as_array else voice.tolist(),
                 }
             )
             return stats

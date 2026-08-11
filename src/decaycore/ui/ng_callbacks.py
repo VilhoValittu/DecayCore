@@ -476,6 +476,7 @@ def _sync_bass_integration_visibility() -> None:
         ("files_direct_dac_topology_scope", bi_visible and is_direct),
         ("bass_integration_xo_info_scope", bi_visible),
         ("bass_integration_direct_scope", bi_visible and is_direct),
+        ("bass_integration_sub_measurements_scope", bi_visible and is_direct),
     ):
         scope = ctrl.get_container(scope_name)
         if scope is None:

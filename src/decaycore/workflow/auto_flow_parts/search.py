@@ -30,9 +30,9 @@ from ...auto_mode.api import (
     _run_auto_mode_search,
 )
 from ...auto_mode.rank_score import attach_official_rank_score, official_rank_score
-from ...application.run_contracts import apply_auto_mode_result
+from ...application.run_contracts import RunContext, apply_auto_mode_result
 from ...features import PACKAGED_AUTO_ENGINE_POLICY_VERSION
-from ...ui.decaycore_utils import scale_taps_with_fs
+from ...common.filter_lengths import scale_taps_with_fs
 from ..bridge_types import ProcessRunCallbacks
 
 from .progress import (
@@ -45,7 +45,7 @@ from .status_text import (
 )
 
 if typing.TYPE_CHECKING:
-    from ..process_run_flow import ProcessRunSupport
+    from ..process_run_support import ProcessRunSupport
 
 logger = logging.getLogger("DecayCore")
 
@@ -65,48 +65,32 @@ _AUTO_PROGRESS_FINALIZE = 0.88
 
 
 def _auto_mode_apply_best_preset(
-    ctx: dict,
+    ctx: RunContext,
     *,
     data: dict,
     measurements: dict,
     auto_res: dict,
     auto_goal: str,
     support: ProcessRunSupport,
-) -> tuple[dict, dict, dict, dict, str]:
+) -> tuple[dict, dict, dict, dict, dict, str]:
     best_preset = dict(auto_res.get("best_preset", {}) or {})
     best_applied_preset = dict(auto_res.get("best_applied_preset", best_preset) or {})
     best_metrics = attach_official_rank_score(auto_res.get("best_metrics", {}))
     winner_meta = dict(auto_res.get("winner", {}) or {})
     optimizer_backend = str(auto_res.get("optimizer_backend", "builtin") or "builtin")
+    resolved_config = apply_auto_mode_result(
+        ctx.require_resolved_config(),
+        auto_res,
+        version=str(support.version),
+        auto_mode_compat_version=AUTO_MODE_COMPAT_VERSION,
+    )
+    ctx.resolved_config = resolved_config
+    ctx.auto_applied_preset = dict(resolved_config.auto_applied_preset)
+    data = resolved_config.resolved_data
+    measurements = resolved_config.measurements
+    if _auto_goal_is_flat_family(auto_goal):
+        data["unsafe_raw_dsp"] = True
     if best_applied_preset:
-        resolved_config = ctx.get("resolved_config")
-        if resolved_config is not None:
-            resolved_config = apply_auto_mode_result(
-                resolved_config,
-                auto_res,
-                version=str(support.version),
-                auto_mode_compat_version=AUTO_MODE_COMPAT_VERSION,
-            )
-            ctx["resolved_config"] = resolved_config
-            ctx["resolved_data"] = resolved_config.resolved_data
-            ctx["data"] = resolved_config.resolved_data
-            ctx["auto_applied_preset"] = dict(resolved_config.auto_applied_preset)
-            data = resolved_config.resolved_data
-            if _auto_goal_is_flat_family(auto_goal):
-                data["unsafe_raw_dsp"] = True
-            measurements = resolved_config.measurements
-            ctx["measurements"] = measurements
-        else:
-            data = dict(data)
-            data.update(best_applied_preset)
-            if _auto_goal_is_flat_family(auto_goal):
-                data["unsafe_raw_dsp"] = True
-            data["program_version"] = support.version
-            data["auto_mode_compat_version"] = AUTO_MODE_COMPAT_VERSION
-            ctx["resolved_data"] = data
-            ctx["data"] = data
-            ctx["auto_applied_preset"] = dict(best_applied_preset)
-            measurements["ui_data"] = data
         try:
             from ...auto_mode.filter_priors import update_auto_mode_filter_priors_from_winner
             update_auto_mode_filter_priors_from_winner(
@@ -270,28 +254,27 @@ def _auto_mode_store_search_meta(
     )
 
 def _run_auto_mode_search_if_needed(
-    ctx: dict,
+    ctx: RunContext,
     *,
     callbacks: ProcessRunCallbacks,
     support: ProcessRunSupport,
 ):
-    if not bool(ctx["auto_mode_enabled"]):
+    if not ctx.auto_mode_enabled:
         return
 
-    data = ctx.get("resolved_data", ctx["data"])
-    ctx["resolved_data"] = data
-    ctx["data"] = data
-    measurements = ctx["measurements"]
-    target_rates = ctx["target_rates"]
-    xos = ctx["xos"]
-    hpf = ctx["hpf"]
-    hc_f = ctx["hc_f"]
-    hc_m = ctx["hc_m"]
-    taps_base = int(ctx["taps_base"])
-    auto_goal = str(ctx["auto_goal"])
+    resolved = ctx.require_resolved_config()
+    data = resolved.resolved_data
+    measurements = resolved.measurements
+    target_rates = resolved.target_rates
+    xos = resolved.xos
+    hpf = resolved.hpf
+    hc_f = resolved.hc_f
+    hc_m = resolved.hc_m
+    taps_base = int(ctx.taps_base)
+    auto_goal = str(ctx.auto_goal)
     if _auto_goal_is_flat_family(auto_goal):
         data["unsafe_raw_dsp"] = True
-    auto_basis = str(ctx["auto_basis"])
+    auto_basis = str(ctx.auto_basis)
     auto_status = _get_auto_status_callback(ctx, callbacks=callbacks, support=support)
 
     try:

@@ -14,11 +14,14 @@ from __future__ import annotations
 
 import logging
 
+import numpy as np
+
 from ...resources.i8n.decaycore_i18n import t
 from ..plot_prediction_parts import ChannelPlotData, compute_channel_plot_data
 from ..results_plot_figures import (
     apply_results_plot_level,
     apply_results_plot_range,
+    build_combined_bass_figure,
     build_filter_figure,
     build_quality_figure,
     build_response_figure,
@@ -124,6 +127,36 @@ def _diagnostic_figure(
         figure = None
     if figure is not None:
         _PLOT_FIGURE_CACHE[cache_key] = figure
+    return figure
+
+
+def _combined_bass_figure(*, stats: dict, dark: bool):
+    """Build the visible Direct-DAC main+sub response when its curves exist."""
+    freq_hz = np.asarray(stats.get("freq_axis", []), dtype=float).reshape(-1)
+    predicted_db = np.asarray(
+        stats.get("direct_dac_sum_predicted_mags", []),
+        dtype=float,
+    ).reshape(-1)
+    if freq_hz.size < 2 or predicted_db.size != freq_hz.size:
+        return None
+
+    def _matching_curve(key: str):
+        curve = np.asarray(stats.get(key, []), dtype=float).reshape(-1)
+        return curve if curve.size == freq_hz.size else None
+
+    cache_key = ("combined", "response", bool(dark))
+    cached = _PLOT_FIGURE_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    figure = build_combined_bass_figure(
+        freq_hz=freq_hz,
+        measured_db=_matching_curve("direct_dac_sum_measured_mags"),
+        predicted_db=predicted_db,
+        target_db=_matching_curve("target_mags"),
+        title=t("results_plot_main_sub_title"),
+        dark=dark,
+    )
+    _PLOT_FIGURE_CACHE[cache_key] = figure
     return figure
 
 
@@ -246,10 +279,23 @@ def _resolve_diagnostic_view(value) -> str:
     )
 
 
+def _sync_diagnostic_view_tabs(*, selected_channel: str, state: dict, view_tabs) -> None:
+    """Keep view controls coherent, including callbacks fired during setup."""
+    combined_selected = selected_channel == "combined"
+    if combined_selected:
+        state["view"] = "response"
+    if view_tabs is None:
+        return
+    view_tabs.set_visibility(not combined_selected)
+    if combined_selected:
+        view_tabs.set_value("response")
+
+
 def _render_diagnostics(
     *,
     channel_inputs: dict[str, dict],
     dark: bool,
+    combined_figure=None,
 ) -> None:
     from nicegui import ui
 
@@ -259,6 +305,10 @@ def _render_diagnostics(
         "view": "response",
     }
     holder_ref: dict[str, object] = {}
+    view_tabs_ref: dict[str, object] = {}
+    available_channels = dict(channel_inputs)
+    if combined_figure is not None:
+        available_channels["combined"] = {}
 
     def render_selected() -> None:
         if not state["open"]:
@@ -268,14 +318,17 @@ def _render_diagnostics(
             return
         holder.clear()
         channel_key = str(state["channel"])
-        source = channel_inputs[channel_key]
         try:
-            channel_data = _compute_channel(channel_key=channel_key, **source)
-            figure = _diagnostic_figure(
-                channel_data=channel_data,
-                view_key=str(state["view"]),
-                dark=dark,
-            )
+            if channel_key == "combined":
+                figure = combined_figure
+            else:
+                source = channel_inputs[channel_key]
+                channel_data = _compute_channel(channel_key=channel_key, **source)
+                figure = _diagnostic_figure(
+                    channel_data=channel_data,
+                    view_key=str(state["view"]),
+                    dark=dark,
+                )
         except _PLOT_EXCEPTIONS:
             logger.debug("Diagnostic plot generation failed", exc_info=True)
             figure = None
@@ -290,7 +343,12 @@ def _render_diagnostics(
     def on_channel_change(event) -> None:
         state["channel"] = _resolve_diagnostic_channel(
             event.value,
-            channel_inputs,
+            available_channels,
+        )
+        _sync_diagnostic_view_tabs(
+            selected_channel=str(state["channel"]),
+            state=state,
+            view_tabs=view_tabs_ref.get("tabs"),
         )
         render_selected()
 
@@ -312,14 +370,17 @@ def _render_diagnostics(
             ui.tab("right", label=t("results_right_channel"))
             if "sub" in channel_inputs:
                 ui.tab("sub", label=t("results_sub_channel"))
-        channel_tabs.set_value("left")
+            if combined_figure is not None:
+                ui.tab("combined", label=t("results_combined_channel"))
 
         with ui.tabs(on_change=on_view_change).classes("w-full mt-2") as view_tabs:
             ui.tab("response", label=t("results_plot_view_response"))
             ui.tab("filter", label=t("results_plot_view_filter"))
             ui.tab("timing", label=t("results_plot_view_timing"))
             ui.tab("quality", label=t("results_plot_view_quality"))
+        view_tabs_ref["tabs"] = view_tabs
         view_tabs.set_value("response")
+        channel_tabs.set_value("left")
         holder_ref["holder"] = ui.column().classes("w-full min-w-0")
 
 
@@ -393,8 +454,22 @@ def _render_plots_and_export(
             "smoothing": smoothing,
         }
 
+    combined_figure = None
+    if bool(data.get("bass_integration_enable", False)):
+        try:
+            combined_figure = _combined_bass_figure(
+                stats=dict(l_st_f or {}),
+                dark=dark,
+            )
+        except _PLOT_EXCEPTIONS:
+            logger.debug("Combined main+sub plot generation failed", exc_info=True)
+
     with ui.card().classes("w-full min-w-0"):
-        _render_diagnostics(channel_inputs=channel_inputs, dark=dark)
+        _render_diagnostics(
+            channel_inputs=channel_inputs,
+            dark=dark,
+            combined_figure=combined_figure,
+        )
 
     if saved_filters_dir:
         ui.label(t("results_saved_to").format(path=saved_filters_dir)).classes(
@@ -405,10 +480,12 @@ def _render_plots_and_export(
 __all__ = [
     "_PLOT_DATA_CACHE",
     "_PLOT_FIGURE_CACHE",
+    "_combined_bass_figure",
     "_diagnostic_figure",
     "_render_plots_and_export",
     "_resolve_diagnostic_channel",
     "_resolve_diagnostic_view",
     "_resolve_toggle_value",
+    "_sync_diagnostic_view_tabs",
     "clear_plot_render_cache",
 ]

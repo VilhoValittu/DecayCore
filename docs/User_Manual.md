@@ -65,13 +65,15 @@ The normal workflow inside DecayCore is:
 
 1. **Files tab**
    Load left and right measurement files.
-2. **Target tab**
-   Select a built-in target curve or load a custom target.
+2. **Measurement tab** (if built-in measurement is available on your platform)
+   Run sweeps to capture measurements directly, instead of importing them.
 3. **Basic tab**
-   Choose the operating mode, filter type, sample rate, taps, and the main safety settings.
-4. **Advanced / Window / XO tabs**
+   Choose the operating mode, filter type, sample rate, taps, and the main safety settings. The Mode you pick here (Automatic, Basic, or Advanced) determines whether the Target tab selects a curve automatically or lets you choose one manually — set this before the Target tab.
+4. **Target tab**
+   Select a built-in target curve or load a custom target.
+5. **Advanced / Window / XO tabs**
    Refine advanced correction, timing, windowing, and crossover behavior when needed.
-5. **Run tab**
+6. **Run tab**
    Start the generation process and review the produced output.
 
 For most systems, start simple:

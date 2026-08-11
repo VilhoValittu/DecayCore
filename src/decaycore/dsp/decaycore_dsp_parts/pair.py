@@ -142,6 +142,7 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
     measurement_ctx_l: MeasurementSideContext | None = None,
     measurement_ctx_r: MeasurementSideContext | None = None,
     include_response_arrays: bool = True,
+    phase_feedback_replay_cache: dict | None = None,
 ):
     """Generoi vasemman ja oikean kanavan FIR-suodattimet.
 
@@ -169,6 +170,8 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
                 p_l,
                 cfg_l,
                 include_response_arrays=bool(include_response_arrays),
+                phase_feedback_replay_cache=phase_feedback_replay_cache,
+                phase_feedback_replay_key="left",
             )
         with _side_measurement_scope(measurement_ctx_r, explicit_contexts=explicit_contexts):
             r_imp, r_st = generate_filter(
@@ -177,7 +180,52 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
                 p_r,
                 cfg_r,
                 include_response_arrays=bool(include_response_arrays),
+                phase_feedback_replay_cache=phase_feedback_replay_cache,
+                phase_feedback_replay_key="right",
             )
+        return l_imp, l_st, r_imp, r_st
+
+    pair_replay = (
+        phase_feedback_replay_cache.get("stereo_link")
+        if isinstance(phase_feedback_replay_cache, dict)
+        else None
+    )
+    if isinstance(pair_replay, dict):
+        cfg2 = copy.deepcopy(cfg)
+        try:
+            cfg2.stereo_link = False
+            if hasattr(cfg2, "auto_gain_db_override"):
+                delattr(cfg2, "auto_gain_db_override")
+        except (AttributeError, TypeError, ValueError):
+            pass
+        cfg2_l = _maybe_per_channel_cfg(cfg2, "l")
+        cfg2_r = _maybe_per_channel_cfg(cfg2, "r")
+        with _side_measurement_scope(measurement_ctx_l, explicit_contexts=explicit_contexts):
+            l_imp, l_st = generate_filter(
+                f_l,
+                m_l,
+                p_l,
+                cfg2_l,
+                include_response_arrays=bool(include_response_arrays),
+                phase_feedback_replay_cache=phase_feedback_replay_cache,
+                phase_feedback_replay_key="left",
+            )
+        with _side_measurement_scope(measurement_ctx_r, explicit_contexts=explicit_contexts):
+            r_imp, r_st = generate_filter(
+                f_r,
+                m_r,
+                p_r,
+                cfg2_r,
+                include_response_arrays=bool(include_response_arrays),
+                phase_feedback_replay_cache=phase_feedback_replay_cache,
+                phase_feedback_replay_key="right",
+            )
+        for stats, cached_stats in (
+            (l_st, pair_replay.get("left_stats")),
+            (r_st, pair_replay.get("right_stats")),
+        ):
+            if isinstance(stats, dict) and isinstance(cached_stats, dict):
+                stats.update(copy.deepcopy(cached_stats))
         return l_imp, l_st, r_imp, r_st
 
     with _side_measurement_scope(measurement_ctx_l, explicit_contexts=explicit_contexts):
@@ -395,6 +443,8 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
             cfg2_l,
             stereo_link_ctx=stereo_ctx_l,
             include_response_arrays=bool(include_response_arrays),
+            phase_feedback_replay_cache=phase_feedback_replay_cache,
+            phase_feedback_replay_key="left",
         )
     with _side_measurement_scope(measurement_ctx_r, explicit_contexts=explicit_contexts):
         r_imp2, r_st2 = generate_filter(
@@ -404,6 +454,8 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
             cfg2_r,
             stereo_link_ctx=stereo_ctx_r,
             include_response_arrays=bool(include_response_arrays),
+            phase_feedback_replay_cache=phase_feedback_replay_cache,
+            phase_feedback_replay_key="right",
         )
 
     try:
@@ -449,6 +501,23 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
             r_st2["stereo_link_auto_gain_mode"] = "per_channel"
     except (TypeError, ValueError):
         pass
+
+    if isinstance(phase_feedback_replay_cache, dict):
+        phase_feedback_replay_cache.setdefault(
+            "stereo_link",
+            {
+                "left_stats": {
+                    key: copy.deepcopy(value)
+                    for key, value in dict(l_st2 or {}).items()
+                    if str(key).startswith("stereo_link_") or key == "offset_method"
+                },
+                "right_stats": {
+                    key: copy.deepcopy(value)
+                    for key, value in dict(r_st2 or {}).items()
+                    if str(key).startswith("stereo_link_") or key == "offset_method"
+                },
+            },
+        )
 
     return l_imp2, l_st2, r_imp2, r_st2
 

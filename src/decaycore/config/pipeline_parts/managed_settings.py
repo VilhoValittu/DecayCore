@@ -16,13 +16,13 @@ import math
 
 from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from ...config.schema import AUTO_MODE_DEFAULT_CFG_TO_UI
-from ...auto_mode.filter_priors import get_auto_mode_filter_auto_defaults
-from ...auto_mode.shared_parts import (
-    _auto_filter_type_for_key,
-    _auto_goal_is_flat_family,
+from ..auto_mode_policy import (
+    auto_filter_type_for_key,
+    auto_goal_is_flat_family,
 )
+from ..auto_mode_priors import get_auto_mode_filter_auto_defaults
 from ...config.mode_policy import MODE_DEFAULTS
-from ...ui_i18n import (
+from ..value_normalization import (
     LVL_ALGO_MEDIAN,
     LVL_MODE_AUTO,
     LVL_MODE_MANUAL,
@@ -35,63 +35,6 @@ from ...ui_i18n import (
 
 logger = logging.getLogger("DecayCore")
 
-
-_AUTO_MODE_DEFAULT_CFG_TO_UI = {
-    "global_gain_db": "gain",
-    "mag_c_min": "mag_c_min",
-    "mag_c_max": "mag_c_max",
-    "max_boost_db": "max_boost",
-    "max_cut_db": "max_cut_db",
-    "phase_limit": "phase_limit",
-    "reg_strength": "reg_strength",
-    "fdw_cycles": "fdw_cycles",
-    "filter_smooth": "filter_smooth",
-    "tdc_strength": "tdc_strength",
-    "tdc_max_reduction_db": "tdc_max_reduction_db",
-    "tdc_slope_db_per_oct": "tdc_slope_db_per_oct",
-    "low_bass_cut_hz": "low_bass_cut_hz",
-    "hpf_enable": "hpf_enable",
-    "hpf_freq": "hpf_freq",
-    "hpf_slope": "hpf_slope",
-    "ir_window_ms": "ir_window",
-    "ir_window_ms_left": "ir_window_left",
-    "ir_window_right": "ir_window",
-    "ir_window_left": "ir_window_left",
-    "mixed_split_freq": "mixed_freq",
-    "trans_width": "trans_width",
-    "bass_first_mode_max_hz": "bass_first_mode_max_hz",
-    "max_slope_db_per_oct": "max_slope_db_per_oct",
-    "max_slope_boost_db_per_oct": "max_slope_boost_db_per_oct",
-    "max_slope_cut_db_per_oct": "max_slope_cut_db_per_oct",
-    "lvl_manual_db": "lvl_manual_db",
-    "manual_target_tilt_db_per_oct": "manual_target_tilt_db_per_oct",
-    "output_tilt_db_per_oct": "output_tilt_db_per_oct",
-    "lvl_min": "lvl_min",
-    "lvl_max": "lvl_max",
-    "conf_pull_floor": "conf_pull_floor",
-    "conf_pull_ceil": "conf_pull_ceil",
-    "conf_pull_max_hz": "conf_pull_max_hz",
-    "conf_pull_gamma_cut": "conf_pull_gamma_cut",
-    "conf_pull_gamma_boost": "conf_pull_gamma_boost",
-    "conf_pull_bass_boost_floor_min": "conf_pull_bass_boost_floor_min",
-    "conf_pull_bass_boost_restore": "conf_pull_bass_boost_restore",
-    "low_bass_cut_strength": "low_bass_cut_strength",
-    "plot_smoothing_level": "plot_smoothing_level",
-    "lvl_mode": "lvl_mode",
-    "lvl_algo": "lvl_algo",
-    "stereo_link_strategy": "stereo_link_strategy",
-    "enable_mag_correction": "mag_correct",
-    "unsafe_raw_dsp": "unsafe_raw_dsp",
-    "exc_prot": "exc_prot",
-    "enable_tdc": "enable_tdc",
-    "enable_afdw": "enable_afdw",
-    "df_smoothing": "df_smoothing",
-    "comparison_mode": "comparison_mode",
-    "bass_first_ai": "bass_first_ai",
-    "phase_safe_2058": "phase_safe_2058",
-    "stereo_link": "stereo_link",
-    "low_bass_cut_enable": "low_bass_cut_enable",
-}
 
 _AUTO_MODE_DEFAULT_CFG_TO_UI = AUTO_MODE_DEFAULT_CFG_TO_UI
 
@@ -200,7 +143,7 @@ def _auto_mode_filter_type_or_default(value: Any) -> str:
         or "linear" in low
     ):
         return str(raw)
-    return str(_auto_filter_type_for_key("asym"))
+    return str(auto_filter_type_for_key("asym"))
 
 
 def _auto_mode_min_local_correction_db(data: dict[str, Any]) -> float:
@@ -260,7 +203,7 @@ def _apply_auto_mode_managed_settings(data: dict[str, Any]) -> None:
 
     for key, value in forced.items():
         data[key] = value
-    if _auto_goal_is_flat_family(str(data.get("auto_goal", "balanced") or "balanced")):
+    if auto_goal_is_flat_family(str(data.get("auto_goal", "balanced") or "balanced")):
         data["unsafe_raw_dsp"] = True
 
 

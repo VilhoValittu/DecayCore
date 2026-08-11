@@ -21,6 +21,7 @@ from ...application.health_service import compute_health
 from ...application.run_request import RunRequest
 from ...application.run_contracts import (
     PreparedRunInput,
+    RunContext,
     copy_resolved_data,
     copy_source_ui_data,
 )
@@ -49,7 +50,7 @@ from ...resources.i8n.decaycore_i18n import t
 from ..bridge_types import ProcessRunCallbacks
 
 if typing.TYPE_CHECKING:
-    from ..process_run_flow import ProcessRunSupport
+    from ..process_run_support import ProcessRunSupport
 
 logger = logging.getLogger("DecayCore")
 
@@ -522,7 +523,7 @@ def _prepare_ui_and_measurements(
     request: RunRequest,
     callbacks: ProcessRunCallbacks,
     support: ProcessRunSupport,
-) -> dict | None:
+) -> RunContext | None:
     perf_stats = {
         "read_s": 0.0,
         "dsp_s": 0.0,
@@ -626,41 +627,17 @@ def _prepare_ui_and_measurements(
         harmonic_magnitudes_db_l=_harmonic_mags_l,
         harmonic_freq_hz_r=_harmonic_freq_hz_r,
         harmonic_magnitudes_db_r=_harmonic_mags_r,
+        measured_snr_db_l=measured_snr_db_l,
+        measured_snr_db_r=measured_snr_db_r,
     )
 
-    return {
-        "run_started_at": run_started_at,
-        "perf_stats": perf_stats,
-        "per_fs_stats": per_fs_stats,
-        "source_ui_data": source_ui_data,
-        "resolved_data": data,
-        "prepared_input": prepared_input,
-        "data": data,
-        "taps_base": taps_base,
-        "f_l": f_l,
-        "m_l": m_l,
-        "p_l": p_l,
-        "f_r": f_r,
-        "m_r": m_r,
-        "p_r": p_r,
-        "bass_integration_bundle": bass_integration_bundle,
-        "raw_ir_l": raw_ir_l,
-        "raw_ir_fs_l": raw_ir_fs_l,
-        "raw_ir_r": raw_ir_r,
-        "raw_ir_fs_r": raw_ir_fs_r,
-        "raw_ir_sub": raw_ir_sub,
-        "raw_ir_fs_sub": raw_ir_fs_sub,
-        "measured_rt60_l": measured_rt60_l,
-        "measured_rt60_bands_l": measured_rt60_bands_l,
-        "measured_rt60_r": measured_rt60_r,
-        "measured_rt60_bands_r": measured_rt60_bands_r,
-        "harmonic_freq_hz_l": _harmonic_freq_hz_l,
-        "harmonic_magnitudes_db_l": _harmonic_mags_l,
-        "harmonic_freq_hz_r": _harmonic_freq_hz_r,
-        "harmonic_magnitudes_db_r": _harmonic_mags_r,
-        "measured_snr_db_l": measured_snr_db_l,
-        "measured_snr_db_r": measured_snr_db_r,
-    }
+    return RunContext(
+        prepared_input=prepared_input,
+        run_started_at=run_started_at,
+        taps_base=taps_base,
+        perf_stats=perf_stats,
+        per_fs_stats=per_fs_stats,
+    )
 
 
 __all__ = [

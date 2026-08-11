@@ -20,7 +20,7 @@ if __package__ in (None, ""):
 
 from .bootstrap import initialize_logging  # noqa: E402
 from .version import VERSION as APP_VERSION  # noqa: E402
-from .workflow.runtime_cache import reset_runtime_caches  # noqa: E402
+from .application.runtime_cache import reset_runtime_caches  # noqa: E402
 
 _BOOTSTRAP = initialize_logging()
 logger = _BOOTSTRAP["logger"]
@@ -37,10 +37,11 @@ _MAIN_APP_CONFIGURED = False
 
 def process_run():
     from .application.request_builder import build_run_request_from_pin
-    from .auto_mode.api import AUTO_MODE_COMPAT_VERSION
+    from .config.auto_mode_policy import AUTO_MODE_COMPAT_VERSION
     from .ui.ng_controls import NgPinProxy
 
-    from .workflow.process_run_flow import ProcessRunSupport, run_process_flow
+    from .workflow.process_run_flow import run_process_flow
+    from .workflow.process_run_support import ProcessRunSupport
     from .workflow.process_support import (
         auto_target_mode_norm as _auto_target_mode_norm,
         auto_target_selection_method_text as _auto_target_selection_method_text,

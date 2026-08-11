@@ -13,7 +13,7 @@ from dataclasses import replace
 
 import numpy as np
 
-from decaycore.auto_mode.auto_mode_profile import profiled_section
+from decaycore.common.profiling import profiled_section
 from decaycore.config.models import FilterConfig
 
 from ._pruning import get_pruning_hook as _get_pruning_hook
@@ -651,15 +651,22 @@ def _run_generate_filter_pipeline(
     cfg: FilterConfig,
     *,
     stereo_link_ctx: StereoLinkContext | None = None,
+    phase_feedback_replay: dict | None = None,
 ) -> dict:
-    state = _run_generate_filter_pre_correction(
-        freqs,
-        meas_mags,
-        raw_phases,
-        cfg,
-        stereo_link_ctx=stereo_link_ctx,
-        presolve_mode=False,
-    )
+    if phase_feedback_replay is None:
+        state = _run_generate_filter_pre_correction(
+            freqs,
+            meas_mags,
+            raw_phases,
+            cfg,
+            stereo_link_ctx=stereo_link_ctx,
+            presolve_mode=False,
+        )
+    else:
+        state = dict(phase_feedback_replay.get("state", {}) or {})
+        if not state:
+            raise ValueError("empty phase-feedback replay state")
+        state["st"] = dict(state.get("st", {}) or {})
     n_fft = state["n_fft"]
     freq_axis = state["freq_axis"]
     gain_db = state["gain_db"]
@@ -680,27 +687,39 @@ def _run_generate_filter_pipeline(
     use_bassfirst = state["use_bassfirst"]
     afdw_on = state["afdw_on"]
 
-    gain_db, hybrid_iir_stats = _apply_hybrid_iir_preconditioning(
-        cfg=cfg,
-        freq_axis=freq_axis,
-        gain_db=np.asarray(gain_db, dtype=float),
-        m_anal=np.asarray(m_anal, dtype=float),
-        calc_offset_db=float(calc_offset_db),
-        target_mags=np.asarray(target_mags, dtype=float),
-        conf_mask=np.asarray(conf_mask, dtype=float),
-        phase_rad=np.asarray(p_rad_interp, dtype=float),
-        f_in=np.asarray(state["f_in"], dtype=float),
-        m_smooth_std=np.asarray(state["m_smooth_std"], dtype=float),
-        p_smooth=np.asarray(state["p_smooth"], dtype=float),
-        st=st,
-    )
-    if isinstance(st, dict) and hybrid_iir_stats:
-        st.update(hybrid_iir_stats)
+    if phase_feedback_replay is None:
+        gain_db, hybrid_iir_stats = _apply_hybrid_iir_preconditioning(
+            cfg=cfg,
+            freq_axis=freq_axis,
+            gain_db=np.asarray(gain_db, dtype=float),
+            m_anal=np.asarray(m_anal, dtype=float),
+            calc_offset_db=float(calc_offset_db),
+            target_mags=np.asarray(target_mags, dtype=float),
+            conf_mask=np.asarray(conf_mask, dtype=float),
+            phase_rad=np.asarray(p_rad_interp, dtype=float),
+            f_in=np.asarray(state["f_in"], dtype=float),
+            m_smooth_std=np.asarray(state["m_smooth_std"], dtype=float),
+            p_smooth=np.asarray(state["p_smooth"], dtype=float),
+            st=st,
+        )
+        if isinstance(st, dict) and hybrid_iir_stats:
+            st.update(hybrid_iir_stats)
 
-    _output_tilt = float(getattr(cfg, "output_tilt_db_per_oct", 0.0) or 0.0)
-    if _output_tilt != 0.0:
-        _safe_f = np.maximum(freq_axis, 1.0)
-        gain_db = gain_db + _output_tilt * np.log2(1000.0 / _safe_f)
+        _output_tilt = float(getattr(cfg, "output_tilt_db_per_oct", 0.0) or 0.0)
+        if _output_tilt != 0.0:
+            _safe_f = np.maximum(freq_axis, 1.0)
+            gain_db = gain_db + _output_tilt * np.log2(1000.0 / _safe_f)
+        replay_state = dict(state)
+        replay_state["st"] = dict(st or {})
+        replay = {
+            "state": replay_state,
+            "gain_db": np.asarray(gain_db, dtype=float).copy(),
+            "hybrid_iir_stats": dict(hybrid_iir_stats or {}),
+        }
+    else:
+        gain_db = np.asarray(phase_feedback_replay.get("gain_db", gain_db), dtype=float).copy()
+        hybrid_iir_stats = dict(phase_feedback_replay.get("hybrid_iir_stats", {}) or {})
+        replay = phase_feedback_replay
 
     with profiled_section("generate_filter.phase_ir"):
         phase_ir = run_phase_ir_stage(
@@ -727,7 +746,14 @@ def _run_generate_filter_pipeline(
             apply_lpf_to_mags_fn=apply_lpf_to_mags,
             limit_gd_gradient_ms_per_oct_fn=_limit_gd_gradient_ms_per_oct,
             cfg_float_allow_zero_fn=_cfg_float_allow_zero,
+            phase_feedback_replay=(
+                replay.get("phase_ir_replay")
+                if isinstance(replay, dict)
+                else None
+            ),
         )
+    if isinstance(replay, dict) and phase_ir.phase_feedback_replay is not None:
+        replay.setdefault("phase_ir_replay", phase_ir.phase_feedback_replay)
 
     impulse = phase_ir.impulse
     gain_db = phase_ir.gain_db
@@ -790,4 +816,5 @@ def _run_generate_filter_pipeline(
         "auto_headroom_db": auto_headroom_db,
         "current_peak_gain": current_peak_gain,
         "final_gain_total": final_gain_total,
+        "phase_feedback_replay": replay,
     }

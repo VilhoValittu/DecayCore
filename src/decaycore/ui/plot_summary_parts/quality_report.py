@@ -457,6 +457,15 @@ def _quality_report_collect(st, settings, *, debug_report=False):
         "phase_realized_gd_improvement_score": _quality_report_safe_float(
             st.get("phase_realized_gd_improvement_score", None)
         ),
+        "phase_feedback_requested": _quality_report_safe_float(
+            st.get("phase_realization_feedback_requested_strength", None)
+        ),
+        "phase_feedback_selected": _quality_report_safe_float(
+            st.get("phase_realization_feedback_selected_strength", None)
+        ),
+        "phase_feedback_reason": str(
+            st.get("phase_realization_feedback_reason", "") or ""
+        ),
         "phase_boundary_peak_mdb": None,
         "phase_boundary_peak_hz": None,
         "bass_adaptive_enabled": bool(st.get("bass_adaptive_smoothing_enabled", False)),
@@ -630,6 +639,7 @@ def _quality_report_build_lines(lq, rq, *, debug_report: bool):
         f"Realized system GD RMS before -> after (ms): L {_quality_report_fmt(lq['phase_realized_gd_before_rms_ms'], '', 2)} -> {_quality_report_fmt(lq['phase_realized_gd_after_rms_ms'], '', 2)} | R {_quality_report_fmt(rq['phase_realized_gd_before_rms_ms'], '', 2)} -> {_quality_report_fmt(rq['phase_realized_gd_after_rms_ms'], '', 2)}",
         f"Realized system GD p95 before -> after (ms): L {_quality_report_fmt(lq['phase_realized_gd_before_p95_ms'], '', 2)} -> {_quality_report_fmt(lq['phase_realized_gd_after_p95_ms'], '', 2)} | R {_quality_report_fmt(rq['phase_realized_gd_before_p95_ms'], '', 2)} -> {_quality_report_fmt(rq['phase_realized_gd_after_p95_ms'], '', 2)}",
         f"Realized GD improvement: L {_quality_report_fmt(lq['phase_realized_gd_improvement_score'], '', 3)} | R {_quality_report_fmt(rq['phase_realized_gd_improvement_score'], '', 3)}",
+        f"Phase realization feedback strength: L {_quality_report_fmt(lq['phase_feedback_requested'], '', 3)} -> {_quality_report_fmt(lq['phase_feedback_selected'], '', 3)} ({_quality_report_fmt_src(lq['phase_feedback_reason'])}) | R {_quality_report_fmt(rq['phase_feedback_requested'], '', 3)} -> {_quality_report_fmt(rq['phase_feedback_selected'], '', 3)} ({_quality_report_fmt_src(rq['phase_feedback_reason'])})",
         f"Phase boundary peak (mdB): L {_quality_report_fmt(lq['phase_boundary_peak_mdb'], '', 2)} | R {_quality_report_fmt(rq['phase_boundary_peak_mdb'], '', 2)}",
         f"Phase boundary peak @ Hz:  L {_quality_report_fmt(lq['phase_boundary_peak_hz'], '', 1)} | R {_quality_report_fmt(rq['phase_boundary_peak_hz'], '', 1)}",
         f"Pre-ringing dB:          L {_quality_report_fmt(lq['pre_ringing_db'], ' dB')} | R {_quality_report_fmt(rq['pre_ringing_db'], ' dB')}",

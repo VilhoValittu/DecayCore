@@ -11,16 +11,11 @@
 from __future__ import annotations
 
 import time
-import typing
-from dataclasses import dataclass
 
 from ..application.run_request import RunRequest
-from .auto_flow_parts import (
-    _run_auto_mode_search_if_needed,
-    _run_auto_mode_seed_phases,
-)
-from .bridge_types import ProcessRunUiBridge
+from ..application.runtime_cache import reset_runtime_caches
 from .pipeline_flow import _run_pipeline
+from .process_run_support import ProcessRunSupport
 from .run_finalize import _finalize_run_outputs
 from .run_prepare_parts import (
     _prepare_target_curve_and_run_context,
@@ -28,17 +23,16 @@ from .run_prepare_parts import (
 )
 
 
-@dataclass(frozen=True)
-class ProcessRunSupport:
-    version: str
-    max_safe_boost: float
-    force_single_plot_fs_hz: int
-    auto_target_mode_norm: typing.Callable[[typing.Any], str]
-    auto_target_selection_method_text: typing.Callable[[typing.Any], str]
-    pick_target_curve_label: typing.Callable[[dict], str]
-    slugify_filename_token: typing.Callable[..., str]
-    has_uploaded_target_file: typing.Callable[[dict], bool]
-    ui_bridge: ProcessRunUiBridge
+def _run_auto_mode_seed_phases(*args, **kwargs):
+    from .auto_flow_parts import _run_auto_mode_seed_phases as implementation
+
+    return implementation(*args, **kwargs)
+
+
+def _run_auto_mode_search_if_needed(*args, **kwargs):
+    from .auto_flow_parts import _run_auto_mode_search_if_needed as implementation
+
+    return implementation(*args, **kwargs)
 
 
 def run_process_flow(*, request: RunRequest, support: ProcessRunSupport):
@@ -46,40 +40,48 @@ def run_process_flow(*, request: RunRequest, support: ProcessRunSupport):
     request.run_started_at = run_started_at
     callbacks = support.ui_bridge.make_callbacks(run_started_at)
 
-    ctx = _prepare_ui_and_measurements(
-        request=request,
-        callbacks=callbacks,
-        support=support,
-    )
-    if ctx is None:
-        return
+    try:
+        ctx = _prepare_ui_and_measurements(
+            request=request,
+            callbacks=callbacks,
+            support=support,
+        )
+        if ctx is None:
+            return
 
-    _run_auto_mode_seed_phases(
-        ctx,
-        callbacks=callbacks,
-        support=support,
-    )
-    _prepare_target_curve_and_run_context(
-        ctx,
-        support=support,
-        callbacks=callbacks,
-    )
-    _run_auto_mode_search_if_needed(
-        ctx,
-        callbacks=callbacks,
-        support=support,
-    )
-    if not _run_pipeline(
-        ctx,
-        callbacks=callbacks,
-        support=support,
-    ):
-        return
-    _finalize_run_outputs(
-        ctx,
-        callbacks=callbacks,
-        support=support,
-    )
+        if bool(getattr(ctx, "auto_mode_enabled", False)):
+            _run_auto_mode_seed_phases(
+                ctx,
+                callbacks=callbacks,
+                support=support,
+            )
+        _prepare_target_curve_and_run_context(
+            ctx,
+            support=support,
+            callbacks=callbacks,
+        )
+        if bool(getattr(ctx, "auto_mode_enabled", False)):
+            _run_auto_mode_search_if_needed(
+                ctx,
+                callbacks=callbacks,
+                support=support,
+            )
+        if not _run_pipeline(
+            ctx,
+            callbacks=callbacks,
+            support=support,
+        ):
+            return
+        _finalize_run_outputs(
+            ctx,
+            callbacks=callbacks,
+            support=support,
+        )
+    finally:
+        # Large FFT/preprocess caches are useful only during this run. Leaving
+        # them alive until the next Run click makes completed ultra-high-rate
+        # jobs retain hundreds of MiB (or more) while the UI is idle.
+        reset_runtime_caches()
 
 
 __all__ = ["ProcessRunSupport", "run_process_flow"]

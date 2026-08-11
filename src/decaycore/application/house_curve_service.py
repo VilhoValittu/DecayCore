@@ -17,6 +17,7 @@ from ..common.house_curves import (
     adapt_house_curve_to_rt60,
     get_house_curve_by_name,
 )
+from ..config.auto_mode_policy import auto_goal_is_flat_family
 from ..config.legacy_keys import is_auto_mode
 from .target_preset_service import load_user_target_preset
 
@@ -25,10 +26,10 @@ MANUAL_TARGET_TILT_PIVOT_HZ = 1000.0
 
 def _auto_goal_uses_hpf_limited_bass_boost(data: dict) -> bool:
     try:
-        goal = str(data.get("auto_goal", "") or "").strip().lower().replace("_", "-")
+        goal = data.get("auto_goal", "")
     except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
         goal = ""
-    return goal in {"flat", "prefer bass", "prefer-bass", "bass"}
+    return auto_goal_is_flat_family(goal)
 
 
 def _prefer_bass_hpf_freq_hz(data: dict) -> float:
@@ -80,7 +81,7 @@ def limit_prefer_bass_boost_to_hpf(freqs, mags, hpf_freq_hz: float):
     if f.size < 2:
         return freqs, mags
 
-    order = np.argsort(f)
+    order = np.argsort(f, kind="stable")
     f = f[order]
     m = m[order]
     hpf_mag = float(min(float(np.interp(hpf_hz, f, m)), 0.0))
@@ -88,7 +89,7 @@ def limit_prefer_bass_boost_to_hpf(freqs, mags, hpf_freq_hz: float):
 
     f_out = np.concatenate([f, np.asarray([hpf_hz], dtype=float)])
     m_out = np.concatenate([m, np.asarray([hpf_mag], dtype=float)])
-    order = np.argsort(f_out)
+    order = np.argsort(f_out, kind="stable")
     f_out = f_out[order]
     m_out = m_out[order]
 

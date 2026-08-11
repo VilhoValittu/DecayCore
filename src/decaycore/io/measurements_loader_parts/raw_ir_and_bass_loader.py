@@ -28,16 +28,10 @@ import numpy as np
 logger = logging.getLogger("DecayCore")
 import scipy.io.wavfile
 
-from ...auto_mode.shared_parts import (
-    AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO,
-    AUTO_MODE_BASS_INTEGRATION_GUARD_LO_RATIO,
-)
-from ...dsp.bass_integration import (
-    build_combined_sub_transfer,
-    compute_bass_integration_diagnostics,
-    compute_direct_dac_bass_integration_diagnostics,
-    normalize_sub_combine_mode,
-    sum_complex_responses,
+from ...config.value_normalization import normalize_sub_combine_mode
+from ...dsp.bass_integration_policy import (
+    BASS_INTEGRATION_GUARD_HI_RATIO,
+    BASS_INTEGRATION_GUARD_LO_RATIO,
 )
 from ..measurement_bundle import BassIntegrationBundle, TransferData
 
@@ -313,50 +307,61 @@ def _prepare_dual_sub_response_if_needed(
         path_key="local_path_r_sub",
         logger=logger,
     )
-    if sub1_peak is None or sub2_peak is None:
+    peak_timing_available = bool(sub1_peak is not None and sub2_peak is not None)
+    if not peak_timing_available:
         if logger:
             logger.warning(
-                "Bass Integration: 2 subwoofers detected but impulse peak detection failed; using configured sub combine mode."
+                "Bass Integration: 2 subwoofers detected but impulse peak timing is unavailable; "
+                "using their shared-anchor measured complex pressure sum without a peak-timing diagnostic."
             )
-        return l_sub, r_sub, real_subs, combine_mode, dual_sub_diag
 
     fs = int(l_sub.sample_rate)
     if logger:
         logger.info("Bass Integration: 2 subwoofers detected.")
-        logger.info(
-            "Bass Integration: SUB1 impulse peak at %d samples / %.3f ms.",
-            int(sub1_peak),
-            float(sub1_peak) / float(fs) * 1000.0,
-        )
-        logger.info(
-            "Bass Integration: SUB2 impulse peak at %d samples / %.3f ms.",
-            int(sub2_peak),
-            float(sub2_peak) / float(fs) * 1000.0,
-        )
-        logger.info(
-            "Bass Integration: measured SUB2 -> SUB1 relative delay: %d samples / %.3f ms (diagnostic only).",
-            int(sub1_peak) - int(sub2_peak),
-            (float(sub1_peak) - float(sub2_peak)) / float(fs) * 1000.0,
-        )
+        if peak_timing_available:
+            logger.info(
+                "Bass Integration: SUB1 impulse peak at %d samples / %.3f ms.",
+                int(sub1_peak),
+                float(sub1_peak) / float(fs) * 1000.0,
+            )
+            logger.info(
+                "Bass Integration: SUB2 impulse peak at %d samples / %.3f ms.",
+                int(sub2_peak),
+                float(sub2_peak) / float(fs) * 1000.0,
+            )
+            logger.info(
+                "Bass Integration: measured SUB2 -> SUB1 relative delay: %d samples / %.3f ms (diagnostic only).",
+                int(sub1_peak) - int(sub2_peak),
+                (float(sub1_peak) - float(sub2_peak)) / float(fs) * 1000.0,
+            )
+    from ...dsp.bass_integration import build_combined_sub_transfer
+
     combined_sub, combine_diag = build_combined_sub_transfer(
         l_sub,
         l_sub,
         r_sub,
-        mode="average",
-        label="Direct-DAC dual-sub single-bus normalized average",
+        mode="sum",
+        label="Direct-DAC dual-sub measured complex pressure sum",
     )
-    delay_samples = int(sub1_peak) - int(sub2_peak)
+    delay_samples = int(sub1_peak) - int(sub2_peak) if peak_timing_available else 0
     delay_ms = float(delay_samples) / float(max(fs, 1)) * 1000.0
     dual_sub_diag = {
         **dict(combine_diag or {}),
-        "sub_topology": "dual_sub_single_bus_average",
+        "sub_topology": "dual_sub_single_bus_complex_sum",
         "dual_sub_preprocessing_applied": True,
-        "dual_sub_preprocessing_version": 2,
-        "dual_sub_sub1_peak_samples": int(sub1_peak),
-        "dual_sub_sub2_peak_samples": int(sub2_peak),
-        "dual_sub_relative_delay_samples": int(delay_samples),
-        "dual_sub_peak_relative_delay_ms": float(delay_ms),
-        "dual_sub_relative_delay_ms": float(delay_ms),
+        "dual_sub_preprocessing_version": 3,
+        "dual_sub_peak_timing_available": bool(peak_timing_available),
+        **(
+            {
+                "dual_sub_sub1_peak_samples": int(sub1_peak),
+                "dual_sub_sub2_peak_samples": int(sub2_peak),
+                "dual_sub_relative_delay_samples": int(delay_samples),
+                "dual_sub_peak_relative_delay_ms": float(delay_ms),
+                "dual_sub_relative_delay_ms": float(delay_ms),
+            }
+            if peak_timing_available
+            else {}
+        ),
         "dual_sub_phase_refined": False,
         "dual_sub_sub1_delay_ms": 0.0,
         "dual_sub_sub2_delay_ms": 0.0,
@@ -365,15 +370,16 @@ def _prepare_dual_sub_response_if_needed(
         "sub_array_delay_ms": 0.0,
         "whether_alignment_applied": False,
         "dual_sub_alignment_reliable": False,
-        "dual_sub_combined_method": "single_bus_complex_average_no_virtual_alignment",
+        "dual_sub_combined_method": "single_bus_measured_complex_pressure_sum",
         "dual_sub_effective_sub_slot_count": 1,
         "dual_sub_per_sub_optimization": False,
         "dual_sub_export_capability": "single_shared_sub_bus",
-        "sub_scaling_assumption": "single_bus_average_normalized",
+        "sub_scaling_assumption": "shared_bus_measured_complex_pressure_sum",
+        "sub_coherence_assumption": "measured_phase_preserving_superposition",
     }
     dual_sub_diag["dual_sub_original_sub_combine_mode"] = str(combine_mode)
     if logger:
-        logger.info("Bass Integration: created normalized single-bus dual-sub average without virtual per-sub delay.")
+        logger.info("Bass Integration: created the shared-bus dual-sub measured complex pressure sum.")
     l_sub = combined_sub
     r_sub = _silent_transfer_like(l_sub, label="Direct-DAC inactive sub slot after dual-sub preprocessing")
     real_subs = [l_sub]
@@ -400,7 +406,7 @@ def _build_bass_integration_base_diagnostics(
         "sub_slots_present": ["l_sub"]
         if bool(dual_sub_diag.get("dual_sub_preprocessing_applied", False))
         else (["l_sub", "r_sub"] if r_sub_source_present else ["l_sub"]),
-        "sub_combine_mode": "dual_sub_single_bus_average"
+        "sub_combine_mode": "dual_sub_single_bus_complex_sum"
         if bool(dual_sub_diag.get("dual_sub_preprocessing_applied", False))
         else str(combine_mode),
         "sub_combined_level_delta_db_20_120": float(
@@ -446,6 +452,11 @@ def _compute_bass_integration_diagnostics_for_bundle(
     guard_hi_ratio: float,
     is_direct_dac: bool,
 ):
+    from ...dsp.bass_integration import (
+        compute_bass_integration_diagnostics,
+        compute_direct_dac_bass_integration_diagnostics,
+    )
+
     if is_direct_dac:
         xo_order = max(1, int(round(_safe_float_from_data(data, "sub_crossover_slope", 24.0))) // 6)
         sub_hpf_hz = _safe_float_from_data(data, "sub_hpf_freq", 20.0)
@@ -487,6 +498,11 @@ def load_bass_integration_measurements(data: dict, *, logger=None):
     Returns a 7-value tuple:
     `(bundle, f_l, m_l, p_l, f_r, m_r, p_r)`.
     """
+    from ...dsp.bass_integration import (
+        build_combined_sub_transfer,
+        sum_complex_responses,
+    )
+
     is_direct_dac = True
 
     pre_ms, post_ms, sl = _get_wav_window_params(data)
@@ -548,12 +564,12 @@ def load_bass_integration_measurements(data: dict, *, logger=None):
     guard_lo_ratio = _safe_float_from_data(
         data,
         "bass_integration_guard_lo_ratio",
-        AUTO_MODE_BASS_INTEGRATION_GUARD_LO_RATIO,
+        BASS_INTEGRATION_GUARD_LO_RATIO,
     )
     guard_hi_ratio = _safe_float_from_data(
         data,
         "bass_integration_guard_hi_ratio",
-        AUTO_MODE_BASS_INTEGRATION_GUARD_HI_RATIO,
+        BASS_INTEGRATION_GUARD_HI_RATIO,
     )
     base_diagnostics = _build_bass_integration_base_diagnostics(
         l_combine_diag=dict(l_combine_diag or {}),
@@ -587,7 +603,7 @@ def load_bass_integration_measurements(data: dict, *, logger=None):
     if bool(dual_sub_diag.get("dual_sub_preprocessing_applied", False)):
         final_diagnostics.update(dict(dual_sub_diag or {}))
         final_diagnostics["sub_slots_present"] = ["l_sub"]
-        final_diagnostics["sub_combine_mode"] = "dual_sub_single_bus_average"
+        final_diagnostics["sub_combine_mode"] = "dual_sub_single_bus_complex_sum"
     bundle = BassIntegrationBundle(
         l_main=l_main,
         r_main=r_main,

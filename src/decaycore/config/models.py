@@ -516,6 +516,8 @@ class FilterConfig:
     final_ir_validation_mode: str = "warn"
     final_ir_validation_score_weight: float = 1.0
     final_ir_validation_candidate_count: int = 3
+    phase_realization_feedback_enable: bool = True
+    phase_realization_feedback_candidate_count: int = 5
     bass_first_ai: bool = False
     bass_first_mode_max_hz: float = 200.0
     bass_first_smooth_floor_lo: float = 0.75

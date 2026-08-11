@@ -50,7 +50,10 @@ def build_bass_integration_dsp_settings(data: dict | None) -> list[BassIntegrati
         )
         or "average"
     ).strip().lower()
-    is_dual_sub_shared = bool(diag.get("dual_sub_preprocessing_applied", False)) or combine_mode == "dual_sub_peak_aligned_average"
+    is_dual_sub_shared = bool(diag.get("dual_sub_preprocessing_applied", False)) or combine_mode in {
+        "dual_sub_peak_aligned_average",
+        "dual_sub_single_bus_complex_sum",
+    }
 
     main_hpf_hz = float(bi_meta.get("avr_crossover_hz", ui_data.get("avr_crossover_hz", 80.0)) or 80.0)
     sub_lpf_hz = float(

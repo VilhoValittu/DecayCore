@@ -12,6 +12,36 @@ All notable changes to **DecayCore** are documented in this file.
 
 ## DecayCore
 
+## [1.2.3] - 11-8-2026
+
+### Lower memory use after demanding runs
+
+DecayCore now limits its largest DSP caches by both entry count and retained array size. Oversized results are not kept in memory, and runtime caches are cleared when a run ends — including interrupted or failed runs. This prevents high-sample-rate processing and repeated smoothing from leaving hundreds of megabytes reserved while the application is idle, without giving up useful caching during the run itself.
+
+Statistics can now stay in array form inside the DSP pipeline and are converted only when needed for output. This avoids unnecessary intermediate copies during memory-intensive processing.
+
+### More accurate and transparent dual-sub integration
+
+When AUTO Bass Integration is enabled, the two subwoofer measurement inputs are now available directly on the Basic page. Bass integration v5 combine separately measured subwoofers as their phase-preserving measured pressure sum, matching the shared mono sub branch used in the exported CamillaDSP configuration without inventing a virtual per-sub delay.
+
+Candidate validation now also checks the mono-centre listening scenario alongside the left and right channels and bases safety decisions on the worst result. The results view and export summary show the combined bass response, the measured timing difference between the subwoofers, the combine method, routing and scaling assumptions, and clarify that both subwoofers use one shared mono FIR filter.
+
+---
+
+### Pienempi muistinkäyttö vaativien ajojen jälkeen
+
+DecayCore rajaa nyt suurimmat DSP-välimuistit sekä alkioiden määrän että niihin säilöttyjen taulukoiden koon perusteella. Ylisuuria tuloksia ei jätetä muistiin, ja ajonaikaiset välimuistit tyhjennetään aina ajon päättyessä — myös keskeytyneen tai epäonnistuneen ajon jälkeen. Näin korkean näytteenottotaajuuden käsittely ja toistuvat tasoitukset eivät jätä satoja megatavuja varatuiksi sovelluksen odottaessa, mutta ajon aikana hyödyllinen välimuisti säilyy käytössä.
+
+Tilastotiedot voivat nyt pysyä DSP-putkessa taulukkomuodossa ja ne muunnetaan vasta tulostusta varten. Tämä vähentää tarpeettomia väliaikaisia kopioita muistia vaativassa käsittelyssä.
+
+### Tarkempi ja läpinäkyvämpi kahden subwooferin integrointi
+
+Kun AUTO Bass Integration on käytössä, kahden subwooferin mittaustiedostot voi nyt valita suoraan Basic-sivulta. Bass Integration v5 yhdistää erikseen mitatut subwooferit niiden vaiheen säilyttäväksi mitatuksi äänenpainesummaksi. Malli vastaa viedyssä CamillaDSP-konfiguraatiossa käytettävää yhteistä monosub-lähtöä ilman laskennallista subwooferikohtaista lisäviivettä.
+
+Ehdokkaiden validointi tarkistaa nyt vasemman ja oikean kanavan lisäksi kuuntelun mono-keskiskenaarion ja tekee turvallisuuspäätökset heikoimman tuloksen perusteella. Tulosnäkymä ja vientiyhteenveto näyttävät yhdistetyn bassovasteen, subwooferien mitatun ajoituseron, yhdistämistavan sekä reititys- ja skaalausoletukset. Yhteenveto kertoo myös selkeästi, että molemmat subwooferit käyttävät yhtä yhteistä mono-FIR-suodatinta.
+
+---
+
 ## [1.2.2] - 7-8-2026
 
 ### Automatic mode

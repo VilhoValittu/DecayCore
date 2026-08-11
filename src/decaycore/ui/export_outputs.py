@@ -31,7 +31,7 @@ from ..config.decaycore_convolver_configs import generate_hlc_config, generate_r
 from ..config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from ..config.results import FilterResult
 from ..dsp.hpf_policy import hpf_settings_should_use_iir
-from ..auto_mode.rank_score import attach_official_rank_score, official_rank_score
+from ..common.auto_reporting import attach_official_rank_score, official_rank_score
 from ..ui_i18n import layout_legacy_name
 
 logger = logging.getLogger("DecayCore")

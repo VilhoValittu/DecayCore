@@ -20,12 +20,6 @@ from ..common.measurement_features import (
     normalize_rt60_bands,
     normalize_rt60_value,
 )
-from ..dsp.bass_integration import (
-    _apply_delay_to_transfer,
-    _apply_gain_trim_to_transfer,
-    _apply_polarity_to_transfer,
-    build_bundle_combined_sub_transfer,
-)
 from ..dsp.correction_types import MeasurementSideContext
 
 logger = logging.getLogger("DecayCore")
@@ -195,6 +189,13 @@ def _resolve_sub_measurement_for_filter(
 
     bundle = measurements.get("bass_integration_bundle")
     if bundle is not None:
+        from ..dsp.bass_integration import (
+            _apply_delay_to_transfer,
+            _apply_gain_trim_to_transfer,
+            _apply_polarity_to_transfer,
+            build_bundle_combined_sub_transfer,
+        )
+
         try:
             sub_transfer, _diag = build_bundle_combined_sub_transfer(
                 bundle,

@@ -10,6 +10,12 @@
 
 import math
 
+from ..common.bass_routing import (
+    DIRECT_DAC_BASS_ROUTING_POLICY_VERSION,
+    DIRECT_DAC_SUB_MIX_LEFT_GAIN_DB,
+    DIRECT_DAC_SUB_MIX_RIGHT_GAIN_DB,
+)
+
 _NUMERIC_PARSE_EXCEPTIONS = (TypeError, ValueError, OverflowError)
 
 
@@ -331,6 +337,9 @@ def _resolve_raspberry_yaml_context(
         "raw_sub_delay_ms": float(raw_sub_delay_ms),
         "sub_delay_pos_ms": float(sub_delay_pos_ms),
         "sub_gain_db": float(sub_gain_db),
+        "sub_mix_left_gain_db": float(DIRECT_DAC_SUB_MIX_LEFT_GAIN_DB),
+        "sub_mix_right_gain_db": float(DIRECT_DAC_SUB_MIX_RIGHT_GAIN_DB),
+        "bass_routing_policy_v": int(DIRECT_DAC_BASS_ROUTING_POLICY_VERSION),
         "main_hpf": float(main_hpf),
         "sub_hpf": float(sub_hpf),
         "sub_lpf": float(sub_lpf),
@@ -536,9 +545,9 @@ def _build_raspberry_yaml_mixer_lines(ctx: dict) -> list[str]:
                 "      - dest: 2",
                 "        sources:",
                 "          - channel: 0",
-                "            gain: 0",
+                f"            gain: {ctx['sub_mix_left_gain_db']:.3f}",
                 "          - channel: 1",
-                "            gain: 0",
+                f"            gain: {ctx['sub_mix_right_gain_db']:.3f}",
             ]
         )
     return lines

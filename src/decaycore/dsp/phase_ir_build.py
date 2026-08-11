@@ -16,7 +16,7 @@ import scipy.fft
 from .phase import calculate_minimum_phase, combine_mixed_phase
 from .phase_ir_align import _compute_alignment_target, _shift_ir
 from .phase_ir_guards import _pre_energy_guard, _tdc_postprocess
-from .phase_ir_ir import _build_complex_spectrum, _ifft_to_ir, _normalize_ir
+from .phase_ir_ir import _phase_batch_to_ir, _phase_to_ir, _normalize_ir
 from .phase_ir_metrics import _summarize_ir_metrics
 from .phase_ir_phase_parts import _PhaseComponents, _apply_phase_model, _compute_excess_phase, _unwrap_phases
 from .phase_ir_realized import compute_realized_phase_gd_metrics
@@ -127,10 +127,11 @@ def _build_phase_ir_raw_impulse(
     low_phase: np.ndarray | None,
 ) -> tuple[np.ndarray, np.ndarray]:
     if is_mixed and low_phase is not None:
-        h_lin = _build_complex_spectrum(total_mag, low_phase)
-        h_min = _build_complex_spectrum(total_mag, min_p)
-        ir_lin = _ifft_to_ir(h_lin, n=n_fft)
-        ir_min = _ifft_to_ir(h_min, n=n_fft)
+        ir_lin, ir_min = _phase_batch_to_ir(
+            total_mag,
+            np.vstack((low_phase, min_p)),
+            n=n_fft,
+        )
         raw_imp = combine_mixed_phase(
             ir_lin,
             ir_min,
@@ -140,8 +141,7 @@ def _build_phase_ir_raw_impulse(
         )
         final_phase = np.angle(scipy.fft.rfft(raw_imp))
     else:
-        h_complex = _build_complex_spectrum(total_mag, final_phase)
-        raw_imp = _ifft_to_ir(h_complex, n=n_fft)
+        raw_imp = _phase_to_ir(total_mag, final_phase, n=n_fft)
     return raw_imp, final_phase
 
 
@@ -428,6 +428,7 @@ def build_phase_and_ir(
     auto_headroom_db: float,
     final_gain_total: np.ndarray,
     limit_gd_gradient_ms_per_oct_fn,
+    phase_feedback_static: dict | None = None,
 ) -> dict:
     """Contract:
       - This stage builds phase + IR only.
@@ -443,19 +444,57 @@ def build_phase_and_ir(
       mixed_transition_hz: float
     Side effects: st updates exactly like before (mixed_blend keys etc.)
     """
-    total_mag = 10**(final_gain_total / 20.0)
-    min_p = calculate_minimum_phase(total_mag, max_phase_deg=None)
-
-    is_mixed = ("Mixed" in cfg.filter_type_str)
-    mixed_split_hz = float(
-        np.clip(float(getattr(cfg, "mixed_split_freq", 300.0) or 300.0), 20.0, float(cfg.fs) * 0.49)
-    )
-    mixed_transition_hz = float(getattr(cfg, "trans_width", mixed_split_hz) or mixed_split_hz)
-    if not np.isfinite(mixed_transition_hz) or mixed_transition_hz < 0.0:
-        mixed_transition_hz = mixed_split_hz
-
-    raw_u, ref_u = _unwrap_phases(p_rad_interp, theo_xo)
-    excess_u = _compute_excess_phase(raw_u, ref_u)
+    static = phase_feedback_static if isinstance(phase_feedback_static, dict) else {}
+    required_static = {
+        "total_mag",
+        "min_phase",
+        "raw_unwrapped",
+        "reference_unwrapped",
+        "excess_unwrapped",
+        "is_mixed",
+        "mixed_split_hz",
+        "mixed_transition_hz",
+    }
+    if required_static.issubset(static):
+        total_mag = np.asarray(static["total_mag"], dtype=float)
+        min_p = np.asarray(static["min_phase"], dtype=float)
+        raw_u = np.asarray(static["raw_unwrapped"], dtype=float)
+        ref_u = np.asarray(static["reference_unwrapped"], dtype=float)
+        excess_u = np.asarray(static["excess_unwrapped"], dtype=float)
+        is_mixed = bool(static["is_mixed"])
+        mixed_split_hz = float(static["mixed_split_hz"])
+        mixed_transition_hz = float(static["mixed_transition_hz"])
+    else:
+        total_mag = 10**(final_gain_total / 20.0)
+        min_p = calculate_minimum_phase(total_mag, max_phase_deg=None)
+        is_mixed = ("Mixed" in cfg.filter_type_str)
+        mixed_split_hz = float(
+            np.clip(
+                float(getattr(cfg, "mixed_split_freq", 300.0) or 300.0),
+                20.0,
+                float(cfg.fs) * 0.49,
+            )
+        )
+        mixed_transition_hz = float(
+            getattr(cfg, "trans_width", mixed_split_hz) or mixed_split_hz
+        )
+        if not np.isfinite(mixed_transition_hz) or mixed_transition_hz < 0.0:
+            mixed_transition_hz = mixed_split_hz
+        raw_u, ref_u = _unwrap_phases(p_rad_interp, theo_xo)
+        excess_u = _compute_excess_phase(raw_u, ref_u)
+        static.update(
+            {
+                "total_mag": np.asarray(total_mag, dtype=float),
+                "min_phase": np.asarray(min_p, dtype=float),
+                "raw_unwrapped": np.asarray(raw_u, dtype=float),
+                "reference_unwrapped": np.asarray(ref_u, dtype=float),
+                "excess_unwrapped": np.asarray(excess_u, dtype=float),
+                "is_mixed": bool(is_mixed),
+                "mixed_split_hz": float(mixed_split_hz),
+                "mixed_transition_hz": float(mixed_transition_hz),
+                "profiles": {},
+            }
+        )
 
     phase_components = _PhaseComponents(
         raw_u=raw_u,
@@ -473,6 +512,7 @@ def build_phase_and_ir(
         afdw_on=afdw_on,
         logger=logger,
         limit_gd_gradient_ms_per_oct_fn=limit_gd_gradient_ms_per_oct_fn,
+        static_profiles=static.setdefault("profiles", {}),
     )
     final_phase = _apply_phase_model(freq_axis, cfg, st, phase_components)
     low_phase = phase_components.low_phase
@@ -530,4 +570,5 @@ def build_phase_and_ir(
         "final_phase": np.asarray(final_phase, dtype=float),
         "mixed_split_hz": float(mixed_split_hz),
         "mixed_transition_hz": float(mixed_transition_hz),
+        "phase_feedback_static": static,
     }

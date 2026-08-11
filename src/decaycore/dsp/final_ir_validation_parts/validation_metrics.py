@@ -139,6 +139,35 @@ def _safe_missing_result() -> FinalIRValidationResult:
     )
 
 
+def _reject_non_finite_result(reason: str) -> FinalIRValidationResult:
+    """Hard-reject result for a FIR that was supplied but contains NaN/Inf.
+
+    Distinct from `_safe_missing_result`: missing inputs are a benign "nothing
+    to validate" case, but a supplied FIR that is non-finite is a corrupted
+    filter and must never be reported as valid/ok.
+    """
+    nan = float("nan")
+    return FinalIRValidationResult(
+        valid=False,
+        severity="reject",
+        score_penalty=5.0,
+        mag_rms_db=nan,
+        mag_peak_db=nan,
+        pre_energy_ratio_db=nan,
+        post_energy_ratio_db=nan,
+        early_energy_ratio_db=nan,
+        gd_peak_ms=nan,
+        gd_rms_ms=nan,
+        voice_band_peak_excess_db=nan,
+        voice_band_energy_excess_db=nan,
+        stereo_delta_rms_db=nan,
+        stereo_delta_peak_db=nan,
+        bass_residual_peak_db=nan,
+        reasons=(reason,),
+        metrics={},
+    )
+
+
 def _final_ir_validation_thresholds(cr: CfgReader) -> dict[str, float]:
     return {
         "warn_pre": cr.float("final_ir_validation_warn_pre_energy_db", -24.0),
@@ -387,10 +416,19 @@ def validate_final_fir_against_ir(
         return _safe_missing_result()
 
     fir_l_arr = _safe_arr(fir_l)
-    if fir_l_arr is None or fir_l_arr.size < 4:
+    if fir_l_arr is None:
+        # fir_l is known non-None here (checked above) but resolved to
+        # entirely non-finite/unusable content — a corrupted filter, not
+        # merely "missing" data. Reject instead of silently reporting ok.
+        return _reject_non_finite_result("fir_l_non_finite_or_empty")
+    if fir_l_arr.size < 4:
         return _safe_missing_result()
+    if not np.all(np.isfinite(fir_l_arr)):
+        return _reject_non_finite_result("fir_l_non_finite")
 
     fir_r_arr = _safe_arr(fir_r)
+    if fir_r is not None and (fir_r_arr is None or not np.all(np.isfinite(fir_r_arr))):
+        return _reject_non_finite_result("fir_r_non_finite")
 
     cr = CfgReader(config)
     thresholds = _final_ir_validation_thresholds(cr)

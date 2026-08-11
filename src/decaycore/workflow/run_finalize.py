@@ -14,12 +14,13 @@ import logging
 import time
 import typing
 
-from ..auto_mode.api import AUTO_MODE_COMPAT_VERSION, _auto_optuna_storage_path, get_auto_mode_cache_path
+from ..application.run_contracts import RunContext
+from ..config.auto_mode_policy import AUTO_MODE_COMPAT_VERSION
 from ..config.legacy_keys import is_auto_mode
 
 if typing.TYPE_CHECKING:
-    from .process_run_flow import ProcessRunSupport
     from .bridge_types import ProcessRunCallbacks
+    from .process_run_support import ProcessRunSupport
 
 logger = logging.getLogger("DecayCore")
 
@@ -48,6 +49,7 @@ def _resolve_auto_cache_and_optuna_paths(data: dict) -> tuple[str | None, str | 
     mode_u = _resolve_mode_upper(data)
     if not is_auto_mode(data, mode_u):
         return None, None
+    from ..auto_mode.api import _auto_optuna_storage_path, get_auto_mode_cache_path
     auto_cache_path = None
     optuna_storage_path = None
     try:
@@ -76,23 +78,23 @@ def _resolve_auto_cache_and_optuna_paths(data: dict) -> tuple[str | None, str | 
     return auto_cache_path, optuna_storage_path
 
 
-def _resolve_primary_fallback_stats(ctx: dict) -> tuple[dict, dict, object, object]:
-    l_st_f = ctx["l_st_f"]
-    r_st_f = ctx["r_st_f"]
-    l_imp_f = ctx["l_imp_f"]
-    r_imp_f = ctx["r_imp_f"]
+def _resolve_primary_fallback_stats(ctx: RunContext) -> tuple[dict, dict, object, object]:
+    l_st_f = ctx.l_st_f
+    r_st_f = ctx.r_st_f
+    l_imp_f = ctx.l_imp_f
+    r_imp_f = ctx.r_imp_f
     if l_st_f is None or r_st_f is None or l_imp_f is None or r_imp_f is None:
-        fallback = ctx["results_by_fs"][-1]
+        fallback = ctx.results_by_fs[-1]
         return fallback.l_st, fallback.r_st, fallback.l_ir, fallback.r_ir
     return l_st_f, r_st_f, l_imp_f, r_imp_f
 
 
-def _resolve_sub_fallback_stats(ctx: dict) -> tuple[object, object, dict]:
-    sub_ir_f = ctx.get("sub_ir_f")
-    sub_st_f = ctx.get("sub_st_f")
-    sub_meas_f = dict(ctx.get("sub_meas_f") or {})
-    if (sub_ir_f is None or sub_st_f is None) and ctx["results_by_fs"]:
-        fallback_r = ctx["results_by_fs"][-1]
+def _resolve_sub_fallback_stats(ctx: RunContext) -> tuple[object, object, dict]:
+    sub_ir_f = ctx.sub_ir_f
+    sub_st_f = ctx.sub_st_f
+    sub_meas_f = dict(ctx.sub_meas_f or {})
+    if (sub_ir_f is None or sub_st_f is None) and ctx.results_by_fs:
+        fallback_r = ctx.results_by_fs[-1]
         if sub_ir_f is None:
             sub_ir_f = fallback_r.sub_ir
         if sub_st_f is None:
@@ -106,16 +108,18 @@ def _resolve_sub_fallback_stats(ctx: dict) -> tuple[object, object, dict]:
     return sub_ir_f, sub_st_f, sub_meas_f
 
 
-def _finalize_run_outputs(ctx: dict, *, callbacks: ProcessRunCallbacks, support: ProcessRunSupport):
-    data = ctx.get("resolved_data", ctx["data"])
-    results_by_fs = ctx["results_by_fs"]
-    perf_stats = ctx["perf_stats"]
-    per_fs_stats = ctx["per_fs_stats"]
-    ft_short = ctx["ft_short"]
-    file_ts = ctx["file_ts"]
-    irw_tag = ctx["irw_tag"]
-    ts = ctx["ts"]
-    target_curve_tag = ctx["target_curve_tag"]
+def _finalize_run_outputs(ctx: RunContext, *, callbacks: ProcessRunCallbacks, support: ProcessRunSupport):
+    resolved = ctx.require_resolved_config()
+    prepared = ctx.prepared_input
+    data = resolved.resolved_data
+    results_by_fs = ctx.results_by_fs
+    perf_stats = ctx.perf_stats
+    per_fs_stats = ctx.per_fs_stats
+    ft_short = ctx.ft_short
+    file_ts = ctx.file_ts
+    irw_tag = ctx.irw_tag
+    ts = ctx.ts
+    target_curve_tag = resolved.target_curve_tag
 
     zip_started_at = time.perf_counter()
     zip_buffer, zip_perf = support.ui_bridge.build_export_zip(
@@ -140,8 +144,8 @@ def _finalize_run_outputs(ctx: dict, *, callbacks: ProcessRunCallbacks, support:
         ts=ts,
         program_version=str(data.get("program_version", support.version) or support.version),
     )
-    ctx["export_filename"] = fname
-    ctx["saved_filters_dir"] = saved_filters_dir
+    ctx.export_filename = fname
+    ctx.saved_filters_dir = saved_filters_dir
     auto_cache_path, optuna_storage_path = _resolve_auto_cache_and_optuna_paths(data)
     l_st_f, r_st_f, l_imp_f, r_imp_f = _resolve_primary_fallback_stats(ctx)
     sub_ir_f, sub_st_f, sub_meas_f = _resolve_sub_fallback_stats(ctx)
@@ -156,19 +160,19 @@ def _finalize_run_outputs(ctx: dict, *, callbacks: ProcessRunCallbacks, support:
 
     support.ui_bridge.render_results(
         data,
-        ctx["f_l"],
-        ctx["m_l"],
-        ctx["p_l"],
-        ctx["f_r"],
-        ctx["m_r"],
-        ctx["p_r"],
+        prepared.f_l,
+        prepared.m_l,
+        prepared.p_l,
+        prepared.f_r,
+        prepared.m_r,
+        prepared.p_r,
         l_imp_f,
         r_imp_f,
         l_st_f,
         r_st_f,
         fname,
         zip_buffer,
-        run_started_at=ctx["run_started_at"],
+        run_started_at=ctx.run_started_at,
         perf_stats=perf_stats,
         per_fs_stats=per_fs_stats,
         saved_filters_dir=saved_filters_dir,

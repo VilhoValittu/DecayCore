@@ -20,14 +20,12 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from .overview import (
-    _format_recommended_xo_hz,
-)
 from .section import _section
 
 from ...resources.i8n.decaycore_i18n import t
 from ..bass_integration_dsp_settings import build_bass_integration_dsp_settings
 from ..results_formatters import (
+    format_recommended_xo_hz as _format_recommended_xo_hz,
     metric_row,
     safe_float,
 )
@@ -81,13 +79,19 @@ def _render_bass_integration(*, data: dict) -> None:
         )
         or "average"
     ).strip().lower()
-    is_dual_sub_prealigned = bool(diag.get("dual_sub_preprocessing_applied", False)) or combine_mode == "dual_sub_peak_aligned_average"
+    is_dual_sub_prealigned = bool(diag.get("dual_sub_preprocessing_applied", False)) or combine_mode in {
+        "dual_sub_peak_aligned_average",
+        "dual_sub_single_bus_complex_sum",
+    }
     metric_channel_mode = str(
         diag.get(
             "metric_channel_mode",
-            bi_meta.get("metric_channel_mode", best_metrics.get("bass_metric_channel_mode", "worst_case")),
+            bi_meta.get(
+                "metric_channel_mode",
+                best_metrics.get("bass_metric_channel_mode", "worst_case_l_r_mono_center"),
+            ),
         )
-        or "worst_case"
+        or "worst_case_l_r_mono_center"
     )
 
     def _first_finite(*values: Any) -> float:

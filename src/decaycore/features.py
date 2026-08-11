@@ -43,6 +43,8 @@ PACKAGED_AUTO_ENGINE_MAX_POLICY_VERSION = PACKAGED_AUTO_ENGINE_POLICY_VERSION
 # is kept separate from RUST_EXTENSION_MODULES because source installs cannot
 # obtain it from the public native-acceleration installation path.
 PACKAGED_BASS_ENGINE_MODULE = "decaycore_bass_engine"
+PACKAGED_BASS_PYTHON_MODULE = "decaycore.dsp.bass_integration"
+PACKAGED_AUTO_PYTHON_MODULE = "decaycore.auto_mode"
 
 # Engine policy versions this build knows how to talk to.  The engine ships
 # inside the package rather than being installed separately, so a version
@@ -76,9 +78,12 @@ def has_rust_acceleration() -> bool:
 
 
 def has_packaged_bass_engine() -> bool:
-    """Return True when the packaged-only automatic bass engine is available."""
+    """Return True when both packaged-only Bass Integration layers are available."""
     try:
-        if importlib.util.find_spec(PACKAGED_BASS_ENGINE_MODULE) is None:
+        if (
+            importlib.util.find_spec(PACKAGED_BASS_PYTHON_MODULE) is None
+            or importlib.util.find_spec(PACKAGED_BASS_ENGINE_MODULE) is None
+        ):
             return False
         module = importlib.import_module(PACKAGED_BASS_ENGINE_MODULE)
         policy_version = int(getattr(module, "ENGINE_POLICY_VERSION", 0) or 0)
@@ -95,9 +100,12 @@ def has_packaged_bass_engine() -> bool:
 
 
 def has_packaged_auto_engine() -> bool:
-    """Return True when the packaged-only automatic-mode engine is compatible."""
+    """Return True when both packaged-only Automatic mode layers are available."""
     try:
-        if importlib.util.find_spec(PACKAGED_AUTO_ENGINE_MODULE) is None:
+        if (
+            importlib.util.find_spec(PACKAGED_AUTO_PYTHON_MODULE) is None
+            or importlib.util.find_spec(PACKAGED_AUTO_ENGINE_MODULE) is None
+        ):
             return False
         module = importlib.import_module(PACKAGED_AUTO_ENGINE_MODULE)
         policy_version = int(getattr(module, "ENGINE_POLICY_VERSION", 0) or 0)
@@ -142,9 +150,11 @@ __all__ = [
     "PACKAGED_AUTO_ENGINE_MIN_POLICY_VERSION",
     "PACKAGED_AUTO_ENGINE_MODULE",
     "PACKAGED_AUTO_ENGINE_POLICY_VERSION",
+    "PACKAGED_AUTO_PYTHON_MODULE",
     "PACKAGED_BASS_ENGINE_MAX_POLICY_VERSION",
     "PACKAGED_BASS_ENGINE_MIN_POLICY_VERSION",
     "PACKAGED_BASS_ENGINE_MODULE",
+    "PACKAGED_BASS_PYTHON_MODULE",
     "PackagedFeatureUnavailableError",
     "RUST_EXTENSION_MODULES",
     "RUST_INSTALL_URL",

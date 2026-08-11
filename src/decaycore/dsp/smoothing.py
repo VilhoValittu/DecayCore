@@ -12,7 +12,7 @@ import hashlib
 import numpy as np
 import logging
 
-from decaycore.auto_mode.auto_mode_profile import profiled_section
+from decaycore.common.profiling import profiled_section
 from decaycore.dsp.cache_utils import BoundedLruCache
 
 # Try to import Rust DSP extension
@@ -179,7 +179,11 @@ def smooth_meas_freq_dep(m_db: np.ndarray, freq_axis: np.ndarray) -> np.ndarray:
 # Module-level cache for adaptive FDW bandwidth stacks.
 # Key: (n_freqs, f0, f_last, full_magnitude_hash) -> sm_stack array
 _AFDW_STACK_CACHE_MAX = 64
-_AFDW_STACK_CACHE = BoundedLruCache(_AFDW_STACK_CACHE_MAX)
+_AFDW_STACK_CACHE_MAX_BYTES = 128 * 1024 * 1024
+_AFDW_STACK_CACHE = BoundedLruCache(
+    _AFDW_STACK_CACHE_MAX,
+    max_bytes=_AFDW_STACK_CACHE_MAX_BYTES,
+)
 
 
 def apply_adaptive_fdw(freqs, mags, confidence_mask, base_cycles=15.0, min_cycles=5.0):

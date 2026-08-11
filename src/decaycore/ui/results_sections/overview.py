@@ -34,13 +34,19 @@ from .quality import (
 
 from ...config.legacy_keys import is_auto_mode
 from ...resources.i8n.decaycore_i18n import t
-from ...auto_mode.audit_trail import build_auto_mode_audit_trail
-from ...auto_mode.rank_score import calibrated_auto_quality
+from ...common.auto_reporting import (
+    attach_official_rank_score,
+    build_auto_mode_audit_trail,
+    calibrated_auto_quality,
+    official_rank_score,
+)
 from .. import decaycore_plot as plots
+from .. import ng_run_runtime
 from .. import ui_state
 from ..results_formatters import (
     anchor_label,
     boost_diag,
+    format_recommended_xo_hz as _format_recommended_xo_hz,
     fmt_ai_match,
     fmt_ai_score,
     fmt_freq_window,
@@ -67,13 +73,6 @@ _RECOVERABLE_UI_EXCEPTIONS = (
     ModuleNotFoundError,
     NameError,
 )
-
-def _format_recommended_xo_hz(value: float) -> str:
-    hz = float(value)
-    if math.isclose(hz, round(hz), abs_tol=1e-6):
-        return f"{hz:.0f} Hz"
-    return f"{hz:.1f} Hz"
-
 
 def _update_plot_status(run_started_at) -> None:
     if run_started_at is None:
@@ -228,17 +227,16 @@ def render_results(
     sub_st_f=None,
 ) -> None:
     from nicegui import ui
-    from ..ng_run_section import get_progress_element, get_results_container, set_progress_visual_state  # noqa: PLC0415
 
     _update_plot_status(run_started_at)
 
-    prog = get_progress_element()
+    prog = ng_run_runtime.get_progress_element()
     _set_progress_value(prog, 0.96, log_context="progress bar set 0.96")
 
     # Clear per-run plot data and figures so stale curves never survive a run.
     clear_plot_render_cache()
 
-    container = get_results_container()
+    container = ng_run_runtime.get_results_container()
     if container is None:
         logger.warning("render_results: results container not available")
         return
@@ -291,7 +289,7 @@ def render_results(
     _publish_done_status(done_msg, done_status, run_started_at)
 
     _set_progress_value(prog, 1.0, log_context="progress bar set 1.0")
-    set_progress_visual_state(completed=True)
+    ng_run_runtime.set_progress_visual_state(completed=True)
 
     _update_last_run_info(l_st_f, r_st_f)
 
@@ -789,8 +787,6 @@ def _render_auto_diagnostics(*, data: dict) -> None:
         return
 
     from nicegui import ui  # noqa: PLC0415
-    from ...auto_mode.rank_score import attach_official_rank_score, official_rank_score  # noqa: PLC0415
-
     bm = attach_official_rank_score(auto_meta.get("best_metrics", {}))
     rank_sc = safe_float(official_rank_score(bm), 0.0)
     avg_sc = safe_float(bm.get("avg_score", 0.0), 0.0)
