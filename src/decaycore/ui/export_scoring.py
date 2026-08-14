@@ -57,9 +57,7 @@ def _dsp_quality_penalty(st: dict | None) -> float:
 
     real_rms = _pick_metric(
         st,
-        (
-            "real_mag_error_rms",
-        ),
+        ("real_mag_error_rms",),
         abs_value=True,
         nonneg=True,
     )
@@ -68,9 +66,7 @@ def _dsp_quality_penalty(st: dict | None) -> float:
 
     ripple_rms = _pick_metric(
         st,
-        (
-            "ripple_rms",
-        ),
+        ("ripple_rms",),
         abs_value=True,
         nonneg=True,
     )
@@ -219,19 +215,17 @@ def _append_export_ranking(summary_content: str, fs_v: int, ranking_context: dic
 
     best_fs = ctx.get("best_fs", None)
     summary_content += "\n=== RUN RANKING (SAMPLE-RATE COMPARISON) ===\n"
-    summary_content += (
-        "Method: run_ranking_score = avg_acoustic_score - boost_penalty - event_penalty - L/R_delta_penalty - dsp_penalty\n"
-    )
-    summary_content += (
-        "Penalties: boost=1.5*dB over +1dB net boost max, event=0.5/event, L/R delta=0.25/score-point, dsp=quality-derived\n"
-    )
+    summary_content += "Method: run_ranking_score = avg_acoustic_score - boost_penalty - event_penalty - L/R_delta_penalty - dsp_penalty\n"
+    summary_content += "Penalties: boost=1.5*dB over +1dB net boost max, event=0.5/event, L/R delta=0.25/score-point, dsp=quality-derived\n"
     summary_content += (
         f"Current run: {int(fs_v)} Hz | rank #{int(cur.get('rank', 0))}/{len(entries)} | "
         f"run_ranking_score={_safe_float(cur.get('run_ranking_score'), 0.0):.3f}/100\n"
     )
     if best_fs is not None:
         summary_content += f"Recommended run: {int(best_fs)} Hz\n"
-    summary_content += "Note: Run ranking score compares sample-rate outputs and is separate from automatic-mode Best rank score.\n"
+    summary_content += (
+        "Note: Run ranking score compares sample-rate outputs and is separate from automatic-mode Best rank score.\n"
+    )
     summary_content += (
         f"{'Rank':<6}{'FS (Hz)':<10}{'RunScore':<12}{'AvgScore':<10}{'DSPpen':<9}"
         f"{'MaxNetBoost':<13}{'Events':<8}{'L/R Delta':<10}\n"

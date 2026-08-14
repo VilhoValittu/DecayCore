@@ -82,10 +82,7 @@ def _call_generate_filter(
             phase_feedback_replay_key=phase_feedback_replay_key,
         )
     except TypeError as exc:
-        if not any(
-            key in str(exc)
-            for key in ("include_response_arrays", "phase_feedback_replay_cache")
-        ):
+        if not any(key in str(exc) for key in ("include_response_arrays", "phase_feedback_replay_cache")):
             raise
         try:
             return dsp.generate_filter(
@@ -130,10 +127,7 @@ def _call_generate_filter_pair(
             phase_feedback_replay_cache=phase_feedback_replay_cache,
         )
     except TypeError as exc:
-        if not any(
-            key in str(exc)
-            for key in ("include_response_arrays", "phase_feedback_replay_cache")
-        ):
+        if not any(key in str(exc) for key in ("include_response_arrays", "phase_feedback_replay_cache")):
             raise
         try:
             return dsp.generate_filter_pair(
@@ -456,9 +450,7 @@ def _generate_main_filters(
         return initial
 
     requested = float(np.clip(float(getattr(cfg, field, 0.9) or 0.0), 0.0, 1.0))
-    candidate_count = int(
-        np.clip(int(getattr(cfg, "phase_realization_feedback_candidate_count", 5) or 5), 2, 5)
-    )
+    candidate_count = int(np.clip(int(getattr(cfg, "phase_realization_feedback_candidate_count", 5) or 5), 2, 5))
     strengths = build_phase_feedback_strengths(requested, candidate_count)
     candidates = [
         assess_phase_feedback_candidate(
@@ -472,10 +464,7 @@ def _generate_main_filters(
             payload=initial,
         )
     ]
-    if not all(
-        np.isfinite(float(channel.get("gd_score", float("nan"))))
-        for channel in candidates[0]["channels"]
-    ):
+    if not all(np.isfinite(float(channel.get("gd_score", float("nan")))) for channel in candidates[0]["channels"]):
         telemetry = phase_feedback_stats(
             field=field,
             candidates=candidates,

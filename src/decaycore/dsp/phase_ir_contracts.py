@@ -43,12 +43,8 @@ def require_scalar_unchanged(stage: str, value_name: str, before, after) -> None
 
 def require_allowed_keys(stage: str, obj, allowed: frozenset[str]) -> None:
     if not isinstance(obj, dict):
-        raise RuntimeError(
-            f"Phase-IR contract breach in {stage}: expected dict output, got {type(obj).__name__}."
-        )
+        raise RuntimeError(f"Phase-IR contract breach in {stage}: expected dict output, got {type(obj).__name__}.")
     extra = set(obj.keys()) - set(allowed)
     if extra:
         keys_txt = ", ".join(sorted(str(k) for k in extra))
-        raise RuntimeError(
-            f"Phase-IR contract breach in {stage}: unexpected output keys: {keys_txt}."
-        )
+        raise RuntimeError(f"Phase-IR contract breach in {stage}: unexpected output keys: {keys_txt}.")

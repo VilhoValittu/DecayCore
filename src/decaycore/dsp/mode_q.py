@@ -52,9 +52,7 @@ def estimate_peak_q(
     if f.size != v.size or f.size < 3:
         return np.zeros(peaks.size, dtype=float), np.zeros(peaks.size, dtype=float)
     try:
-        _widths, _heights, left_ips, right_ips = scipy.signal.peak_widths(
-            v, peaks, rel_height=0.5
-        )
+        _widths, _heights, left_ips, right_ips = scipy.signal.peak_widths(v, peaks, rel_height=0.5)
     except (ValueError, TypeError, FloatingPointError):
         return np.zeros(peaks.size, dtype=float), np.zeros(peaks.size, dtype=float)
     x = np.arange(f.size, dtype=float)

@@ -64,7 +64,10 @@ def main():
 
     @app.on_startup
     async def _print_shutdown_hint() -> None:
-        print("To shut down the DecayCore, close browser tab, press red icon on right top corner, at terminal press Ctrl+C or close the terminal.", flush=True)
+        print(
+            "To shut down the DecayCore, close browser tab, press red icon on right top corner, at terminal press Ctrl+C or close the terminal.",
+            flush=True,
+        )
 
     ui.run(
         port=8080,
@@ -79,5 +82,6 @@ def main():
 
 if __name__ == "__main__":
     import multiprocessing
+
     multiprocessing.freeze_support()
     main()

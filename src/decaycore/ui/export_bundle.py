@@ -172,8 +172,7 @@ def build_export_zip(
 
         if multi_rate_on:
             include_sub = bool(results) and all(
-                getattr(getattr(result, "sub_ir", None), "size", 0) > 0
-                for result in list(results or [])
+                getattr(getattr(result, "sub_ir", None), "size", 0) > 0 for result in list(results or [])
             )
             yaml_settings = _direct_dac_yaml_export_settings(
                 data,
@@ -241,7 +240,6 @@ def save_export_bundle(
             f.write(zip_buffer.getvalue())
         save_msg = f"Saved: {os.path.abspath(out_path)}"
     except (
-
         AttributeError,
         TypeError,
         ValueError,

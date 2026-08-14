@@ -9,11 +9,13 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 """Target tab preview metadata: RT60 / harmonics payloads, figures and renderers."""
+
 from __future__ import annotations
 
 from .. import ng_controls as ctrl
 from ...common.measurement_features import build_harmonic_boost_risk_curve, build_target_decay_hint
 from .preview_state import STATE
+
 
 def _decay_hint_status_color(status: str) -> str:
     return {
@@ -142,7 +144,11 @@ def _build_target_preview_metadata_payload() -> dict[str, object]:
     def _fundamental_curve(slot: str, *, bass_integration_enabled: bool):
         source = _cv(f"generated_measurement_{slot.lower()}", None)
         upload_value = _cv(f"file_{slot.lower()}", None)
-        if not bass_integration_enabled and isinstance(source, dict) and generated_source_matches_upload(source, upload_value):
+        if (
+            not bass_integration_enabled
+            and isinstance(source, dict)
+            and generated_source_matches_upload(source, upload_value)
+        ):
             analysis_freq = source.get("spatial_avg_analysis_freq_hz", source.get("analysis_freq_hz"))
             analysis_mag = source.get("spatial_avg_analysis_magnitude_db", source.get("analysis_magnitude_db"))
             if analysis_freq is not None and analysis_mag is not None:
@@ -312,14 +318,16 @@ def _build_target_preview_rt60_fig(metadata_payload: dict[str, object]):
                 continue
             freqs = sorted(float(freq) for freq in bands.keys())
             vals = [float(bands[freq]) for freq in freqs]
-            fig.add_trace(go.Scatter(
-                x=freqs,
-                y=vals,
-                mode="lines+markers",
-                name=f"RT60 {side}",
-                line=dict(color=colors[side], width=2.0),
-                marker=dict(size=6),
-            ))
+            fig.add_trace(
+                go.Scatter(
+                    x=freqs,
+                    y=vals,
+                    mode="lines+markers",
+                    name=f"RT60 {side}",
+                    line=dict(color=colors[side], width=2.0),
+                    marker=dict(size=6),
+                )
+            )
             traces_added += 1
         if traces_added == 0:
             return None
@@ -392,13 +400,15 @@ def _build_target_preview_harmonics_fig(metadata_payload: dict[str, object]):
                 mask = (freq_arr > 0.0) & np.isfinite(freq_arr) & np.isfinite(val_arr)
                 if int(mask.sum()) < 4:
                     continue
-                fig.add_trace(go.Scatter(
-                    x=freq_arr[mask],
-                    y=val_arr[mask],
-                    mode="lines",
-                    name=f"H{int(order)} {side}",
-                    line=dict(color=colors.get(int(order), {}).get(side, "#6b7280"), width=1.8),
-                ))
+                fig.add_trace(
+                    go.Scatter(
+                        x=freq_arr[mask],
+                        y=val_arr[mask],
+                        mode="lines",
+                        name=f"H{int(order)} {side}",
+                        line=dict(color=colors.get(int(order), {}).get(side, "#6b7280"), width=1.8),
+                    )
+                )
                 traces_added += 1
         if traces_added == 0:
             return None
@@ -469,13 +479,15 @@ def _build_target_preview_harmonic_risk_fig(metadata_payload: dict[str, object])
             if not np.any(masked_risk > 0.0):
                 continue
             max_risk = max(max_risk, float(np.max(masked_risk)))
-            fig.add_trace(go.Scatter(
-                x=freq_arr[mask],
-                y=masked_risk,
-                mode="lines",
-                name=f"Risk {side}",
-                line=dict(color=colors[side], width=2.0),
-            ))
+            fig.add_trace(
+                go.Scatter(
+                    x=freq_arr[mask],
+                    y=masked_risk,
+                    mode="lines",
+                    name=f"Risk {side}",
+                    line=dict(color=colors[side], width=2.0),
+                )
+            )
             traces_added += 1
         if traces_added == 0:
             return None
@@ -542,17 +554,27 @@ def _render_target_preview_metadata() -> None:
         with ui.expansion(_target_hint_translate("target_preview_metadata_title")).classes("w-full"):
             with ui.column().classes("w-full gap-3"):
                 if rt60_fig is not None:
-                    ui.label(_target_hint_translate("target_preview_metadata_rt60_title")).classes("text-sm font-semibold")
+                    ui.label(_target_hint_translate("target_preview_metadata_rt60_title")).classes(
+                        "text-sm font-semibold"
+                    )
                     ui.plotly(rt60_fig).classes("w-full")
                 if harmonics_fig is not None:
-                    ui.label(_target_hint_translate("target_preview_metadata_harmonics_title")).classes("text-sm font-semibold")
+                    ui.label(_target_hint_translate("target_preview_metadata_harmonics_title")).classes(
+                        "text-sm font-semibold"
+                    )
                     ui.plotly(harmonics_fig).classes("w-full")
                 if risk_fig is not None:
-                    ui.label(_target_hint_translate("target_preview_metadata_risk_title")).classes("text-sm font-semibold")
+                    ui.label(_target_hint_translate("target_preview_metadata_risk_title")).classes(
+                        "text-sm font-semibold"
+                    )
                     ui.plotly(risk_fig).classes("w-full")
                 elif bool(metadata_payload.get("has_harmonics", False)):
-                    ui.label(_target_hint_translate("target_preview_metadata_risk_title")).classes("text-sm font-semibold")
-                    ui.label(_target_hint_translate("target_preview_metadata_risk_none")).classes("text-xs text-gray-500")
+                    ui.label(_target_hint_translate("target_preview_metadata_risk_title")).classes(
+                        "text-sm font-semibold"
+                    )
+                    ui.label(_target_hint_translate("target_preview_metadata_risk_none")).classes(
+                        "text-xs text-gray-500"
+                    )
 
 
 def _render_target_decay_hint() -> None:
@@ -617,11 +639,9 @@ def _render_target_decay_hint() -> None:
         ui.label(_target_hint_translate("target_decay_hint_title")).classes("text-sm font-semibold")
         with ui.row().classes("w-full items-center gap-2"):
             ui.html(
-                
-                    '<span style="display:inline-block;padding:4px 10px;'
-                    'border-radius:9999px;font-size:0.72rem;font-weight:700;'
-                    f'background:{badge_color};color:#ffffff;">{_target_hint_translate(badge_key)}</span>'
-                
+                '<span style="display:inline-block;padding:4px 10px;'
+                "border-radius:9999px;font-size:0.72rem;font-weight:700;"
+                f'background:{badge_color};color:#ffffff;">{_target_hint_translate(badge_key)}</span>'
             )
             ui.label(_target_hint_translate(summary_key)).classes("text-xs cf-target-hint-summary")
         for key in detail_keys:

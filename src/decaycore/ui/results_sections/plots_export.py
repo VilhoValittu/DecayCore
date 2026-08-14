@@ -199,21 +199,13 @@ def _render_plot_widget(figure) -> None:
         apply_results_plot_range(figure, mode)
         refresh_widget()
 
-    has_level_control = bool(
-        controls.get("exported_indexes") and controls.get("compensated_indexes")
-    )
-    has_range_control = bool(
-        controls.get("correction_range") and controls.get("full_range")
-    )
-    with ui.row().classes(
-        "w-full items-center justify-between gap-3 flex-wrap px-2 pt-1"
-    ):
+    has_level_control = bool(controls.get("exported_indexes") and controls.get("compensated_indexes"))
+    has_range_control = bool(controls.get("correction_range") and controls.get("full_range"))
+    with ui.row().classes("w-full items-center justify-between gap-3 flex-wrap px-2 pt-1"):
         with ui.row().classes("items-center gap-3 flex-wrap"):
             if has_level_control:
                 with ui.row().classes("items-center gap-2 flex-wrap"):
-                    ui.label(t("results_plot_level_control")).classes(
-                        "text-sm text-gray-400"
-                    )
+                    ui.label(t("results_plot_level_control")).classes("text-sm text-gray-400")
                     ui.toggle(
                         {
                             "exported": t("plot_level_exported"),
@@ -225,9 +217,7 @@ def _render_plot_widget(figure) -> None:
                     ).props("dense no-caps").classes("cf-results-choice-toggle")
             if has_range_control:
                 with ui.row().classes("items-center gap-2 flex-wrap"):
-                    ui.label(t("results_plot_range_control")).classes(
-                        "text-sm text-gray-400"
-                    )
+                    ui.label(t("results_plot_range_control")).classes("text-sm text-gray-400")
                     ui.toggle(
                         {
                             "correction": t("results_plot_range_correction"),
@@ -236,11 +226,9 @@ def _render_plot_widget(figure) -> None:
                         value=str(controls.get("default_range_mode", "full")),
                         on_change=on_range_change,
                     ).props("dense no-caps").classes("cf-results-choice-toggle")
-        ui.button(icon="fullscreen", on_click=open_fullscreen).props(
-            'dense round color="primary"'
-        ).classes("cf-results-fullscreen-button").tooltip(
-            t("results_plot_fullscreen_open_tooltip")
-        )
+        ui.button(icon="fullscreen", on_click=open_fullscreen).props('dense round color="primary"').classes(
+            "cf-results-fullscreen-button"
+        ).tooltip(t("results_plot_fullscreen_open_tooltip"))
 
     widget_ref["widget"] = ui.plotly(figure).classes("w-full cf-results-plot")
 
@@ -249,9 +237,9 @@ def _render_plot_widget(figure) -> None:
         dialog_ref["dialog"] = fullscreen_dialog
         with ui.card().classes("cf-results-fullscreen-card"):
             with ui.row().classes("w-full justify-end shrink-0"):
-                ui.button(icon="close", on_click=fullscreen_dialog.close).props(
-                    "flat dense round"
-                ).tooltip(t("results_plot_fullscreen_close_tooltip"))
+                ui.button(icon="close", on_click=fullscreen_dialog.close).props("flat dense round").tooltip(
+                    t("results_plot_fullscreen_close_tooltip")
+                )
             fullscreen_widget_ref["widget"] = ui.plotly(figure).classes(
                 "w-full grow cf-results-plot cf-results-fullscreen-plot"
             )
@@ -272,11 +260,7 @@ def _resolve_diagnostic_channel(value, channel_inputs: dict[str, dict]) -> str:
 
 def _resolve_diagnostic_view(value) -> str:
     selected = str(value)
-    return (
-        selected
-        if selected in {"response", "filter", "timing", "quality"}
-        else "response"
-    )
+    return selected if selected in {"response", "filter", "timing", "quality"} else "response"
 
 
 def _sync_diagnostic_view_tabs(*, selected_channel: str, state: dict, view_tabs) -> None:
@@ -334,9 +318,7 @@ def _render_diagnostics(
             figure = None
         with holder:
             if figure is None:
-                ui.label(t("results_plot_quality_unavailable")).classes(
-                    "text-sm text-gray-400 py-6"
-                )
+                ui.label(t("results_plot_quality_unavailable")).classes("text-sm text-gray-400 py-6")
             else:
                 _render_plot_widget(figure)
 
@@ -413,16 +395,8 @@ def _render_plots_and_export(
         and sub_measurements.get("f_sub") is not None
         and len(sub_measurements.get("f_sub", [])) > 0
     )
-    left_stats = {
-        key: value
-        for key, value in dict(l_st_f or {}).items()
-        if key not in _DIRECT_DAC_COMBINED_KEYS
-    }
-    right_stats = {
-        key: value
-        for key, value in dict(r_st_f or {}).items()
-        if key not in _DIRECT_DAC_COMBINED_KEYS
-    }
+    left_stats = {key: value for key, value in dict(l_st_f or {}).items() if key not in _DIRECT_DAC_COMBINED_KEYS}
+    right_stats = {key: value for key, value in dict(r_st_f or {}).items() if key not in _DIRECT_DAC_COMBINED_KEYS}
     channel_inputs = {
         "left": {
             "freqs": f_l,
@@ -472,9 +446,7 @@ def _render_plots_and_export(
         )
 
     if saved_filters_dir:
-        ui.label(t("results_saved_to").format(path=saved_filters_dir)).classes(
-            "text-sm text-gray-400 mt-2"
-        )
+        ui.label(t("results_saved_to").format(path=saved_filters_dir)).classes("text-sm text-gray-400 mt-2")
 
 
 __all__ = [

@@ -113,6 +113,7 @@ def _load_raw_wav_from_source(file_dict=None, local_path: str = "") -> tuple:
     except _RECOVERABLE_WAV_LOAD_EXCEPTIONS:
         return None, 0
 
+
 def load_raw_irs_lr(
     data: dict,
     *,
@@ -146,6 +147,7 @@ def load_raw_irs_lr(
             return ir_l, fs_l, ir_r, fs_r
 
     return None, 0, None, 0
+
 
 def load_raw_ir_sub(data: dict, *, logger=None) -> tuple:
     """Lataa sub-kanavan raaka WAV IR -data bass integration -sloteista
@@ -223,8 +225,7 @@ def _load_bass_integration_transfers(
         logger=logger,
     )
     r_sub_source_present = bool(
-        _get_uploaded_file(data, "file_r_sub") is not None
-        or _get_local_path(data, "local_path_r_sub")
+        _get_uploaded_file(data, "file_r_sub") is not None or _get_local_path(data, "local_path_r_sub")
     )
     r_sub = _load_coherent_transfer_slot(
         data,
@@ -403,12 +404,16 @@ def _build_bass_integration_base_diagnostics(
     combine_mode: str,
 ) -> dict:
     return {
-        "sub_slots_present": ["l_sub"]
-        if bool(dual_sub_diag.get("dual_sub_preprocessing_applied", False))
-        else (["l_sub", "r_sub"] if r_sub_source_present else ["l_sub"]),
-        "sub_combine_mode": "dual_sub_single_bus_complex_sum"
-        if bool(dual_sub_diag.get("dual_sub_preprocessing_applied", False))
-        else str(combine_mode),
+        "sub_slots_present": (
+            ["l_sub"]
+            if bool(dual_sub_diag.get("dual_sub_preprocessing_applied", False))
+            else (["l_sub", "r_sub"] if r_sub_source_present else ["l_sub"])
+        ),
+        "sub_combine_mode": (
+            "dual_sub_single_bus_complex_sum"
+            if bool(dual_sub_diag.get("dual_sub_preprocessing_applied", False))
+            else str(combine_mode)
+        ),
         "sub_combined_level_delta_db_20_120": float(
             l_combine_diag.get(
                 "sub_combined_level_delta_db_20_120",
@@ -428,8 +433,7 @@ def _build_bass_integration_base_diagnostics(
             or r_combine_diag.get("whether_alignment_applied", False)
         ),
         "alignment_offset_ms": float(
-            l_combine_diag.get("alignment_offset_ms", r_combine_diag.get("alignment_offset_ms", 0.0))
-            or 0.0
+            l_combine_diag.get("alignment_offset_ms", r_combine_diag.get("alignment_offset_ms", 0.0)) or 0.0
         ),
         "alignment_confidence": float(
             max(
@@ -525,13 +529,16 @@ def load_bass_integration_measurements(data: dict, *, logger=None):
     if validated is None:
         return None, None, None, None, None, None, None
     l_main, r_main, l_sub, r_sub = validated
-    if _shared_sample_rate_or_none(
-        l_main=l_main,
-        r_main=r_main,
-        l_sub=l_sub,
-        r_sub=r_sub,
-        logger=logger,
-    ) is None:
+    if (
+        _shared_sample_rate_or_none(
+            l_main=l_main,
+            r_main=r_main,
+            l_sub=l_sub,
+            r_sub=r_sub,
+            logger=logger,
+        )
+        is None
+    ):
         return None, None, None, None, None, None, None
 
     combine_mode = normalize_sub_combine_mode(data.get("bass_integration_sub_combine_mode", "average"))
@@ -626,4 +633,4 @@ def load_bass_integration_measurements(data: dict, *, logger=None):
     )
 
 
-__all__ = ['_load_raw_wav_from_source', 'load_raw_irs_lr', 'load_raw_ir_sub', 'load_bass_integration_measurements']
+__all__ = ["_load_raw_wav_from_source", "load_raw_irs_lr", "load_raw_ir_sub", "load_bass_integration_measurements"]

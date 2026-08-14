@@ -211,15 +211,11 @@ def apply_cuts_only_guard(
                 cur_before = cur.copy()
                 cur[valid_floor] = np.minimum(cur[valid_floor], floor_vals[valid_floor])
                 out[apply_mask] = cur
-                floor_reapplied_bins = int(
-                    np.count_nonzero(cur_before[valid_floor] > (cur[valid_floor] + 1e-9))
-                )
+                floor_reapplied_bins = int(np.count_nonzero(cur_before[valid_floor] > (cur[valid_floor] + 1e-9)))
     except (TypeError, ValueError):
         floor_reapplied_bins = 0
 
-    boost_clamped_bins = int(
-        np.count_nonzero((before[apply_mask] > 1e-9) & (out[apply_mask] <= 1e-9))
-    )
+    boost_clamped_bins = int(np.count_nonzero((before[apply_mask] > 1e-9) & (out[apply_mask] <= 1e-9)))
     return out, {
         "guard_bins": int(np.count_nonzero(apply_mask)),
         "boost_clamped_bins": int(boost_clamped_bins),

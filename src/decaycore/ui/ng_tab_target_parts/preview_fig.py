@@ -9,6 +9,7 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 """Target tab preview figure assembly (Plotly dict + draggable shape points)."""
+
 from __future__ import annotations
 
 import logging
@@ -30,6 +31,7 @@ from ..target_preview_interaction import (
 from .preview_curve import _current_target_preview_curve
 from .preview_state import STATE
 
+
 def _build_target_preview_fig():  # noqa: C901 - target preview figure is assembled from many UI states
     """Build the target curve preview Plotly figure from current ctrl values.
 
@@ -40,7 +42,6 @@ def _build_target_preview_fig():  # noqa: C901 - target preview figure is assemb
         from ...config.auto_mode_policy import auto_goal_forced_level_window  # noqa: PLC0415
         from ...config.value_normalization import normalize_sub_combine_mode  # noqa: PLC0415
 
-
         def _cv(name, default=None):
             return ctrl.value(name, default)
 
@@ -50,7 +51,6 @@ def _build_target_preview_fig():  # noqa: C901 - target preview figure is assemb
                 if math.isfinite(x):
                     return x
             except (
-
                 AttributeError,
                 TypeError,
                 ValueError,
@@ -78,9 +78,7 @@ def _build_target_preview_fig():  # noqa: C901 - target preview figure is assemb
         pre_ms = _to_float(_cv("ir_window_left", 85.0), 85.0)
         post_ms = _to_float(_cv("ir_window_right") or _cv("ir_window", 500.0), 500.0)
         smoothing_level = 96
-        bass_integration_enabled = bool(
-            _cv("bass_integration_enable", False)
-        ) and has_packaged_bass_engine()
+        bass_integration_enabled = bool(_cv("bass_integration_enable", False)) and has_packaged_bass_engine()
         bass_integration_sub_combine_mode = normalize_sub_combine_mode(
             _cv("bass_integration_sub_combine_mode", "average")
         )
@@ -128,7 +126,6 @@ def _build_target_preview_fig():  # noqa: C901 - target preview figure is assemb
         )
 
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -141,6 +138,7 @@ def _build_target_preview_fig():  # noqa: C901 - target preview figure is assemb
         NameError,
     ):
         import logging  # noqa: PLC0415
+
         logging.getLogger("DecayCore").warning("_build_target_preview_fig failed", exc_info=True)
         return None, [], []
 
@@ -198,36 +196,48 @@ def _assemble_target_preview_figure(
         target_trace["hoverinfo"] = "skip"
     fig.add_trace(go.Scatter(**target_trace))
     if is_manual_level:
-        fig.add_trace(go.Scatter(
-            x=[freq_axis[0], freq_axis[-1]],
-            y=[lvl_manual_db, lvl_manual_db],
-            mode="lines",
-            name=f"Manual level ({lvl_manual_db:+.1f} dB)",
-            line=dict(color="rgba(15,23,42,0.55)", width=1.2, dash="dot"),
-            hoverinfo="skip",
-            visible="legendonly",
-        ))
-        fig.add_trace(go.Scatter(
-            x=[freq_axis[0], freq_axis[-1]],
-            y=[0.0, 0.0],
-            mode="lines",
-            name=f"Manual tilt ({manual_target_tilt_db_per_oct:+.1f} dB/oct @ 1 kHz)",
-            line=dict(color="#f4a261", width=1.8, dash="dot"),
-            hoverinfo="skip",
-            visible="legendonly",
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=[freq_axis[0], freq_axis[-1]],
+                y=[lvl_manual_db, lvl_manual_db],
+                mode="lines",
+                name=f"Manual level ({lvl_manual_db:+.1f} dB)",
+                line=dict(color="rgba(15,23,42,0.55)", width=1.2, dash="dot"),
+                hoverinfo="skip",
+                visible="legendonly",
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=[freq_axis[0], freq_axis[-1]],
+                y=[0.0, 0.0],
+                mode="lines",
+                name=f"Manual tilt ({manual_target_tilt_db_per_oct:+.1f} dB/oct @ 1 kHz)",
+                line=dict(color="#f4a261", width=1.8, dash="dot"),
+                hoverinfo="skip",
+                visible="legendonly",
+            )
+        )
     if "L" in speaker_interp:
-        fig.add_trace(go.Scatter(
-            x=freq_axis, y=speaker_interp["L"], mode="lines",
-            name="Predicted L total" if bass_integration_enabled else "Speaker L",
-            line=dict(color="rgba(102,187,255,0.55)", width=1.2),
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=freq_axis,
+                y=speaker_interp["L"],
+                mode="lines",
+                name="Predicted L total" if bass_integration_enabled else "Speaker L",
+                line=dict(color="rgba(102,187,255,0.55)", width=1.2),
+            )
+        )
     if "R" in speaker_interp:
-        fig.add_trace(go.Scatter(
-            x=freq_axis, y=speaker_interp["R"], mode="lines",
-            name="Predicted R total" if bass_integration_enabled else "Speaker R",
-            line=dict(color="rgba(255,167,102,0.55)", width=1.2),
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=freq_axis,
+                y=speaker_interp["R"],
+                mode="lines",
+                name="Predicted R total" if bass_integration_enabled else "Speaker R",
+                line=dict(color="rgba(255,167,102,0.55)", width=1.2),
+            )
+        )
     for comp_key, trace_name, color in (
         ("L_main", "L main only", "rgba(102,187,255,0.35)"),
         ("L_sub", "L sub only", "rgba(30,64,175,0.35)"),
@@ -235,26 +245,32 @@ def _assemble_target_preview_figure(
         ("R_sub", "R sub only", "rgba(185,28,28,0.35)"),
     ):
         if comp_key in speaker_components:
-            fig.add_trace(go.Scatter(
-                x=freq_axis,
-                y=speaker_components[comp_key],
-                mode="lines",
-                name=trace_name,
-                line=dict(color=color, width=1.0, dash="dot"),
-                visible="legendonly",
-            ))
+            fig.add_trace(
+                go.Scatter(
+                    x=freq_axis,
+                    y=speaker_components[comp_key],
+                    mode="lines",
+                    name=trace_name,
+                    line=dict(color=color, width=1.0, dash="dot"),
+                    visible="legendonly",
+                )
+            )
     if len(speaker_interp) > 0:
         avg = np.mean(np.vstack([speaker_interp[k] for k in sorted(speaker_interp)]), axis=0)
-        fig.add_trace(go.Scatter(
-            x=freq_axis, y=avg, mode="lines",
-            name="Predicted avg" if bass_integration_enabled else "Speaker avg",
-            line=dict(color="#dc2626", width=2.0),
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=freq_axis,
+                y=avg,
+                mode="lines",
+                name="Predicted avg" if bass_integration_enabled else "Speaker avg",
+                line=dict(color="#dc2626", width=2.0),
+            )
+        )
     _HARM_CLRS = {
         2: {"L": "rgba(40,120,255,0.65)", "R": "rgba(255,110,40,0.65)"},
-        3: {"L": "rgba(0,80,200,0.60)",   "R": "rgba(200,60,10,0.60)"},
-        4: {"L": "rgba(0,50,160,0.55)",   "R": "rgba(160,35,0,0.55)"},
-        5: {"L": "rgba(0,20,120,0.50)",   "R": "rgba(120,15,0,0.50)"},
+        3: {"L": "rgba(0,80,200,0.60)", "R": "rgba(200,60,10,0.60)"},
+        4: {"L": "rgba(0,50,160,0.55)", "R": "rgba(160,35,0,0.55)"},
+        5: {"L": "rgba(0,20,120,0.50)", "R": "rgba(120,15,0,0.50)"},
     }
     for _hch in ("L", "R"):
         if _hch not in harmonic_sources:
@@ -267,17 +283,18 @@ def _assemble_target_preview_figure(
             _hmsk = (_hf_arr > 10.0) & np.isfinite(_hf_arr) & np.isfinite(_ha)
             if _hmsk.sum() < 4:
                 continue
-            _hi = np.interp(freq_axis, _hf_arr[_hmsk], _ha[_hmsk],
-                            left=_ha[_hmsk][0], right=_ha[_hmsk][-1])
+            _hi = np.interp(freq_axis, _hf_arr[_hmsk], _ha[_hmsk], left=_ha[_hmsk][0], right=_ha[_hmsk][-1])
             _hcolor = _HARM_CLRS.get(_hord, {}).get(_hch, "rgba(128,128,128,0.50)")
-            fig.add_trace(go.Scatter(
-                x=freq_axis,
-                y=_hi + _h_off,
-                mode="lines",
-                name=f"H{_hord} {_hch}",
-                line=dict(color=_hcolor, width=1.0, dash="dot"),
-                visible="legendonly",
-            ))
+            fig.add_trace(
+                go.Scatter(
+                    x=freq_axis,
+                    y=_hi + _h_off,
+                    mode="lines",
+                    name=f"H{_hord} {_hch}",
+                    line=dict(color=_hcolor, width=1.0, dash="dot"),
+                    visible="legendonly",
+                )
+            )
     fig.update_xaxes(
         type="log",
         title_text="Hz",
@@ -298,15 +315,22 @@ def _assemble_target_preview_figure(
         linecolor="rgba(15,23,42,0.22)",
         zerolinecolor="rgba(15,23,42,0.10)",
     )
-    fig.update_layout(height=320, margin=dict(l=40, r=20, t=30, b=35),
-                      showlegend=True, template="plotly_white",
-                      paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
-                      font=dict(color="#1f2937"),
-                      uirevision="target_preview_lock")
+    fig.update_layout(
+        height=320,
+        margin=dict(l=40, r=20, t=30, b=35),
+        showlegend=True,
+        template="plotly_white",
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        font=dict(color="#1f2937"),
+        uirevision="target_preview_lock",
+    )
     if is_manual_level and target_curve_path:
         drag_shape = build_draggable_target_shape(freq_axis, target_curve_display)
         drag_shape["path"] = target_curve_path
-        tilt_handle_shape = build_draggable_tilt_handle_shape(float(np.interp(16000.0, freq_axis, target_curve_display)))
+        tilt_handle_shape = build_draggable_tilt_handle_shape(
+            float(np.interp(16000.0, freq_axis, target_curve_display))
+        )
         fig.update_layout(shapes=[drag_shape, tilt_handle_shape])
 
     fig_dict = fig.to_plotly_json()
@@ -314,8 +338,8 @@ def _assemble_target_preview_figure(
     layout["uirevision"] = "target_preview_lock"
     layout["editrevision"] = (
         f"target_preview_manual_{STATE.refresh_token}_{int(STATE.drag_active)}"
-        if is_manual_level else
-        "target_preview_static"
+        if is_manual_level
+        else "target_preview_static"
     )
     fig_dict["config"] = {
         "responsive": True,
@@ -344,7 +368,10 @@ def _build_target_preview_speaker_curves(
 ):
     """Load + align speaker/sub measurement curves for the target preview."""
     import numpy as np  # noqa: PLC0415
-    from ...io.generated_measurement_source import generated_source_matches_upload, parse_generated_source  # noqa: PLC0415
+    from ...io.generated_measurement_source import (
+        generated_source_matches_upload,
+        parse_generated_source,
+    )  # noqa: PLC0415
     from ...dsp.smoothing import psychoacoustic_smoothing as _psycho_smooth  # noqa: PLC0415
     from ..target_preview_cache import (  # noqa: PLC0415
         load_path_measurement_curve,
@@ -357,7 +384,6 @@ def _build_target_preview_speaker_curves(
         try:
             return _psycho_smooth(freq_axis, np.asarray(m, dtype=float))
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -380,7 +406,6 @@ def _build_target_preview_speaker_curves(
             diff = np.nanmedian(t_curve[mask] - np.asarray(m_curve, dtype=float)[mask])
             return np.asarray(m_curve, dtype=float) + diff
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -439,7 +464,6 @@ def _build_target_preview_speaker_curves(
                     return None
                 return np.interp(freq_axis, ff, mm, left=mm[0], right=mm[-1])
             except (
-
                 AttributeError,
                 TypeError,
                 ValueError,
@@ -475,7 +499,9 @@ def _build_target_preview_speaker_curves(
             if total_curve is None:
                 continue
             total_aligned = _align(total_curve, target_curve, freq_axis, lvl_min, lvl_max)
-            _speaker_align_offset[ch] = float(np.nanmedian(total_aligned - total_curve)) if np.isfinite(total_curve).any() else 0.0
+            _speaker_align_offset[ch] = (
+                float(np.nanmedian(total_aligned - total_curve)) if np.isfinite(total_curve).any() else 0.0
+            )
             speaker_interp[ch] = _smooth_for_preview(freq_axis, total_aligned)
 
             main_curve = _interp_transfer(main_tr)
@@ -532,15 +558,21 @@ def _build_target_preview_speaker_curves(
                 speaker_interp[ch] = _smooth_for_preview(freq_axis, m_aligned)
 
     from ...io.measurements_loader_parts import _try_load_harmonic_sidecar  # noqa: PLC0415
+
     for _hch in ("L", "R"):
         if _hch in _harmonic_sources:
             continue
-        _hlp = str(_cv(
-            ("local_path_l_main" if _hch == "L" else "local_path_r_main")
-            if bass_integration_enabled else
-            ("local_path_l" if _hch == "L" else "local_path_r"),
-            "",
-        ) or "")
+        _hlp = str(
+            _cv(
+                (
+                    ("local_path_l_main" if _hch == "L" else "local_path_r_main")
+                    if bass_integration_enabled
+                    else ("local_path_l" if _hch == "L" else "local_path_r")
+                ),
+                "",
+            )
+            or ""
+        )
         if not _hlp:
             continue
         _hf, _hm = _try_load_harmonic_sidecar(_hlp)

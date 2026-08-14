@@ -17,7 +17,6 @@ from typing import Any
 
 import numpy as np
 
-
 _EPS = 1e-12
 _SEVERITY_ORDER: dict[str, int] = {"ok": 0, "warn": 1, "reject": 2}
 
@@ -27,25 +26,9 @@ _SEVERITY_ORDER: dict[str, int] = {"ok": 0, "warn": 1, "reject": 2}
 # ---------------------------------------------------------------------------
 
 
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -53,13 +36,9 @@ _SEVERITY_ORDER: dict[str, int] = {"ok": 0, "warn": 1, "reject": 2}
 # ---------------------------------------------------------------------------
 
 
-
-
 # ---------------------------------------------------------------------------
 # FIR spectrum computation (cached for both GD and magnitude metrics)
 # ---------------------------------------------------------------------------
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -67,19 +46,9 @@ _SEVERITY_ORDER: dict[str, int] = {"ok": 0, "warn": 1, "reject": 2}
 # ---------------------------------------------------------------------------
 
 
-
-
 # ---------------------------------------------------------------------------
 # Magnitude metrics
 # ---------------------------------------------------------------------------
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -87,18 +56,15 @@ _SEVERITY_ORDER: dict[str, int] = {"ok": 0, "warn": 1, "reject": 2}
 # ---------------------------------------------------------------------------
 
 
-
-
 # ---------------------------------------------------------------------------
 # Safe missing result
 # ---------------------------------------------------------------------------
 
 
-
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class FinalIRValidationResult:
@@ -127,21 +93,26 @@ class FinalIRValidationResult:
     reasons: tuple[str, ...]
     metrics: dict[str, float]
 
+
 def _bump_severity(current: str, candidate: str) -> str:
     if _SEVERITY_ORDER.get(candidate, 0) > _SEVERITY_ORDER.get(current, 0):
         return candidate
     return current
 
+
 def _next_pow2(n: int) -> int:
     return int(2 ** np.ceil(np.log2(max(n, 2))))
 
+
 def _main_peak_index(ir: np.ndarray) -> int:
     return int(np.argmax(np.abs(ir)))
+
 
 def _safe_energy(x: np.ndarray) -> float:
     if x.size == 0:
         return 0.0
     return float(np.sum(x * x))
+
 
 def _safe_rms(x: np.ndarray) -> float:
     arr = np.asarray(x, dtype=float).reshape(-1)
@@ -149,6 +120,7 @@ def _safe_rms(x: np.ndarray) -> float:
     if arr.size < 2:
         return 0.0
     return float(np.sqrt(np.mean(arr * arr)))
+
 
 def _safe_arr(value: Any, n_ref: int | None = None) -> np.ndarray | None:
     if value is None:
@@ -163,18 +135,18 @@ def _safe_arr(value: Any, n_ref: int | None = None) -> np.ndarray | None:
     except (TypeError, ValueError):
         return None
 
+
 def _freq_mask(freq: np.ndarray, lo: float, hi: float) -> np.ndarray:
     return (freq >= float(lo)) & (freq <= float(hi))
 
 
 __all__ = [
-    'FinalIRValidationResult',
-    '_bump_severity',
-    '_next_pow2',
-    '_main_peak_index',
-    '_safe_energy',
-    '_safe_rms',
-    '_safe_arr',
-    '_freq_mask',
+    "FinalIRValidationResult",
+    "_bump_severity",
+    "_next_pow2",
+    "_main_peak_index",
+    "_safe_energy",
+    "_safe_rms",
+    "_safe_arr",
+    "_freq_mask",
 ]
-

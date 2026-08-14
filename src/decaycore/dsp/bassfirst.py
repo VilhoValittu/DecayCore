@@ -17,20 +17,25 @@ from decaycore.dsp.mode_q import estimate_peak_q
 
 _LOGGER = logging.getLogger(__name__)
 
+
 def _clamp01(x):
     return np.clip(x, 0.0, 1.0)
 
+
 _LOG_GRAD_F_FLOOR = 10.0  # Hz; prevents inflation of roughness below this frequency
+
 
 def _log_grad(x, f):
     df = np.gradient(f) + 1e-12
     dx_df = np.gradient(x) / df
     return dx_df * np.maximum(f, _LOG_GRAD_F_FLOOR)
 
+
 def _baseline_heavy(freqs, mags_db, sigma_hz=6.0):
     df = np.median(np.diff(freqs[np.isfinite(freqs)])) if len(freqs) > 2 else 1.0
     sigma_bins = max(1.0, float(sigma_hz / max(df, 1e-9)))
     return scipy.ndimage.gaussian_filter1d(mags_db, sigma=sigma_bins)
+
 
 def _freq_prior(freqs, f1=120.0, f2=200.0):
     p = np.ones_like(freqs, dtype=float)
@@ -40,6 +45,7 @@ def _freq_prior(freqs, f1=120.0, f2=200.0):
     mid = (freqs >= f1) & (freqs < f2)
     p[mid] = 1.0 - (freqs[mid] - f1) / (f2 - f1)
     return p
+
 
 def _adaptive_mode_weights(rt60_lf_s: float | None, peak_q_values: list[float]) -> tuple[float, float, float]:
     w_gd, w_mag, w_q = 0.45, 0.35, 0.20
@@ -67,8 +73,11 @@ def _adaptive_mode_weights(rt60_lf_s: float | None, peak_q_values: list[float]) 
             w_mag /= total
             w_q /= total
 
-    _LOGGER.debug(f"room_mode_weights: gd={w_gd:.3f} mag={w_mag:.3f} q={w_q:.3f} (rt60={rt60_lf_s}, mean_q={np.mean(peak_q_values) if peak_q_values else 'none'})")
+    _LOGGER.debug(
+        f"room_mode_weights: gd={w_gd:.3f} mag={w_mag:.3f} q={w_q:.3f} (rt60={rt60_lf_s}, mean_q={np.mean(peak_q_values) if peak_q_values else 'none'})"
+    )
     return w_gd, w_mag, w_q
+
 
 def _wav_source_relaxed_thresholds(
     *,
@@ -154,15 +163,29 @@ def _apply_room_mode_taper(
         return np.asarray(room_mode_mask, dtype=float)
 
 
-def build_bassfirst_masks(freq_axis, m_raw_db, phase_rad_unwrapped, gd_ms, gd_diff,
-                          is_wav_source=False, mode_f1=120.0, mode_f2=200.0,
-                          rew_asym: bool = False, left_ms: float = 0.0,
-                          gd_t0=1.0, gd_t1=6.0,
-                          mag_a0=1.5, mag_a1=8.0,
-                          q0=2.0, q1=10.0,
-                          rough_r0=0.6, rough_r1=2.5,
-                          pj_p0=0.0008, pj_p1=0.0040,
-                          rt60_lf_s: float | None = None):
+def build_bassfirst_masks(
+    freq_axis,
+    m_raw_db,
+    phase_rad_unwrapped,
+    gd_ms,
+    gd_diff,
+    is_wav_source=False,
+    mode_f1=120.0,
+    mode_f2=200.0,
+    rew_asym: bool = False,
+    left_ms: float = 0.0,
+    gd_t0=1.0,
+    gd_t1=6.0,
+    mag_a0=1.5,
+    mag_a1=8.0,
+    q0=2.0,
+    q1=10.0,
+    rough_r0=0.6,
+    rough_r1=2.5,
+    pj_p0=0.0008,
+    pj_p1=0.0040,
+    rt60_lf_s: float | None = None,
+):
 
     f = np.asarray(freq_axis, dtype=float)
     m = np.asarray(m_raw_db, dtype=float)
@@ -197,7 +220,7 @@ def build_bassfirst_masks(freq_axis, m_raw_db, phase_rad_unwrapped, gd_ms, gd_di
     )
 
     w_gd, w_mag, w_q = _adaptive_mode_weights(rt60_lf_s, peak_q_values)
-    mode_score = prior * (w_gd*gd_norm + w_mag*mag_norm + w_q*q_norm)
+    mode_score = prior * (w_gd * gd_norm + w_mag * mag_norm + w_q * q_norm)
     room_mode_mask = scipy.ndimage.gaussian_filter1d(_clamp01(mode_score), sigma=4)
 
     if bool(is_wav_source):
@@ -221,7 +244,7 @@ def build_bassfirst_masks(freq_axis, m_raw_db, phase_rad_unwrapped, gd_ms, gd_di
     pj = scipy.ndimage.gaussian_filter1d(np.abs(d2), sigma=6)
     pj_norm = _clamp01((pj - pj_p0) / (pj_p1 - pj_p0 + 1e-12))
 
-    bad = _clamp01(0.75*rough_norm + 0.25*pj_norm)
+    bad = _clamp01(0.75 * rough_norm + 0.25 * pj_norm)
     reliability_mask = 1.0 - bad
 
     dbg = {
@@ -235,9 +258,8 @@ def build_bassfirst_masks(freq_axis, m_raw_db, phase_rad_unwrapped, gd_ms, gd_di
     }
     return reliability_mask, room_mode_mask, dbg
 
-def fuse_conf_for_smoothing(freq_axis, reliability_mask,
-                            bass_floor_lo=0.75, bass_floor_hi=0.35,
-                            f_lo=80.0, f_hi=200.0):
+
+def fuse_conf_for_smoothing(freq_axis, reliability_mask, bass_floor_lo=0.75, bass_floor_hi=0.35, f_lo=80.0, f_hi=200.0):
     """Funktio: fuse conf for smoothing."""
     f = np.asarray(freq_axis, dtype=float)
     rel = np.asarray(reliability_mask, dtype=float)
@@ -249,9 +271,8 @@ def fuse_conf_for_smoothing(freq_axis, reliability_mask,
 
     return np.maximum(rel, floor)
 
-def modulate_gain_bassfirst(gain_db, room_mode_mask,
-                            k_mode_cut=0.6, k_mode_boost=0.9,
-                            max_cut_db: float | None = None):
+
+def modulate_gain_bassfirst(gain_db, room_mode_mask, k_mode_cut=0.6, k_mode_boost=0.9, max_cut_db: float | None = None):
     g = np.asarray(gain_db, dtype=float)
     mm = np.asarray(room_mode_mask, dtype=float)
 

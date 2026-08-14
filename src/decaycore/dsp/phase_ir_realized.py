@@ -193,15 +193,9 @@ def compute_realized_phase_gd_metrics(
         "phase_realized_gd_after_rms_ms": float(after["rms_ms"]),
         "phase_realized_gd_before_p95_ms": float(before["p95_ms"]),
         "phase_realized_gd_after_p95_ms": float(after["p95_ms"]),
-        "phase_realized_gd_gradient_before_p95_ms_per_oct": float(
-            before["gradient_p95_ms_per_oct"]
-        ),
-        "phase_realized_gd_gradient_after_p95_ms_per_oct": float(
-            after["gradient_p95_ms_per_oct"]
-        ),
-        "phase_realized_filter_gd_gradient_p95_ms_per_oct": float(
-            filter_only["gradient_p95_ms_per_oct"]
-        ),
+        "phase_realized_gd_gradient_before_p95_ms_per_oct": float(before["gradient_p95_ms_per_oct"]),
+        "phase_realized_gd_gradient_after_p95_ms_per_oct": float(after["gradient_p95_ms_per_oct"]),
+        "phase_realized_filter_gd_gradient_p95_ms_per_oct": float(filter_only["gradient_p95_ms_per_oct"]),
         "phase_realized_gd_rms_improvement_frac": float(rms_improvement),
         "phase_realized_gd_p95_improvement_frac": float(p95_improvement),
         "phase_realized_gd_gradient_improvement_frac": float(gradient_improvement),

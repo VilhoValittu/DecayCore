@@ -9,6 +9,7 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 """Shared rendering helpers for results metric sections."""
+
 from __future__ import annotations
 
 import html

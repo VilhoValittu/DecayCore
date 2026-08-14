@@ -79,7 +79,8 @@ def _apply_confidence_logic(
     if n_floored > 0:
         _logger.debug(
             "mag_shape: conf_floor_bass=%.2f applied to %d bins below 100 Hz",
-            conf_floor_bass, n_floored,
+            conf_floor_bass,
+            n_floored,
         )
     return (np.asarray(err_db, dtype=float) * eff_conf).copy(), {
         "mode": "weighted_conf_floor",

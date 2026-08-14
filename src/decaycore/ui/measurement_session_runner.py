@@ -123,7 +123,6 @@ class MeasurementSessionRunner:
                     progress_callback=_progress_callback,
                 )
             except (
-
                 AttributeError,
                 TypeError,
                 ValueError,

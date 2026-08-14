@@ -62,8 +62,7 @@ def _append_leveling_tilt_lines(lines: list[str], tilt_value) -> None:
     lines.append(f"Tilt slope: {tilt_f:+.2f} dB/oct\n")
     if abs(tilt_f) > 1.5:
         lines.append(
-            "Warning: Large broadband tilt detected. "
-            "May indicate measurement/target mismatch or strong room tilt.\n"
+            "Warning: Large broadband tilt detected. " "May indicate measurement/target mismatch or strong room tilt.\n"
         )
 
 
@@ -102,4 +101,4 @@ def _append_leveling_summary(
     return "".join(lines)
 
 
-__all__ = ['_append_leveling_summary']
+__all__ = ["_append_leveling_summary"]

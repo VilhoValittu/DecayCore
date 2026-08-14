@@ -176,9 +176,15 @@ def _compute_comparison_payload(
         complex_cmp = 10 ** (m_cmp_raw / 20.0) * np.exp(1j * p_cmp_rad)
         conf_cmp, refl_cmp, _ = analyze_acoustic_confidence(freq_cmp, complex_cmp, ref_fs)
         target_cmp = np.zeros_like(freq_cmp, dtype=float)
-        target_level_db_cmp, calc_offset_db_cmp, meas_level_db_window_cmp, target_level_db_window_cmp, offset_method_cmp, s_min_cmp, s_max_cmp = (
-            compute_leveling(cfg, freq_cmp, m_cmp_raw, target_cmp, stereo_link_ctx=stereo_link_ctx)
-        )
+        (
+            target_level_db_cmp,
+            calc_offset_db_cmp,
+            meas_level_db_window_cmp,
+            target_level_db_window_cmp,
+            offset_method_cmp,
+            s_min_cmp,
+            s_max_cmp,
+        ) = compute_leveling(cfg, freq_cmp, m_cmp_raw, target_cmp, stereo_link_ctx=stereo_link_ctx)
         cmp = {
             "cmp_ref_fs": float(ref_fs),
             "cmp_ref_taps": float(ref_taps),
@@ -236,9 +242,7 @@ def _compute_meas_fixed_core(
     # stereo presolve pass and the real pipeline pass via _MEAS_FIXED_CACHE.
     f_in, m_in, p_in = _prepare_preprocess_inputs(freqs, meas_mags, raw_phases)
     freq_axis = np.fft.rfftfreq(n_fft, d=1.0 / float(cfg.fs))
-    m_smooth_std = analysis_smoothing_lf_to_hf(
-        f_in, m_in, low_bw=1 / 3.0, high_bw=1 / 1.0, f_lo=230.0, f_hi=400.0
-    )
+    m_smooth_std = analysis_smoothing_lf_to_hf(f_in, m_in, low_bw=1 / 3.0, high_bw=1 / 1.0, f_lo=230.0, f_hi=400.0)
     p_smooth_oct = 1 / 12.0 if cfg.fs > 96000 else 1 / 24.0
     p_smooth, _ = apply_smoothing_std(f_in, p_in, np.zeros_like(p_in), p_smooth_oct)
     m_interp = np.interp(freq_axis, f_in, m_in)
@@ -378,7 +382,9 @@ def _run_preprocess_build_result(meas_data: dict, *, n_fft: int) -> PreprocessRe
     )
 
 
-def run_preprocess(freqs, meas_mags, raw_phases, cfg, *, stereo_link_ctx=None, presolve_mode: bool = False) -> PreprocessResult:
+def run_preprocess(
+    freqs, meas_mags, raw_phases, cfg, *, stereo_link_ctx=None, presolve_mode: bool = False
+) -> PreprocessResult:
     n_fft = int(cfg.num_taps)
     meas_data = _run_preprocess_meas_fixed(
         freqs,

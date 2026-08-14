@@ -21,6 +21,7 @@ To bridge the gap: `_notify` pushes pending notifications into a
 thread-safe deque. A `ui.timer` (installed once per page load) drains the
 deque from the UI event loop where the client context is valid.
 """
+
 from __future__ import annotations
 
 import collections

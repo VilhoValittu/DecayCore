@@ -21,6 +21,7 @@ logger = logging.getLogger("DecayCore.dsp")
 # Try to import Rust DSP extension
 try:
     from decaycore_dsp import gd_smooth_loop_rs as _gd_smooth_loop_rs
+
     _DSP_RUST_AVAILABLE = True
 except ImportError:
     _DSP_RUST_AVAILABLE = False
@@ -61,7 +62,7 @@ def apply_confidence_weighted_target_pull(
     is_cut = t < m
     gc = float(gamma_cut) if np.isfinite(float(gamma_cut)) and float(gamma_cut) > 0 else 1.0
     gb = float(gamma_boost) if np.isfinite(float(gamma_boost)) and float(gamma_boost) > 0 else 1.0
-    w_eff = np.clip(np.where(is_cut, w ** gc, w ** gb), 0.0, 1.0)
+    w_eff = np.clip(np.where(is_cut, w**gc, w**gb), 0.0, 1.0)
     out = (w_eff * t) + ((1.0 - w_eff) * m)
     if pull_mask is not None:
         out = np.where(pull_mask, out, t)
@@ -175,14 +176,14 @@ def _limit_gd_gradient_ms_per_oct(
     ph = np.asarray(phase_rad, dtype=float)
     if f.size < 16 or ph.size != f.size:
         return ph
-    m = (np.asarray(mask, dtype=bool) if mask is not None else np.ones_like(f, dtype=bool))
+    m = np.asarray(mask, dtype=bool) if mask is not None else np.ones_like(f, dtype=bool)
     m = m & np.isfinite(f) & np.isfinite(ph) & (f > 0.0) & (f >= float(f_min)) & (f <= float(f_max))
     if not np.any(m):
         return ph
     idx = np.where(m)[0]
     i0, i1 = int(idx[0]), int(idx[-1])
-    ff = f[i0:i1 + 1]
-    pp = ph[i0:i1 + 1]
+    ff = f[i0 : i1 + 1]
+    pp = ph[i0 : i1 + 1]
     if ff.size < 16 or not np.all(np.diff(ff) > 0.0):
         return ph
     pp_u = np.unwrap(pp)
@@ -236,13 +237,20 @@ def _limit_gd_gradient_ms_per_oct(
     dphi_df = -2.0 * np.pi * (gd_new / 1000.0)
     phi_new = float(pp_u[0]) + scipy.integrate.cumulative_trapezoid(dphi_df, ff, initial=0.0)
     out = ph.copy()
-    out[i0:i1 + 1] = np.nan_to_num(phi_new, nan=0.0, posinf=0.0, neginf=0.0)
+    out[i0 : i1 + 1] = np.nan_to_num(phi_new, nan=0.0, posinf=0.0, neginf=0.0)
     return out
 
 
 def _stage_probe(stage_name, freq_axis, arr_db, mask_c, global_gain_db=0.0, auto_headroom_db=0.0, logger_obj=None):
     try:
-        out = {"stage": str(stage_name), "boost_peak_db": 0.0, "cut_peak_db": 0.0, "boost_bins": 0, "cut_bins": 0, "net_boost_peak_db": 0.0}
+        out = {
+            "stage": str(stage_name),
+            "boost_peak_db": 0.0,
+            "cut_peak_db": 0.0,
+            "boost_bins": 0,
+            "cut_bins": 0,
+            "net_boost_peak_db": 0.0,
+        }
         if arr_db is None or mask_c is None or not np.any(mask_c):
             return out
         vv = np.asarray(arr_db, dtype=float)[np.asarray(mask_c, dtype=bool)]
@@ -258,7 +266,14 @@ def _stage_probe(stage_name, freq_axis, arr_db, mask_c, global_gain_db=0.0, auto
             )
         return out
     except (AttributeError, TypeError, ValueError, FloatingPointError, IndexError):
-        return {"stage": str(stage_name), "boost_peak_db": 0.0, "cut_peak_db": 0.0, "boost_bins": 0, "cut_bins": 0, "net_boost_peak_db": 0.0}
+        return {
+            "stage": str(stage_name),
+            "boost_peak_db": 0.0,
+            "cut_peak_db": 0.0,
+            "boost_bins": 0,
+            "cut_bins": 0,
+            "net_boost_peak_db": 0.0,
+        }
 
 
 def apply_hpf_to_mags(freqs, mags, cutoff, order):

@@ -14,6 +14,7 @@ A preset is a snapshot of the currently displayed target curve, saved under
 a user-chosen name so it can be reselected later from the hc_mode dropdown
 alongside the built-in house curves (Harman, Toole, BK, ...).
 """
+
 from __future__ import annotations
 
 import json
@@ -32,8 +33,16 @@ logger = logging.getLogger("DecayCore")
 
 _PRESET_LOCK = Lock()
 _RECOVERABLE_IO_EXCEPTIONS = (
-    RuntimeError, OSError, ImportError, TypeError, ValueError,
-    AttributeError, KeyError, IndexError, OverflowError, FloatingPointError,
+    RuntimeError,
+    OSError,
+    ImportError,
+    TypeError,
+    ValueError,
+    AttributeError,
+    KeyError,
+    IndexError,
+    OverflowError,
+    FloatingPointError,
 )
 
 
@@ -65,7 +74,7 @@ def mode_key_for_slug(slug: str) -> str:
 def _slug_from_mode_key(mode_key) -> str | None:
     if not isinstance(mode_key, str) or not mode_key.startswith(USER_PRESET_MODE_PREFIX):
         return None
-    slug = mode_key[len(USER_PRESET_MODE_PREFIX):].strip()
+    slug = mode_key[len(USER_PRESET_MODE_PREFIX) :].strip()
     return slug or None
 
 

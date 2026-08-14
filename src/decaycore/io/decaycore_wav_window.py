@@ -20,7 +20,6 @@ try:
     import scipy
     import scipy.signal  # noqa: F401
 except (
-
     AttributeError,
     TypeError,
     ValueError,
@@ -31,7 +30,7 @@ except (
     ImportError,
     ModuleNotFoundError,
     NameError,
-): # pragma: no cover
+):  # pragma: no cover
     scipy = None  # type: ignore
 
 from ..dsp.dsp_utils import choose_fft_len as _next_pow2
@@ -50,7 +49,6 @@ def _tukey_window(n: int, alpha: float = 0.25) -> np.ndarray:
         try:
             return scipy.signal.windows.tukey(n, alpha=a).astype(np.float32)
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -164,7 +162,7 @@ def _wav_window_extract_anchor_segment(
     n_copy = max(0, src_i1 - src_i0)
     if n_copy > 0 and dst_i0 < seg.size:
         n_copy = min(int(n_copy), int(seg.size - dst_i0))
-        seg[dst_i0:dst_i0 + n_copy] = sig[src_i0:src_i0 + n_copy]
+        seg[dst_i0 : dst_i0 + n_copy] = sig[src_i0 : src_i0 + n_copy]
     return seg if seg.size >= 64 else sig.copy()
 
 
@@ -297,8 +295,12 @@ def ir_wav_to_freq_response(
     sig -= float(np.mean(sig))
     seg = _wav_window_extract_peak_segment(sig, fs_i=fs_i, pre_ms=pre_ms, post_ms=post_ms)
     seg = _wav_window_apply_detrend(seg, detrend=detrend, logger=logger, context="linear detrend")
-    seg = _wav_window_apply_window(seg, window=window, tukey_alpha=tukey_alpha, logger=logger, context="window apply in wav freq response")
-    n_fft = _wav_window_resolve_n_fft(seg.size, zero_pad_pow2=zero_pad_pow2, min_n_fft=min_n_fft, context="min_n_fft apply")
+    seg = _wav_window_apply_window(
+        seg, window=window, tukey_alpha=tukey_alpha, logger=logger, context="window apply in wav freq response"
+    )
+    n_fft = _wav_window_resolve_n_fft(
+        seg.size, zero_pad_pow2=zero_pad_pow2, min_n_fft=min_n_fft, context="min_n_fft apply"
+    )
 
     spec = np.fft.rfft(seg, n=n_fft)
     freqs = np.fft.rfftfreq(n_fft, d=1.0 / float(fs_i))
@@ -308,8 +310,18 @@ def ir_wav_to_freq_response(
 
     phase_rad = np.unwrap(np.angle(spec))
     phase_deg = np.rad2deg(phase_rad)
-    mag_db = _wav_window_apply_mag_smoothing(freqs, mag_db, smoothing_level=smoothing_level, logger=logger, context="octave smoothing in wav freq response")
-    phase_deg, _ = _wav_window_apply_phase_hf_hold(freqs, phase_deg, spec=None, phase_hf_hold=phase_hf_hold, fs_i=fs_i, logger=logger, context="phase hf hold in wav freq response")
+    mag_db = _wav_window_apply_mag_smoothing(
+        freqs, mag_db, smoothing_level=smoothing_level, logger=logger, context="octave smoothing in wav freq response"
+    )
+    phase_deg, _ = _wav_window_apply_phase_hf_hold(
+        freqs,
+        phase_deg,
+        spec=None,
+        phase_hf_hold=phase_hf_hold,
+        fs_i=fs_i,
+        logger=logger,
+        context="phase hf hold in wav freq response",
+    )
 
     return freqs.astype(float), mag_db.astype(float), phase_deg.astype(float)
 
@@ -339,10 +351,16 @@ def ir_wav_to_complex_response(
         raise ValueError("WAV too short.")
 
     sig -= float(np.mean(sig))
-    seg = _wav_window_extract_anchor_segment(sig, fs_i=fs_i, pre_ms=pre_ms, post_ms=post_ms, anchor_sample=anchor_sample)
+    seg = _wav_window_extract_anchor_segment(
+        sig, fs_i=fs_i, pre_ms=pre_ms, post_ms=post_ms, anchor_sample=anchor_sample
+    )
     seg = _wav_window_apply_detrend(seg, detrend=detrend, logger=logger, context="linear detrend in complex response")
-    seg = _wav_window_apply_window(seg, window=window, tukey_alpha=tukey_alpha, logger=logger, context="window apply in complex response")
-    n_fft = _wav_window_resolve_n_fft(seg.size, zero_pad_pow2=zero_pad_pow2, min_n_fft=min_n_fft, context="min_n_fft apply in complex response")
+    seg = _wav_window_apply_window(
+        seg, window=window, tukey_alpha=tukey_alpha, logger=logger, context="window apply in complex response"
+    )
+    n_fft = _wav_window_resolve_n_fft(
+        seg.size, zero_pad_pow2=zero_pad_pow2, min_n_fft=min_n_fft, context="min_n_fft apply in complex response"
+    )
 
     spec = np.fft.rfft(seg, n=n_fft)
     freqs = np.fft.rfftfreq(n_fft, d=1.0 / float(fs_i))
@@ -350,8 +368,18 @@ def ir_wav_to_complex_response(
 
     phase_rad = np.unwrap(np.angle(spec))
     phase_deg = np.rad2deg(phase_rad)
-    mag_db = _wav_window_apply_mag_smoothing(freqs, mag_db, smoothing_level=smoothing_level, logger=logger, context="octave smoothing in complex response")
-    phase_deg, spec = _wav_window_apply_phase_hf_hold(freqs, phase_deg, spec=spec, phase_hf_hold=phase_hf_hold, fs_i=fs_i, logger=logger, context="phase hf hold in complex response")
+    mag_db = _wav_window_apply_mag_smoothing(
+        freqs, mag_db, smoothing_level=smoothing_level, logger=logger, context="octave smoothing in complex response"
+    )
+    phase_deg, spec = _wav_window_apply_phase_hf_hold(
+        freqs,
+        phase_deg,
+        spec=spec,
+        phase_hf_hold=phase_hf_hold,
+        fs_i=fs_i,
+        logger=logger,
+        context="phase hf hold in complex response",
+    )
 
     return (
         freqs.astype(float),

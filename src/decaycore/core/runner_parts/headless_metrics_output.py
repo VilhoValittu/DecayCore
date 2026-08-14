@@ -26,61 +26,6 @@ from .headless_values import _f
 logger = logging.getLogger("DecayCore")
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def _load_optional_metadata(config_dir: Path, config: dict) -> tuple[dict, dict, dict]:
     from .headless_export_bundle import _read_json
 
@@ -100,6 +45,7 @@ def _load_optional_metadata(config_dir: Path, config: dict) -> tuple[dict, dict,
         harmonics.update(_read_json(harm_path))
     return metadata, rt60, harmonics
 
+
 def _pick(stats: list[dict], keys: list[str], default: float | None = None) -> float | None:
     vals: list[float] = []
     for st in stats:
@@ -111,6 +57,7 @@ def _pick(stats: list[dict], keys: list[str], default: float | None = None) -> f
     if not vals:
         return default
     return float(max(vals, key=abs)) if len(vals) > 1 else float(vals[0])
+
 
 def _build_auto_audit_metrics(auto_meta: dict, best_metrics: dict) -> dict:
     if not auto_meta and not best_metrics:
@@ -155,6 +102,7 @@ def _build_auto_audit_metrics(auto_meta: dict, best_metrics: dict) -> dict:
         "optimizer_backend": str(selection.get("optimizer_backend", auto_meta.get("optimizer_backend", "")) or ""),
     }
 
+
 def _extract_rt60(rt60: dict, ctx: dict | None) -> dict[str, float]:
     out: dict[str, float] = {}
     src = rt60.get("rt60", rt60)
@@ -173,6 +121,7 @@ def _extract_rt60(rt60: dict, ctx: dict | None) -> dict[str, float]:
                     out[str(int(round(float(k))))] = float(val)
     return out
 
+
 def _extract_harmonics(harmonics: dict) -> dict[str, float]:
     src = harmonics.get("harmonics", harmonics)
     risks: list[tuple[float, float]] = []
@@ -186,9 +135,11 @@ def _extract_harmonics(harmonics: dict) -> dict[str, float]:
                         risks.append((float(f_hz), max(0.0, 60.0 + float(db_val))))
     if not risks:
         return {}
+
     def band(lo: float, hi: float) -> float:
         vals = [r for f, r in risks if lo <= f < hi]
         return float(max(vals)) if vals else 0.0
+
     max_pair = max(risks, key=lambda p: p[1], default=(0.0, 0.0))
     return {
         "risk_20_80": band(20.0, 80.0),
@@ -198,7 +149,21 @@ def _extract_harmonics(harmonics: dict) -> dict[str, float]:
         "risk_freq_hz": float(max_pair[0]),
     }
 
-def _build_metrics(status: str, data: dict, ctx: dict | None, metadata: dict, rt60_src: dict, harmonics_src: dict, *, started_at: str, finished_at: str, runtime_s: float, warnings: list[str], errors: list[str]) -> dict:
+
+def _build_metrics(
+    status: str,
+    data: dict,
+    ctx: dict | None,
+    metadata: dict,
+    rt60_src: dict,
+    harmonics_src: dict,
+    *,
+    started_at: str,
+    finished_at: str,
+    runtime_s: float,
+    warnings: list[str],
+    errors: list[str],
+) -> dict:
     if isinstance(ctx, dict):
         results = list(ctx.get("results_by_fs", []) or [])
     else:
@@ -265,25 +230,25 @@ def _build_metrics(status: str, data: dict, ctx: dict | None, metadata: dict, rt
         "residual_peak_count": _pick(stats, ["residual_peak_count", "events_total"], 0.0),
         "residual_peak_max_db": _pick(stats, ["residual_peak_max_db", "events_severity"], 0.0),
         "gd_spike_count": _pick(stats, ["gd_spike_count"], 0.0),
-        "gd_max_ms": _pick(stats, ["gd_abs_max_20_500_ms", "mixed_excess_delay_before_ms", "gd_grad_limiter_after_max_ms_per_oct"]),
+        "gd_max_ms": _pick(
+            stats, ["gd_abs_max_20_500_ms", "mixed_excess_delay_before_ms", "gd_grad_limiter_after_max_ms_per_oct"]
+        ),
         "gd_before_rms_ms": _pick(stats, ["phase_realized_gd_before_rms_ms"]),
         "gd_after_rms_ms": _pick(stats, ["phase_realized_gd_after_rms_ms"]),
         "gd_improvement_frac": _pick(stats, ["phase_realized_gd_improvement_score"]),
-        "phase_feedback_requested_strength": _pick(
-            stats, ["phase_realization_feedback_requested_strength"]
+        "phase_feedback_requested_strength": _pick(stats, ["phase_realization_feedback_requested_strength"]),
+        "phase_feedback_selected_strength": _pick(stats, ["phase_realization_feedback_selected_strength"]),
+        "phase_feedback_applied": bool(_pick(stats, ["phase_realization_feedback_applied"], False)),
+        "max_boost_db": _pick(
+            stats, ["net_boost_peak_db", "max_net_boost_db", "max_boost_db"], _f(data.get("max_boost"), None)
         ),
-        "phase_feedback_selected_strength": _pick(
-            stats, ["phase_realization_feedback_selected_strength"]
-        ),
-        "phase_feedback_applied": bool(
-            _pick(stats, ["phase_realization_feedback_applied"], False)
-        ),
-        "max_boost_db": _pick(stats, ["net_boost_peak_db", "max_net_boost_db", "max_boost_db"], _f(data.get("max_boost"), None)),
         "max_cut_db": -abs(float(_f(data.get("max_cut_db"), 0.0) or 0.0)),
         "bass_ripple_20_200_db": _pick(stats, ["bass_ripple_20_200_db", "ripple_rms"], None),
         "tdc_strength": _f(data.get("tdc_strength"), None),
         "confidence_pull": _f(data.get("conf_pull_floor"), None),
-        "filter_taps": int(getattr(result, "taps", data.get("taps", 0)) or 0) if (result is not None or data.get("taps")) else None,
+        "filter_taps": (
+            int(getattr(result, "taps", data.get("taps", 0)) or 0) if (result is not None or data.get("taps")) else None
+        ),
         "optuna_trials": int(auto_meta.get("trials_ok", auto_meta.get("trials_total", 0)) or 0),
         "schroeder_hz_estimate": _pick(stats, ["schroeder_hz_estimate"]),
     }
@@ -346,6 +311,7 @@ def _build_metrics(status: str, data: dict, ctx: dict | None, metadata: dict, rt
         "errors": list(errors or []),
     }
 
+
 def _write_summary(path: Path, metrics_doc: dict) -> None:
     m = dict(metrics_doc.get("metrics", {}) or {})
     bi = dict(metrics_doc.get("bass_integration", {}) or {})
@@ -386,6 +352,7 @@ def _write_summary(path: Path, metrics_doc: dict) -> None:
         lines.append("Errors: " + "; ".join(metrics_doc["errors"]))
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
+
 def _write_outputs(output_dir: Path, metrics_doc: dict) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "metrics.json").write_text(json.dumps(metrics_doc, indent=2, sort_keys=True), encoding="utf-8")
@@ -393,12 +360,12 @@ def _write_outputs(output_dir: Path, metrics_doc: dict) -> None:
 
 
 __all__ = [
-    '_load_optional_metadata',
-    '_f',
-    '_pick',
-    '_extract_rt60',
-    '_extract_harmonics',
-    '_build_metrics',
-    '_write_summary',
-    '_write_outputs',
+    "_load_optional_metadata",
+    "_f",
+    "_pick",
+    "_extract_rt60",
+    "_extract_harmonics",
+    "_build_metrics",
+    "_write_summary",
+    "_write_outputs",
 ]

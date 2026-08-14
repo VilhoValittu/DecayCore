@@ -100,10 +100,15 @@ def run_headless(config_path: Path, output_dir: Path, args: argparse.Namespace) 
         logger.info("Resolved input L: %s", data.get("local_path_l"))
         logger.info("Resolved input R: %s", data.get("local_path_r"))
         if data.get("bass_integration_enable"):
-            logger.info("Resolved BI main/sub: %s | %s | %s | %s", data.get("local_path_l_main"), data.get("local_path_r_main"), data.get("local_path_l_sub"), data.get("local_path_r_sub"))
+            logger.info(
+                "Resolved BI main/sub: %s | %s | %s | %s",
+                data.get("local_path_l_main"),
+                data.get("local_path_r_main"),
+                data.get("local_path_l_sub"),
+                data.get("local_path_r_sub"),
+            )
         return run_batch(data, output_dir, headless=True)
     except (
-
         AttributeError,
         TypeError,
         ValueError,

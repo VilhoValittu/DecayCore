@@ -83,8 +83,7 @@ class BoundedLruCache:
             self._weights[key] = weight
             self._retained_bytes += weight
             while len(self._data) > self._max_items or (
-                self._max_bytes is not None
-                and self._retained_bytes > self._max_bytes
+                self._max_bytes is not None and self._retained_bytes > self._max_bytes
             ):
                 old_key, _old_value = self._data.popitem(last=False)
                 self._retained_bytes -= self._weights.pop(old_key, 0)

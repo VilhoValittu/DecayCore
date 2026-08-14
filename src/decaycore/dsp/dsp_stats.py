@@ -46,13 +46,21 @@ def apply_measured_mag_stats(
     n_ref = int(f_ref.size)
 
     m_corr_st = arr_if_valid_for_stats(stats.get("measured_mags"), expected_size=n_ref)
-    m_corr = np.asarray(m_anal, dtype=float) - float(calc_offset_db) if m_corr_st is None else np.asarray(m_corr_st, dtype=float)
+    m_corr = (
+        np.asarray(m_anal, dtype=float) - float(calc_offset_db)
+        if m_corr_st is None
+        else np.asarray(m_corr_st, dtype=float)
+    )
 
     m_corr_arr = np.asarray(m_corr, dtype=float)
     stats["measured_mags"] = m_corr_arr.tolist() if as_lists else m_corr_arr
     if bool(include_raw):
         m_raw_st = arr_if_valid_for_stats(stats.get("measured_mags_raw"), expected_size=n_ref)
-        m_raw = np.asarray(m_corr, dtype=float) + float(calc_offset_db) if m_raw_st is None else np.asarray(m_raw_st, dtype=float)
+        m_raw = (
+            np.asarray(m_corr, dtype=float) + float(calc_offset_db)
+            if m_raw_st is None
+            else np.asarray(m_raw_st, dtype=float)
+        )
         m_raw_arr = np.asarray(m_raw, dtype=float)
         stats["measured_mags_raw"] = m_raw_arr.tolist() if as_lists else m_raw_arr
 
@@ -99,7 +107,9 @@ def apply_lf_guard_stats(stats: dict, *, cfg, freq_axis, gain_db) -> None:
         lf_guard_hz = max(lf_guard_hz, float(low_hz_cfg))
     if exc_on_cfg and np.isfinite(exc_f_cfg) and exc_f_cfg > 0.0:
         lf_guard_hz = max(lf_guard_hz, float(exc_f_cfg * 1.41))
-    lf_mask = (freq_axis > 0.0) & (freq_axis <= lf_guard_hz) if lf_guard_hz > 0.0 else np.zeros_like(freq_axis, dtype=bool)
+    lf_mask = (
+        (freq_axis > 0.0) & (freq_axis <= lf_guard_hz) if lf_guard_hz > 0.0 else np.zeros_like(freq_axis, dtype=bool)
+    )
     lf_boost_max_db = float(np.max(np.asarray(gain_db, dtype=float)[lf_mask])) if np.any(lf_mask) else 0.0
     stats["lf_guard_hz"] = float(lf_guard_hz)
     stats["lf_guard_bins"] = int(np.count_nonzero(lf_mask))
@@ -155,11 +165,15 @@ def _append_boost_candidate_reasons(
         return
     if boost_bins_cand > 0 and boost_bins_post == 0:
         if boost_bins_cand_low == boost_bins_cand and low_hz_cfg > 0:
-            reasons.append(f"all boost candidates were <= low_bass_cut_hz ({low_hz_cfg:.1f} Hz) where cuts-only policy applies")
+            reasons.append(
+                f"all boost candidates were <= low_bass_cut_hz ({low_hz_cfg:.1f} Hz) where cuts-only policy applies"
+            )
         if exc_on and exc_f_cfg > 0 and boost_bins_cand_exc == boost_bins_cand:
             reasons.append(f"all boost candidates were < exc_freq ({exc_f_cfg:.1f} Hz) while exc_prot is ON")
         if not reasons:
-            reasons.append("boost candidates existed but were removed by limits/safety clamp (check max_boost_db, slope limits, exc/low-bass policies)")
+            reasons.append(
+                "boost candidates existed but were removed by limits/safety clamp (check max_boost_db, slope limits, exc/low-bass policies)"
+            )
 
 
 def _append_boost_partial_reduction_reasons(
@@ -190,7 +204,9 @@ def _append_boost_net_peak_reason(
     do_norm: bool,
 ) -> None:
     if boost_bins_post > 0 and net_boost_peak <= 0.0:
-        reasons.append(f"net boost peak <= 0.00 dB after global gain/headroom (net_peak={net_boost_peak:.2f} dB, normalize={'ON' if do_norm else 'OFF'})")
+        reasons.append(
+            f"net boost peak <= 0.00 dB after global gain/headroom (net_peak={net_boost_peak:.2f} dB, normalize={'ON' if do_norm else 'OFF'})"
+        )
 
 
 def apply_boost_blocked_reason(stats: dict, *, cfg) -> None:

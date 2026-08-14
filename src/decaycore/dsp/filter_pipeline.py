@@ -101,7 +101,9 @@ def _interp_to_axis(src_freq: np.ndarray, src_values: np.ndarray, dst_freq: np.n
     return np.interp(dst_f, src_f, src_v, left=float(src_v[0]), right=float(src_v[-1]))
 
 
-def _hybrid_iir_modal_analysis_axis(cfg: FilterConfig, policy: HybridIIRPolicy, native_freq: np.ndarray) -> tuple[np.ndarray, str]:
+def _hybrid_iir_modal_analysis_axis(
+    cfg: FilterConfig, policy: HybridIIRPolicy, native_freq: np.ndarray
+) -> tuple[np.ndarray, str]:
     try:
         fs = float(getattr(cfg, "fs", 0) or 0)
     except (TypeError, ValueError):
@@ -188,10 +190,7 @@ def _hybrid_iir_residual_cut_caps(
     """Reuse residual-authority gates when their source arrays are available."""
     modal_support = _array_from_stats(st, "authority_modal_support", "modal_support")
     decay_need = _array_from_stats(st, "authority_decay_need", "decay_need")
-    if (
-        modal_support.size != native_freq.size
-        and decay_need.size != native_freq.size
-    ):
+    if modal_support.size != native_freq.size and decay_need.size != native_freq.size:
         return np.full_like(modal_freq, float(max_cut_db), dtype=float)
 
     def authority_on_modal_axis(*keys: str) -> np.ndarray | None:
@@ -283,15 +282,23 @@ def _apply_hybrid_iir_preconditioning(
     try:
         native_freq = np.asarray(freq_axis, dtype=float)
         modal_freq, modal_axis_source = _hybrid_iir_modal_analysis_axis(cfg, policy, native_freq)
-        modal_measured_src_f = np.asarray(f_in, dtype=float).reshape(-1) if f_in is not None else np.asarray([], dtype=float)
+        modal_measured_src_f = (
+            np.asarray(f_in, dtype=float).reshape(-1) if f_in is not None else np.asarray([], dtype=float)
+        )
         modal_measured_src_m = (
-            np.asarray(m_smooth_std, dtype=float).reshape(-1) if m_smooth_std is not None else np.asarray([], dtype=float)
+            np.asarray(m_smooth_std, dtype=float).reshape(-1)
+            if m_smooth_std is not None
+            else np.asarray([], dtype=float)
         )
         if modal_measured_src_f.size >= 2 and modal_measured_src_m.size == modal_measured_src_f.size:
-            measured_dense = _interp_to_axis(modal_measured_src_f, modal_measured_src_m, modal_freq) - float(calc_offset_db)
+            measured_dense = _interp_to_axis(modal_measured_src_f, modal_measured_src_m, modal_freq) - float(
+                calc_offset_db
+            )
             measured_source = "preprocessed_measurement"
         else:
-            measured_dense = _interp_to_axis(native_freq, np.asarray(m_anal, dtype=float), modal_freq) - float(calc_offset_db)
+            measured_dense = _interp_to_axis(native_freq, np.asarray(m_anal, dtype=float), modal_freq) - float(
+                calc_offset_db
+            )
             measured_source = "native_analysis"
         target_dense = _interp_to_axis(native_freq, np.asarray(target_mags, dtype=float), modal_freq)
         conf_dense = np.clip(_interp_to_axis(native_freq, np.asarray(conf_mask, dtype=float), modal_freq), 0.0, 1.0)
@@ -354,7 +361,6 @@ def _apply_hybrid_iir_preconditioning(
         )
         result = _hybrid_iir_native_result(result, native_freq, float(getattr(cfg, "fs", 0) or 0))
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -374,13 +380,9 @@ def _apply_hybrid_iir_preconditioning(
 
     stats = result.to_stats()
     stats["hybrid_iir_modal_event_count"] = int(getattr(modal, "mode_count", 0) or 0)
-    stats["hybrid_iir_residual_modal_event_count"] = int(
-        getattr(residual_modal, "mode_count", 0) or 0
-    )
+    stats["hybrid_iir_residual_modal_event_count"] = int(getattr(residual_modal, "mode_count", 0) or 0)
     stats["hybrid_iir_residual_authority_cap_max_db"] = float(
-        np.max(residual_cut_caps)
-        if np.asarray(residual_cut_caps).size
-        else 0.0
+        np.max(residual_cut_caps) if np.asarray(residual_cut_caps).size else 0.0
     )
     stats["hybrid_iir_gd_source"] = str(gd_source)
     stats["hybrid_iir_min_gd_excess_ms_effective"] = float(policy.min_gd_excess_ms)
@@ -505,7 +507,6 @@ def _run_generate_filter_pre_correction(
             )
             _pruning_hook(-(_p90 + _clip_pen))
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -516,10 +517,7 @@ def _run_generate_filter_pre_correction(
             ImportError,
             ModuleNotFoundError,
         ) as exc:
-            if (
-                type(exc).__name__ == "TrialPruned"
-                and str(getattr(type(exc), "__module__", "")).startswith("optuna")
-            ):
+            if type(exc).__name__ == "TrialPruned" and str(getattr(type(exc), "__module__", "")).startswith("optuna"):
                 raise
             logger.exception("pruning hook call")
 
@@ -746,11 +744,7 @@ def _run_generate_filter_pipeline(
             apply_lpf_to_mags_fn=apply_lpf_to_mags,
             limit_gd_gradient_ms_per_oct_fn=_limit_gd_gradient_ms_per_oct,
             cfg_float_allow_zero_fn=_cfg_float_allow_zero,
-            phase_feedback_replay=(
-                replay.get("phase_ir_replay")
-                if isinstance(replay, dict)
-                else None
-            ),
+            phase_feedback_replay=(replay.get("phase_ir_replay") if isinstance(replay, dict) else None),
         )
     if isinstance(replay, dict) and phase_ir.phase_feedback_replay is not None:
         replay.setdefault("phase_ir_replay", phase_ir.phase_feedback_replay)

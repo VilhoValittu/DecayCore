@@ -40,6 +40,15 @@ from ...auto_mode.api import (
     _estimate_auto_mag_c_min,
     _resolve_auto_hpf_application,
 )
+from ...auto_mode.filter_priors import get_auto_mode_filter_prior
+from ...auto_mode.cache_synth_target import synth_target_cache_identity
+from ...auto_mode.shared_parts._constants import (
+    AUTO_MODE_SYNTH_TARGET_BASS_COMP_FRAC,
+    AUTO_MODE_SYNTH_TARGET_BASS_COMP_REF_DB,
+    AUTO_MODE_SYNTH_TARGET_HF_COMP_FRAC,
+    AUTO_MODE_SYNTH_TARGET_SMOOTH_OCT,
+    AUTO_MODE_SYNTH_TARGET_TILT_COMP_FRAC,
+)
 from ...application.run_contracts import RunContext
 from ...config.auto_mode_policy import auto_goal_forced_level_window
 from ...config.legacy_keys import is_auto_mode
@@ -48,11 +57,12 @@ from ...config.pipeline_parts import (
     choose_target_rates,
     detect_is_wav_source,
 )
-from ...common.filter_lengths import scale_taps_with_fs
+from ...dsp.target_synthesis import adaptive_target_diagnostics
 from ..bridge_types import ProcessRunCallbacks
 
 from .progress import _get_auto_status_callback
 from .status_text import _resolve_auto_hpf_seed_source
+from .search_reference import resolve_auto_search_reference
 
 if typing.TYPE_CHECKING:
     from ..process_run_support import ProcessRunSupport
@@ -100,6 +110,11 @@ def _target_cache_pick_from_entry(
     ).strip()
     seed = _target_seed_from_cache_entry(payload)
     if not hc or not seed:
+        return None
+    if hc.lower() == "adaptive":
+        # Generic target caches store only a curve name.  "Adaptive" is not a
+        # built-in curve and must never be restored without its versioned
+        # synthesized points and measurement identity.
         return None
     return {
         "selected_hc_mode": str(hc),
@@ -363,11 +378,82 @@ def _try_cached_target_pick_before_search(
     hpf: dict | None,
     goal: str,
 ) -> dict | None:
+    target_mode = str(data.get("auto_target_mode", "auto") or "auto").strip().lower()
+    if target_mode == "adaptive":
+        expected_identity = synth_target_cache_identity(
+            measurements,
+            tilt_comp_frac=float(AUTO_MODE_SYNTH_TARGET_TILT_COMP_FRAC),
+            bass_comp_frac=float(AUTO_MODE_SYNTH_TARGET_BASS_COMP_FRAC),
+            bass_comp_ref_db=float(AUTO_MODE_SYNTH_TARGET_BASS_COMP_REF_DB),
+            hf_comp_frac=float(AUTO_MODE_SYNTH_TARGET_HF_COMP_FRAC),
+            smooth_oct=float(AUTO_MODE_SYNTH_TARGET_SMOOTH_OCT),
+        )
+        try:
+            prior = get_auto_mode_filter_prior(
+                data.get("filter_type", ""),
+                measurements=measurements,
+                measurement_sig=str(expected_identity["measurement_signature"]),
+            )
+        except _seed_phases_cache_exception_tuple() as exc:
+            logger.info(
+                "Automatic mode adaptive prior cache read failed; synthesizing a fresh target (%s: %s)",
+                type(exc).__name__,
+                exc,
+            )
+            return None
+        curve = dict(prior.get("adaptive_curve", {}) or {})
+        cached_identity = dict(curve.get("cache_identity", {}) or {})
+        if cached_identity != expected_identity:
+            logger.info("Automatic mode adaptive prior cache miss; synthesis identity changed")
+            return None
+        try:
+            synth_f = np.asarray(curve.get("frequency_hz", []), dtype=float).reshape(-1)
+            synth_m = np.asarray(curve.get("magnitude_db", []), dtype=float).reshape(-1)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if (
+            synth_f.size < 4
+            or synth_m.size != synth_f.size
+            or not np.all(np.isfinite(synth_f))
+            or not np.all(np.isfinite(synth_m))
+            or not np.all(np.diff(synth_f) > 0.0)
+        ):
+            logger.info("Automatic mode adaptive prior cache miss; synthesizing a fresh target")
+            return None
+        logger.info(
+            "Automatic mode adaptive prior cache hit (filter=%s, points=%d)",
+            str(_auto_filter_cache_key(data) or "n/a"),
+            int(synth_f.size),
+        )
+        diagnostics = adaptive_target_diagnostics(
+            measurements.get("f_l"),
+            measurements.get("m_l"),
+            measurements.get("f_r"),
+            measurements.get("m_r"),
+            target_f=synth_f,
+            target_m=synth_m,
+            smooth_oct=float(AUTO_MODE_SYNTH_TARGET_SMOOTH_OCT),
+            measurements=measurements,
+        )
+        return {
+            "selected_hc_mode": "Adaptive",
+            "fit_rms_db": float(diagnostics.get("fit_rms_db", float("nan"))),
+            "offset_db": 0.0,
+            "selection_method": "cache_filter_prior_adaptive_hit",
+            "top_n": 0,
+            "trials_per_curve": 0,
+            "candidates": [],
+            "evaluated": [],
+            "best_preset": dict(prior.get("seed_preset", {}) or {}),
+            "adaptive_target_diagnostics": dict(diagnostics),
+            "_adaptive_curve_cache_identity": dict(expected_identity),
+            "_synth_hc_f": synth_f,
+            "_synth_hc_m": synth_m,
+        }
+    if target_mode not in ("auto", "best", "find_best", "find-best", "builtin", "built-in"):
+        return None
     filter_key = str(_auto_filter_cache_key(data) or "").strip()
-    compat_version = str(
-        data.get("auto_mode_compat_version", AUTO_MODE_COMPAT_VERSION)
-        or AUTO_MODE_COMPAT_VERSION
-    )
+    compat_version = str(data.get("auto_mode_compat_version", AUTO_MODE_COMPAT_VERSION) or AUTO_MODE_COMPAT_VERSION)
     pick = _seed_phases_pick_from_global_measurement_cache(
         measurements=measurements,
         filter_key=filter_key,
@@ -449,8 +535,7 @@ def _seed_phases_emit_preview_status(
     bass_integration_active: bool,
 ) -> None:
     auto_status(
-        "DecayCore automatic mode: init "
-        f"(goal {auto_goal}, basis {auto_basis}, filter {ft}, taps {int(taps_base)})"
+        "DecayCore automatic mode: init " f"(goal {auto_goal}, basis {auto_basis}, filter {ft}, taps {int(taps_base)})"
     )
     if forced_level_window is not None:
         auto_status(
@@ -460,8 +545,7 @@ def _seed_phases_emit_preview_status(
         )
     elif bass_integration_active:
         auto_status(
-            "DecayCore automatic mode: bass integration Smart Scan range "
-            "500-3000 Hz (main), 20-200 Hz (sub)"
+            "DecayCore automatic mode: bass integration Smart Scan range " "500-3000 Hz (main), 20-200 Hz (sub)"
         )
 
 
@@ -513,8 +597,7 @@ def _seed_phases_apply_preview_seed_heuristics(
         )
     else:
         f6_status = (
-            f"-6 dB fallback {lf_rolloff.get('reason', 'unavailable')!s} "
-            f"(preserving {float(est_mag_c_min):.1f} Hz)"
+            f"-6 dB fallback {lf_rolloff.get('reason', 'unavailable')!s} " f"(preserving {float(est_mag_c_min):.1f} Hz)"
         )
     optimizer_backend = str(_auto_optimizer_backend(data, default_optuna_enabled=False) or "builtin").strip().lower()
     if str(optimizer_backend) == "optuna":
@@ -682,11 +765,11 @@ def _seed_phases_build_pre_target_measurements(
     p_r,
 ):
     pre_target_rates = choose_target_rates(data)
-    pre_fs = int(pre_target_rates[0]) if pre_target_rates else int(data.get("fs", 44100) or 44100)
-    if bool(data.get("multi_rate_opt", False)):
-        pre_taps = int(scale_taps_with_fs(pre_fs, base_taps=taps_base))
-    else:
-        pre_taps = int(taps_base)
+    pre_fs, pre_taps = resolve_auto_search_reference(
+        data=data,
+        target_rates=pre_target_rates,
+        taps_base=taps_base,
+    )
     pre_xos, pre_hpf = build_xos_hpf(data)
     pre_f_l, pre_m_l, pre_f_r, pre_m_r = _seed_phases_extract_direct_dac_pre_measurements(
         ctx,
@@ -706,6 +789,12 @@ def _seed_phases_build_pre_target_measurements(
             "p_r": np.asarray(p_r, dtype=float),
             "ui_data": data,
             "is_wav_source": bool(detect_is_wav_source(data)),
+            "measured_rt60_l": ctx.prepared_input.measured_rt60_l,
+            "measured_rt60_bands_l": ctx.prepared_input.measured_rt60_bands_l,
+            "measured_rt60_r": ctx.prepared_input.measured_rt60_r,
+            "measured_rt60_bands_r": ctx.prepared_input.measured_rt60_bands_r,
+            "measured_snr_db_l": ctx.prepared_input.measured_snr_db_l,
+            "measured_snr_db_r": ctx.prepared_input.measured_snr_db_r,
         }
     )
     return pre_measurements, pre_fs, pre_taps, pre_xos, pre_hpf, pre_f_l, pre_m_l, pre_f_r, pre_m_r
@@ -785,6 +874,7 @@ def _seed_phases_apply_target_curve_selection(
         "cache_measurement_global_hit",
         "cache_measurement_global_filter_seed_hit",
         "cache_optuna_target_hit",
+        "cache_filter_prior_adaptive_hit",
     }
     if target_seed_preset:
         data["_auto_target_seed_preset"] = dict(target_seed_preset)
@@ -804,9 +894,18 @@ def _seed_phases_apply_target_curve_selection(
     if chosen_hc == "Adaptive" and "_synth_hc_f" in tc_pick:
         data["_synth_hc_f"] = tc_pick["_synth_hc_f"]
         data["_synth_hc_m"] = tc_pick["_synth_hc_m"]
+        cache_identity = dict(tc_pick.get("_adaptive_curve_cache_identity", {}) or {})
+        if cache_identity:
+            data["_adaptive_curve_cache_identity"] = cache_identity
+            data["_adaptive_curve_prior_measurement_sig"] = str(cache_identity.get("measurement_signature", "") or "")
+        else:
+            data.pop("_adaptive_curve_cache_identity", None)
+            data.pop("_adaptive_curve_prior_measurement_sig", None)
     else:
         data.pop("_synth_hc_f", None)
         data.pop("_synth_hc_m", None)
+        data.pop("_adaptive_curve_cache_identity", None)
+        data.pop("_adaptive_curve_prior_measurement_sig", None)
     data["local_path_house"] = ""
     data["_auto_target_curve_meta"] = dict(tc_pick)
     if chosen_hc == "Adaptive":
@@ -841,8 +940,7 @@ def _seed_phases_apply_target_curve_selection(
     )
     if target_seed_preset:
         logger.info(
-            "Automatic mode target seed preset: "
-            + ", ".join([f"{k}={v}" for k, v in target_seed_preset.items()])
+            "Automatic mode target seed preset: " + ", ".join([f"{k}={v}" for k, v in target_seed_preset.items()])
         )
 
 
@@ -879,7 +977,11 @@ def _seed_phases_run_auto_mode_preview(
     )
     try:
         seed_f_l, seed_m_l, seed_f_r, seed_m_r = _seed_phases_extract_direct_dac_pre_measurements(
-            ctx, f_l, m_l, f_r, m_r,
+            ctx,
+            f_l,
+            m_l,
+            f_r,
+            m_r,
         )
         _seed_phases_apply_preview_seed_heuristics(
             data,
@@ -944,16 +1046,18 @@ def _seed_phases_run_auto_mode_preview(
                 "DecayCore automatic mode: custom target selected but no file found, "
                 "using built-in target comparison"
             )
-        pre_measurements, pre_fs, pre_taps, pre_xos, pre_hpf, pre_f_l, pre_m_l, pre_f_r, pre_m_r = _seed_phases_build_pre_target_measurements(
-            ctx,
-            data=data,
-            taps_base=taps_base,
-            f_l=f_l,
-            m_l=m_l,
-            f_r=f_r,
-            m_r=m_r,
-            p_l=p_l,
-            p_r=p_r,
+        pre_measurements, pre_fs, pre_taps, pre_xos, pre_hpf, pre_f_l, pre_m_l, pre_f_r, pre_m_r = (
+            _seed_phases_build_pre_target_measurements(
+                ctx,
+                data=data,
+                taps_base=taps_base,
+                f_l=f_l,
+                m_l=m_l,
+                f_r=f_r,
+                m_r=m_r,
+                p_l=p_l,
+                p_r=p_r,
+            )
         )
         tc_pick = _seed_phases_run_target_curve_selection(
             data=data,
@@ -1011,7 +1115,6 @@ def _run_auto_mode_seed_phases(
         _mode_preview_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
         auto_mode_preview = is_auto_mode(data, _mode_preview_u)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -1029,9 +1132,7 @@ def _run_auto_mode_seed_phases(
     auto_basis = "preset_objective_score"
     logger.info(f"Automatic mode goal: {auto_goal} (basis: {auto_basis})")
     auto_status = (
-        _get_auto_status_callback(ctx, callbacks=callbacks, support=support)
-        if auto_mode_preview
-        else callbacks.status
+        _get_auto_status_callback(ctx, callbacks=callbacks, support=support) if auto_mode_preview else callbacks.status
     )
 
     if auto_mode_preview:
@@ -1056,4 +1157,4 @@ def _run_auto_mode_seed_phases(
     ctx.auto_basis = auto_basis
 
 
-__all__ = ['_run_auto_mode_seed_phases']
+__all__ = ["_run_auto_mode_seed_phases"]

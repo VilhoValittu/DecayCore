@@ -50,14 +50,14 @@ def _resolve_auto_cache_and_optuna_paths(data: dict) -> tuple[str | None, str | 
     if not is_auto_mode(data, mode_u):
         return None, None
     from ..auto_mode.api import _auto_optuna_storage_path, get_auto_mode_cache_path
+
     auto_cache_path = None
     optuna_storage_path = None
     try:
         auto_cache_path = str(
             get_auto_mode_cache_path(
                 compat_version=str(
-                    data.get("auto_mode_compat_version", AUTO_MODE_COMPAT_VERSION)
-                    or AUTO_MODE_COMPAT_VERSION
+                    data.get("auto_mode_compat_version", AUTO_MODE_COMPAT_VERSION) or AUTO_MODE_COMPAT_VERSION
                 ),
             )
         )
@@ -68,8 +68,7 @@ def _resolve_auto_cache_and_optuna_paths(data: dict) -> tuple[str | None, str | 
             optuna_storage_path = str(
                 _auto_optuna_storage_path(
                     compat_version=str(
-                        data.get("auto_mode_compat_version", AUTO_MODE_COMPAT_VERSION)
-                        or AUTO_MODE_COMPAT_VERSION
+                        data.get("auto_mode_compat_version", AUTO_MODE_COMPAT_VERSION) or AUTO_MODE_COMPAT_VERSION
                     ),
                 )
             )
@@ -101,9 +100,7 @@ def _resolve_sub_fallback_stats(ctx: RunContext) -> tuple[object, object, dict]:
             sub_st_f = fallback_r.sub_st
         if not sub_meas_f:
             sub_meas_f = {
-                k: fallback_r.measurements[k]
-                for k in ("f_sub", "m_sub", "p_sub")
-                if k in fallback_r.measurements
+                k: fallback_r.measurements[k] for k in ("f_sub", "m_sub", "p_sub") if k in fallback_r.measurements
             }
     return sub_ir_f, sub_st_f, sub_meas_f
 

@@ -88,12 +88,7 @@ def _prepare_curve_for_target_plot(
         m_abs = _maybe_shift_to_abs(m, avg_t_db)
         t_abs = _maybe_shift_to_abs(tm, avg_t_db)
         t_on_f = np.interp(f, tf, t_abs)
-        mask = (
-            (f >= float(f_min_hz))
-            & (f <= float(f_max_hz))
-            & np.isfinite(m_abs)
-            & np.isfinite(t_on_f)
-        )
+        mask = (f >= float(f_min_hz)) & (f <= float(f_max_hz)) & np.isfinite(m_abs) & np.isfinite(t_on_f)
         if np.count_nonzero(mask) >= 4:
             off = float(np.median(m_abs[mask] - t_on_f[mask]))
             if np.isfinite(off):
@@ -158,11 +153,7 @@ def _filter_confidence_segments(
     *,
     min_width_hz: float,
 ) -> list[tuple[float, float]]:
-    kept = [
-        (float(start), float(end))
-        for start, end in merged
-        if float(end - start) >= float(min_width_hz)
-    ]
+    kept = [(float(start), float(end)) for start, end in merged if float(end - start) >= float(min_width_hz)]
     if kept:
         return kept
     return [(float(start), float(end)) for start, end in merged]

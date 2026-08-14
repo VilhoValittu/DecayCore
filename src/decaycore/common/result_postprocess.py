@@ -22,7 +22,6 @@ def _irwin_tag(mode: Any) -> str:
     try:
         m = str(mode or "auto").strip().lower()
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -142,7 +141,6 @@ def _ensure_scoring_keys(st: dict | None, f_in, m_in, hc_f, hc_m):
                 if f.size > 1 and hf.size > 1 and hm.size > 1:
                     st["target_mags"] = np.interp(f, hf, hm)
             except (
-
                 AttributeError,
                 TypeError,
                 ValueError,
@@ -160,7 +158,6 @@ def _ensure_scoring_keys(st: dict | None, f_in, m_in, hc_f, hc_m):
             st["confidence_mask"] = np.ones_like(f, dtype=float)
         return st
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -204,7 +201,6 @@ def _inject_filter_mags_for_ui(st: dict | None, filt_ir, fs: int):
         st[key_g] = np.interp(f_q, f_fft, g_db).tolist()
         st[f"{key_g}_source"] = "ir_fft_final"
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -223,7 +219,6 @@ def _gd_abs_spread_ms(gd_ms, *, mask=None) -> float | None:
     try:
         gd = np.asarray(gd_ms, dtype=float).reshape(-1)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -244,7 +239,6 @@ def _gd_abs_spread_ms(gd_ms, *, mask=None) -> float | None:
         try:
             band_mask = np.asarray(mask, dtype=bool).reshape(-1)
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -286,8 +280,9 @@ def _inject_filter_gd_stats(st: dict | None, filt_ir, fs: int, lo_hz: float = 20
         f_fft = np.fft.rfftfreq(ir.size, d=1.0 / fs_i)
         phase_raw = np.unwrap(np.angle(h))
         # GD in ms — no delay compensation needed since we measure range (offset cancels)
-        gd_ms = np.nan_to_num(-np.gradient(phase_raw, 2.0 * np.pi * np.maximum(f_fft, 1e-9)) * 1000.0,
-                               nan=0.0, posinf=0.0, neginf=0.0)
+        gd_ms = np.nan_to_num(
+            -np.gradient(phase_raw, 2.0 * np.pi * np.maximum(f_fft, 1e-9)) * 1000.0, nan=0.0, posinf=0.0, neginf=0.0
+        )
         # 5-95th percentile range in band — robust to spikes, no delay compensation needed
         mask = (f_fft >= float(lo_hz)) & (f_fft <= float(hi_hz)) & np.isfinite(gd_ms)
         gd_range = _gd_abs_spread_ms(gd_ms, mask=mask)
@@ -296,7 +291,6 @@ def _inject_filter_gd_stats(st: dict | None, filt_ir, fs: int, lo_hz: float = 20
         else:
             st["gd_abs_max_20_500_ms"] = float(gd_range)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -322,7 +316,6 @@ def _avg_confidence_pct(st: dict) -> float:
             try:
                 return float(v)
             except (
-
                 AttributeError,
                 TypeError,
                 ValueError,
@@ -345,7 +338,6 @@ def _avg_confidence_pct(st: dict) -> float:
         try:
             return float(v)
         except (
-
             AttributeError,
             TypeError,
             ValueError,

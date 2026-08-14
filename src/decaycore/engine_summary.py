@@ -28,7 +28,6 @@ def summarize_run(result: FilterResult) -> dict:
     try:
         shift_samples = int(shift_samples)
     except (
-
         AttributeError,
         TypeError,
         ValueError,

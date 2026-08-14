@@ -43,7 +43,6 @@ def _as_float_array(value) -> np.ndarray:
     try:
         return np.asarray(value, dtype=float).reshape(-1)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -180,10 +179,14 @@ def _modal_support_curve(
     support = np.zeros_like(freq_axis, dtype=float)
     for event in tuple(events or ()):
         freq_hz = _safe_float(_event_value(event, "freq_hz", _event_value(event, "freq", 0.0)), 0.0)
-        width_oct = _safe_float(
-            _event_value(event, "safe_width_oct", 0.0),
-            0.0,
-        ) or _safe_float(_event_value(event, "width_oct", 0.0), 0.0) or (1.0 / 12.0)
+        width_oct = (
+            _safe_float(
+                _event_value(event, "safe_width_oct", 0.0),
+                0.0,
+            )
+            or _safe_float(_event_value(event, "width_oct", 0.0), 0.0)
+            or (1.0 / 12.0)
+        )
         width_oct = float(max(1.0 / 48.0, width_oct))
         severity = float(np.clip(_safe_float(_event_value(event, "severity", 0.0), 0.0), 0.0, 1.0))
         correction = float(np.clip(_safe_float(_event_value(event, "correction_priority", 0.0), 0.0), 0.0, 1.0))
@@ -208,10 +211,14 @@ def _modal_decay_need_curve(
     need = np.zeros_like(freq_axis, dtype=float)
     for event in tuple(events or ()):
         freq_hz = _safe_float(_event_value(event, "freq_hz", _event_value(event, "freq", 0.0)), 0.0)
-        width_oct = _safe_float(
-            _event_value(event, "safe_width_oct", 0.0),
-            0.0,
-        ) or _safe_float(_event_value(event, "width_oct", 0.0), 0.0) or (1.0 / 12.0)
+        width_oct = (
+            _safe_float(
+                _event_value(event, "safe_width_oct", 0.0),
+                0.0,
+            )
+            or _safe_float(_event_value(event, "width_oct", 0.0), 0.0)
+            or (1.0 / 12.0)
+        )
         width_oct = float(max(1.0 / 48.0, width_oct))
         decay = float(np.clip(_safe_float(_event_value(event, "decay_severity", 0.0), 0.0), 0.0, 1.0))
         gd_excess = float(np.clip(_safe_float(_event_value(event, "gd_excess_ms", 0.0), 0.0) / 60.0, 0.0, 1.0))
@@ -227,9 +234,7 @@ def _modal_decay_need_curve(
         }.get(kind, 0.20)
         strength = float(
             np.clip(
-                kind_factor
-                * confidence
-                * (0.50 * decay + 0.25 * gd_excess + 0.15 * cut_priority + 0.10 * severity),
+                kind_factor * confidence * (0.50 * decay + 0.25 * gd_excess + 0.15 * cut_priority + 0.10 * severity),
                 0.0,
                 1.0,
             )

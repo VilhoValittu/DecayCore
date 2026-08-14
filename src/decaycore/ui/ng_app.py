@@ -17,6 +17,7 @@ Public API:
     update_status_notices(*, summary_text, info_text)
     update_auto_selected_bar(msg)
 """
+
 from __future__ import annotations
 
 import importlib
@@ -121,7 +122,6 @@ def _user_manual_path_candidates() -> list[Path]:
         try:
             candidates.append(Path(sys._MEIPASS) / "docs" / "User_Manual.md")  # type: ignore[attr-defined]
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -151,6 +151,7 @@ def _resolve_user_manual_path() -> Path | None:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def configure_app(*, process_run, PROGRAM_NAME: str, VERSION: str, MAX_SAFE_BOOST: float) -> None:
     """Wire runtime globals and register the NiceGUI main page."""
@@ -201,6 +202,7 @@ def get_run_wall_clock_text(default: str = "") -> str:
 # ---------------------------------------------------------------------------
 # Page registration
 # ---------------------------------------------------------------------------
+
 
 def register_main_page() -> None:
     from nicegui import ui
@@ -289,6 +291,7 @@ def register_main_page() -> None:
 # Start handler
 # ---------------------------------------------------------------------------
 
+
 def _on_start_click() -> None:
     """Called from ng_run_section in a background thread."""
     if not callable(_PROCESS_RUN):
@@ -297,7 +300,6 @@ def _on_start_click() -> None:
     try:
         _PROCESS_RUN()
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -315,6 +317,7 @@ def _on_start_click() -> None:
 # ---------------------------------------------------------------------------
 # Header rendering
 # ---------------------------------------------------------------------------
+
 
 def _persist_theme_preference(*, dark: bool) -> None:
     cfg = dict(load_config() or {})
@@ -336,16 +339,18 @@ def _build_rust_warning_banner() -> None:
 
     logger.warning("Native Rust acceleration not installed (missing: %s)", ", ".join(missing))
 
-    with ui.row().classes("w-full items-center gap-2 cf-rust-warning").style(
-        "background:#7a1f1f; color:#fff; padding:10px 16px; border-radius:8px; margin:8px 0;"
+    with (
+        ui.row()
+        .classes("w-full items-center gap-2 cf-rust-warning")
+        .style("background:#7a1f1f; color:#fff; padding:10px 16px; border-radius:8px; margin:8px 0;")
     ):
         ui.icon("warning").classes("text-xl")
         with ui.column().classes("gap-0 min-w-0"):
             ui.label(t("rust_warning_title")).classes("font-semibold")
             ui.label(t("rust_warning_body")).classes("text-sm")
-        ui.link(t("rust_warning_link"), RUST_INSTALL_URL, new_tab=True).classes(
-            "underline font-semibold"
-        ).style("color:#fff;")
+        ui.link(t("rust_warning_link"), RUST_INSTALL_URL, new_tab=True).classes("underline font-semibold").style(
+            "color:#fff;"
+        )
 
 
 def _build_brand_header(*, version: str, dark_mode, initial_theme_dark: bool) -> None:
@@ -365,13 +370,12 @@ def _build_brand_header(*, version: str, dark_mode, initial_theme_dark: bool) ->
                     initial_logo_src = logo_dark_src if initial_theme_dark or not logo_light_src else logo_light_src
                     logo_el = ui.html(
                         f'<img id="cf-brand-logo" src="{initial_logo_src}" style="{logo_img_style}" />'
-                        if initial_logo_src else ""
+                        if initial_logo_src
+                        else ""
                     )
                 with ui.column().classes("cf-brand-block gap-1 min-w-0"):
                     ui.label("DecayCore").classes("cf-brand-title")
-                    ui.label(
-                        t("brand_subtitle")
-                    ).classes("cf-brand-subtitle")
+                    ui.label(t("brand_subtitle")).classes("cf-brand-subtitle")
                     ui.label(version).classes("cf-brand-version")
             from .ng_run_section import build_info_panel  # noqa: PLC0415
 
@@ -387,9 +391,7 @@ def _build_brand_header(*, version: str, dark_mode, initial_theme_dark: bool) ->
                         if _state["dark"]:
                             dark_mode.disable()
                             _ui.run_javascript("document.body.classList.add('cf-light')")
-                            _ui.run_javascript(
-                                results_plot_theme_javascript(dark=False)
-                            )
+                            _ui.run_javascript(results_plot_theme_javascript(dark=False))
                             if logo_light_src:
                                 logo_el.set_content(
                                     f'<img id="cf-brand-logo" src="{logo_light_src}" style="{logo_img_style}" />'
@@ -399,9 +401,7 @@ def _build_brand_header(*, version: str, dark_mode, initial_theme_dark: bool) ->
                         else:
                             dark_mode.enable()
                             _ui.run_javascript("document.body.classList.remove('cf-light')")
-                            _ui.run_javascript(
-                                results_plot_theme_javascript(dark=True)
-                            )
+                            _ui.run_javascript(results_plot_theme_javascript(dark=True))
                             if logo_dark_src:
                                 logo_el.set_content(
                                     f'<img id="cf-brand-logo" src="{logo_dark_src}" style="{logo_img_style}" />'
@@ -418,11 +418,12 @@ def _build_brand_header(*, version: str, dark_mode, initial_theme_dark: bool) ->
 
                     async def _do_quit():
                         from nicegui import app as _nicegui_app
+
                         _nicegui_app.shutdown()
 
-                    ui.button(icon="power_settings_new", on_click=_do_quit) \
-                        .props("flat dense round color=negative") \
-                        .tooltip(t("quit_btn_tooltip"))
+                    ui.button(icon="power_settings_new", on_click=_do_quit).props(
+                        "flat dense round color=negative"
+                    ).tooltip(t("quit_btn_tooltip"))
 
         # About / guide (collapsed by default)
         with ui.expansion(t("about_title")).classes("w-full"):

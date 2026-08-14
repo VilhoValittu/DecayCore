@@ -33,13 +33,14 @@ from ..phase_ir_phase_models import (
     phase_region_profiles as _phase_region_profiles_impl,
 )
 
+
 def _merge_minphase_and_excess(min_u, excess_masked) -> np.ndarray:
     return _merge_minphase_and_excess_impl(min_u, excess_masked)
 
-def _phase_region_profiles(
-    freq_axis: np.ndarray, phase_lim_hz: float, cfg
-) -> dict[str, Any]:
+
+def _phase_region_profiles(freq_axis: np.ndarray, phase_lim_hz: float, cfg) -> dict[str, Any]:
     return _phase_region_profiles_impl(freq_axis, phase_lim_hz, cfg)
+
 
 def _phase_confidence_profile(
     freq_axis: np.ndarray,
@@ -59,6 +60,7 @@ def _phase_confidence_profile(
         afdw_on=afdw_on,
     )
 
+
 def _max_abs_gd_gradient_ms_per_oct(
     freq_axis: np.ndarray,
     phase_rad: np.ndarray,
@@ -67,6 +69,7 @@ def _max_abs_gd_gradient_ms_per_oct(
 ) -> tuple[float, float | None]:
     return _max_abs_gd_gradient_ms_per_oct_impl(freq_axis, phase_rad, mask=mask)
 
+
 def _gd_grad_metrics(
     freq_axis: np.ndarray,
     phase_rad: np.ndarray,
@@ -74,6 +77,7 @@ def _gd_grad_metrics(
     mask: np.ndarray | None = None,
 ) -> dict[str, Any]:
     return _gd_grad_metrics_impl(freq_axis, phase_rad, mask=mask)
+
 
 def _gd_grad_limiter(
     ir,
@@ -95,6 +99,7 @@ def _gd_grad_limiter(
         limiter_fn=limiter_fn,
     )
 
+
 def _weighted_mean(values: np.ndarray, weights: np.ndarray) -> float:
     v = np.asarray(values, dtype=float)
     w = np.asarray(weights, dtype=float)
@@ -110,9 +115,8 @@ def _weighted_mean(values: np.ndarray, weights: np.ndarray) -> float:
         return float("nan")
     return float(np.sum(vv * ww) / denom)
 
-def _weighted_share(
-    values: np.ndarray, weights: np.ndarray, total_weights: np.ndarray
-) -> float:
+
+def _weighted_share(values: np.ndarray, weights: np.ndarray, total_weights: np.ndarray) -> float:
     v = np.asarray(values, dtype=float)
     w = np.asarray(weights, dtype=float)
     tw = np.asarray(total_weights, dtype=float)
@@ -122,29 +126,20 @@ def _weighted_share(
     den_sel = np.isfinite(v) & np.isfinite(tw) & (tw > 1e-12)
     if int(np.count_nonzero(num_sel)) <= 0 or int(np.count_nonzero(den_sel)) <= 0:
         return float("nan")
-    num = float(
-        np.sum(
-            np.asarray(v[num_sel], dtype=float) * np.asarray(w[num_sel], dtype=float)
-        )
-    )
-    den = float(
-        np.sum(
-            np.asarray(v[den_sel], dtype=float) * np.asarray(tw[den_sel], dtype=float)
-        )
-    )
+    num = float(np.sum(np.asarray(v[num_sel], dtype=float) * np.asarray(w[num_sel], dtype=float)))
+    den = float(np.sum(np.asarray(v[den_sel], dtype=float) * np.asarray(tw[den_sel], dtype=float)))
     if not np.isfinite(den) or den <= 1e-12:
         return float("nan")
     return float(np.clip(num / den, 0.0, 1.0))
 
 
 __all__ = [
-    '_merge_minphase_and_excess',
-    '_phase_region_profiles',
-    '_phase_confidence_profile',
-    '_max_abs_gd_gradient_ms_per_oct',
-    '_gd_grad_metrics',
-    '_gd_grad_limiter',
-    '_weighted_mean',
-    '_weighted_share',
+    "_merge_minphase_and_excess",
+    "_phase_region_profiles",
+    "_phase_confidence_profile",
+    "_max_abs_gd_gradient_ms_per_oct",
+    "_gd_grad_metrics",
+    "_gd_grad_limiter",
+    "_weighted_mean",
+    "_weighted_share",
 ]
-

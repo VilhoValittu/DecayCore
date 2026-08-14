@@ -132,7 +132,17 @@ def _pre_energy_guard_setup(cfg, ir, st) -> tuple[
         limit_db = float(getattr(cfg, "max_pre_ringing_db", -35.0) or -35.0)
     except (AttributeError, TypeError, ValueError):
         limit_db = -35.0
-    return x, float(ratio_max), float(strength), int(split_idx), float(min_pre_scale), float(taper_floor), float(taper_power), info, float(limit_db)
+    return (
+        x,
+        float(ratio_max),
+        float(strength),
+        int(split_idx),
+        float(min_pre_scale),
+        float(taper_floor),
+        float(taper_power),
+        info,
+        float(limit_db),
+    )
 
 
 def _pre_energy_guard_apply_trigger(
@@ -147,7 +157,13 @@ def _pre_energy_guard_apply_trigger(
     info: dict[str, Any],
 ) -> tuple[np.ndarray, float, float]:
     y = x.copy()
-    full_scale = float(np.clip(np.sqrt(ratio_target / max(float(_pre_post_energy_ratio(x, split=split, eps=1e-20)), 1e-30)), min_pre_scale, 1.0))
+    full_scale = float(
+        np.clip(
+            np.sqrt(ratio_target / max(float(_pre_post_energy_ratio(x, split=split, eps=1e-20)), 1e-30)),
+            min_pre_scale,
+            1.0,
+        )
+    )
     y_full = x.copy()
     y_full[:split] *= full_scale
     if split > 1:
@@ -174,10 +190,12 @@ def _pre_energy_guard_apply_trigger(
 
 
 def _pre_energy_guard(ir, cfg, st) -> tuple[np.ndarray, dict[str, Any]]:
-    x, ratio_max, strength, split_idx, min_pre_scale, taper_floor, taper_power, info, limit_db = _pre_energy_guard_setup(
-        cfg,
-        ir,
-        st,
+    x, ratio_max, strength, split_idx, min_pre_scale, taper_floor, taper_power, info, limit_db = (
+        _pre_energy_guard_setup(
+            cfg,
+            ir,
+            st,
+        )
     )
 
     if not info["enabled"]:

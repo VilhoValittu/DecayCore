@@ -24,7 +24,6 @@ from .validation_setup import (
     _safe_rms,
 )
 
-
 _EPS = 1e-12
 _SEVERITY_ORDER: dict[str, int] = {"ok": 0, "warn": 1, "reject": 2}
 
@@ -34,25 +33,9 @@ _SEVERITY_ORDER: dict[str, int] = {"ok": 0, "warn": 1, "reject": 2}
 # ---------------------------------------------------------------------------
 
 
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -60,13 +43,9 @@ _SEVERITY_ORDER: dict[str, int] = {"ok": 0, "warn": 1, "reject": 2}
 # ---------------------------------------------------------------------------
 
 
-
-
 # ---------------------------------------------------------------------------
 # FIR spectrum computation (cached for both GD and magnitude metrics)
 # ---------------------------------------------------------------------------
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -74,19 +53,9 @@ _SEVERITY_ORDER: dict[str, int] = {"ok": 0, "warn": 1, "reject": 2}
 # ---------------------------------------------------------------------------
 
 
-
-
 # ---------------------------------------------------------------------------
 # Magnitude metrics
 # ---------------------------------------------------------------------------
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -94,18 +63,15 @@ _SEVERITY_ORDER: dict[str, int] = {"ok": 0, "warn": 1, "reject": 2}
 # ---------------------------------------------------------------------------
 
 
-
-
 # ---------------------------------------------------------------------------
 # Safe missing result
 # ---------------------------------------------------------------------------
 
 
-
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def _temporal_energy_metrics(
     ir: np.ndarray,
@@ -142,12 +108,14 @@ def _temporal_energy_metrics(
         "early_energy_ratio_db": early_ratio_db,
     }
 
+
 def _fir_spectrum(fir: np.ndarray, fs: int) -> tuple[np.ndarray, np.ndarray]:
     """Compute FFT spectrum and frequency axis for FIR. Returns (spectrum, freqs)."""
     n = _next_pow2(max(fir.size, 16384))
     spectrum = np.fft.rfft(fir, n=n)
     freqs = np.fft.rfftfreq(n, d=1.0 / fs)
     return spectrum, freqs
+
 
 def _gd_metrics_from_fir(
     fir: np.ndarray,
@@ -180,7 +148,6 @@ def _gd_metrics_from_fir(
         gd_rms = _safe_rms(gd_residual)
         return gd_peak, gd_rms, True
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -192,6 +159,7 @@ def _gd_metrics_from_fir(
         ModuleNotFoundError,
     ):
         return 0.0, 0.0, False
+
 
 def _fir_to_mag_db(
     fir: np.ndarray,
@@ -207,6 +175,7 @@ def _fir_to_mag_db(
         mag_interp -= float(np.median(mag_interp[norm_mask]))
     return mag_interp
 
+
 def _skip_pre_ringing(
     fir: np.ndarray,
     ir_anchor_mode: str | None,
@@ -215,6 +184,7 @@ def _skip_pre_ringing(
     """Return True when pre-ringing check is not meaningful for this filter type."""
     del fir, ir_anchor_mode
     return _is_minimum_phase(filter_type)
+
 
 def _is_minimum_phase(filter_type: str | None) -> bool:
     mode = str(filter_type or "").strip().lower()
@@ -245,13 +215,9 @@ def _system_gd_improvement_metrics(
         return out
     components: list[tuple[float, float]] = []
     if np.isfinite(before_peak) and before_peak > 0.20 and np.isfinite(after_peak):
-        components.append(
-            (0.55, float(np.clip((before_peak - after_peak) / before_peak, -1.0, 1.0)))
-        )
+        components.append((0.55, float(np.clip((before_peak - after_peak) / before_peak, -1.0, 1.0))))
     if np.isfinite(before_rms) and before_rms > 0.10 and np.isfinite(after_rms):
-        components.append(
-            (0.45, float(np.clip((before_rms - after_rms) / before_rms, -1.0, 1.0)))
-        )
+        components.append((0.45, float(np.clip((before_rms - after_rms) / before_rms, -1.0, 1.0))))
     if components:
         denom = float(sum(weight for weight, _ in components))
         improvement = float(
@@ -270,6 +236,7 @@ def _system_gd_improvement_metrics(
         "gd_after_rms_ms": float(after_rms),
         "gd_improvement_frac": float(improvement),
     }
+
 
 def _magnitude_metrics(
     freq_axis: np.ndarray,
@@ -296,7 +263,6 @@ def _magnitude_metrics(
         try:
             smoothed = scipy.signal.savgol_filter(corrected, window_length=min(51, corrected.size | 1), polyorder=2)
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -325,7 +291,7 @@ def _magnitude_metrics(
     voice_err = positive_err[voice_mask] if np.any(voice_mask) else np.array([0.0])
     bass_err = positive_err[band_mask] if np.any(band_mask) else np.array([0.0])
 
-    mag_rms = float(np.sqrt(np.mean(band_err ** 2))) if band_err.size > 0 else 0.0
+    mag_rms = float(np.sqrt(np.mean(band_err**2))) if band_err.size > 0 else 0.0
     mag_peak = float(np.max(np.abs(band_err))) if band_err.size > 0 else 0.0
     bass_residual_peak = float(np.max(np.maximum(bass_err, 0.0))) if bass_err.size > 0 else 0.0
     voice_peak = float(np.max(np.maximum(voice_err, 0.0))) if voice_err.size > 0 else 0.0
@@ -338,6 +304,7 @@ def _magnitude_metrics(
         "voice_band_peak_excess_db": voice_peak,
         "voice_band_energy_excess_db": voice_energy,
     }
+
 
 def _stereo_metrics(
     mag_l: np.ndarray | None,
@@ -360,12 +327,12 @@ def _stereo_metrics(
 
 
 __all__ = [
-    '_temporal_energy_metrics',
-    '_fir_spectrum',
-    '_gd_metrics_from_fir',
-    '_fir_to_mag_db',
-    '_skip_pre_ringing',
-    '_is_minimum_phase',
-    '_magnitude_metrics',
-    '_stereo_metrics',
+    "_temporal_energy_metrics",
+    "_fir_spectrum",
+    "_gd_metrics_from_fir",
+    "_fir_to_mag_db",
+    "_skip_pre_ringing",
+    "_is_minimum_phase",
+    "_magnitude_metrics",
+    "_stereo_metrics",
 ]

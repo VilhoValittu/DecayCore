@@ -63,10 +63,7 @@ def _phase_batch_to_ir(
         except (RuntimeError, TypeError, ValueError, FloatingPointError):
             pass
     return np.asarray(
-        [
-            _ifft_to_ir(_build_complex_spectrum(mag, phase), n=n_fft)
-            for phase in phase_rows
-        ],
+        [_ifft_to_ir(_build_complex_spectrum(mag, phase), n=n_fft) for phase in phase_rows],
         dtype=float,
     )
 
@@ -81,5 +78,5 @@ def _normalize_ir(ir, cfg) -> np.ndarray:
     out = np.asarray(ir, dtype=float).copy()
     mx = float(np.max(np.abs(out))) if out.size else 0.0
     if mx > 0.0:
-        out *= (0.89 / mx)
+        out *= 0.89 / mx
     return out

@@ -36,9 +36,7 @@ def _audit_fmt_avg(value) -> str:
     return f"{float(v):.3f}" if math.isfinite(float(v)) else "n/a"
 
 
-def _auto_audit_from_meta(
-    data: dict, auto_meta: dict, bm: dict, bp: dict, optimizer_backend: str
-) -> dict:
+def _auto_audit_from_meta(data: dict, auto_meta: dict, bm: dict, bp: dict, optimizer_backend: str) -> dict:
     audit = _audit_dict(auto_meta.get("audit_trail"))
     if audit:
         return dict(audit)
@@ -46,24 +44,11 @@ def _auto_audit_from_meta(
         best_metrics=bm,
         best_preset=bp,
         winner_explanation=_audit_dict(auto_meta.get("winner_explanation")),
-        residual_peak_safety_override_meta=_audit_dict(
-            auto_meta.get("residual_peak_safety_override")
-        ),
-        optimizer_backend=str(
-            optimizer_backend
-            or auto_meta.get("optimizer_backend", "builtin")
-            or "builtin"
-        ),
-        goal=str(
-            auto_meta.get("auto_goal", data.get("auto_goal", "balanced")) or "balanced"
-        ),
-        selection_basis=str(
-            auto_meta.get("selection_basis", "rank_score") or "rank_score"
-        ),
-        target_name=str(
-            _audit_dict(auto_meta.get("winner_explanation")).get("target_name", "")
-            or ""
-        ),
+        residual_peak_safety_override_meta=_audit_dict(auto_meta.get("residual_peak_safety_override")),
+        optimizer_backend=str(optimizer_backend or auto_meta.get("optimizer_backend", "builtin") or "builtin"),
+        goal=str(auto_meta.get("auto_goal", data.get("auto_goal", "balanced")) or "balanced"),
+        selection_basis=str(auto_meta.get("selection_basis", "rank_score") or "rank_score"),
+        target_name=str(_audit_dict(auto_meta.get("winner_explanation")).get("target_name", "") or ""),
         target_meta=_audit_dict(data.get("_auto_target_curve_meta")),
         top=_audit_list(auto_meta.get("top")),
         cache_info={},
@@ -102,16 +87,9 @@ def _append_dsp_effective_auto_audit_summary(
     search = _audit_dict(audit.get("search"))
     cache = _audit_dict(audit.get("cache"))
 
-    goal = str(
-        selection.get("goal", auto_meta.get("auto_goal", "balanced")) or "balanced"
-    )
-    basis = str(
-        selection.get("basis", auto_meta.get("selection_basis", "rank_score"))
-        or "rank_score"
-    )
-    backend = str(
-        selection.get("optimizer_backend", optimizer_backend or "builtin") or "builtin"
-    )
+    goal = str(selection.get("goal", auto_meta.get("auto_goal", "balanced")) or "balanced")
+    basis = str(selection.get("basis", auto_meta.get("selection_basis", "rank_score")) or "rank_score")
+    backend = str(selection.get("optimizer_backend", optimizer_backend or "builtin") or "builtin")
     summary_content += "AUTO audit trail:\n"
     summary_content += (
         f"- Winner: rank {_audit_fmt_score(winner.get('rank_score_official'))}/100, "
@@ -122,19 +100,13 @@ def _append_dsp_effective_auto_audit_summary(
         summary_content += f"- Why: {why}\n"
 
     gate_status = str(hard_gates.get("status", "passed") or "passed").replace("_", " ")
-    failures = [
-        str(item)
-        for item in _audit_list(hard_gates.get("hard_gate_failures"))
-        if str(item or "").strip()
-    ]
+    failures = [str(item) for item in _audit_list(hard_gates.get("hard_gate_failures")) if str(item or "").strip()]
     failure_txt = f" ({', '.join(failures)})" if failures else ""
     summary_content += f"- Safety gates: {gate_status}{failure_txt}\n"
 
     override = _audit_dict(hard_gates.get("winner_override"))
     if override:
-        override_state = (
-            "applied" if bool(override.get("applied", False)) else "not applied"
-        )
+        override_state = "applied" if bool(override.get("applied", False)) else "not applied"
         override_reason = str(override.get("reason", "") or "").strip()
         reason_txt = f" ({override_reason})" if override_reason else ""
         summary_content += f"- Winner override: {override_state}{reason_txt}\n"
@@ -143,20 +115,15 @@ def _append_dsp_effective_auto_audit_summary(
         summary_content += f"- Fallback: {fallback_reason}\n"
 
     trials_ok = int(search.get("trials_ok", auto_meta.get("trials_ok", 0)) or 0)
-    trials_total = int(
-        search.get("trials_total", auto_meta.get("trials_total", 0)) or 0
-    )
+    trials_total = int(search.get("trials_total", auto_meta.get("trials_total", 0)) or 0)
     phase4 = _audit_dict(search.get("phase4_steps"))
     phase4_used = any(bool(v) for v in phase4.values())
     summary_content += (
-        f"- Search: {backend}, {trials_ok}/{trials_total} trials ok, "
-        f"phase4={'on' if phase4_used else 'off'}\n"
+        f"- Search: {backend}, {trials_ok}/{trials_total} trials ok, " f"phase4={'on' if phase4_used else 'off'}\n"
     )
 
     target_name = str(
-        selection.get("target_name", "")
-        or _audit_dict(audit.get("target")).get("name", "")
-        or ""
+        selection.get("target_name", "") or _audit_dict(audit.get("target")).get("name", "") or ""
     ).strip()
     if target_name:
         summary_content += f"- Target: {target_name}\n"
@@ -170,5 +137,3 @@ def _append_dsp_effective_auto_audit_summary(
             f"saves={int(cache_stats.get('saves', 0) or 0)}\n"
         )
     return summary_content
-
-

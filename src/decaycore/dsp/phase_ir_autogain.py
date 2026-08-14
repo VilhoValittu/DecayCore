@@ -70,9 +70,7 @@ def _compute_peak_metrics(cfg, gain_db: np.ndarray, mask_c: np.ndarray) -> tuple
 
 def _resolve_gain_margin(cfg) -> float:
     try:
-        gain_margin_db = float(
-            getattr(cfg, "auto_gain_margin_db", getattr(cfg, "global_gain_db", 0.0)) or 0.0
-        )
+        gain_margin_db = float(getattr(cfg, "auto_gain_margin_db", getattr(cfg, "global_gain_db", 0.0)) or 0.0)
     except (AttributeError, TypeError, ValueError):
         gain_margin_db = 0.0
     if (not np.isfinite(gain_margin_db)) or (gain_margin_db < 0.0):
@@ -146,8 +144,7 @@ def _compute_normalize_headroom(cfg, *, peak_effective_db: float, auto_global_ga
         )
         return float(auto_headroom_db)
     logger.info(
-        f"Clip Prevention (Normalize ON): no extra headroom needed "
-        f"(post-auto peak={peak_after_auto:.2f} dB)"
+        f"Clip Prevention (Normalize ON): no extra headroom needed " f"(post-auto peak={peak_after_auto:.2f} dB)"
     )
     return 0.0
 

@@ -13,4 +13,4 @@ from .session_dialog_builder import (
     build_measurement_session_dialog,
 )
 
-__all__ = ['_format_session_progress_percent', 'build_measurement_session_dialog']
+__all__ = ["_format_session_progress_percent", "build_measurement_session_dialog"]

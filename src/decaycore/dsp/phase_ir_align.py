@@ -84,7 +84,7 @@ def _compute_alignment_target(ir, cfg, st, *, stage: str = "post_window") -> int
         return None
 
     anchor_mode = _resolve_ir_anchor_mode(cfg)
-    is_mixed = ("Mixed" in str(getattr(cfg, "filter_type_str", "")))
+    is_mixed = "Mixed" in str(getattr(cfg, "filter_type_str", ""))
 
     requested_win_mode, win_mode, is_min_filter = _resolve_ir_window_mode(cfg, logger=None)
     _record_alignment_modes(

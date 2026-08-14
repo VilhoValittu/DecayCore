@@ -26,14 +26,14 @@ from .metrics import _store_realized_pre_ir_metrics
 from .pipeline import apply_post_limits_and_metrics
 
 __all__ = [
-    '_apply_acoustic_authority_caps',
-    '_apply_candidate_metrics',
-    '_apply_hard_clamps',
-    '_apply_low_frequency_policy',
-    '_apply_soft_clamps',
-    '_authority_band_metrics',
-    '_prepare_boost_caps',
-    '_stats_array',
-    '_store_realized_pre_ir_metrics',
-    'apply_post_limits_and_metrics',
+    "_apply_acoustic_authority_caps",
+    "_apply_candidate_metrics",
+    "_apply_hard_clamps",
+    "_apply_low_frequency_policy",
+    "_apply_soft_clamps",
+    "_authority_band_metrics",
+    "_prepare_boost_caps",
+    "_stats_array",
+    "_store_realized_pre_ir_metrics",
+    "apply_post_limits_and_metrics",
 ]

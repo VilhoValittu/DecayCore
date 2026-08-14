@@ -15,6 +15,7 @@ Replaces camillafir_ui._render_results() + results_sections.py.
 render_results() has the same signature as _render_results() so ng_bridge.py
 can call it without changes to workflow code.
 """
+
 from __future__ import annotations
 
 import logging
@@ -72,13 +73,17 @@ def _render_bass_integration(*, data: dict) -> None:
     lf_rolloff = dict(diag.get("lf_rolloff", {}) or {})
     allpass_auto_enabled = bool(data.get("bass_integration_allpass_auto_enable", False))
     allpass_on = bool(allpass_meta.get("enabled", False))
-    combine_mode = str(
-        diag.get(
-            "sub_combine_mode",
-            bi_meta.get("sub_combine_mode", data.get("bass_integration_sub_combine_mode", "average")),
+    combine_mode = (
+        str(
+            diag.get(
+                "sub_combine_mode",
+                bi_meta.get("sub_combine_mode", data.get("bass_integration_sub_combine_mode", "average")),
+            )
+            or "average"
         )
-        or "average"
-    ).strip().lower()
+        .strip()
+        .lower()
+    )
     is_dual_sub_prealigned = bool(diag.get("dual_sub_preprocessing_applied", False)) or combine_mode in {
         "dual_sub_peak_aligned_average",
         "dual_sub_single_bus_complex_sum",
@@ -157,12 +162,16 @@ def _render_bass_integration(*, data: dict) -> None:
     main_sub_gd_assessment = _format_main_sub_gd_assessment(xo_main_gd, xo_sub_gd)
     sub_level_delta_20_120 = safe_float(diag.get("sub_combined_level_delta_db_20_120", float("nan")), float("nan"))
     sub_level_delta_30_90 = safe_float(diag.get("sub_combined_level_delta_db_30_90", float("nan")), float("nan"))
-    dominant_channel = str(
-        diag.get("dominant_channel", best_metrics.get("bass_dominant_channel", "unknown")) or "unknown"
-    ).strip().lower()
-    feasibility_class = str(
-        diag.get("feasibility_class", best_metrics.get("bass_feasibility_class", "unknown")) or "unknown"
-    ).strip().lower()
+    dominant_channel = (
+        str(diag.get("dominant_channel", best_metrics.get("bass_dominant_channel", "unknown")) or "unknown")
+        .strip()
+        .lower()
+    )
+    feasibility_class = (
+        str(diag.get("feasibility_class", best_metrics.get("bass_feasibility_class", "unknown")) or "unknown")
+        .strip()
+        .lower()
+    )
     feasibility_reason = str(
         diag.get("feasibility_reason", best_metrics.get("bass_feasibility_reason", "")) or ""
     ).strip()
@@ -206,9 +215,7 @@ def _render_bass_integration(*, data: dict) -> None:
     sub_lpf_metric_label = t("results_metric_sub_lpf")
     sub_lpf_rec_metric_label = t("results_metric_sub_lpf_recommended")
     playback_note = (
-        t("bass_integration_direct_playback_match")
-        if bi_mode == "direct_dac"
-        else t("bass_integration_playback_match")
+        t("bass_integration_direct_playback_match") if bi_mode == "direct_dac" else t("bass_integration_playback_match")
     )
     actual_main_hpf_hz = float(bi_meta.get("avr_crossover_hz", data.get("avr_crossover_hz", 80.0)) or 80.0)
     actual_sub_lpf_hz = float(
@@ -330,9 +337,9 @@ def _render_bass_integration(*, data: dict) -> None:
                         and bi_meta.get("recommended_crossover_hz_l") is not None
                         and bi_meta.get("recommended_crossover_hz_r") is not None
                         and abs(
-                            float(bi_meta["recommended_crossover_hz_l"])
-                            - float(bi_meta["recommended_crossover_hz_r"])
-                        ) >= 1.0
+                            float(bi_meta["recommended_crossover_hz_l"]) - float(bi_meta["recommended_crossover_hz_r"])
+                        )
+                        >= 1.0
                     )
                     else [
                         metric_row(
@@ -448,12 +455,20 @@ def _render_bass_integration(*, data: dict) -> None:
                     if is_dual_sub_prealigned
                     else "results_metric_bass_alignment_polarity"
                 ),
-                t("ir_align_value_inverted")
-                if bool(alignment_meta.get("polarity_invert", data.get("bass_integration_sub_polarity_invert", False)))
-                else t("ir_align_value_ok"),
-                t("ir_align_value_inverted")
-                if bool(alignment_meta.get("polarity_invert", data.get("bass_integration_sub_polarity_invert", False)))
-                else t("ir_align_value_ok"),
+                (
+                    t("ir_align_value_inverted")
+                    if bool(
+                        alignment_meta.get("polarity_invert", data.get("bass_integration_sub_polarity_invert", False))
+                    )
+                    else t("ir_align_value_ok")
+                ),
+                (
+                    t("ir_align_value_inverted")
+                    if bool(
+                        alignment_meta.get("polarity_invert", data.get("bass_integration_sub_polarity_invert", False))
+                    )
+                    else t("ir_align_value_ok")
+                ),
             ),
             metric_row(
                 t(
@@ -461,11 +476,27 @@ def _render_bass_integration(*, data: dict) -> None:
                     if is_dual_sub_prealigned
                     else "results_metric_bass_alignment_gain"
                 ),
-                _fmt(safe_float(alignment_meta.get("gain_trim_db", data.get("bass_integration_sub_gain_trim_db", float("nan"))), float("nan")), " dB"),
-                _fmt(safe_float(alignment_meta.get("gain_trim_db", data.get("bass_integration_sub_gain_trim_db", float("nan"))), float("nan")), " dB"),
+                _fmt(
+                    safe_float(
+                        alignment_meta.get("gain_trim_db", data.get("bass_integration_sub_gain_trim_db", float("nan"))),
+                        float("nan"),
+                    ),
+                    " dB",
+                ),
+                _fmt(
+                    safe_float(
+                        alignment_meta.get("gain_trim_db", data.get("bass_integration_sub_gain_trim_db", float("nan"))),
+                        float("nan"),
+                    ),
+                    " dB",
+                ),
             ),
             metric_row(
-                t("results_metric_bass_shared_sub_allpass" if is_dual_sub_prealigned else "results_metric_bass_allpass"),
+                t(
+                    "results_metric_bass_shared_sub_allpass"
+                    if is_dual_sub_prealigned
+                    else "results_metric_bass_allpass"
+                ),
                 t("state_on") if allpass_on else t("state_off"),
                 t("state_on") if allpass_on else t("state_off"),
             ),
@@ -556,8 +587,20 @@ def _render_bass_integration(*, data: dict) -> None:
                 [
                     metric_row(
                         t("results_metric_sub_filter_boost"),
-                        _fmt(safe_float(sub_st.get("max_boost_db_effective", sub_st.get("max_boost_db", float("nan"))), float("nan")), " dB"),
-                        _fmt(safe_float(sub_st.get("max_boost_db_effective", sub_st.get("max_boost_db", float("nan"))), float("nan")), " dB"),
+                        _fmt(
+                            safe_float(
+                                sub_st.get("max_boost_db_effective", sub_st.get("max_boost_db", float("nan"))),
+                                float("nan"),
+                            ),
+                            " dB",
+                        ),
+                        _fmt(
+                            safe_float(
+                                sub_st.get("max_boost_db_effective", sub_st.get("max_boost_db", float("nan"))),
+                                float("nan"),
+                            ),
+                            " dB",
+                        ),
                     ),
                     metric_row(
                         t("results_metric_sub_filter_cut"),
@@ -595,4 +638,4 @@ def _render_bass_integration(*, data: dict) -> None:
     )
 
 
-__all__ = ['_render_bass_integration']
+__all__ = ["_render_bass_integration"]

@@ -12,6 +12,7 @@
 
 Replaces build_input_section() from layout_builders.py.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -27,23 +28,6 @@ from ...io.measurements_loader_parts.lr_measurement_loader import (
 )
 from ...ui_i18n import normalize_layout_value
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 _MEASUREMENT_LIBRARY_EXTENSIONS = frozenset({".txt", ".wav"})
 _MEASUREMENT_SLOT_UPLOAD_KEYS = {
     "local_path_l": "file_l",
@@ -55,36 +39,14 @@ _MEASUREMENT_SLOT_UPLOAD_KEYS = {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 _SLOT_FILTER_THRESHOLD = -50.0
 _SUB_SLOT_KEYS = frozenset({"local_path_l_sub", "local_path_r_sub"})
 _SUB_FILENAME_PREFIXES = ("sub", "lfe", "sw")
 
+
 def _normalize_layout_value(value: Any, t: Callable[[str], str] | None = None) -> str:
     return normalize_layout_value(value, t)
+
 
 def _guess_upload_format(file_data: dict[str, Any] | None) -> str:
     if not isinstance(file_data, dict):
@@ -99,11 +61,11 @@ def _guess_upload_format(file_data: dict[str, Any] | None) -> str:
         return "TXT"
     return "Unknown"
 
+
 def _normalize_local_path_value(value: Any) -> str:
     try:
         return str(value or "").strip().strip('"').strip("'")
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -116,6 +78,7 @@ def _normalize_local_path_value(value: Any) -> str:
         NameError,
     ):
         return ""
+
 
 def _describe_local_path(path_raw: Any) -> dict[str, Any]:
     path = _normalize_local_path_value(path_raw)
@@ -158,11 +121,11 @@ def _describe_local_path(path_raw: Any) -> dict[str, Any]:
         "rt60_val": rt60_val,
     }
 
+
 def _format_upload_size(size_bytes: Any) -> str:
     try:
         size = float(size_bytes)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -181,6 +144,7 @@ def _format_upload_size(size_bytes: Any) -> str:
         return f"{size / (1024.0 * 1024.0):.2f} MB"
     return f"{size / 1024.0:.1f} KB"
 
+
 def _build_upload_payload(*, filename: str, content: bytes, mime_type: str = "") -> dict[str, Any]:
     content_bytes = bytes(content or b"")
     return {
@@ -191,20 +155,22 @@ def _build_upload_payload(*, filename: str, content: bytes, mime_type: str = "")
         "content_sha256": hashlib.sha256(content_bytes).hexdigest(),
     }
 
+
 def _file_slot_scope_name(upload_key: str, slot_variant: str) -> str:
     return f"{upload_key}_status_scope__{slot_variant}"
+
 
 def _file_slot_input_name(path_key: str, slot_variant: str) -> str:
     return f"{path_key}__{slot_variant}"
 
 
 __all__ = [
-    '_normalize_layout_value',
-    '_guess_upload_format',
-    '_normalize_local_path_value',
-    '_describe_local_path',
-    '_format_upload_size',
-    '_build_upload_payload',
-    '_file_slot_scope_name',
-    '_file_slot_input_name',
+    "_normalize_layout_value",
+    "_guess_upload_format",
+    "_normalize_local_path_value",
+    "_describe_local_path",
+    "_format_upload_size",
+    "_build_upload_payload",
+    "_file_slot_scope_name",
+    "_file_slot_input_name",
 ]

@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-
 AUTO_MODE_GOAL_DEFAULT = "balanced"
 AUTO_MODE_GOAL_ROOM_SAFE = "room-safe"
 AUTO_MODE_GOAL_LOW_RIPPLE = "low-ripple"
@@ -86,11 +85,9 @@ def auto_filter_cache_key(
     *,
     filter_type: str | None = None,
 ) -> str:
-    value = str(
-        filter_type
-        if filter_type is not None
-        else (base_data or {}).get("filter_type", "") or ""
-    ).strip().lower()
+    value = (
+        str(filter_type if filter_type is not None else (base_data or {}).get("filter_type", "") or "").strip().lower()
+    )
     if value in AUTO_MODE_CACHE_FILTER_KEYS:
         return value
     if "asym" in value:

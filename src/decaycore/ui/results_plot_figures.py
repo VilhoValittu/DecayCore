@@ -83,11 +83,7 @@ def _overview_range(
     left: ChannelPlotData,
     right: ChannelPlotData,
 ) -> tuple[float, float]:
-    valid = [
-        data
-        for data in (left, right)
-        if data.has_valid_correction_range
-    ]
+    valid = [data for data in (left, right) if data.has_valid_correction_range]
     if not valid:
         return 10.0, min(left.full_max_hz, right.full_max_hz)
     return (
@@ -97,11 +93,7 @@ def _overview_range(
 
 
 def _tick_values(max_hz: float) -> list[int]:
-    return [
-        value
-        for value in (10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000)
-        if value <= float(max_hz)
-    ]
+    return [value for value in (10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000) if value <= float(max_hz)]
 
 
 def _base_layout(
@@ -168,10 +160,7 @@ def _title_with_filter_metadata(title: str, data: ChannelPlotData) -> str:
             t("results_plot_filter_delay_removed").format(value=filter_delay_ms),
         )
     )
-    return (
-        f"{title}<span style='font-size:0.78em; font-weight:400;'>"
-        f"&nbsp;&nbsp;&nbsp;&nbsp;{metadata}</span>"
-    )
+    return f"{title}<span style='font-size:0.78em; font-weight:400;'>" f"&nbsp;&nbsp;&nbsp;&nbsp;{metadata}</span>"
 
 
 def _apply_log_x_axis(
@@ -233,10 +222,7 @@ def _set_results_plot_controls(
     fig.update_layout(
         meta={
             "results_plot_controls": {
-                "base_visibility": [
-                    trace.visible if trace.visible is not None else True
-                    for trace in fig.data
-                ],
+                "base_visibility": [trace.visible if trace.visible is not None else True for trace in fig.data],
                 "exported_indexes": list(exported_indexes or []),
                 "compensated_indexes": list(compensated_indexes or []),
                 "correction_range": list(correction_range) if correction_range else None,
@@ -262,9 +248,7 @@ def apply_results_plot_level(fig: go.Figure, mode: str) -> None:
     if len(base) != len(fig.data):
         return
     exported_indexes = [int(index) for index in controls.get("exported_indexes", [])]
-    compensated_indexes = [
-        int(index) for index in controls.get("compensated_indexes", [])
-    ]
+    compensated_indexes = [int(index) for index in controls.get("compensated_indexes", [])]
     visibility = list(base)
     for index in exported_indexes:
         visibility[index] = mode in {"exported", "both"}
@@ -537,9 +521,7 @@ def build_response_figure(
 
     full_range = _full_range(data)
     correction_range = (
-        (data.correction_min_hz, data.correction_max_hz)
-        if data.has_valid_correction_range
-        else full_range
+        (data.correction_min_hz, data.correction_max_hz) if data.has_valid_correction_range else full_range
     )
     initial_range = full_range if default_full_range else correction_range
     _base_layout(
@@ -619,9 +601,7 @@ def build_filter_figure(
     )
     full_range = _full_range(data)
     correction_range = (
-        (data.correction_min_hz, data.correction_max_hz)
-        if data.has_valid_correction_range
-        else full_range
+        (data.correction_min_hz, data.correction_max_hz) if data.has_valid_correction_range else full_range
     )
     _base_layout(
         fig,
@@ -661,9 +641,7 @@ def build_timing_figure(
         ),
     )
     corrected_band_mask = (
-        np.isfinite(data.freq_hz)
-        & (data.freq_hz >= 10.0)
-        & (data.freq_hz <= float(data.phase_display_max_hz))
+        np.isfinite(data.freq_hz) & (data.freq_hz >= 10.0) & (data.freq_hz <= float(data.phase_display_max_hz))
     )
     fig.add_trace(
         go.Scatter(
@@ -866,13 +844,7 @@ def build_combined_bass_figure(
     target = np.asarray(target_db, dtype=float) if target_db is not None else None
     reference = predicted if predicted is not None else measured
     if reference is not None and target is not None:
-        align_mask = (
-            mask
-            & (freq >= 50.0)
-            & (freq <= 200.0)
-            & np.isfinite(reference)
-            & np.isfinite(target)
-        )
+        align_mask = mask & (freq >= 50.0) & (freq <= 200.0) & np.isfinite(reference) & np.isfinite(target)
         if np.count_nonzero(align_mask) >= 4:
             offset_db = float(np.median(reference[align_mask] - target[align_mask]))
 

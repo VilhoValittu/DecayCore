@@ -36,67 +36,13 @@ def _convert_ir_for_export(ir: np.ndarray, fmt: str) -> np.ndarray:
         return (np.clip(ir, -1.0, 1.0) * 32767).astype(np.int16)
     return ir.astype(np.float32)
 
+
 from ...auto_mode.api import AUTO_MODE_COMPAT_VERSION
 from ...auto_mode.rank_score import attach_official_rank_score, official_rank_score
 from ...config.decaycore_config import _make_default_config
 from ...version import VERSION
 
 logger = logging.getLogger("DecayCore")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def _headless_camilladsp_yaml_name(*, data: dict | None, ft_short: str, irw_tag: str, fs_v: int | None = None) -> str:
@@ -116,7 +62,6 @@ def _headless_hybrid_iir_biquads(result, side: str) -> list[dict]:
     try:
         st = dict(getattr(result, st_name, {}) or {})
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -158,6 +103,7 @@ def _headless_summary_content(data: dict, result: Any) -> str:
         lines.append(f"{side} GD max: {'n/a' if gd is None else f'{gd:.3f} ms'}")
     return "\n".join(lines) + "\n"
 
+
 def _build_headless_export_zip(
     *,
     data: dict,
@@ -184,7 +130,6 @@ def _build_headless_export_zip(
     try:
         yaml_xo_order = int(round(float(data.get("sub_crossover_slope", 12) or 12) / 6.0))
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -200,7 +145,6 @@ def _build_headless_export_zip(
     try:
         yaml_sub_hpf_order = int(round(float(data.get("sub_hpf_slope", 12) or 12) / 6.0))
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -233,10 +177,12 @@ def _build_headless_export_zip(
             )
             if str(spec.get("layout")) == "Stereo":
                 stereo_wav = io.BytesIO()
-                stereo_ir = np.column_stack((
-                    _convert_ir_for_export(result.l_ir, wav_fmt),
-                    _convert_ir_for_export(result.r_ir, wav_fmt),
-                ))
+                stereo_ir = np.column_stack(
+                    (
+                        _convert_ir_for_export(result.l_ir, wav_fmt),
+                        _convert_ir_for_export(result.r_ir, wav_fmt),
+                    )
+                )
                 scipy.io.wavfile.write(stereo_wav, fs_v, stereo_ir)
                 zf.writestr(str(spec["bundle_names"][0]), stereo_wav.getvalue())
             else:
@@ -357,6 +303,7 @@ def _build_headless_export_zip(
 
     return zip_buffer, perf
 
+
 def _save_headless_export_bundle(
     zip_buffer: io.BytesIO,
     *,
@@ -381,12 +328,14 @@ def _save_headless_export_bundle(
     path.write_bytes(zip_buffer.getvalue())
     return fname, str(out_dir.resolve()), f"Saved: {path.resolve()}"
 
+
 def _read_json(path: Path) -> dict:
     with Path(path).open("r", encoding="utf-8-sig") as fh:
         data = json.load(fh)
     if not isinstance(data, dict):
         raise ValueError(f"JSON root must be an object: {path}")
     return data
+
 
 def _resolve_path(value: Any, base_dir: Path) -> str:
     text = str(value or "").strip()
@@ -396,6 +345,7 @@ def _resolve_path(value: Any, base_dir: Path) -> str:
     if not path.is_absolute():
         path = base_dir / path
     return str(path.resolve())
+
 
 def _first_existing(base_dir: Path, names: list[str]) -> str:
     for name in names:
@@ -485,12 +435,12 @@ def _normalize_headless_config(config: dict, *, config_dir: Path, output_dir: Pa
 
 
 __all__ = [
-    '_headless_camilladsp_yaml_name',
-    '_headless_summary_content',
-    '_build_headless_export_zip',
-    '_save_headless_export_bundle',
-    '_read_json',
-    '_resolve_path',
-    '_first_existing',
-    '_normalize_headless_config',
+    "_headless_camilladsp_yaml_name",
+    "_headless_summary_content",
+    "_build_headless_export_zip",
+    "_save_headless_export_bundle",
+    "_read_json",
+    "_resolve_path",
+    "_first_existing",
+    "_normalize_headless_config",
 ]

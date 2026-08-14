@@ -15,6 +15,7 @@ Replaces camillafir_ui._render_results() + results_sections.py.
 render_results() has the same signature as _render_results() so ng_bridge.py
 can call it without changes to workflow code.
 """
+
 from __future__ import annotations
 
 import logging
@@ -58,7 +59,6 @@ from ..results_formatters import (
     stereo_link_mode_label,
 )
 
-
 logger = logging.getLogger("DecayCore")
 
 _RECOVERABLE_UI_EXCEPTIONS = (
@@ -73,6 +73,7 @@ _RECOVERABLE_UI_EXCEPTIONS = (
     ModuleNotFoundError,
     NameError,
 )
+
 
 def _update_plot_status(run_started_at) -> None:
     if run_started_at is None:
@@ -117,11 +118,7 @@ def _publish_done_status(done_msg: str, done_status: str, run_started_at) -> Non
 
 def _filter_download_payload(zip_buffer) -> bytes | None:
     try:
-        raw_payload = (
-            zip_buffer
-            if isinstance(zip_buffer, (bytes, bytearray, memoryview))
-            else zip_buffer.getvalue()
-        )
+        raw_payload = zip_buffer if isinstance(zip_buffer, (bytes, bytearray, memoryview)) else zip_buffer.getvalue()
         payload = bytes(raw_payload)
     except (AttributeError, TypeError, ValueError, BufferError, OSError):
         logger.warning("Filter ZIP payload is unavailable", exc_info=True)
@@ -160,9 +157,7 @@ def _render_filter_download(*, fname, zip_buffer) -> None:
     filename = _filter_download_filename(fname)
     with ui.card().classes("w-full mt-4 items-center text-center"):
         ui.label(t("results_download_title")).classes("text-lg font-semibold")
-        ui.label(t("results_download_description")).classes(
-            "text-sm text-gray-400 max-w-2xl"
-        )
+        ui.label(t("results_download_description")).classes("text-sm text-gray-400 max-w-2xl")
         ui.button(
             t("results_download_button"),
             icon="download",
@@ -170,9 +165,7 @@ def _render_filter_download(*, fname, zip_buffer) -> None:
                 payload=payload,
                 filename=filename,
             ),
-        ).props("color=primary no-caps").classes("mt-2").tooltip(
-            t("results_download_tooltip")
-        )
+        ).props("color=primary no-caps").classes("mt-2").tooltip(t("results_download_tooltip"))
 
 
 def _update_last_run_info(l_st_f, r_st_f) -> None:
@@ -189,17 +182,18 @@ def _update_last_run_info(l_st_f, r_st_f) -> None:
         r_conf = float(r_st_f.get("avg_confidence") or 0.0)
         ui_state.set_last_run_info(
             {
-                "score": (float(l_score) + float(r_score)) / 2.0
-                if (l_score is not None and r_score is not None)
-                else None,
-                "match": (float(l_match) + float(r_match)) / 2.0
-                if (l_match is not None and r_match is not None)
-                else None,
+                "score": (
+                    (float(l_score) + float(r_score)) / 2.0 if (l_score is not None and r_score is not None) else None
+                ),
+                "match": (
+                    (float(l_match) + float(r_match)) / 2.0 if (l_match is not None and r_match is not None) else None
+                ),
                 "conf": (l_conf + r_conf) / 2.0,
             }
         )
     except _RECOVERABLE_UI_EXCEPTIONS:
         logger.debug("set_last_run_info failed", exc_info=True)
+
 
 def render_results(
     data,
@@ -293,6 +287,7 @@ def render_results(
 
     _update_last_run_info(l_st_f, r_st_f)
 
+
 def _render_run_overview(*, data: dict, l_st_f: dict, r_st_f: dict) -> None:
     l_ai = plots.calc_ai_summary_from_stats(l_st_f)
     r_ai = plots.calc_ai_summary_from_stats(r_st_f)
@@ -370,8 +365,8 @@ def _render_run_overview(*, data: dict, l_st_f: dict, r_st_f: dict) -> None:
             ),
             metric_row(
                 t("results_metric_schroeder_hz"),
-                f"{l_st_f.get('schroeder_hz_estimate', 0):.0f} Hz" if l_st_f.get('schroeder_hz_estimate') else "n/a",
-                f"{r_st_f.get('schroeder_hz_estimate', 0):.0f} Hz" if r_st_f.get('schroeder_hz_estimate') else "n/a",
+                f"{l_st_f.get('schroeder_hz_estimate', 0):.0f} Hz" if l_st_f.get("schroeder_hz_estimate") else "n/a",
+                f"{r_st_f.get('schroeder_hz_estimate', 0):.0f} Hz" if r_st_f.get("schroeder_hz_estimate") else "n/a",
             ),
         ],
         summary_lines=acoustic_summary,
@@ -411,6 +406,7 @@ def _render_run_overview(*, data: dict, l_st_f: dict, r_st_f: dict) -> None:
             ),
         ],
     )
+
 
 def _display_polish_rank(polish: dict, raw_key: str, official_key: str) -> float:
     official = safe_float(polish.get(official_key, float("nan")), float("nan"))
@@ -561,13 +557,13 @@ def _build_auto_polish_lines(auto_meta: dict) -> list[str]:
 
     return lines
 
+
 def _append_auto_polish_to_status_log(*, data: dict) -> None:
     from .. import ui_state  # noqa: PLC0415
 
     try:
         mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -592,6 +588,7 @@ def _append_auto_polish_to_status_log(*, data: dict) -> None:
     ui_state.append_auto_status_detail_raw(t("results_auto_diag_polish_header") + ":")
     for line in lines:
         ui_state.append_auto_status_detail_raw("  " + line)
+
 
 def _build_p6_validation_block(best_metrics: dict) -> str | None:
     severity = str(best_metrics.get("final_ir_validation_severity", "") or "").strip().lower()
@@ -629,15 +626,19 @@ def _build_p6_validation_block(best_metrics: dict) -> str | None:
 
     return "\n\n".join(lines)
 
+
 def _auto_audit_fmt(value: Any, *, precision: int = 3) -> str:
     v = safe_float(value, float("nan"))
     return f"{float(v):.{int(precision)}f}" if math.isfinite(v) else "n/a"
 
+
 def _audit_dict(value: Any) -> dict:
     return dict(value or {}) if isinstance(value, dict) else {}
 
+
 def _audit_list(value: Any) -> list:
     return list(value or []) if isinstance(value, (list, tuple)) else []
+
 
 def _audit_status_label(status: str) -> str:
     key = {
@@ -649,11 +650,16 @@ def _audit_status_label(status: str) -> str:
         return t(key)
     return str(status or "n/a").replace("_", " ")
 
+
 def _audit_override_label(applied: bool) -> str:
-    return t("results_auto_diag_audit_override_applied" if bool(applied) else "results_auto_diag_audit_override_not_applied")
+    return t(
+        "results_auto_diag_audit_override_applied" if bool(applied) else "results_auto_diag_audit_override_not_applied"
+    )
+
 
 def _audit_reason_text(reason: Any) -> str:
     return str(reason or "").strip().replace("_", " ")
+
 
 def _auto_audit_from_meta(data: dict, auto_meta: dict, bm: dict) -> dict:
     audit = _audit_dict(auto_meta.get("audit_trail"))
@@ -688,6 +694,7 @@ def _auto_audit_from_meta(data: dict, auto_meta: dict, bm: dict) -> dict:
         source="ui_reconstructed",
     )
 
+
 def _build_auto_audit_markdown(*, data: dict, auto_meta: dict, bm: dict) -> str:
     audit = _auto_audit_from_meta(data, auto_meta, bm)
     if not audit:
@@ -713,7 +720,11 @@ def _build_auto_audit_markdown(*, data: dict, auto_meta: dict, bm: dict) -> str:
     if why:
         lines.append(t("results_auto_diag_audit_why").format(summary=why))
 
-    failures = [_audit_reason_text(item) for item in _audit_list(hard_gates.get("hard_gate_failures")) if str(item or "").strip()]
+    failures = [
+        _audit_reason_text(item)
+        for item in _audit_list(hard_gates.get("hard_gate_failures"))
+        if str(item or "").strip()
+    ]
     failure_txt = f" ({', '.join(failures)})" if failures else ""
     lines.append(
         t("results_auto_diag_audit_safety").format(
@@ -764,11 +775,11 @@ def _build_auto_audit_markdown(*, data: dict, auto_meta: dict, bm: dict) -> str:
         )
     return "\n\n".join(lines)
 
+
 def _render_auto_diagnostics(*, data: dict) -> None:
     try:
         mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -787,6 +798,7 @@ def _render_auto_diagnostics(*, data: dict) -> None:
         return
 
     from nicegui import ui  # noqa: PLC0415
+
     bm = attach_official_rank_score(auto_meta.get("best_metrics", {}))
     rank_sc = safe_float(official_rank_score(bm), 0.0)
     avg_sc = safe_float(bm.get("avg_score", 0.0), 0.0)
@@ -828,10 +840,12 @@ def _render_auto_diagnostics(*, data: dict) -> None:
         if p6_block:
             ui.markdown(f"**{t('results_auto_diag_p6_header')}**\n\n{p6_block}")
 
+
 def _update_crossover_recommendation_label(data: dict) -> None:
     """Update the crossover recommendation label in the input tab after a run."""
     try:
         from .. import ng_controls as ctrl  # noqa: PLC0415
+
         label_el = ctrl.get("avr_crossover_hz_recommendation")
         if label_el is None:
             return
@@ -843,7 +857,6 @@ def _update_crossover_recommendation_label(data: dict) -> None:
         else:
             label_el.set_text("")
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -859,16 +872,16 @@ def _update_crossover_recommendation_label(data: dict) -> None:
 
 
 __all__ = [
-    '_format_recommended_xo_hz',
-    'render_results',
-    '_esc',
-    '_metric_table_html',
-    '_section',
-    '_render_run_overview',
-    '_build_auto_polish_lines',
-    '_append_auto_polish_to_status_log',
-    '_build_p6_validation_block',
-    '_build_auto_audit_markdown',
-    '_render_auto_diagnostics',
-    '_update_crossover_recommendation_label',
+    "_format_recommended_xo_hz",
+    "render_results",
+    "_esc",
+    "_metric_table_html",
+    "_section",
+    "_render_run_overview",
+    "_build_auto_polish_lines",
+    "_append_auto_polish_to_status_log",
+    "_build_p6_validation_block",
+    "_build_auto_audit_markdown",
+    "_render_auto_diagnostics",
+    "_update_crossover_recommendation_label",
 ]

@@ -494,12 +494,12 @@ In AUTO mode, DecayCore supports three target selection strategies:
 1. Starts from a Harman6-style reference shape.
 2. Aligns each channel to the reference and estimates broad bass residuals instead of treating the reference curve's own bass shelf as room buildup.
 3. Reduces adaptation when the left and right channels disagree, and bounds target changes to −2.0/+0.75 dB below 500 Hz.
-4. Uses RT60 only as a confidence guard that can prevent additional bass lift in a slow-decay room. RT60 does not create broadband target tilt.
+4. Uses RT60 as the authority for additional bass lift and as a guard that suppresses lift in a slow-decay room. RT60 does not create broadband target tilt.
 5. Keeps the Harman6 response unchanged above 500 Hz by default. Optional high-frequency adaptation requires explicit high-SNR, stereo-consistent evidence.
 
 #### RT60 requirement
 
-RT60 data is automatically available when measurements are produced by DecayCore's built-in measurement tool. With external REW exports or WAV impulse files, RT60 data is typically absent; adaptive target remains valid and simply omits the decay-based bass-lift guard.
+RT60 data is automatically available when measurements are produced by DecayCore's built-in measurement tool. With external REW exports or WAV impulse files, RT60 data is typically absent; adaptive target remains valid but does not add bass lift without reliable decay evidence.
 
 If RT60 data is not available, `Auto: search best built-in` is generally the safer strategy.
 

@@ -53,7 +53,6 @@ def _as_float(value: Any, default: float = 0.0) -> float:
     try:
         fallback = float(default)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -80,7 +79,6 @@ def _as_float(value: Any, default: float = 0.0) -> float:
     try:
         v = float(value)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -102,7 +100,6 @@ def _as_int(value: Any, default: int = 0) -> int:
     try:
         return int(float(value))
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -194,7 +191,9 @@ def _build_config_safe_auto_goal(data: dict) -> str:
         return "balanced"
 
 
-def _build_config_apply_unsafe_raw(cfg: FilterConfig, data: dict, *, mode_u: str, auto_goal: str, max_safe_boost: float) -> None:
+def _build_config_apply_unsafe_raw(
+    cfg: FilterConfig, data: dict, *, mode_u: str, auto_goal: str, max_safe_boost: float
+) -> None:
     unsafe_raw_req = bool(data.get("unsafe_raw_dsp", False))
     unsafe_raw_auto = bool(mode_u == "AUTO" and _auto_goal_is_flat_family(auto_goal))
     unsafe_raw = bool(unsafe_raw_req and (mode_u == "ADVANCED" or unsafe_raw_auto))
@@ -320,13 +319,25 @@ def _build_config_apply_post_mode_settings(cfg: FilterConfig, data: dict) -> Non
     ):
         logger.exception("ir_window attr set")
     try:
-        ir_anchor_mode = str(data.get("ir_anchor_mode", getattr(cfg, "ir_anchor_mode", "min_causal")) or "min_causal").strip().lower()
+        ir_anchor_mode = (
+            str(data.get("ir_anchor_mode", getattr(cfg, "ir_anchor_mode", "min_causal")) or "min_causal")
+            .strip()
+            .lower()
+        )
         if ir_anchor_mode not in ("peak", "centroid", "min_causal"):
             ir_anchor_mode = "min_causal"
         cfg.ir_anchor_mode = ir_anchor_mode
-        cfg.min_causal_ms = float(max(0.0, _as_float(data.get("min_causal_ms", getattr(cfg, "min_causal_ms", 80.0)), 80.0)))
-        cfg.auto_asym_left_ratio = float(np.clip(_as_float(data.get("auto_asym_left_ratio", getattr(cfg, "auto_asym_left_ratio", 0.35)), 0.35), 0.0, 1.0))
-        cfg.auto_asym_left_max_ms = float(max(0.0, _as_float(data.get("auto_asym_left_max_ms", getattr(cfg, "auto_asym_left_max_ms", 25.0)), 25.0)))
+        cfg.min_causal_ms = float(
+            max(0.0, _as_float(data.get("min_causal_ms", getattr(cfg, "min_causal_ms", 80.0)), 80.0))
+        )
+        cfg.auto_asym_left_ratio = float(
+            np.clip(
+                _as_float(data.get("auto_asym_left_ratio", getattr(cfg, "auto_asym_left_ratio", 0.35)), 0.35), 0.0, 1.0
+            )
+        )
+        cfg.auto_asym_left_max_ms = float(
+            max(0.0, _as_float(data.get("auto_asym_left_max_ms", getattr(cfg, "auto_asym_left_max_ms", 25.0)), 25.0))
+        )
     except (
         AttributeError,
         TypeError,
@@ -341,9 +352,19 @@ def _build_config_apply_post_mode_settings(cfg: FilterConfig, data: dict) -> Non
     ):
         logger.exception("ir anchor/asym attr set")
     try:
-        cfg.enable_ir_pre_energy_guard = bool(data.get("enable_ir_pre_energy_guard", getattr(cfg, "enable_ir_pre_energy_guard", True)))
-        cfg.pre_energy_ratio_max = float(max(0.0, _as_float(data.get("pre_energy_ratio_max", getattr(cfg, "pre_energy_ratio_max", 0.25)), 0.25)))
-        cfg.pre_energy_guard_strength = float(np.clip(_as_float(data.get("pre_energy_guard_strength", getattr(cfg, "pre_energy_guard_strength", 0.8)), 0.8), 0.0, 1.0))
+        cfg.enable_ir_pre_energy_guard = bool(
+            data.get("enable_ir_pre_energy_guard", getattr(cfg, "enable_ir_pre_energy_guard", True))
+        )
+        cfg.pre_energy_ratio_max = float(
+            max(0.0, _as_float(data.get("pre_energy_ratio_max", getattr(cfg, "pre_energy_ratio_max", 0.25)), 0.25))
+        )
+        cfg.pre_energy_guard_strength = float(
+            np.clip(
+                _as_float(data.get("pre_energy_guard_strength", getattr(cfg, "pre_energy_guard_strength", 0.8)), 0.8),
+                0.0,
+                1.0,
+            )
+        )
     except (
         AttributeError,
         TypeError,

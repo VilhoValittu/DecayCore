@@ -237,14 +237,20 @@ def _normalize_bass_integration_alignment_fields(data: dict[str, Any], is_auto_m
         0.0,
     )
     data["bass_integration_sub_polarity_invert"] = bool(data.get("bass_integration_sub_polarity_invert", False))
-    data["bass_integration_sub_gain_trim_db"] = _safe_float(data.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0, 0.0)
+    data["bass_integration_sub_gain_trim_db"] = _safe_float(
+        data.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0, 0.0
+    )
     data["bass_integration_alignment_auto_applied"] = bool(data.get("bass_integration_alignment_auto_applied", False))
     data["bass_integration_alignment_reason"] = str(data.get("bass_integration_alignment_reason", "") or "")
     data["bass_integration_allpass_auto_enable"] = bool(data.get("bass_integration_allpass_auto_enable", False))
     if bool(data.get("bass_integration_enable", False)) and is_auto_mode:
         data["bass_integration_allpass_auto_enable"] = False
-    data["bass_integration_allpass_freq_hz"] = _safe_positive_float(data.get("bass_integration_allpass_freq_hz", 0.0) or 0.0, 0.0)
-    data["bass_integration_allpass_q"] = _safe_positive_float(data.get("bass_integration_allpass_q", 0.707) or 0.707, 0.707)
+    data["bass_integration_allpass_freq_hz"] = _safe_positive_float(
+        data.get("bass_integration_allpass_freq_hz", 0.0) or 0.0, 0.0
+    )
+    data["bass_integration_allpass_q"] = _safe_positive_float(
+        data.get("bass_integration_allpass_q", 0.707) or 0.707, 0.707
+    )
     data["bass_integration_allpass_auto_applied"] = bool(data.get("bass_integration_allpass_auto_applied", False))
     if (
         not bool(data.get("bass_integration_enable", False))
@@ -256,9 +262,7 @@ def _normalize_bass_integration_alignment_fields(data: dict[str, Any], is_auto_m
 
 def _normalize_bass_integration_lpf(data: dict[str, Any]) -> None:
     main_xo_hz = _safe_float(
-        data.get("sub_crossover_hz", data.get("avr_crossover_hz", 80.0))
-        or data.get("avr_crossover_hz", 80.0)
-        or 80.0,
+        data.get("sub_crossover_hz", data.get("avr_crossover_hz", 80.0)) or data.get("avr_crossover_hz", 80.0) or 80.0,
         80.0,
     )
     if main_xo_hz <= 0.0:
@@ -312,6 +316,7 @@ def _normalize_smoothing_defaults(data: dict[str, Any]) -> None:
     if data.get("plot_smoothing_level") is None:
         data["plot_smoothing_level"] = "Psychoacoustic"
 
+
 def collect_ui_data(pin) -> dict[str, Any]:
     """Funktio: collect ui data."""
     data: dict[str, Any] = {key: _read_pin_value(pin, key) for key in _UI_PIN_KEYS}
@@ -331,8 +336,7 @@ def collect_ui_data(pin) -> dict[str, Any]:
         _apply_auto_mode_managed_settings(data)
 
     auto_prefer_bass = bool(
-        is_auto_mode
-        and auto_goal_is_flat_family(str(data.get("auto_goal", "balanced") or "balanced"))
+        is_auto_mode and auto_goal_is_flat_family(str(data.get("auto_goal", "balanced") or "balanced"))
     )
     if auto_prefer_bass:
         data["auto_target_mode"] = "selected"
@@ -378,4 +382,4 @@ def log_df_smoothing_toggle(source, logger) -> bool:
     return df_on
 
 
-__all__ = ['collect_ui_config', 'collect_ui_data', 'log_df_smoothing_toggle']
+__all__ = ["collect_ui_config", "collect_ui_data", "log_df_smoothing_toggle"]

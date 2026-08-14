@@ -21,11 +21,11 @@ from .single_channel import (
 )
 
 __all__ = [
-    '_limit_gd_gradient_ms_per_oct',
-    '_maybe_per_channel_cfg',
-    '_normalize_impulse_if_requested',
-    '_run_generate_filter_stereo_link_presolve_stats',
-    'apply_confidence_weighted_target_pull',
-    'generate_filter',
-    'generate_filter_pair',
+    "_limit_gd_gradient_ms_per_oct",
+    "_maybe_per_channel_cfg",
+    "_normalize_impulse_if_requested",
+    "_run_generate_filter_stereo_link_presolve_stats",
+    "apply_confidence_weighted_target_pull",
+    "generate_filter",
+    "generate_filter_pair",
 ]

@@ -140,7 +140,9 @@ def run_mag_raw_stage(
         logger=logger,
     )
     raw_g = _error_to_correction_mag(err_db + float(manual_target_bias_db))
-    _log_stage_stats("raw_g_pre_confpull", raw_g, np.zeros_like(freq_axis, dtype=bool), logger=logger, enabled=debug_stage_stats)
+    _log_stage_stats(
+        "raw_g_pre_confpull", raw_g, np.zeros_like(freq_axis, dtype=bool), logger=logger, enabled=debug_stage_stats
+    )
 
     base_sigma = 60 // (filter_smooth / 12 if filter_smooth > 0 else 1)
     df_mode = bool(getattr(cfg, "df_smoothing", False))
@@ -212,14 +214,17 @@ def run_mag_bassfirst_afdw_conf_stage(  # noqa: C901 - bass-first confidence han
                 left_ms = float(getattr(cfg, "ir_window_left", getattr(cfg, "ir_window_ms_left", 0.0)) or 0.0)
                 if win_mode == "rew_asym" and left_ms < 15.0:
                     bf_mode_f2 = min(bf_mode_f2, 80.0)
-                    logger.info(f"REW Asym low-latency: left_ms={left_ms:.1f} -> bass-first limited to {float(bf_mode_f2):.0f} Hz")
+                    logger.info(
+                        f"REW Asym low-latency: left_ms={left_ms:.1f} -> bass-first limited to {float(bf_mode_f2):.0f} Hz"
+                    )
             except (AttributeError, TypeError, ValueError):
                 pass
             _mctx = get_measurement_ctx()
             _rt60_lf_for_mask: float | None = None
             if _mctx is not None and isinstance(_mctx.measured_rt60_bands, dict):
                 _lf_vals_mask = [
-                    float(v) for k, v in _mctx.measured_rt60_bands.items()
+                    float(v)
+                    for k, v in _mctx.measured_rt60_bands.items()
                     if 20.0 <= float(k) <= 150.0 and float(v) > 0.05
                 ]
                 if _lf_vals_mask:
@@ -254,7 +259,8 @@ def run_mag_bassfirst_afdw_conf_stage(  # noqa: C901 - bass-first confidence han
                     )
                     logger.debug(
                         "bassfirst RT60 modulation: lf_rt60=%.2fs factor=%.3f",
-                        _rt60_lf_for_mask, _rt60_factor,
+                        _rt60_lf_for_mask,
+                        _rt60_factor,
                     )
             # SNR-based HF confidence reduction: low SNR → widen A-FDW above 2 kHz.
             if (
@@ -275,7 +281,8 @@ def run_mag_bassfirst_afdw_conf_stage(  # noqa: C901 - bass-first confidence han
                         )
                         logger.debug(
                             "bassfirst SNR modulation: snr=%.1f dB factor=%.3f",
-                            _snr, _snr_factor,
+                            _snr,
+                            _snr_factor,
                         )
             # Schroeder boost: below Schroeder frequency (modal region) FIR correction
             # is well-defined and reliable → boost confidence to allow tighter A-FDW.
@@ -303,15 +310,21 @@ def run_mag_bassfirst_afdw_conf_stage(  # noqa: C901 - bass-first confidence han
                             _fs_hz,
                         )
         except (TypeError, ValueError, FloatingPointError, IndexError) as exc:
-            logger.warning("bass-first confidence computation failed (%s: %s); falling back to conf_mask", type(exc).__name__, exc)
+            logger.warning(
+                "bass-first confidence computation failed (%s: %s); falling back to conf_mask", type(exc).__name__, exc
+            )
             bf_rel = bf_room_mode = bf_conf_for_smoothing = None
 
     if raw_stage.afdw_on:
         try:
             if isinstance(st, dict):
-                conf_for_afdw = bf_conf_for_smoothing if (use_bassfirst and bf_conf_for_smoothing is not None) else conf_mask
+                conf_for_afdw = (
+                    bf_conf_for_smoothing if (use_bassfirst and bf_conf_for_smoothing is not None) else conf_mask
+                )
                 c = np.clip(conf_for_afdw, 0.0, 1.0)
-                adaptive_cycles = float(raw_stage.afdw_min) + (c * (float(raw_stage.afdw_base) - float(raw_stage.afdw_min)))
+                adaptive_cycles = float(raw_stage.afdw_min) + (
+                    c * (float(raw_stage.afdw_base) - float(raw_stage.afdw_min))
+                )
                 bw = np.clip(2.0 / np.maximum(adaptive_cycles, 1.0), AFDW_BW_MIN_OCT, AFDW_BW_MAX_OCT)
                 afdw_bw_oct = bw
                 afdw_bw_min_oct = float(np.min(bw))
@@ -325,7 +338,9 @@ def run_mag_bassfirst_afdw_conf_stage(  # noqa: C901 - bass-first confidence han
                 try:
                     c_plot = np.clip(np.asarray(conf_mask, dtype=float), 0.0, 1.0)
                     if c_plot.shape == np.asarray(freq_axis, dtype=float).shape:
-                        adaptive_cycles_plot = float(raw_stage.afdw_min) + (c_plot * (float(raw_stage.afdw_base) - float(raw_stage.afdw_min)))
+                        adaptive_cycles_plot = float(raw_stage.afdw_min) + (
+                            c_plot * (float(raw_stage.afdw_base) - float(raw_stage.afdw_min))
+                        )
                         bw_plot = np.clip(2.0 / np.maximum(adaptive_cycles_plot, 1.0), AFDW_BW_MIN_OCT, AFDW_BW_MAX_OCT)
                 except (TypeError, ValueError, FloatingPointError):
                     bw_plot = np.asarray(afdw_bw_oct, dtype=float)
@@ -339,8 +354,12 @@ def run_mag_bassfirst_afdw_conf_stage(  # noqa: C901 - bass-first confidence han
                                 fx_cmp = st.get("cmp_freq_axis", None)
                             if fx_cmp is not None:
                                 fx_cmp = np.asarray(fx_cmp, dtype=float)
-                                st["cmp_afdw_bw_oct"] = np.asarray(np.interp(fx_cmp, freq_axis, np.asarray(afdw_bw_oct, dtype=float)), dtype=float).tolist()
-                                st["cmp_afdw_bw_plot_oct"] = np.asarray(np.interp(fx_cmp, freq_axis, np.asarray(bw_plot, dtype=float)), dtype=float).tolist()
+                                st["cmp_afdw_bw_oct"] = np.asarray(
+                                    np.interp(fx_cmp, freq_axis, np.asarray(afdw_bw_oct, dtype=float)), dtype=float
+                                ).tolist()
+                                st["cmp_afdw_bw_plot_oct"] = np.asarray(
+                                    np.interp(fx_cmp, freq_axis, np.asarray(bw_plot, dtype=float)), dtype=float
+                                ).tolist()
                     except (TypeError, ValueError, FloatingPointError):
                         pass
                     st["afdw_bw_min_oct"] = float(afdw_bw_min_oct)
@@ -352,7 +371,13 @@ def run_mag_bassfirst_afdw_conf_stage(  # noqa: C901 - bass-first confidence han
                     pass
         except (TypeError, ValueError, FloatingPointError, IndexError):
             pass
-        final_g = apply_adaptive_fdw(freq_axis, final_g, bf_conf_for_smoothing if (use_bassfirst and bf_conf_for_smoothing is not None) else conf_mask, base_cycles=float(raw_stage.afdw_base), min_cycles=float(raw_stage.afdw_min))
+        final_g = apply_adaptive_fdw(
+            freq_axis,
+            final_g,
+            bf_conf_for_smoothing if (use_bassfirst and bf_conf_for_smoothing is not None) else conf_mask,
+            base_cycles=float(raw_stage.afdw_base),
+            min_cycles=float(raw_stage.afdw_min),
+        )
         try:
             if isinstance(st, dict):
                 st["fdw_mode"] = "adaptive"
@@ -360,7 +385,9 @@ def run_mag_bassfirst_afdw_conf_stage(  # noqa: C901 - bass-first confidence han
             pass
     else:
         fixed_cycles = float(max(1.0, raw_stage.afdw_base))
-        final_g = apply_adaptive_fdw(freq_axis, final_g, np.ones_like(freq_axis, dtype=float), base_cycles=fixed_cycles, min_cycles=fixed_cycles)
+        final_g = apply_adaptive_fdw(
+            freq_axis, final_g, np.ones_like(freq_axis, dtype=float), base_cycles=fixed_cycles, min_cycles=fixed_cycles
+        )
         try:
             bw_fixed_oct = float(np.clip(2.0 / max(fixed_cycles, 1.0), AFDW_BW_MIN_OCT, AFDW_BW_MAX_OCT))
             if isinstance(st, dict):
@@ -381,7 +408,7 @@ def run_mag_bassfirst_afdw_conf_stage(  # noqa: C901 - bass-first confidence han
             if i0 > 0:
                 g0[:i0] = g0[i0]
             if i1 < (g0.size - 1):
-                g0[i1 + 1:] = g0[i1]
+                g0[i1 + 1 :] = g0[i1]
         raw_safe_ref = psycho_smooth_safe_gain(freq_axis, g0)
         raw_safe_ref = np.where(mask_c, np.asarray(raw_safe_ref, dtype=float), 0.0)
     except (TypeError, ValueError, FloatingPointError, IndexError):
@@ -412,9 +439,18 @@ def run_mag_bassfirst_afdw_conf_stage(  # noqa: C901 - bass-first confidence han
                 st["bass_adaptive_conf_source"] = str(conf_for_bass_adapt_src)
         except (TypeError, ValueError):
             pass
-        final_g = apply_confidence_adaptive_bass_smoothing(final_g, freq_axis, cfg, st, conf_for_bass_adapt, stage_tag="core")
+        final_g = apply_confidence_adaptive_bass_smoothing(
+            final_g, freq_axis, cfg, st, conf_for_bass_adapt, stage_tag="core"
+        )
         pre_bass_adapt_g = pre_bass_adapt
-        _log_stage_stats("final_g_post_bass_adaptive", final_g, mask_c, ref=pre_bass_adapt, logger=logger, enabled=raw_stage.debug_stage_stats)
+        _log_stage_stats(
+            "final_g_post_bass_adaptive",
+            final_g,
+            mask_c,
+            ref=pre_bass_adapt,
+            logger=logger,
+            enabled=raw_stage.debug_stage_stats,
+        )
     except (TypeError, ValueError, FloatingPointError, IndexError):
         pass
 
@@ -439,7 +475,9 @@ def run_mag_bassfirst_afdw_conf_stage(  # noqa: C901 - bass-first confidence han
     try:
         tmp_after_apply = np.zeros_like(gain_db, dtype=float)
         tmp_after_apply[mask_c] = gain_apply[mask_c]
-        _record_stage_probe(stage_probes, "after_gain_apply", stage_probe, freq_axis, tmp_after_apply, mask_c, cfg, logger)
+        _record_stage_probe(
+            stage_probes, "after_gain_apply", stage_probe, freq_axis, tmp_after_apply, mask_c, cfg, logger
+        )
     except (TypeError, ValueError, FloatingPointError, IndexError):
         pass
 

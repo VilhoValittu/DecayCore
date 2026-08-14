@@ -11,11 +11,11 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 from ..app_paths import decaycore_data_dir
 from .auto_mode_policy import auto_filter_cache_key
-
 
 _BOOL_KEYS = {
     "bass_first_ai",
@@ -44,19 +44,64 @@ def normalize_prior_scalar(key: str, value):
 
 
 def normalize_prior_mapping(payload: dict) -> dict:
-    return {
-        str(key): normalize_prior_scalar(str(key), value)
-        for key, value in dict(payload or {}).items()
+    return {str(key): normalize_prior_scalar(str(key), value) for key, value in dict(payload or {}).items()}
+
+
+def normalize_adaptive_curve(payload: dict | None) -> dict:
+    """Return a JSON-safe adaptive target curve or an empty mapping."""
+    payload_d = dict(payload or {})
+    try:
+        frequency_hz = [float(value) for value in payload_d.get("frequency_hz", [])]
+        magnitude_db = [float(value) for value in payload_d.get("magnitude_db", [])]
+    except (TypeError, ValueError, OverflowError):
+        return {}
+    if len(frequency_hz) < 4 or len(frequency_hz) != len(magnitude_db):
+        return {}
+    if not all(math.isfinite(value) for value in (*frequency_hz, *magnitude_db)):
+        return {}
+    if any(right <= left for left, right in zip(frequency_hz, frequency_hz[1:])):
+        return {}
+    out = {
+        "frequency_hz": frequency_hz,
+        "magnitude_db": magnitude_db,
     }
+    cache_identity = dict(payload_d.get("cache_identity", {}) or {})
+    try:
+        normalized_identity = {
+            "algorithm_version": int(cache_identity["algorithm_version"]),
+            "measurement_signature": str(cache_identity["measurement_signature"]),
+            "tilt_comp_frac": float(cache_identity["tilt_comp_frac"]),
+            "bass_comp_frac": float(cache_identity["bass_comp_frac"]),
+            "bass_comp_ref_db": float(cache_identity["bass_comp_ref_db"]),
+            "hf_comp_frac": float(cache_identity["hf_comp_frac"]),
+            "smooth_oct": float(cache_identity["smooth_oct"]),
+        }
+    except (KeyError, TypeError, ValueError, OverflowError):
+        normalized_identity = {}
+    if (
+        normalized_identity
+        and all(
+            math.isfinite(value)
+            for key, value in normalized_identity.items()
+            if key not in {"algorithm_version", "measurement_signature"}
+        )
+        and normalized_identity["measurement_signature"]
+    ):
+        out["cache_identity"] = normalized_identity
+    return out
 
 
 def normalize_filter_prior_entry(payload: dict) -> dict:
     payload_d = dict(payload or {})
-    return {
+    entry = {
         "filter_type": str(payload_d.get("filter_type", "") or ""),
         "auto_defaults": normalize_prior_mapping(payload_d.get("auto_defaults", {}) or {}),
         "seed_preset": normalize_prior_mapping(payload_d.get("seed_preset", {}) or {}),
     }
+    adaptive_curve = normalize_adaptive_curve(payload_d.get("adaptive_curve", {}) or {})
+    if adaptive_curve:
+        entry["adaptive_curve"] = adaptive_curve
+    return entry
 
 
 def normalize_filter_priors(payload: dict) -> dict:
@@ -69,7 +114,7 @@ def normalize_filter_priors(payload: dict) -> dict:
 def merge_filter_prior_entry(base: dict | None, overlay: dict | None) -> dict:
     base_d = normalize_filter_prior_entry(dict(base or {}))
     overlay_d = normalize_filter_prior_entry(dict(overlay or {}))
-    return {
+    entry = {
         "filter_type": str(overlay_d.get("filter_type") or base_d.get("filter_type") or ""),
         "auto_defaults": {
             **dict(base_d.get("auto_defaults", {}) or {}),
@@ -80,6 +125,10 @@ def merge_filter_prior_entry(base: dict | None, overlay: dict | None) -> dict:
             **dict(overlay_d.get("seed_preset", {}) or {}),
         },
     }
+    adaptive_curve = dict(overlay_d.get("adaptive_curve", {}) or {}) or dict(base_d.get("adaptive_curve", {}) or {})
+    if adaptive_curve:
+        entry["adaptive_curve"] = adaptive_curve
+    return entry
 
 
 def merge_filter_priors(base: dict | None, overlay: dict | None) -> dict:
@@ -125,6 +174,7 @@ __all__ = [
     "get_auto_mode_filter_auto_defaults",
     "merge_filter_prior_entry",
     "merge_filter_priors",
+    "normalize_adaptive_curve",
     "normalize_filter_prior_entry",
     "normalize_filter_priors",
     "normalize_prior_mapping",

@@ -35,16 +35,22 @@ def _append_bass_integration_summary(
         summary_content += f"Mode: {bi_mode}\n"
         if raw_bi_mode == "direct_dac":
             pass
-        summary_content += f"Profile: {bi_meta.get('profile', ui_data.get('bass_integration_profile', 'safe')) or 'safe'!s}\n"
+        summary_content += (
+            f"Profile: {bi_meta.get('profile', ui_data.get('bass_integration_profile', 'safe')) or 'safe'!s}\n"
+        )
         summary_content += f"Sub combine mode: {bi_meta.get('sub_combine_mode', ui_data.get('bass_integration_sub_combine_mode', 'average')) or 'average'!s}\n"
         dual_sub_diag = dict(bi_meta.get("diagnostics", {}) or {})
-        combine_mode = str(
-            dual_sub_diag.get(
-                "sub_combine_mode",
-                bi_meta.get("sub_combine_mode", ui_data.get("bass_integration_sub_combine_mode", "average")),
+        combine_mode = (
+            str(
+                dual_sub_diag.get(
+                    "sub_combine_mode",
+                    bi_meta.get("sub_combine_mode", ui_data.get("bass_integration_sub_combine_mode", "average")),
+                )
+                or "average"
             )
-            or "average"
-        ).strip().lower()
+            .strip()
+            .lower()
+        )
         is_dual_sub_shared = bool(dual_sub_diag.get("dual_sub_preprocessing_applied", False)) or combine_mode in {
             "dual_sub_peak_aligned_average",
             "dual_sub_single_bus_complex_sum",
@@ -55,12 +61,8 @@ def _append_bass_integration_summary(
                 combine_mode == "dual_sub_single_bus_complex_sum"
                 or dual_sub_method == "single_bus_measured_complex_pressure_sum"
             )
-            sub1_peak_ms = _safe_float(
-                dual_sub_diag.get("dual_sub_sub1_peak_ms", float("nan")), float("nan")
-            )
-            sub2_peak_ms = _safe_float(
-                dual_sub_diag.get("dual_sub_sub2_peak_ms", float("nan")), float("nan")
-            )
+            sub1_peak_ms = _safe_float(dual_sub_diag.get("dual_sub_sub1_peak_ms", float("nan")), float("nan"))
+            sub2_peak_ms = _safe_float(dual_sub_diag.get("dual_sub_sub2_peak_ms", float("nan")), float("nan"))
             delay_ms = _safe_float(
                 dual_sub_diag.get("dual_sub_relative_delay_ms", float("nan")),
                 float("nan"),
@@ -107,7 +109,9 @@ def _append_bass_integration_summary(
                 summary_content += "- Combined method: complex vector average after peak alignment\n"
             summary_content += "- Output filter: one shared mono Sub FIR for both subwoofers\n"
             summary_content += "- Per-sub optimization: no\n"
-            summary_content += "- Reported delay, polarity, gain trim, and allpass values apply to the shared combined sub branch.\n"
+            summary_content += (
+                "- Reported delay, polarity, gain trim, and allpass values apply to the shared combined sub branch.\n"
+            )
         dsp_settings = build_bass_integration_dsp_settings(ui_data)
         if dsp_settings:
             summary_content += "\n=== DSP SETTINGS TO ENTER IN YOUR DSP ===\n"
@@ -119,20 +123,17 @@ def _append_bass_integration_summary(
         diag = dict(bi_meta.get("diagnostics", {}) or {})
         gd_cont = dict(diag.get("gd_continuity", {}) or {})
         alignment = dict(bi_meta.get("alignment", {}) or {})
+
         def _first_finite(*values):
             for value in values:
                 parsed = _safe_float(value, float("nan"))
                 if parsed == parsed and abs(parsed) != float("inf"):
                     return float(parsed)
             return float("nan")
+
         if raw_bi_mode == "direct_dac":
             summary_content += f"Auto alignment applied: {'YES' if bool(alignment.get('applied', False)) else 'NO'}\n"
-            sub_delay = float(
-                alignment.get(
-                    "delay_ms", ui_data.get("bass_integration_sub_delay_ms", 0.0)
-                )
-                or 0.0
-            )
+            sub_delay = float(alignment.get("delay_ms", ui_data.get("bass_integration_sub_delay_ms", 0.0)) or 0.0)
             main_delay_default = max(0.0, -sub_delay)
             main_l_delay_raw = alignment.get(
                 "main_l_delay_ms",
@@ -150,18 +151,11 @@ def _append_bass_integration_summary(
                 main_r_delay_raw,
                 main_delay_default,
             )
-            if (
-                main_l_delay == main_l_delay
-                and abs(main_l_delay) != float("inf")
-                and abs(main_l_delay) > 1e-6
-            ) or (
-                main_r_delay == main_r_delay
-                and abs(main_r_delay) != float("inf")
-                and abs(main_r_delay) > 1e-6
+            if (main_l_delay == main_l_delay and abs(main_l_delay) != float("inf") and abs(main_l_delay) > 1e-6) or (
+                main_r_delay == main_r_delay and abs(main_r_delay) != float("inf") and abs(main_r_delay) > 1e-6
             ):
                 summary_content += (
-                    "CamillaDSP main delay: "
-                    f"L {float(main_l_delay):+.2f} ms, R {float(main_r_delay):+.2f} ms\n"
+                    "CamillaDSP main delay: " f"L {float(main_l_delay):+.2f} ms, R {float(main_r_delay):+.2f} ms\n"
                 )
             worst_channel = (
                 str(
@@ -207,16 +201,9 @@ def _append_bass_integration_summary(
             bm.get("bass_xo_gd_mismatch_ms", float("nan")),
         )
         feasibility_class = (
-            str(
-                diag.get("feasibility_class", bm.get("bass_feasibility_class", ""))
-                or ""
-            )
-            .strip()
-            .lower()
+            str(diag.get("feasibility_class", bm.get("bass_feasibility_class", "")) or "").strip().lower()
         )
-        feasibility_reason = str(
-            diag.get("feasibility_reason", bm.get("bass_feasibility_reason", "")) or ""
-        ).strip()
+        feasibility_reason = str(diag.get("feasibility_reason", bm.get("bass_feasibility_reason", "")) or "").strip()
         if feasibility_class:
             feasibility_label = feasibility_class.upper()
             if feasibility_class in ("marginal", "infeasible"):
@@ -228,8 +215,7 @@ def _append_bass_integration_summary(
             in list(bm.get("hard_gate_failures", bm.get("hard_gate_reasons", [])) or [])
         )
         hard_gate_reason = str(
-            bm.get("bass_integration_hard_gate_reason", feasibility_reason)
-            or feasibility_reason
+            bm.get("bass_integration_hard_gate_reason", feasibility_reason) or feasibility_reason
         ).strip()
         if hard_gate_failed:
             summary_content += "Safety gate: Bass Integration infeasible hard gate\n"
@@ -248,9 +234,7 @@ def _append_bass_integration_summary(
     return summary_content
 
 
-def _append_bass_integration_allpass_auto_summary(
-    summary_content: str, data: dict | None
-) -> str:
+def _append_bass_integration_allpass_auto_summary(summary_content: str, data: dict | None) -> str:
     try:
         ui_data = dict(data or {})
         if not bool(ui_data.get("bass_integration_enable", False)):
@@ -273,17 +257,11 @@ def _append_bass_integration_allpass_auto_summary(
             return "n/a"
 
         summary_content += "\n=== BASS INTEGRATION ALLPASS AUTO ===\n"
-        summary_content += (
-            f"State: {'ON' if bool(allpass_meta.get('enabled', False)) else 'OFF'}\n"
-        )
+        summary_content += f"State: {'ON' if bool(allpass_meta.get('enabled', False)) else 'OFF'}\n"
         summary_content += "Mode: direct_dac only\n"
         if bool(allpass_meta.get("enabled", False)):
-            summary_content += (
-                f"Freq: {float(allpass_meta.get('freq_hz', 0.0) or 0.0):.1f} Hz\n"
-            )
-            summary_content += (
-                f"Q: {float(allpass_meta.get('q', 0.707) or 0.707):.3f}\n"
-            )
+            summary_content += f"Freq: {float(allpass_meta.get('freq_hz', 0.0) or 0.0):.1f} Hz\n"
+            summary_content += f"Q: {float(allpass_meta.get('q', 0.707) or 0.707):.3f}\n"
         else:
             summary_content += "Freq: n/a\n"
             summary_content += "Q: n/a\n"
@@ -296,7 +274,9 @@ def _append_bass_integration_allpass_auto_summary(
         summary_content += f"- Overlap ripple: {_fmt(optimized.get('overlap_ripple_db', float('nan')), ' dB p2p')}\n"
         summary_content += f"- XO GD mismatch: {_fmt(optimized.get('xo_gd_mismatch_ms', float('nan')), ' ms')}\n"
         summary_content += f"Improvement score: {_fmt(allpass_meta.get('improvement_score', float('nan')))}\n"
-        summary_content += f"Reason: {allpass_meta.get('reason', ui_data.get('bass_integration_allpass_reason', '')) or ''!s}\n"
+        summary_content += (
+            f"Reason: {allpass_meta.get('reason', ui_data.get('bass_integration_allpass_reason', '')) or ''!s}\n"
+        )
         summary_content += "Does not change FIR generation.\n"
         summary_content += "Applied in the exported CamillaDSP Direct DAC sub pipeline when State is ON.\n"
         summary_content += "HLC config export is unchanged.\n"
@@ -305,4 +285,4 @@ def _append_bass_integration_allpass_auto_summary(
     return summary_content
 
 
-__all__ = ['_append_bass_integration_summary', '_append_bass_integration_allpass_auto_summary']
+__all__ = ["_append_bass_integration_summary", "_append_bass_integration_allpass_auto_summary"]

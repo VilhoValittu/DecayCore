@@ -100,7 +100,9 @@ def _to_axis(arr: Any, fallback: np.ndarray) -> np.ndarray:
     return np.asarray(fallback if fallback is not None else [], dtype=float).ravel()
 
 
-def _extract_lr_measurement_axes(measurements: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def _extract_lr_measurement_axes(
+    measurements: dict,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     empty = np.asarray([], dtype=float)
     return (
         _to_axis(measurements.get("f_l"), empty),
@@ -125,6 +127,7 @@ def _resample_to_axis(values: Any, f_src: np.ndarray, f_dst: np.ndarray) -> np.n
     f_q = np.clip(fd, float(np.min(fs)), float(np.max(fs)))
     return np.interp(f_q, fs, v).astype(float)
 
+
 def _resolve_sub_measurement_for_filter(
     measurements: dict,
     *,
@@ -141,7 +144,6 @@ def _resolve_sub_measurement_for_filter(
         try:
             delay_ms = float(measurements.get("bass_integration_sub_delay_ms", 0.0) or 0.0)
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -157,7 +159,6 @@ def _resolve_sub_measurement_for_filter(
         try:
             gain_trim_db = float(measurements.get("bass_integration_sub_gain_trim_db", 0.0) or 0.0)
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -209,7 +210,6 @@ def _resolve_sub_measurement_for_filter(
                 np.asarray(sub_transfer.phase_deg, dtype=float),
             )
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -232,6 +232,7 @@ def _resolve_sub_measurement_for_filter(
         np.asarray(p_sub, dtype=float),
     )
 
+
 def _interp_complex_to_axis(
     f_src: np.ndarray,
     h_src: np.ndarray,
@@ -249,6 +250,7 @@ def _interp_complex_to_axis(
     im = np.interp(f_q, fs, np.imag(hs))
     return (re + 1j * im).astype(np.complex128, copy=False)
 
+
 def _ir_fft_on_axis(ir: np.ndarray, fs: int, f_axis: np.ndarray) -> np.ndarray:
     x = np.asarray(ir if ir is not None else [], dtype=float).reshape(-1)
     fa = np.asarray(f_axis if f_axis is not None else [], dtype=float).reshape(-1)
@@ -261,12 +263,12 @@ def _ir_fft_on_axis(ir: np.ndarray, fs: int, f_axis: np.ndarray) -> np.ndarray:
 
 
 __all__ = [
-    '_build_measurement_side_ctx',
-    '_phase_from_ir',
-    '_to_axis',
-    '_extract_lr_measurement_axes',
-    '_resample_to_axis',
-    '_resolve_sub_measurement_for_filter',
-    '_interp_complex_to_axis',
-    '_ir_fft_on_axis',
+    "_build_measurement_side_ctx",
+    "_phase_from_ir",
+    "_to_axis",
+    "_extract_lr_measurement_axes",
+    "_resample_to_axis",
+    "_resolve_sub_measurement_for_filter",
+    "_interp_complex_to_axis",
+    "_ir_fft_on_axis",
 ]

@@ -259,16 +259,18 @@ def _compute_tdc_reduction_stats(freq_axis: Any, tdc_reduction_db: np.ndarray) -
                 band_lo = float(np.min(fv[active]))
                 band_hi = float(np.max(fv[active]))
     return {
-        "peak_db": peak_db, "peak_hz": peak_hz, "rms_db": rms_db,
-        "area_db_hz": area_db_hz, "band_lo": band_lo, "band_hi": band_hi,
+        "peak_db": peak_db,
+        "peak_hz": peak_hz,
+        "rms_db": rms_db,
+        "area_db_hz": area_db_hz,
+        "band_lo": band_lo,
+        "band_hi": band_hi,
     }
 
 
 def _tdc_normalized_modal_events(modal_events, tdc_hi_hz: float) -> list[dict[str, Any]]:
     return [
-        n
-        for me in (modal_events or [])
-        if (n := _normalize_modal_event(me)) is not None and n["freq_hz"] <= tdc_hi_hz
+        n for me in (modal_events or []) if (n := _normalize_modal_event(me)) is not None and n["freq_hz"] <= tdc_hi_hz
     ]
 
 
@@ -443,30 +445,39 @@ def apply_smart_tdc(
     tdc_hi_hz = float(np.clip(_tdc_safe_float(max_tdc_hz, 300.0), 80.0, 500.0))
 
     def _emit_telemetry(
-        *, events_seen=0, events_used=0, skipped_high=0, strongest=None,
-        reason="", modal_events_seen=0, modal_events_used=0, modal_voice_events_used=0,
+        *,
+        events_seen=0,
+        events_used=0,
+        skipped_high=0,
+        strongest=None,
+        reason="",
+        modal_events_seen=0,
+        modal_events_used=0,
+        modal_voice_events_used=0,
     ) -> None:
         if telemetry is None:
             return
         stats = _compute_tdc_reduction_stats(freq_axis, tdc_reduction_db)
-        telemetry.update({
-            "tdc_enabled": bool(strength > 0.0 and max_red > 0.0),
-            "tdc_applied": bool(stats["peak_db"] > 1e-9),
-            "tdc_events_seen": int(events_seen),
-            "tdc_events_used": int(events_used),
-            "tdc_events_skipped_high": int(skipped_high),
-            "tdc_peak_reduction_db": stats["peak_db"],
-            "tdc_peak_reduction_hz": stats["peak_hz"],
-            "tdc_reduction_rms_db": stats["rms_db"],
-            "tdc_reduction_area_db_hz": stats["area_db_hz"],
-            "tdc_reduction_band_low_hz": stats["band_lo"],
-            "tdc_reduction_band_high_hz": stats["band_hi"],
-            "tdc_max_tdc_hz": float(tdc_hi_hz),
-            "tdc_skip_reason": str(reason),
-            "tdc_modal_events_seen": int(modal_events_seen),
-            "tdc_modal_events_used": int(modal_events_used),
-            "tdc_modal_voice_events_used": int(modal_voice_events_used),
-        })
+        telemetry.update(
+            {
+                "tdc_enabled": bool(strength > 0.0 and max_red > 0.0),
+                "tdc_applied": bool(stats["peak_db"] > 1e-9),
+                "tdc_events_seen": int(events_seen),
+                "tdc_events_used": int(events_used),
+                "tdc_events_skipped_high": int(skipped_high),
+                "tdc_peak_reduction_db": stats["peak_db"],
+                "tdc_peak_reduction_hz": stats["peak_hz"],
+                "tdc_reduction_rms_db": stats["rms_db"],
+                "tdc_reduction_area_db_hz": stats["area_db_hz"],
+                "tdc_reduction_band_low_hz": stats["band_lo"],
+                "tdc_reduction_band_high_hz": stats["band_hi"],
+                "tdc_max_tdc_hz": float(tdc_hi_hz),
+                "tdc_skip_reason": str(reason),
+                "tdc_modal_events_seen": int(modal_events_seen),
+                "tdc_modal_events_used": int(modal_events_used),
+                "tdc_modal_voice_events_used": int(modal_voice_events_used),
+            }
+        )
         if isinstance(strongest, dict):
             telemetry.update(strongest)
 

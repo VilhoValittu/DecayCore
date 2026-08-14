@@ -136,10 +136,7 @@ def _log_xo_hpf_info(xos, hpf) -> None:
     try:
         if xos:
             xo_txt = ", ".join(
-                [
-                    f"{float(x.get('freq')):.1f}Hz/{int(x.get('slope', int(x.get('order', 1)) * 6))}dB/oct"
-                    for x in xos
-                ]
+                [f"{float(x.get('freq')):.1f}Hz/{int(x.get('slope', int(x.get('order', 1)) * 6))}dB/oct" for x in xos]
             )
             _safe_log_info(logger, "XO (UI->CFG): %s", xo_txt)
         else:
@@ -388,6 +385,8 @@ def _build_measurements_dict(
         "measured_rt60_bands_l": prepared.measured_rt60_bands_l,
         "measured_rt60_r": prepared.measured_rt60_r,
         "measured_rt60_bands_r": prepared.measured_rt60_bands_r,
+        "measured_snr_db_l": prepared.measured_snr_db_l,
+        "measured_snr_db_r": prepared.measured_snr_db_r,
         "harmonic_freq_hz_l": prepared.harmonic_freq_hz_l,
         "harmonic_magnitudes_db_l": prepared.harmonic_magnitudes_db_l,
         "harmonic_freq_hz_r": prepared.harmonic_freq_hz_r,
@@ -545,9 +544,7 @@ def _prepare_target_curve_bass_integration_context(
         data["sub_crossover_hz"] = float(bi_recommended_xo_hz)
         data["avr_crossover_hz"] = float(bi_recommended_xo_hz)
         _sub_lpf_store = (
-            float(bi_recommended_sub_lpf_hz)
-            if bi_recommended_sub_lpf_hz is not None
-            else float(bi_recommended_xo_hz)
+            float(bi_recommended_sub_lpf_hz) if bi_recommended_sub_lpf_hz is not None else float(bi_recommended_xo_hz)
         )
         _sub_lpf_store = max(float(bi_recommended_xo_hz), _sub_lpf_store)
         data["direct_dac_sub_lpf_hz"] = _sub_lpf_store
@@ -558,10 +555,7 @@ def _prepare_target_curve_bass_integration_context(
                 f"sub LPF {_sub_lpf_store:.1f} Hz (overlap)"
             )
         else:
-            logger.info(
-                "Bass Integration Direct-DAC auto XO selected: "
-                f"{float(bi_recommended_xo_hz):.1f} Hz"
-            )
+            logger.info("Bass Integration Direct-DAC auto XO selected: " f"{float(bi_recommended_xo_hz):.1f} Hz")
     _current_main_hpf = _safe_float_from_dict(data, "sub_crossover_hz", 80.0, positive=True)
     _current_sub_lpf = _safe_float_from_dict(
         data,
@@ -634,7 +628,9 @@ def _log_target_curve_bass_integration_summary(bundle, data: dict, elapsed_s: fl
         NameError,
     ):
         _cache_str = ""
-    _align_str = "alignment applied" if bool(data.get("bass_integration_alignment_auto_applied", False)) else "alignment skipped"
+    _align_str = (
+        "alignment applied" if bool(data.get("bass_integration_alignment_auto_applied", False)) else "alignment skipped"
+    )
     _xo_val = float(data.get("avr_crossover_hz", 0.0) or 0.0)
     _allpass_str = (
         f"allpass {float(data.get('bass_integration_allpass_freq_hz', 0.0)):.1f} Hz"
@@ -700,15 +696,15 @@ def _prepare_target_curve_and_run_context(
 
 
 __all__ = [
-    '_build_bass_integration_metadata_unified',
-    '_prepare_target_curve_and_run_context',
-    '_prepare_target_curve_bass_integration_context',
-    '_safe_float_from_dict',
-    'build_xos_hpf',
-    'choose_dash_fs',
-    'choose_target_rates',
-    'detect_is_wav_source',
-    'filter_type_short',
-    'load_house_curve',
-    'log_df_smoothing_toggle',
+    "_build_bass_integration_metadata_unified",
+    "_prepare_target_curve_and_run_context",
+    "_prepare_target_curve_bass_integration_context",
+    "_safe_float_from_dict",
+    "build_xos_hpf",
+    "choose_dash_fs",
+    "choose_target_rates",
+    "detect_is_wav_source",
+    "filter_type_short",
+    "load_house_curve",
+    "log_df_smoothing_toggle",
 ]

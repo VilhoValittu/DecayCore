@@ -32,10 +32,10 @@ class LRDifferenceResult:
     """Per-run L/R difference metrics derived from measured response data."""
 
     # Magnitude RMS mismatch in fixed bands (dB).
-    mag_rms_bass_db: float       # 20–200 Hz
-    mag_rms_mid_db: float        # 200–2000 Hz
-    mag_rms_band_db: float       # correction / analysis band
-    mag_maxabs_band_db: float    # peak absolute delta over analysis band
+    mag_rms_bass_db: float  # 20–200 Hz
+    mag_rms_mid_db: float  # 200–2000 Hz
+    mag_rms_band_db: float  # correction / analysis band
+    mag_maxabs_band_db: float  # peak absolute delta over analysis band
 
     # Optional group-delay mismatch over analysis band (ms).
     gd_rms_band_ms: float = float("nan")
@@ -56,6 +56,7 @@ _NAN_RESULT = LRDifferenceResult(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _band_mask(freq: np.ndarray, lo: float, hi: float) -> np.ndarray:
     """Boolean mask for bins inside [lo, hi] Hz."""
@@ -89,7 +90,6 @@ def _get_mags(st: dict, key: str = "measured_mags") -> np.ndarray | None:
     try:
         arr = np.asarray(raw, dtype=float).reshape(-1)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -106,15 +106,14 @@ def _get_mags(st: dict, key: str = "measured_mags") -> np.ndarray | None:
     return arr
 
 
-def _get_freq(st: dict) -> np.ndarray | None:
-    """Return freq_axis from stats dict or None."""
-    raw = st.get("freq_axis")
+def _get_freq(st: dict, key: str = "freq_axis") -> np.ndarray | None:
+    """Return a frequency-axis array from stats dict or None."""
+    raw = st.get(key)
     if raw is None:
         return None
     try:
         arr = np.asarray(raw, dtype=float).reshape(-1)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -129,6 +128,20 @@ def _get_freq(st: dict) -> np.ndarray | None:
     if arr.size < 8:
         return None
     return arr
+
+
+def _get_measured_curve(
+    st: dict,
+    *,
+    freq_key: str,
+    mag_key: str,
+) -> tuple[np.ndarray | None, np.ndarray | None]:
+    """Return a matched frequency/magnitude pair for the requested grid."""
+    freq = _get_freq(st, freq_key)
+    mags = _get_mags(st, mag_key)
+    if freq is not None and mags is not None and freq.size == mags.size:
+        return freq, mags
+    return None, None
 
 
 def _interp_to_axis(
@@ -147,6 +160,7 @@ def _interp_to_axis(
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
+
 
 def compute_lr_difference_metrics(
     l_st: dict,
@@ -176,21 +190,32 @@ def compute_lr_difference_metrics(
         l_st = dict(l_st or {})
         r_st = dict(r_st or {})
 
-        # Prefer comparison-mode mags when present, fall back to native.
-        l_mag = _get_mags(l_st, "cmp_measured_mags")
-        if l_mag is None:
-            l_mag = _get_mags(l_st, "measured_mags")
-        r_mag = _get_mags(r_st, "cmp_measured_mags")
-        if r_mag is None:
-            r_mag = _get_mags(r_st, "measured_mags")
+        # Select both channels from the same grid and keep each magnitude
+        # curve paired with its own axis. Comparison and native grids commonly
+        # have different lengths and independently normalized level offsets.
+        l_freq, l_mag = _get_measured_curve(
+            l_st,
+            freq_key="cmp_freq_axis",
+            mag_key="cmp_measured_mags",
+        )
+        r_freq, r_mag = _get_measured_curve(
+            r_st,
+            freq_key="cmp_freq_axis",
+            mag_key="cmp_measured_mags",
+        )
+        if l_freq is None or l_mag is None or r_freq is None or r_mag is None:
+            l_freq, l_mag = _get_measured_curve(
+                l_st,
+                freq_key="freq_axis",
+                mag_key="measured_mags",
+            )
+            r_freq, r_mag = _get_measured_curve(
+                r_st,
+                freq_key="freq_axis",
+                mag_key="measured_mags",
+            )
 
-        if l_mag is None or r_mag is None:
-            return _NAN_RESULT
-
-        l_freq = _get_freq(l_st)
-        r_freq = _get_freq(r_st)
-
-        if l_freq is None or r_freq is None:
+        if l_freq is None or l_mag is None or r_freq is None or r_mag is None:
             return _NAN_RESULT
 
         # Bring everything onto l_freq as reference axis.
@@ -245,7 +270,6 @@ def compute_lr_difference_metrics(
             band_hi_hz=band_hi,
         )
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -264,6 +288,7 @@ def compute_lr_difference_metrics(
 # Optional GD mismatch
 # ---------------------------------------------------------------------------
 
+
 def _compute_gd_rms_band(
     l_st: dict,
     r_st: dict,
@@ -280,7 +305,6 @@ def _compute_gd_rms_band(
             return float("nan")
         return _gd_rms_band_from_arrays(l_gd, r_gd, freq, band_lo, band_hi)
     except (
-
         AttributeError,
         TypeError,
         ValueError,

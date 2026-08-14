@@ -22,6 +22,7 @@ Usage:
 The hook callable receives a single float (partial score, higher = better).
 It should raise optuna.TrialPruned() if the trial should be stopped early.
 """
+
 from __future__ import annotations
 
 import threading

@@ -723,5 +723,3 @@ MODE_CLAMPS_BASE: dict[str, dict[str, tuple[Any, Any]]] = {
     },
     "ADVANCED": {},
 }
-
-

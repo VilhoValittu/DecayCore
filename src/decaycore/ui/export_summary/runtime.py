@@ -55,17 +55,18 @@ def _polish_display_rank(polish: dict, raw_key: str, official_key: str) -> float
     raw = _safe_float(dict(polish or {}).get(raw_key, float("nan")), float("nan"))
     return float(calibrated_auto_quality(raw))
 
+
 def _format_recommended_xo_hz(value: float) -> str:
     hz = float(value)
     if math.isclose(hz, round(hz), abs_tol=1e-6):
         return f"{hz:.0f} Hz"
     return f"{hz:.1f} Hz"
 
+
 def _auto_search_space_summary(data: dict | None) -> str:
     try:
         ft = str((data or {}).get("filter_type", "") or "").strip().lower()
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -104,6 +105,7 @@ def _auto_search_space_summary(data: dict | None) -> str:
         "Because the calculation count is still large, runtime depends strongly on computer performance."
     )
 
+
 def _module_runtime_version(module_name: str) -> str:
     try:
         mod = __import__(str(module_name))
@@ -111,7 +113,6 @@ def _module_runtime_version(module_name: str) -> str:
         if ver:
             return ver
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -131,7 +132,6 @@ def _module_runtime_version(module_name: str) -> str:
         if ver:
             return ver
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -145,6 +145,7 @@ def _module_runtime_version(module_name: str) -> str:
     ):
         logger.exception("module version metadata")
     return "n/a"
+
 
 def _runtime_versions_text() -> str:
     py_ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
@@ -203,19 +204,17 @@ def _append_main_speaker_xo_hpf_summary(summary_content: str, data: dict | None)
             summary_content += "Crossovers: OFF\n"
 
         summary_content += _hpf_summary_line(ui_data)
-        summary_content += (
-            "Note: this XO / HPF section models the main speaker crossover / HPF phase chain.\n"
-        )
+        summary_content += "Note: this XO / HPF section models the main speaker crossover / HPF phase chain.\n"
     except _RECOVERABLE_SUMMARY_EXCEPTIONS:
         logger.exception("XO/HPF summary section")
     return summary_content
 
 
 __all__ = [
-    '_polish_display_rank',
-    '_format_recommended_xo_hz',
-    '_auto_search_space_summary',
-    '_module_runtime_version',
-    '_runtime_versions_text',
-    '_append_main_speaker_xo_hpf_summary',
+    "_polish_display_rank",
+    "_format_recommended_xo_hz",
+    "_auto_search_space_summary",
+    "_module_runtime_version",
+    "_runtime_versions_text",
+    "_append_main_speaker_xo_hpf_summary",
 ]

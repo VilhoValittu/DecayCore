@@ -12,6 +12,56 @@ All notable changes to **DecayCore** are documented in this file.
 
 ## DecayCore
 
+## [1.2.4] - 14-8-2026
+
+### Measurement
+
+Measurement warning texts have been clarified.
+
+### Adaptive curve
+
+The adaptive curve is now saved to the filter_mode_priors file. This enables more accurate results in automatic mode.
+
+### UI
+
+Texts have been simplified.
+The info box now moves along with the UI.
+
+### Export
+
+Multi-rate taps now scale by sample-rate family:
+44.1/48 kHz → 65536
+88.2/96 kHz → 131072
+176.4/192 kHz → 262144
+When “Generate all common filter sample rates” is active:
+target pre-fetch always uses 44.1 kHz / 65536 taps
+
+---
+
+### Mittaus
+
+Selkeytetty mittauksen varoitustekstejä.
+
+### Adaptiviinen käyrä
+
+Adaptiivinen käyrä tallennetaan nyt filter_mode_priors tiedostoon. Tämä mahdollistaa tarkemmat tulokset automaattimoodissa.
+
+### UI
+
+Tekstejä yksinkertaistettu.
+Info-boksi liikkuu nyt UI:n mukana.
+
+### Export
+
+Multi-rate taps skaalautuu nyt sample rate -perheittäin:
+44,1/48 kHz → 65 536
+88,2/96 kHz → 131 072
+176,4/192 kHz → 262 144
+Kun “Generate all common filter sample rates” on aktiivinen:
+target-esihaku käyttää aina 44,1 kHz / 65 536 taps
+
+---
+
 ## [1.2.3] - 11-8-2026
 
 ### Lower memory use after demanding runs

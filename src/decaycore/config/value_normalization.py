@@ -147,7 +147,6 @@ def _as_text(value: Any) -> str:
     try:
         return str(value or "").strip()
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -169,7 +168,6 @@ def _translation_variants(label_key: str, t: Callable[[str], str] | None = None)
         try:
             translated = _as_text(t(label_key))
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -189,7 +187,6 @@ def _translation_variants(label_key: str, t: Callable[[str], str] | None = None)
         try:
             translated = _as_text((catalog or {}).get(label_key))
         except (
-
             AttributeError,
             TypeError,
             ValueError,

@@ -82,7 +82,8 @@ def write_bypass_fir_wavs(
         if int(r_bypass.size) != n:
             r_bypass = np.pad(r_bypass, (0, n - int(r_bypass.size)))
         scipy.io.wavfile.write(
-            stereo_wav, int(fs),
+            stereo_wav,
+            int(fs),
             np.column_stack((_convert_bypass_ir(l_bypass, wav_fmt), _convert_bypass_ir(r_bypass, wav_fmt))),
         )
         zf.writestr(bypass_zip_path(str(spec["bundle_names"][0])), stereo_wav.getvalue())

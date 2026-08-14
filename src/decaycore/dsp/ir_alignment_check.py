@@ -18,18 +18,16 @@ from __future__ import annotations
 
 import numpy as np
 
-
 # ---------------------------------------------------------------------------
 # Apufunktiot
 # ---------------------------------------------------------------------------
+
 
 def _peak_index(x: np.ndarray) -> int:
     return int(np.argmax(np.abs(x)))
 
 
-def _window_around_peak(
-    x: np.ndarray, fs: int, pre_ms: float = 5.0, post_ms: float = 500.0
-) -> np.ndarray:
+def _window_around_peak(x: np.ndarray, fs: int, pre_ms: float = 5.0, post_ms: float = 500.0) -> np.ndarray:
     peak = _peak_index(x)
     pre = int(round(pre_ms * fs / 1000.0))
     post = int(round(post_ms * fs / 1000.0))
@@ -38,9 +36,7 @@ def _window_around_peak(
     return x[start:end]
 
 
-def _freq_response(
-    x: np.ndarray, fs: int
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _freq_response(x: np.ndarray, fs: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Palauttaa (freqs_hz, magnitude_db, phase_deg) ikkunoidusta IR:stä."""
     n = max(len(x), 65536)
     n = 1 << (max(1, n) - 1).bit_length()
@@ -68,9 +64,12 @@ def _group_delay_ms(freqs: np.ndarray, phase_deg: np.ndarray, hz: float) -> floa
 # Ristikorrelaatiopohjainen ajoitusanalyysi
 # ---------------------------------------------------------------------------
 
+
 def _xcorr_timing(
-    fs_a: int, x_a: np.ndarray,
-    fs_b: int, x_b: np.ndarray,
+    fs_a: int,
+    x_a: np.ndarray,
+    fs_b: int,
+    x_b: np.ndarray,
     max_lag_ms: float = 150.0,
 ) -> dict:
     """Laskee ristikorrelaation impulssiikkunoiden välillä ja palauttaa
@@ -81,13 +80,13 @@ def _xcorr_timing(
 
     pre = int(0.050 * fs_a)
     post = int(0.600 * fs_a)
-    seg_a = x_a[max(0, peak_a - pre): min(len(x_a), peak_a + post)].copy()
-    seg_b = x_b[max(0, peak_b - pre): min(len(x_b), peak_b + post)].copy()
+    seg_a = x_a[max(0, peak_a - pre) : min(len(x_a), peak_a + post)].copy()
+    seg_b = x_b[max(0, peak_b - pre) : min(len(x_b), peak_b + post)].copy()
 
     if seg_a.size > 0:
-        seg_a /= (np.max(np.abs(seg_a)) + 1e-12)
+        seg_a /= np.max(np.abs(seg_a)) + 1e-12
     if seg_b.size > 0:
-        seg_b /= (np.max(np.abs(seg_b)) + 1e-12)
+        seg_b /= np.max(np.abs(seg_b)) + 1e-12
 
     n = min(len(seg_a), len(seg_b))
     seg_a = seg_a[:n]
@@ -99,7 +98,7 @@ def _xcorr_timing(
     xcorr = np.fft.irfft(A * np.conj(B), n=n_fft)
 
     max_lag_samp = min(int(round(max_lag_ms * fs_a / 1000.0)), n_fft // 2 - 1)
-    search = np.concatenate([xcorr[:max_lag_samp + 1], xcorr[n_fft - max_lag_samp:]])
+    search = np.concatenate([xcorr[: max_lag_samp + 1], xcorr[n_fft - max_lag_samp :]])
     best_idx = int(np.argmax(np.abs(search)))
     best_value = float(search[best_idx])
 
@@ -124,6 +123,7 @@ def _xcorr_timing(
 # Napaisuus, taso, vaihe
 # ---------------------------------------------------------------------------
 
+
 def _polarity_check(x_a: np.ndarray, x_b: np.ndarray, *, timing: dict | None = None) -> dict:
     # A single peak-sample sign is brittle with real room IRs. Prefer the
     # signed correlation peak when timing analysis is already available.
@@ -138,8 +138,8 @@ def _polarity_check(x_a: np.ndarray, x_b: np.ndarray, *, timing: dict | None = N
 def _level_check(x_a: np.ndarray, x_b: np.ndarray) -> dict:
     peak_a = float(np.max(np.abs(x_a)))
     peak_b = float(np.max(np.abs(x_b)))
-    rms_a = float(np.sqrt(np.mean(x_a ** 2)))
-    rms_b = float(np.sqrt(np.mean(x_b ** 2)))
+    rms_a = float(np.sqrt(np.mean(x_a**2)))
+    rms_b = float(np.sqrt(np.mean(x_b**2)))
     return {
         "peak_a_dbfs": 20.0 * np.log10(peak_a + 1e-12),
         "peak_b_dbfs": 20.0 * np.log10(peak_b + 1e-12),
@@ -148,8 +148,12 @@ def _level_check(x_a: np.ndarray, x_b: np.ndarray) -> dict:
 
 
 def _phase_check(
-    freqs_a: np.ndarray, phase_a: np.ndarray, gd_a_ms: float,
-    freqs_b: np.ndarray, phase_b: np.ndarray, gd_b_ms: float,
+    freqs_a: np.ndarray,
+    phase_a: np.ndarray,
+    gd_a_ms: float,
+    freqs_b: np.ndarray,
+    phase_b: np.ndarray,
+    gd_b_ms: float,
     xo_hz: float,
 ) -> dict:
     ph_a = _interp_at(freqs_a, phase_a, xo_hz)
@@ -171,6 +175,7 @@ def _phase_check(
 # ---------------------------------------------------------------------------
 # Julkinen entry point
 # ---------------------------------------------------------------------------
+
 
 def run_ir_alignment_check(
     ir_a: np.ndarray,
@@ -236,7 +241,6 @@ def run_ir_alignment_check(
             "ir_align_gd_diff_ms": phase["gd_diff_ms"],
         }
     except (
-
         AttributeError,
         TypeError,
         ValueError,

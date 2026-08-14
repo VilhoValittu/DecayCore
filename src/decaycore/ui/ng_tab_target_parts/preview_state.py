@@ -9,6 +9,7 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 """Shared mutable state for the Target tab preview."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

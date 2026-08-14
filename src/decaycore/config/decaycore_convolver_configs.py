@@ -698,8 +698,6 @@ def generate_raspberry_yaml(
     )
 
 
-
-
 def generate_hlc_config(
     fs,
     ft_short,
@@ -733,7 +731,7 @@ def generate_hlc_config(
         f"{r_name}",
         f"{r_ch}",
         "1.0",
-        "1.0"
+        "1.0",
     ]
     return "\n".join(config)
 
@@ -770,6 +768,6 @@ def generate_bypass_hlc_config(
         f"{r_name}",
         f"{r_ch}",
         "1.0",
-        "1.0"
+        "1.0",
     ]
     return "\n".join(config)

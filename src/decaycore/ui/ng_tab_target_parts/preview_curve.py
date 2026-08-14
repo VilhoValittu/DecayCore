@@ -9,6 +9,7 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 """Shared target-preview curve resolution and TXT serialization."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -147,10 +148,7 @@ def _build_target_preview_curve(
         manual_tilt_db_per_oct if is_manual_level else 0.0,
     )
     display_magnitude_db = np.asarray(display_magnitude_db, dtype=float).reshape(-1)
-    if (
-        display_magnitude_db.size != frequency_hz.size
-        or not np.all(np.isfinite(display_magnitude_db))
-    ):
+    if display_magnitude_db.size != frequency_hz.size or not np.all(np.isfinite(display_magnitude_db)):
         return None
 
     return _TargetPreviewCurve(

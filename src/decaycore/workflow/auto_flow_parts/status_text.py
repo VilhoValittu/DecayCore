@@ -43,6 +43,7 @@ _AUTO_PROGRESS_PHASE3_START = 0.82
 _AUTO_PROGRESS_PHASE3_END = 0.85
 _AUTO_PROGRESS_FINALIZE = 0.88
 
+
 def _build_auto_selected_text(run_data: dict) -> str:
     try:
         target_name = str(
@@ -53,7 +54,6 @@ def _build_auto_selected_text(run_data: dict) -> str:
             or "n/a"
         ).strip()
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -120,9 +120,8 @@ def _build_auto_selected_text(run_data: dict) -> str:
     elif ft_short == "Mixed":
         detail_txt = f" · mixed freq {mixed_txt}"
 
-    return (
-        f"Selected · {target_name} · {hpf_label} {hpf_txt} · -6 dB {f6_txt}{detail_txt}{rank_txt}"
-    )
+    return f"Selected · {target_name} · {hpf_label} {hpf_txt} · -6 dB {f6_txt}{detail_txt}{rank_txt}"
+
 
 def _resolve_auto_hpf_seed_source(
     ctx: RunContext,
@@ -154,7 +153,6 @@ def _resolve_auto_hpf_seed_source(
                         True,
                     )
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -178,6 +176,7 @@ def _resolve_auto_hpf_seed_source(
         bool(data.get("hpf_enable", False)),
     )
 
+
 def _auto_finalize_status_suffix(winner_explanation: dict | None) -> str:
     phase_label = str(dict(winner_explanation or {}).get("phase_label", "") or "").strip()
     if not phase_label:
@@ -186,6 +185,7 @@ def _auto_finalize_status_suffix(winner_explanation: dict | None) -> str:
     if not any(token in lower for token in ("pareto", "tie-break", "winner polish", "cache")):
         return ""
     return f", via {phase_label}"
+
 
 def _build_auto_finalize_status(
     best_metrics: dict | None,
@@ -209,8 +209,8 @@ def _build_auto_finalize_status(
 
 
 __all__ = [
-    '_build_auto_selected_text',
-    '_resolve_auto_hpf_seed_source',
-    '_auto_finalize_status_suffix',
-    '_build_auto_finalize_status',
+    "_build_auto_selected_text",
+    "_resolve_auto_hpf_seed_source",
+    "_auto_finalize_status_suffix",
+    "_build_auto_finalize_status",
 ]

@@ -103,8 +103,8 @@ def fmt_tilt(st: dict, warn_thr: float = 1.5):
         tilt = float(tilt)
         if abs(tilt) > warn_thr:
             return (
-                "<span title=\"Large broadband tilt detected during leveling, "
-                "house curve not suitable for speaker in room.\">"
+                '<span title="Large broadband tilt detected during leveling, '
+                'house curve not suitable for speaker in room.">'
                 f"{tilt:+.2f} dB/oct &#9888;"
                 "</span>"
             )

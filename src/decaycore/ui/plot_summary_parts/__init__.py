@@ -25,15 +25,15 @@ from .quality_report import (
 )
 
 __all__ = [
-    '_calc_acoustic_score',
-    '_calc_target_match',
-    '_clamp',
-    '_float_allow_zero',
-    '_format_summary_content_legacy',
-    'calc_acoustic_score',
-    'calc_ai_summary_from_stats',
-    'calc_target_match_from_stats',
-    'format_band_rt60_summary',
-    'format_dsp_quality_report_block',
-    'format_summary_content',
+    "_calc_acoustic_score",
+    "_calc_target_match",
+    "_clamp",
+    "_float_allow_zero",
+    "_format_summary_content_legacy",
+    "calc_acoustic_score",
+    "calc_ai_summary_from_stats",
+    "calc_target_match_from_stats",
+    "format_band_rt60_summary",
+    "format_dsp_quality_report_block",
+    "format_summary_content",
 ]

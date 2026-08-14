@@ -31,6 +31,7 @@ from ..measurements_wav import (
     parse_measurements_from_wav_path,
 )
 
+
 def _silent_transfer_like(template: TransferData, *, label: str) -> TransferData:
     freqs = np.asarray(template.freqs_hz, dtype=float)
     complex_spec = np.zeros(freqs.shape, dtype=np.complex128)
@@ -42,6 +43,7 @@ def _silent_transfer_like(template: TransferData, *, label: str) -> TransferData
         sample_rate=int(template.sample_rate),
         label=str(label or ""),
     )
+
 
 def parse_measurements_from_upload(
     file_dict,
@@ -85,7 +87,6 @@ def parse_measurements_from_upload(
             )
         return parse_txt_bytes(content)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -98,6 +99,7 @@ def parse_measurements_from_upload(
         NameError,
     ):
         return None, None, None
+
 
 def _try_load_harmonic_sidecar(
     wav_path: str,
@@ -135,7 +137,6 @@ def _try_load_harmonic_sidecar(
             return None, None
         return freq_hz, mags
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -149,6 +150,7 @@ def _try_load_harmonic_sidecar(
     ):
         return None, None
 
+
 def _measurement_sidecar_stems(path: str) -> tuple[str, ...]:
     base = os.path.splitext(path)[0]
     stems = [base]
@@ -158,9 +160,11 @@ def _measurement_sidecar_stems(path: str) -> tuple[str, ...]:
         stems.append(base[:-3])
     return tuple(dict.fromkeys(stems))
 
+
 def _measurement_sidecar_candidates(path: str, suffixes: tuple[str, ...]) -> tuple[str, ...]:
     stems = _measurement_sidecar_stems(path)
     return tuple(f"{stem}{suffix}" for stem in stems for suffix in suffixes)
+
 
 def _try_load_measurement_metadata_sidecar(wav_path: str) -> dict[str, object] | None:
     if not wav_path:
@@ -177,7 +181,6 @@ def _try_load_measurement_metadata_sidecar(wav_path: str) -> dict[str, object] |
             payload = json.load(fh)
         return payload if isinstance(payload, dict) else None
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -191,6 +194,7 @@ def _try_load_measurement_metadata_sidecar(wav_path: str) -> dict[str, object] |
     ):
         return None
 
+
 def _try_load_rt60_sidecar(wav_path: str) -> tuple[float | None, dict[float, float] | None]:
     metadata = _try_load_measurement_metadata_sidecar(wav_path)
     if not isinstance(metadata, dict):
@@ -198,6 +202,7 @@ def _try_load_rt60_sidecar(wav_path: str) -> tuple[float | None, dict[float, flo
     rt60_val = normalize_rt60_value(metadata.get("rt60_val", None))
     rt60_bands = normalize_rt60_bands(metadata.get("rt60_bands", None))
     return rt60_val, rt60_bands
+
 
 def load_measurements_lr(data: dict, *, logger=None):
     """Lataa vasemman ja oikean kanavan mittaukset ensisijaisuusjarjestyksessa.
@@ -215,8 +220,12 @@ def load_measurements_lr(data: dict, *, logger=None):
     up_r = _get_uploaded_file(data, "file_r")
 
     if up_l is not None and up_r is not None:
-        f_l, m_l, p_l = parse_measurements_from_upload(up_l, pre_ms=pre_ms, post_ms=post_ms, smoothing_level=sl, logger=logger)
-        f_r, m_r, p_r = parse_measurements_from_upload(up_r, pre_ms=pre_ms, post_ms=post_ms, smoothing_level=sl, logger=logger)
+        f_l, m_l, p_l = parse_measurements_from_upload(
+            up_l, pre_ms=pre_ms, post_ms=post_ms, smoothing_level=sl, logger=logger
+        )
+        f_r, m_r, p_r = parse_measurements_from_upload(
+            up_r, pre_ms=pre_ms, post_ms=post_ms, smoothing_level=sl, logger=logger
+        )
         if f_l is not None and f_r is not None:
             return f_l, m_l, p_l, f_r, m_r, p_r
 
@@ -228,8 +237,12 @@ def load_measurements_lr(data: dict, *, logger=None):
         ext_r = os.path.splitext(lp_r)[1].lower()
 
         if ext_l == ".wav" and ext_r == ".wav":
-            f_l, m_l, p_l = parse_measurements_from_wav_path(lp_l, pre_ms=pre_ms, post_ms=post_ms, smoothing_level=sl, logger=logger)
-            f_r, m_r, p_r = parse_measurements_from_wav_path(lp_r, pre_ms=pre_ms, post_ms=post_ms, smoothing_level=sl, logger=logger)
+            f_l, m_l, p_l = parse_measurements_from_wav_path(
+                lp_l, pre_ms=pre_ms, post_ms=post_ms, smoothing_level=sl, logger=logger
+            )
+            f_r, m_r, p_r = parse_measurements_from_wav_path(
+                lp_r, pre_ms=pre_ms, post_ms=post_ms, smoothing_level=sl, logger=logger
+            )
             return f_l, m_l, p_l, f_r, m_r, p_r
 
         f_l, m_l, p_l = parse_txt_path(lp_l, logger=logger)
@@ -240,13 +253,12 @@ def load_measurements_lr(data: dict, *, logger=None):
 
 
 __all__ = [
-    '_silent_transfer_like',
-    'parse_measurements_from_upload',
-    '_try_load_harmonic_sidecar',
-    '_measurement_sidecar_stems',
-    '_measurement_sidecar_candidates',
-    '_try_load_measurement_metadata_sidecar',
-    '_try_load_rt60_sidecar',
-    'load_measurements_lr',
+    "_silent_transfer_like",
+    "parse_measurements_from_upload",
+    "_try_load_harmonic_sidecar",
+    "_measurement_sidecar_stems",
+    "_measurement_sidecar_candidates",
+    "_try_load_measurement_metadata_sidecar",
+    "_try_load_rt60_sidecar",
+    "load_measurements_lr",
 ]
-

@@ -10,7 +10,6 @@
 
 import logging
 
-
 logger = logging.getLogger(__name__)
 from ..export_scoring import _safe_float
 
@@ -125,5 +124,4 @@ def _append_auto_stereo_policy_summary(
     return summary_content
 
 
-__all__ = ['_append_auto_stereo_policy_summary']
-
+__all__ = ["_append_auto_stereo_policy_summary"]

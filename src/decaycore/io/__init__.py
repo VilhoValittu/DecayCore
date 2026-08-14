@@ -7,4 +7,3 @@
 # Commercial use requires separate written permission.
 #
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
-

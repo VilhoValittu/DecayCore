@@ -162,12 +162,7 @@ def band_filter_peak_boost_from_stats(
     )
     if gain is None or gain.size != freq.size:
         return float("nan")
-    mask = (
-        np.isfinite(freq)
-        & np.isfinite(gain)
-        & (freq >= float(lo_hz))
-        & (freq <= float(hi_hz))
-    )
+    mask = np.isfinite(freq) & np.isfinite(gain) & (freq >= float(lo_hz)) & (freq <= float(hi_hz))
     if int(np.count_nonzero(mask)) < 8:
         return float("nan")
     band_gain = np.asarray(gain[mask], dtype=float)
@@ -352,10 +347,10 @@ def band_lr_spectral_xcorr_from_stats(
     n_lag = min(int(n_lag_bins), n_pts // 4)
     xcorr = np.correlate(yl_n, yr_n, mode="full")
     mid = len(xcorr) // 2
-    norm = float(np.sqrt(np.sum(yl_n ** 2) * np.sum(yr_n ** 2))) + 1e-12
+    norm = float(np.sqrt(np.sum(yl_n**2) * np.sum(yr_n**2))) + 1e-12
     xcorr_n = xcorr / norm
 
-    window = xcorr_n[mid - n_lag: mid + n_lag + 1]
+    window = xcorr_n[mid - n_lag : mid + n_lag + 1]
     best_idx = int(np.argmax(window))
     best_lag_bins = best_idx - n_lag
 

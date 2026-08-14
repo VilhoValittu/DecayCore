@@ -48,7 +48,11 @@ from ...measurement.devices import (
     list_wasapi_output_devices,
 )
 from ...measurement.io import save_measurement_bundle
-from ...measurement.models import MeasurementBundle, MeasurementRequest, MeasurementSessionAggregate
+from ...measurement.models import (
+    MeasurementBundle,
+    MeasurementRequest,
+    MeasurementSessionAggregate,
+)
 from ...measurement.reference_signal_parts import _sanitize_measurement_dither_level_db
 from ...measurement.sweep import (
     DEFAULT_MEASUREMENT_DITHER_LEVEL_DB,
@@ -77,21 +81,8 @@ _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS = (
 )
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 _SESSION_PREVIEW_CHANNEL_ORDER = ("left", "right", "sub1", "sub2")
+
 
 def _session_preview_channel_options(
     bundles: dict[str, MeasurementBundle],
@@ -105,10 +96,9 @@ def _session_preview_channel_options(
         "sub2": f"{sub_label} 2",
     }
     return {
-        channel_key: labels[channel_key]
-        for channel_key in _SESSION_PREVIEW_CHANNEL_ORDER
-        if channel_key in bundles
+        channel_key: labels[channel_key] for channel_key in _SESSION_PREVIEW_CHANNEL_ORDER if channel_key in bundles
     }
+
 
 def _session_preview_default_channel_key(
     bundles: dict[str, MeasurementBundle],
@@ -121,6 +111,7 @@ def _session_preview_default_channel_key(
         if channel_key in bundles:
             return channel_key
     return None
+
 
 def _session_preview_bundle(
     session: MeasurementSessionAggregate,
@@ -136,6 +127,7 @@ def _session_preview_bundle(
         return None
     return bundles.get(selected_key)
 
+
 def _format_ms(value_ms: float | None, t: Callable[[str], str]) -> str:
     if value_ms is None or not np.isfinite(value_ms):
         return t("health_not_set")
@@ -147,11 +139,7 @@ def _measurement_timing_reference_text(
     t: Callable[[str], str],
 ) -> str:
     if timing.reference_expected:
-        return (
-            t("measurement_reference_detected")
-            if timing.reference_detected
-            else t("measurement_reference_missing")
-        )
+        return t("measurement_reference_detected") if timing.reference_detected else t("measurement_reference_missing")
     return t("measurement_reference_unused")
 
 
@@ -230,17 +218,12 @@ def _measurement_summary_html(
         and not bool(bundle.health.latency_reliable)
         and fallback_latency_ms is not None
     ):
-        html += (
-            f"<div><b>{t('measurement_latency_fallback')}</b>: "
-            f"{_format_ms(fallback_latency_ms, t)}</div>"
-        )
-    ref_text = _format_ms(timing_ref_latency_ms, t) if timing_ref_latency_ms is not None else t("measurement_left_ref_not_set")
+        html += f"<div><b>{t('measurement_latency_fallback')}</b>: " f"{_format_ms(fallback_latency_ms, t)}</div>"
+    ref_text = (
+        _format_ms(timing_ref_latency_ms, t) if timing_ref_latency_ms is not None else t("measurement_left_ref_not_set")
+    )
     html += f"<div><b>{t('measurement_left_ref_label')}</b>: {ref_text}</div>"
-    if (
-        timing_ref_latency_ms is not None
-        and bundle.health.latency_ms is not None
-        and bundle.health.latency_reliable
-    ):
+    if timing_ref_latency_ms is not None and bundle.health.latency_ms is not None and bundle.health.latency_reliable:
         rel_ms = bundle.health.latency_ms - timing_ref_latency_ms
         sign = "+" if rel_ms >= 0 else ""
         html += f"<div><b>{t('measurement_left_ref_delay')}</b>: {sign}{rel_ms:.2f} ms</div>"
@@ -251,10 +234,7 @@ def _measurement_summary_html(
         mode = str(bundle.metadata.get("timing_mode", "") or "")
         corr_pre = bundle.metadata.get("pre_chirp_correlation_score")
         corr_post = bundle.metadata.get("post_chirp_correlation_score")
-        corr_vals = [
-            float(v) for v in (corr_pre, corr_post)
-            if v is not None and math.isfinite(float(v))
-        ]
+        corr_vals = [float(v) for v in (corr_pre, corr_post) if v is not None and math.isfinite(float(v))]
         corr_txt = f" (corr {max(corr_vals):.2f})" if corr_vals else ""
         mode_label = {
             "reference_anchored": t("measurement_timing_mode_anchored"),
@@ -263,6 +243,7 @@ def _measurement_summary_html(
         }.get(mode, mode)
         html += f"<div><b>{t('measurement_timing_mode')}</b>: {mode_label}{corr_txt}</div>"
     return html
+
 
 def _measurement_role_value(value) -> str:
     role = str(value or "").strip().lower()
@@ -292,9 +273,7 @@ class _MeasurementTabContext:
     default_use_wasapi: bool
     backend_message_state: dict[str, str | None] = field(default_factory=lambda: {"value": None})
     backend_message_label: dict[str, Any] = field(default_factory=lambda: {"widget": None})
-    session_preview_state: dict[str, object] = field(
-        default_factory=lambda: {"bundles": {}, "selected_key": None}
-    )
+    session_preview_state: dict[str, object] = field(default_factory=lambda: {"bundles": {}, "selected_key": None})
     sub_output_channel_row: Any = None
     upload_status: Any = None
     clear_calibration_btn: Any = None
@@ -351,9 +330,7 @@ class _MeasurementTabContext:
     def refresh_input_device_options(self, use_wasapi: bool | None = None) -> None:
         options = self.input_device_options(
             use_wasapi=_measurement_use_wasapi_value(
-                ctrl.value("measurement_use_wasapi", self.default_use_wasapi)
-                if use_wasapi is None
-                else use_wasapi
+                ctrl.value("measurement_use_wasapi", self.default_use_wasapi) if use_wasapi is None else use_wasapi
             )
         )
         ctrl.set_options("measurement_input_device", options)
@@ -367,9 +344,7 @@ class _MeasurementTabContext:
     def refresh_output_device_options(self, role_value: str | None = None, use_wasapi: bool | None = None) -> None:
         normalized_role = _measurement_role_value(role_value or ctrl.value("measurement_role", self.default_role))
         resolved_use_wasapi = _measurement_use_wasapi_value(
-            ctrl.value("measurement_use_wasapi", self.default_use_wasapi)
-            if use_wasapi is None
-            else use_wasapi
+            ctrl.value("measurement_use_wasapi", self.default_use_wasapi) if use_wasapi is None else use_wasapi
         )
         options = self.output_device_options_for_role(normalized_role, use_wasapi=resolved_use_wasapi)
         ctrl.set_options("measurement_output_device", options)
@@ -535,11 +510,7 @@ class _MeasurementTabContext:
         bundle = self.current_bundle()
         if bundle is None:
             return
-        save_dir = Path(
-            safe_measurements_dir(
-                str(bundle.capture.request.save_dir or default_measurements_dir())
-            )
-        )
+        save_dir = Path(safe_measurements_dir(str(bundle.capture.request.save_dir or default_measurements_dir())))
         role = str(bundle.capture.request.role or "generic").strip().lower() or "generic"
         stem = "measurement" if role == "generic" else f"measurement_{role}"
         bundle.saved_paths = save_measurement_bundle(bundle, save_dir, stem)
@@ -644,11 +615,17 @@ class _MeasurementTabContext:
             ctrl.set_value("local_path_r__legacy", "")
             applied_roles.append("Right")
         if session.final_sub1_bundle is not None:
-            ctrl.set_value("file_l_sub", bundle_to_upload_payload(session.final_sub1_bundle, filename="measurement_sub1_ir.wav"))
+            ctrl.set_value(
+                "file_l_sub",
+                bundle_to_upload_payload(session.final_sub1_bundle, filename="measurement_sub1_ir.wav"),
+            )
             ctrl.set_value("local_path_l_sub", "")
             applied_roles.append("Sub 1")
         if session.final_sub2_bundle is not None:
-            ctrl.set_value("file_r_sub", bundle_to_upload_payload(session.final_sub2_bundle, filename="measurement_sub2_ir.wav"))
+            ctrl.set_value(
+                "file_r_sub",
+                bundle_to_upload_payload(session.final_sub2_bundle, filename="measurement_sub2_ir.wav"),
+            )
             ctrl.set_value("local_path_r_sub", "")
             applied_roles.append("Sub 2")
 
@@ -739,7 +716,9 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
     with page_shell(title=t("tab_measurement"), intro=t("measurement_page_intro")):
         with section_card(title=t("measurement_capture_section_title"), intro=t("measurement_intro")):
             ui.label(t("measurement_volume_attenuation_hint")).classes("text-xs text-gray-400")
-            ctx.backend_message_label["widget"] = ui.label("").classes("w-full whitespace-pre-wrap text-sm text-red-400")
+            ctx.backend_message_label["widget"] = ui.label("").classes(
+                "w-full whitespace-pre-wrap text-sm text-red-400"
+            )
             ctx.set_backend_message(ctx.backend_message_state["value"])
 
             ctrl.register("generated_measurement_l", ctrl._ValueHolder(None))
@@ -751,7 +730,12 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
             )
             ctrl.register(
                 "measurement_samplerate",
-                ctrl._ValueHolder(int(get_val("measurement_samplerate", DEFAULT_MEASUREMENT_SAMPLE_RATE) or DEFAULT_MEASUREMENT_SAMPLE_RATE)),
+                ctrl._ValueHolder(
+                    int(
+                        get_val("measurement_samplerate", DEFAULT_MEASUREMENT_SAMPLE_RATE)
+                        or DEFAULT_MEASUREMENT_SAMPLE_RATE
+                    )
+                ),
             )
             ctrl.register(
                 "measurement_sub_output_channel",
@@ -787,7 +771,9 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
                         options=input_options,
                         value=_pick_measurement_device_value(None, input_default, input_options),
                         label=t("measurement_input_device"),
-                    ).props("dense outlined").classes("flex-1"),
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1"),
                 )
                 ctrl.register(
                     "measurement_output_device",
@@ -795,7 +781,9 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
                         options=output_options,
                         value=_pick_measurement_device_value(None, output_default, output_options),
                         label=t("measurement_output_device"),
-                    ).props("dense outlined").classes("flex-1"),
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1"),
                 )
                 ctrl.register(
                     "measurement_role",
@@ -807,7 +795,9 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
                         },
                         value=default_role,
                         label=t("measurement_role"),
-                    ).props("dense outlined").classes("flex-1"),
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1"),
                 )
                 ui.button(
                     t("measurement_refresh_devices"),
@@ -825,7 +815,9 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
                         options={idx: str(idx + 1) for idx in range(8)},
                         value=sub_output_default,
                         label=t("measurement_sub_output_channel"),
-                    ).props("dense outlined").classes("flex-1"),
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1"),
                 )
                 ui.label(t("measurement_sub_output_channel_hint")).classes("flex-1 text-xs text-gray-400")
 
@@ -842,7 +834,9 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
                                 )
                             ),
                             format="%.1f",
-                        ).props("dense outlined").classes("w-full"),
+                        )
+                        .props("dense outlined")
+                        .classes("w-full"),
                     )
                     ui.label(t("measurement_dither_level_hint")).classes("text-xs text-gray-400")
                 with ui.column().classes("flex-1 gap-2"):
@@ -858,16 +852,31 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
                     on_click=ctx.clear_calibration_upload,
                 ).props('outline color="secondary"')
 
-        with section_card(title=t("measurement_actions_section_title"), intro=t("measurement_actions_section_intro")):
-            start_btn = ui.button(t("measurement_start_button"), on_click=ctx.run_measurement_thread).props('color="positive" unelevated').classes("w-full")
-            audibility_test_btn = ui.button(
-                t("measurement_audibility_test_button"),
-                on_click=ctx.run_audibility_test_thread,
-            ).props('outline color="secondary"').classes("w-full")
-            guided_session_btn = ui.button(
-                t("measurement_guided_session_button"),
-                on_click=open_guided_session_dialog,
-            ).props('outline color="secondary"').classes("w-full")
+        with section_card(
+            title=t("measurement_actions_section_title"),
+            intro=t("measurement_actions_section_intro"),
+        ):
+            start_btn = (
+                ui.button(t("measurement_start_button"), on_click=ctx.run_measurement_thread)
+                .props('color="positive" unelevated')
+                .classes("w-full")
+            )
+            audibility_test_btn = (
+                ui.button(
+                    t("measurement_audibility_test_button"),
+                    on_click=ctx.run_audibility_test_thread,
+                )
+                .props('outline color="secondary"')
+                .classes("w-full")
+            )
+            guided_session_btn = (
+                ui.button(
+                    t("measurement_guided_session_button"),
+                    on_click=open_guided_session_dialog,
+                )
+                .props('outline color="secondary"')
+                .classes("w-full")
+            )
             status_label = ui.label("").classes("text-sm text-gray-400")
             error_label = ui.label("").classes("text-sm text-red-400")
 
@@ -875,17 +884,32 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
             summary_html = ui.html("")
             warnings_label = ui.label("").classes("whitespace-pre-wrap text-sm")
             with ui.row().classes("w-full gap-3"):
-                save_btn = ui.button(t("measurement_save_ir"), on_click=ctx.save_current_bundle).props('outline color="secondary"')
-                apply_left_btn = ui.button(t("measurement_apply_left"), on_click=lambda: ctx.apply_bundle("left")).props('outline color="secondary"')
-                apply_right_btn = ui.button(t("measurement_apply_right"), on_click=lambda: ctx.apply_bundle("right")).props('outline color="secondary"')
-                clear_ref_btn = ui.button(t("measurement_left_ref_clear"), on_click=measurement_state.clear_timing_reference).props('outline color="secondary"')
+                save_btn = ui.button(t("measurement_save_ir"), on_click=ctx.save_current_bundle).props(
+                    'outline color="secondary"'
+                )
+                apply_left_btn = ui.button(
+                    t("measurement_apply_left"),
+                    on_click=lambda: ctx.apply_bundle("left"),
+                ).props('outline color="secondary"')
+                apply_right_btn = ui.button(
+                    t("measurement_apply_right"),
+                    on_click=lambda: ctx.apply_bundle("right"),
+                ).props('outline color="secondary"')
+                clear_ref_btn = ui.button(
+                    t("measurement_left_ref_clear"),
+                    on_click=measurement_state.clear_timing_reference,
+                ).props('outline color="secondary"')
             session_preview_selector_row = ui.row().classes("w-full gap-3 items-center")
             with session_preview_selector_row:
-                session_preview_channel = ui.select(
-                    {},
-                    value=None,
-                    label=t("measurement_role"),
-                ).props("dense outlined").classes("w-56")
+                session_preview_channel = (
+                    ui.select(
+                        {},
+                        value=None,
+                        label=t("measurement_role"),
+                    )
+                    .props("dense outlined")
+                    .classes("w-56")
+                )
             session_preview_selector_row.set_visibility(False)
             plot_scope = ui.column().classes("w-full")
 
@@ -927,7 +951,10 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
                 clear_ref_btn.disable()
                 return
 
-            ctx.set_html_content(summary_html, _measurement_summary_html(bundle, t, timing_ref_latency_ms))
+            ctx.set_html_content(
+                summary_html,
+                _measurement_summary_html(bundle, t, timing_ref_latency_ms),
+            )
             warnings = list(bundle.health.warnings)
             warnings_label.set_text("\n".join(warnings) if warnings else t("measurement_no_warnings"))
             save_btn.enable()
@@ -960,7 +987,13 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
 
         def _refresh_view() -> None:
             snap = measurement_state.get_snapshot()
-            if bool(snap.get("busy", False)):
+            is_busy = bool(snap.get("busy", False))
+            # Check if devices are available
+            input_opts = ctx.input_device_options()
+            output_opts = ctx.output_device_options_for_role(ctrl.value("measurement_role", default_role))
+            has_devices = bool(input_opts and output_opts)
+
+            if is_busy or not has_devices:
                 start_btn.disable()
                 audibility_test_btn.disable()
                 guided_session_btn.disable()
@@ -981,9 +1014,14 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
                 return
             last_nonce["value"] = int(snap.get("nonce", -1) or -1)
             bundle = ctx.current_bundle()
-            _render_bundle(bundle if isinstance(bundle, MeasurementBundle) else None, timing_ref_latency_ms=ref_ms)
+            _render_bundle(
+                bundle if isinstance(bundle, MeasurementBundle) else None,
+                timing_ref_latency_ms=ref_ms,
+            )
 
-        ctrl.get("measurement_mic_calibration_upload").on_value_change(lambda _e: ctx.refresh_calibration_upload_status())
+        ctrl.get("measurement_mic_calibration_upload").on_value_change(
+            lambda _e: ctx.refresh_calibration_upload_status()
+        )
         ctrl.get("measurement_role").on_value_change(
             lambda e: (
                 ctx.refresh_sub_output_channel_ui(e.value),
@@ -1011,13 +1049,13 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
 
 
 __all__ = [
-    '_session_preview_channel_options',
-    '_session_preview_default_channel_key',
-    '_session_preview_bundle',
-    '_format_ms',
-    '_measurement_summary_html',
-    'build_measurement_tab',
-    'sys',
-    'ctrl',
-    '_sanitize_measurement_dither_level_db',
+    "_session_preview_channel_options",
+    "_session_preview_default_channel_key",
+    "_session_preview_bundle",
+    "_format_ms",
+    "_measurement_summary_html",
+    "build_measurement_tab",
+    "sys",
+    "ctrl",
+    "_sanitize_measurement_dither_level_db",
 ]

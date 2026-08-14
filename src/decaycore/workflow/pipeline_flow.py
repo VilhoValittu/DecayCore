@@ -40,21 +40,24 @@ def _run_pipeline(ctx: RunContext, *, callbacks: ProcessRunCallbacks, support: P
     hc_f = resolved.hc_f
     hc_m = resolved.hc_m
     taps_base = int(ctx.taps_base)
+    source_data = resolved.source_ui_data
+    multi_rate_on = bool(source_data.get("multi_rate_opt", data.get("multi_rate_opt", False)))
+    base_fs = int(float(source_data.get("fs", data.get("fs", 44100)) or 44100))
     dash_fs = int(resolved.dash_fs)
     results_by_fs = ctx.results_by_fs
     perf_stats = ctx.perf_stats
     per_fs_stats = ctx.per_fs_stats
-    pipeline_start = (
-        _PIPELINE_PROGRESS_START_AUTO
-        if ctx.auto_mode_enabled
-        else _PIPELINE_PROGRESS_START
-    )
+    pipeline_start = _PIPELINE_PROGRESS_START_AUTO if ctx.auto_mode_enabled else _PIPELINE_PROGRESS_START
     pipeline_span = float(max(0.0, _PIPELINE_PROGRESS_END - pipeline_start))
 
     for index, fs_v in enumerate(target_rates):
-        if bool(data.get("multi_rate_opt", False)):
-            taps_v = scale_taps_with_fs(fs_v, base_taps=taps_base)
-            logger.info(f"Auto taps: {int(fs_v)} Hz -> {int(taps_v)} taps (ref 44100 Hz -> {taps_base} taps)")
+        if multi_rate_on:
+            taps_v = scale_taps_with_fs(
+                fs_v,
+                base_taps=taps_base,
+                base_fs=base_fs,
+            )
+            logger.info(f"Auto taps: {int(fs_v)} Hz -> {int(taps_v)} taps " f"(ref {base_fs} Hz -> {taps_base} taps)")
         else:
             taps_v = taps_base
 
@@ -106,9 +109,7 @@ def _run_pipeline(ctx: RunContext, *, callbacks: ProcessRunCallbacks, support: P
             ctx.sub_ir_f = result.sub_ir
             ctx.sub_st_f = result.sub_st
             ctx.sub_meas_f = {
-                k: result.measurements[k]
-                for k in ("f_sub", "m_sub", "p_sub")
-                if k in result.measurements
+                k: result.measurements[k] for k in ("f_sub", "m_sub", "p_sub") if k in result.measurements
             }
 
     if not results_by_fs:

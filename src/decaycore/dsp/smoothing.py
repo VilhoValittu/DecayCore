@@ -18,6 +18,7 @@ from decaycore.dsp.cache_utils import BoundedLruCache
 # Try to import Rust DSP extension
 try:
     from decaycore_dsp import smooth_mag_core_rs as _smooth_mag_core_rs
+
     _DSP_RUST_AVAILABLE = True
 except ImportError:
     _DSP_RUST_AVAILABLE = False
@@ -85,12 +86,13 @@ def clear_smoothing_cache() -> None:
 # Core smoothing
 # ---------------------------------------------------------------------------
 
+
 def psychoacoustic_smoothing(
     freqs,
     mags,
     *,
-    low_bw=1/48.0,
-    high_bw=1/3.0,
+    low_bw=1 / 48.0,
+    high_bw=1 / 3.0,
     f_lo=200.0,
     f_hi=2000.0,
 ):
@@ -110,15 +112,18 @@ def psychoacoustic_smoothing(
 
     return (1.0 - w) * m_low + w * m_high
 
+
 def psycho_smooth_safe_gain(freqs, mags):
     """Funktio: psycho smooth safe gain."""
     return psychoacoustic_smoothing(
-        freqs, mags,
-        low_bw=1/48.0,
-        high_bw=1/3.0,
+        freqs,
+        mags,
+        low_bw=1 / 48.0,
+        high_bw=1 / 3.0,
         f_lo=200.0,
         f_hi=2000.0,
     )
+
 
 def smooth_gain_fractional_octave(freqs, gain_db, filter_smooth, *, mult=1.0):
     """Kasittelee signaalia tai dataa: smooth gain fractional octave."""
@@ -151,8 +156,8 @@ def smooth_gain_fractional_octave(freqs, gain_db, filter_smooth, *, mult=1.0):
 
 MEAS_SMOOTH_BLEND_LO_HZ: float = 120.0
 MEAS_SMOOTH_BLEND_HI_HZ: float = 350.0
-MEAS_SMOOTH_BELOW: float = 96.0   # 1/96 oct — tarkka bassossa
-MEAS_SMOOTH_ABOVE: float = 3.0    # 1/3 oct — leveä ylätaajuuksilla
+MEAS_SMOOTH_BELOW: float = 96.0  # 1/96 oct — tarkka bassossa
+MEAS_SMOOTH_ABOVE: float = 3.0  # 1/3 oct — leveä ylätaajuuksilla
 
 
 def smooth_meas_freq_dep(m_db: np.ndarray, freq_axis: np.ndarray) -> np.ndarray:
@@ -226,10 +231,23 @@ def _apply_adaptive_fdw_impl(freqs, mags, confidence_mask, base_cycles=15.0, min
         _log_afdw_bw_once(f, t)
         return out
 
-    bw_list = np.array([
-        1.0/96.0, 1.0/72.0, 1.0/48.0, 1.0/36.0, 1.0/24.0, 1.0/18.0,
-        1.0/12.0, 1.0/9.0, 1.0/6.0, 1.0/4.5, 1.0/3.0, 1.0/2.0,
-    ], dtype=float)
+    bw_list = np.array(
+        [
+            1.0 / 96.0,
+            1.0 / 72.0,
+            1.0 / 48.0,
+            1.0 / 36.0,
+            1.0 / 24.0,
+            1.0 / 18.0,
+            1.0 / 12.0,
+            1.0 / 9.0,
+            1.0 / 6.0,
+            1.0 / 4.5,
+            1.0 / 3.0,
+            1.0 / 2.0,
+        ],
+        dtype=float,
+    )
 
     n = f.size
     _m_full = np.ascontiguousarray(m, dtype=np.float64)
@@ -242,13 +260,13 @@ def _apply_adaptive_fdw_impl(freqs, mags, confidence_mask, base_cycles=15.0, min
             sm_stack[i] = _apply_smoothing_mag_only(f, m, float(bw))
         _AFDW_STACK_CACHE.put(_stack_key, sm_stack)
 
-    hi = np.searchsorted(bw_list, t, side='right')
+    hi = np.searchsorted(bw_list, t, side="right")
     hi = np.clip(hi, 1, len(bw_list) - 1)
     lo = hi - 1
 
     bw_lo = bw_list[lo]
     bw_hi = bw_list[hi]
-    denom = (bw_hi - bw_lo)
+    denom = bw_hi - bw_lo
     denom = np.where(denom <= 1e-12, 1.0, denom)
     alpha = (t - bw_lo) / denom
     alpha = np.clip(alpha, 0.0, 1.0)
@@ -258,7 +276,6 @@ def _apply_adaptive_fdw_impl(freqs, mags, confidence_mask, base_cycles=15.0, min
     sm_hi = sm_stack[hi, idx]
 
     out = (1.0 - alpha) * sm_lo + alpha * sm_hi
-
 
     _log_afdw_bw_once(f, t)
     return out
@@ -289,6 +306,7 @@ def _log_afdw_bw_once(f: np.ndarray, t: np.ndarray) -> None:
 # ---------------------------------------------------------------------------
 # Internal smoothing helpers
 # ---------------------------------------------------------------------------
+
 
 def _smooth_mag_core(
     freqs: np.ndarray,
@@ -368,7 +386,8 @@ def _apply_smoothing_mag_only(freqs: np.ndarray, mags: np.ndarray, octave_fracti
 
 def apply_smoothing_std(freqs, mags, phases, octave_fraction=1.0):
     """Soveltaa tai paivittaa: apply smoothing std."""
-    if octave_fraction <= 0: return mags, phases
+    if octave_fraction <= 0:
+        return mags, phases
     freqs = np.asarray(freqs, dtype=np.float64).ravel()
     mags = np.asarray(mags, dtype=np.float64).ravel()
     phases = np.asarray(phases, dtype=np.float64).ravel()

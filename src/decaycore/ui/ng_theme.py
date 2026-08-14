@@ -563,16 +563,126 @@ body {
     border: 1px solid var(--cf-border);
     border-radius: var(--cf-radius);
     padding: 12px 16px;
-    min-width: 260px;
-    max-width: 360px;
-    text-align: right;
+    width: 320px;
+    min-width: 320px;
+    max-width: 320px;
+    text-align: left;
     font-size: 0.78rem;
-    line-height: 1.7;
+    line-height: 1.4;
     color: var(--cf-text);
-    white-space: nowrap;
+    white-space: normal;
     overflow: hidden;
     flex-shrink: 0;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.cf-info-panel-slot {
+    width: 320px;
+    min-width: 320px;
+    max-width: 320px;
+    min-height: 132px;
+}
+
+.cf-info-panel-floating {
+    position: fixed;
+    top: var(--cf-info-panel-float-top, 164px);
+    right: 24px;
+    z-index: 900;
+    box-shadow:
+        8px 8px 0 rgba(6, 4, 25, 0.42),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.cf-info-panel-docked {
+    position: static;
+}
+
+.cf-info-panel-header {
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.cf-info-panel-title {
+    color: var(--cf-text-strong);
+    font-family: var(--cf-font-display);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.cf-info-readiness {
+    padding: 3px 8px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.cf-info-readiness::before {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    vertical-align: 1px;
+}
+
+.cf-info-readiness-ok {
+    color: var(--cf-success);
+    background: color-mix(in srgb, var(--cf-success) 10%, transparent);
+}
+
+.cf-info-readiness-warn {
+    color: var(--cf-warning);
+    background: color-mix(in srgb, var(--cf-warning) 10%, transparent);
+}
+
+.cf-info-readiness-dim {
+    color: var(--cf-muted);
+    background: var(--cf-surface-2);
+}
+
+.cf-info-chip-row {
+    width: 100%;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 9px;
+}
+
+.cf-info-chip {
+    padding: 4px 8px;
+    border: 1px solid var(--cf-border);
+    border-radius: var(--cf-radius-xs);
+    background: var(--cf-surface-2);
+    color: var(--cf-text);
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.cf-info-chip-primary {
+    border-color: color-mix(in srgb, var(--cf-accent) 45%, transparent);
+    background: var(--cf-surface-accent);
+    color: var(--cf-accent-strong);
+}
+
+.cf-info-chip-option {
+    border-color: color-mix(in srgb, var(--cf-success) 38%, transparent);
+    background: color-mix(in srgb, var(--cf-success) 10%, transparent);
+    color: var(--cf-success);
+}
+
+.cf-info-detail {
+    width: 100%;
+    line-height: 1.55;
 }
 
 .cf-info-line-dim {
@@ -582,6 +692,10 @@ body {
 .cf-info-line-score {
     color: var(--cf-accent-strong);
     font-weight: 700;
+    width: 100%;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--cf-border);
 }
 
 .cf-info-line-ok {

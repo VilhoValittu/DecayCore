@@ -16,7 +16,6 @@ import statistics
 
 from ..application.house_curve_service import MANUAL_TARGET_TILT_PIVOT_HZ
 
-
 _PATH_TOKEN_RE = re.compile(r"[ML]|[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?")
 _PATH_VALIDATE_RE = re.compile(
     r"\s*(?:[ML]\s*[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?(?:\s*,\s*|\s+)"
@@ -37,7 +36,6 @@ def round_manual_target_tilt_db_per_oct(value: float) -> float:
     try:
         return round(float(value) * 10.0) / 10.0
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -56,7 +54,6 @@ def round_manual_target_db(value: float) -> float:
     try:
         return round(float(value) * 10.0) / 10.0
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -75,7 +72,6 @@ def clamp_manual_target_db(value: float, y_min: float = -10.0, y_max: float = 20
     try:
         v = float(value)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -261,7 +257,6 @@ def extract_target_tilt_from_shape_relayout(
     try:
         pivot = float(pivot_hz)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -311,7 +306,6 @@ def parse_svg_path_points(path: str) -> list[tuple[float, float]]:
             x = float(tokens[idx])
             y = float(tokens[idx + 1])
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -360,7 +354,6 @@ def _current_manual_target_db() -> float:
     try:
         value = float(ctrl.value("lvl_manual_db", 0.0) or 0.0)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -384,7 +377,6 @@ def _current_manual_target_tilt_db_per_oct() -> float:
     try:
         value = float(ctrl.value("manual_target_tilt_db_per_oct", 0.0) or 0.0)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -432,7 +424,6 @@ def _path_center_frequency_hz(points: list[tuple[float, float]]) -> float | None
     try:
         return float(math.exp(statistics.mean(math.log(x) for x in x_values)))
     except (
-
         AttributeError,
         TypeError,
         ValueError,

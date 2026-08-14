@@ -129,6 +129,7 @@ def median_rt60_mid_band(bands) -> float:
 # RT60 summary
 # ---------------------------------------------------------------------------
 
+
 def summarize_rt60_bands(
     bands,
     wideband: float | None = None,
@@ -176,7 +177,6 @@ def summarize_rt60_bands(
                 if math.isfinite(v) and 0.05 < v < 5.0:
                     return v
             except (
-
                 AttributeError,
                 TypeError,
                 ValueError,
@@ -202,8 +202,7 @@ def summarize_rt60_bands(
             result["wideband_s"] = float(np.median(valid_vals))
 
     result["valid"] = any(
-        result[k] is not None
-        for k in ("lf_20_120_s", "lowmid_120_400_s", "mid_400_2000_s", "hf_2000_8000_s")
+        result[k] is not None for k in ("lf_20_120_s", "lowmid_120_400_s", "mid_400_2000_s", "hf_2000_8000_s")
     )
     return result
 
@@ -405,6 +404,7 @@ def _harmonic_boost_risk_build(
     ):
         return None, None, empty_summary
 
+
 def build_harmonic_boost_risk_curve(
     harmonic_freq_hz,
     harmonic_magnitudes_db: dict,
@@ -515,12 +515,10 @@ def build_target_decay_hint(
         or (wideband_rt60 is not None and wideband_rt60 >= 0.45)
     )
     harmonic_strong = bool(
-        (harmonic_peak is not None and harmonic_peak >= 0.75)
-        or (harmonic_mean is not None and harmonic_mean >= 0.50)
+        (harmonic_peak is not None and harmonic_peak >= 0.75) or (harmonic_mean is not None and harmonic_mean >= 0.50)
     )
     harmonic_caution = bool(
-        (harmonic_peak is not None and harmonic_peak >= 0.45)
-        or (harmonic_mean is not None and harmonic_mean >= 0.28)
+        (harmonic_peak is not None and harmonic_peak >= 0.45) or (harmonic_mean is not None and harmonic_mean >= 0.28)
     )
 
     if not has_data:
@@ -574,6 +572,7 @@ def build_target_decay_hint(
 # ---------------------------------------------------------------------------
 # Aggregation helpers
 # ---------------------------------------------------------------------------
+
 
 def aggregate_rt60_bands(
     bands_list: list,
@@ -723,6 +722,7 @@ def _harmonic_average_rows(rows: list[np.ndarray], *, mode: str) -> np.ndarray:
 # Distance / outlier helpers
 # ---------------------------------------------------------------------------
 
+
 def rt60_distance_score(
     candidate_bands,
     reference_bands,
@@ -752,7 +752,7 @@ def rt60_distance_score(
         return None
 
     arr = np.array(log_ratios, dtype=float)
-    return float(np.sqrt(np.mean(arr ** 2)))
+    return float(np.sqrt(np.mean(arr**2)))
 
 
 def harmonic_distance_score(
@@ -793,7 +793,7 @@ def harmonic_distance_score(
             c_on_grid = np.interp(grid, cf, c_arr, left=c_arr[0], right=c_arr[-1])
             r_on_grid = np.interp(grid, rf, r_arr, left=r_arr[0], right=r_arr[-1])
             diff = c_on_grid - r_on_grid
-            diffs_sq.append(diff ** 2)
+            diffs_sq.append(diff**2)
 
         if not diffs_sq:
             return None
@@ -801,7 +801,6 @@ def harmonic_distance_score(
         all_sq = np.concatenate(diffs_sq)
         return float(np.sqrt(np.mean(all_sq)))
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -830,6 +829,7 @@ def estimate_schroeder_hz(
     when RT60 is unavailable or non-positive.
     """
     import math
+
     if rt60_val is None:
         return None
     try:

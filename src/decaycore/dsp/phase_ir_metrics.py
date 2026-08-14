@@ -158,8 +158,8 @@ def compute_pre_post_energy_metrics(
             "window_post_samples": int(window_post),
         }
 
-    pre = np.asarray(x[anchor_idx - window_pre:anchor_idx], dtype=float)
-    post = np.asarray(x[anchor_idx:anchor_idx + window_post], dtype=float)
+    pre = np.asarray(x[anchor_idx - window_pre : anchor_idx], dtype=float)
+    post = np.asarray(x[anchor_idx : anchor_idx + window_post], dtype=float)
     pre_energy = float(np.sum(pre * pre))
     post_energy = float(np.sum(post * post))
     if post_energy <= float(_PRE_ENERGY_EPS):

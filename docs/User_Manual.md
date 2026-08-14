@@ -245,7 +245,7 @@ How it works:
 4. Uses RT60 as a confidence guard: long bass decay can prevent extra target lift, but RT60 does not create target tilt.
 5. Preserves the Harman6 shape above 500 Hz by default.
 
-**RT60 is optional:** it is captured automatically by DecayCore's built-in measurement tool. With external REW exports or WAV impulse files, adaptive target remains valid and simply omits the decay-based bass-lift guard.
+**RT60 is optional:** it is captured automatically by DecayCore's built-in measurement tool. With external REW exports or WAV impulse files, adaptive target remains valid, but it does not add bass lift without reliable decay evidence.
 
 If you are using external measurements without RT60 data, `Auto: search best built-in` is the safer choice. It evaluates how well different built-in curves match the measured room without requiring RT60 data.
 

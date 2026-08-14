@@ -59,7 +59,6 @@ def parse_measurements_from_bytes(file_content):
         return np.array(freqs), np.array(mags), np.array(phases)
 
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -96,7 +95,6 @@ def parse_measurements_from_path(path, *, logger=None):
         return parse_measurements_from_bytes(content)
 
     except (
-
         AttributeError,
         TypeError,
         ValueError,

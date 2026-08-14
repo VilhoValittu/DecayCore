@@ -24,7 +24,6 @@ def _bool_value(value, default: bool = False) -> bool:
     try:
         return bool(value)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -43,7 +42,6 @@ def _float_value(value, default: float) -> float:
     try:
         parsed = float(value)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -69,7 +67,6 @@ def _float_or_none(value) -> float | None:
     try:
         parsed = float(value)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -128,11 +125,7 @@ class StereoAutoPolicyConfig:
             ),
             channel_specific_refine_trials=max(
                 0,
-                int(
-                    round(
-                        _float_value(src.get("channel_specific_refine_trials", 32), 32)
-                    )
-                ),
+                int(round(_float_value(src.get("channel_specific_refine_trials", 32), 32))),
             ),
             channel_specific_seed_from_asymmetry=_bool_value(
                 src.get("channel_specific_seed_from_asymmetry", True),
@@ -200,15 +193,11 @@ class StereoAutoPolicyConfig:
             ),
             max_lr_predicted_delta_db_below_split=max(
                 0.0,
-                _float_value(
-                    src.get("max_lr_predicted_delta_db_below_split", 4.0), 4.0
-                ),
+                _float_value(src.get("max_lr_predicted_delta_db_below_split", 4.0), 4.0),
             ),
             max_lr_predicted_delta_db_above_split=max(
                 0.0,
-                _float_value(
-                    src.get("max_lr_predicted_delta_db_above_split", 1.5), 1.5
-                ),
+                _float_value(src.get("max_lr_predicted_delta_db_above_split", 1.5), 1.5),
             ),
             max_policy_divergence_score=max(
                 0.0,
@@ -226,59 +215,29 @@ class StereoAutoPolicyConfig:
 
     def to_dict(self) -> dict[str, bool | float | int]:
         return {
-            "enable_channel_specific_auto_policy": bool(
-                self.enable_channel_specific_auto_policy
-            ),
-            "channel_specific_policy_max_hz": float(
-                self.channel_specific_policy_max_hz
-            ),
+            "enable_channel_specific_auto_policy": bool(self.enable_channel_specific_auto_policy),
+            "channel_specific_policy_max_hz": float(self.channel_specific_policy_max_hz),
             "channel_specific_refine_trials": int(self.channel_specific_refine_trials),
-            "channel_specific_seed_from_asymmetry": bool(
-                self.channel_specific_seed_from_asymmetry
-            ),
-            "allow_per_channel_confidence_pull": bool(
-                self.allow_per_channel_confidence_pull
-            ),
+            "channel_specific_seed_from_asymmetry": bool(self.channel_specific_seed_from_asymmetry),
+            "allow_per_channel_confidence_pull": bool(self.allow_per_channel_confidence_pull),
             "allow_per_channel_tdc": bool(self.allow_per_channel_tdc),
-            "allow_per_channel_bass_first_mode_max_hz": bool(
-                self.allow_per_channel_bass_first_mode_max_hz
-            ),
-            "allow_per_channel_low_bass_cut_strength": bool(
-                self.allow_per_channel_low_bass_cut_strength
-            ),
-            "allow_per_channel_lf_phase_restraint": bool(
-                self.allow_per_channel_lf_phase_restraint
-            ),
+            "allow_per_channel_bass_first_mode_max_hz": bool(self.allow_per_channel_bass_first_mode_max_hz),
+            "allow_per_channel_low_bass_cut_strength": bool(self.allow_per_channel_low_bass_cut_strength),
+            "allow_per_channel_lf_phase_restraint": bool(self.allow_per_channel_lf_phase_restraint),
             "max_confidence_pull_delta": float(self.max_confidence_pull_delta),
             "max_tdc_strength_delta": float(self.max_tdc_strength_delta),
-            "max_tdc_max_reduction_delta_db": float(
-                self.max_tdc_max_reduction_delta_db
-            ),
-            "max_bass_first_mode_max_hz_delta": float(
-                self.max_bass_first_mode_max_hz_delta
-            ),
-            "max_low_bass_cut_strength_delta": float(
-                self.max_low_bass_cut_strength_delta
-            ),
-            "max_excess_phase_strength_delta": float(
-                self.max_excess_phase_strength_delta
-            ),
+            "max_tdc_max_reduction_delta_db": float(self.max_tdc_max_reduction_delta_db),
+            "max_bass_first_mode_max_hz_delta": float(self.max_bass_first_mode_max_hz_delta),
+            "max_low_bass_cut_strength_delta": float(self.max_low_bass_cut_strength_delta),
+            "max_excess_phase_strength_delta": float(self.max_excess_phase_strength_delta),
             "stereo_coherence_weight": float(self.stereo_coherence_weight),
-            "phantom_center_stability_weight": float(
-                self.phantom_center_stability_weight
-            ),
+            "phantom_center_stability_weight": float(self.phantom_center_stability_weight),
             "policy_divergence_weight": float(self.policy_divergence_weight),
             "asymmetry_budget_weight": float(self.asymmetry_budget_weight),
-            "max_lr_predicted_delta_db_below_split": float(
-                self.max_lr_predicted_delta_db_below_split
-            ),
-            "max_lr_predicted_delta_db_above_split": float(
-                self.max_lr_predicted_delta_db_above_split
-            ),
+            "max_lr_predicted_delta_db_below_split": float(self.max_lr_predicted_delta_db_below_split),
+            "max_lr_predicted_delta_db_above_split": float(self.max_lr_predicted_delta_db_above_split),
             "max_policy_divergence_score": float(self.max_policy_divergence_score),
-            "min_worst_channel_improvement_db": float(
-                self.min_worst_channel_improvement_db
-            ),
+            "min_worst_channel_improvement_db": float(self.min_worst_channel_improvement_db),
             "shared_preference_bias": float(self.shared_preference_bias),
         }
 
@@ -320,9 +279,7 @@ class ResolvedChannelAutoPolicy:
             out["excess_phase_strength"] = float(self.excess_phase_strength)
         return out
 
-    def effective_value(
-        self, key: str, shared: "ResolvedChannelAutoPolicy | None" = None
-    ):
+    def effective_value(self, key: str, shared: "ResolvedChannelAutoPolicy | None" = None):
         value = getattr(self, str(key), None)
         if value is not None:
             return value
@@ -531,9 +488,7 @@ class FilterConfig:
     bass_integration_profile: str = "safe"
     bass_integration_sub_combine_mode: str = "average"
     avr_crossover_hz: float = 80.0
-    avr_crossover_hz_l: float | None = (
-        None  # per-channel HPF override; None = use avr_crossover_hz
-    )
+    avr_crossover_hz_l: float | None = None  # per-channel HPF override; None = use avr_crossover_hz
     avr_crossover_hz_r: float | None = None
     bass_integration_guard_lo_ratio: float = 0.60
     bass_integration_guard_hi_ratio: float = 1.40
@@ -595,7 +550,5 @@ class FilterConfig:
     low_bass_cut_enable: bool = True
     low_bass_cut_strength: float = 0.0
     auto_optimize_low_bass_cut: bool = True
-    stereo_auto_policy: StereoAutoPolicyConfig = field(
-        default_factory=StereoAutoPolicyConfig
-    )
+    stereo_auto_policy: StereoAutoPolicyConfig = field(default_factory=StereoAutoPolicyConfig)
     stereo_resolved_auto_policies: StereoResolvedAutoPolicies | None = None

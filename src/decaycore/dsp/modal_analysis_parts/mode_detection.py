@@ -24,37 +24,6 @@ from .modal_preparation import (
 )
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def _modal_candidate_geometry(
     freq: np.ndarray,
     excess: np.ndarray,
@@ -111,6 +80,7 @@ def _modal_candidate_geometry(
         "q_estimate": q_estimate,
     }
 
+
 def _voice_weight(freq_hz: float) -> float:
     f = float(freq_hz)
     if 80.0 <= f <= 160.0:
@@ -120,6 +90,7 @@ def _voice_weight(freq_hz: float) -> float:
     if 160.0 < f <= 220.0:
         return float(np.clip(1.0 - (f - 160.0) / 60.0, 0.0, 1.0))
     return 0.0
+
 
 def modal_support_for_band(
     modal_events: Sequence[RoomModeEvent],
@@ -206,6 +177,7 @@ def modal_support_for_band(
         "used_by": [],
     }
 
+
 def _lr_consistency_at(
     freq: np.ndarray,
     left_mag: np.ndarray,
@@ -220,8 +192,12 @@ def _lr_consistency_at(
     mask = np.abs(np.log2(np.maximum(freq, 1e-9) / max(float(center_hz), 1e-9))) <= half
     if int(np.count_nonzero(mask)) < 2:
         return 0.0
-    left_excess = _smooth_log_box(freq[mask], left_mag[mask], 1.0 / 8.0) - _smooth_log_box(freq[mask], left_mag[mask], 1.0)
-    right_excess = _smooth_log_box(freq[mask], right_mag[mask], 1.0 / 8.0) - _smooth_log_box(freq[mask], right_mag[mask], 1.0)
+    left_excess = _smooth_log_box(freq[mask], left_mag[mask], 1.0 / 8.0) - _smooth_log_box(
+        freq[mask], left_mag[mask], 1.0
+    )
+    right_excess = _smooth_log_box(freq[mask], right_mag[mask], 1.0 / 8.0) - _smooth_log_box(
+        freq[mask], right_mag[mask], 1.0
+    )
     left_peak = float(np.nanmax(left_excess)) if left_excess.size else 0.0
     right_peak = float(np.nanmax(right_excess)) if right_excess.size else 0.0
     floor = max(0.75, 0.35 * float(peak_db))
@@ -231,6 +207,7 @@ def _lr_consistency_at(
     if left_peak >= floor or right_peak >= floor:
         return 0.5
     return 0.0
+
 
 def _decay_severity_at(rt60_by_band, center_hz: float) -> float:
     if rt60_by_band is None:
@@ -252,7 +229,6 @@ def _decay_severity_at(rt60_by_band, center_hz: float) -> float:
             if np.isfinite(f) and np.isfinite(v) and f > 0.0 and 0.05 <= v <= 5.0:
                 pairs.append((float(f), float(v)))
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -273,7 +249,6 @@ def _decay_severity_at(rt60_by_band, center_hz: float) -> float:
         x = float(np.log2(max(float(center_hz), 1e-9)))
         rt = float(np.interp(x, np.log2(freq), rt60))
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -287,6 +262,7 @@ def _decay_severity_at(rt60_by_band, center_hz: float) -> float:
         return 0.0
     target = 0.45 if float(center_hz) <= 120.0 else 0.38
     return float(np.clip((rt - target) / 0.55, 0.0, 1.0))
+
 
 def _classify_event(
     *,
@@ -456,6 +432,7 @@ def _finalize_room_mode_events(events: list[RoomModeEvent]) -> ModalAnalysisResu
         voice_band_modal_risk=float(voice_risk),
     )
 
+
 def detect_room_modes(
     freq_axis,
     measured_mag_db,
@@ -536,7 +513,6 @@ def detect_room_modes(
 
         return _finalize_room_mode_events(events)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -551,11 +527,11 @@ def detect_room_modes(
 
 
 __all__ = [
-    '_modal_candidate_geometry',
-    '_voice_weight',
-    'modal_support_for_band',
-    '_lr_consistency_at',
-    '_decay_severity_at',
-    '_classify_event',
-    'detect_room_modes',
+    "_modal_candidate_geometry",
+    "_voice_weight",
+    "modal_support_for_band",
+    "_lr_consistency_at",
+    "_decay_severity_at",
+    "_classify_event",
+    "detect_room_modes",
 ]

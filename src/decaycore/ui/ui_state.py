@@ -47,13 +47,35 @@ def is_status_dom_ready() -> bool:
 def _status_split_elapsed_suffix(msg: str) -> tuple[str, str]:
     try:
         s = str(msg or "").strip()
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         s = ""
     if not s:
         return "", ""
     try:
         match = re.match(r"^(.*?)(\|\s*\d+(?:\.\d+)?\s*s)\s*$", s, flags=re.IGNORECASE)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         match = None
     if not match:
         return str(s), ""
@@ -89,7 +111,19 @@ def _compact_auto_status_legacy_target(after: str) -> str | None:
     low = after.lower()
     for prefixes, compact in (
         (("adaptive target",), "Synthesizing · target"),
-        (("target shortlist", "target preselect winner", "target preselect", "target search", "selecting target curve", "target trials", "target finalize", "target curve mode"), "Selecting · target"),
+        (
+            (
+                "target shortlist",
+                "target preselect winner",
+                "target preselect",
+                "target search",
+                "selecting target curve",
+                "target trials",
+                "target finalize",
+                "target curve mode",
+            ),
+            "Selecting · target",
+        ),
         (("target preselect cache seed", "target preselect seed loaded"), "Loading · target"),
     ):
         if any(low.startswith(prefix) for prefix in prefixes):
@@ -209,7 +243,18 @@ def _compact_auto_status_legacy(after: str) -> str:
             return compact
     try:
         clean = re.sub(r"\s*\(.*\)\s*$", "", after).strip()
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         clean = after
     return f"Auto · {clean}" if clean else "Auto · running"
 
@@ -217,7 +262,18 @@ def _compact_auto_status_legacy(after: str) -> str:
 def _compact_auto_status_core(core: str) -> str:
     try:
         s = str(core or "").strip()
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         s = ""
     bracket_m = re.match(r"^DecayCore automatic mode \[([^\]]+)\][^:]*:\s*(.+)$", s, flags=re.IGNORECASE)
     if bracket_m:
@@ -227,7 +283,7 @@ def _compact_auto_status_core(core: str) -> str:
     prefix = "DecayCore automatic mode:"
     if not s.startswith(prefix):
         return s
-    after = s[len(prefix):].strip()
+    after = s[len(prefix) :].strip()
     return _compact_auto_status_legacy(after)
 
 
@@ -301,7 +357,9 @@ def _auto_status_detail_target_core(after: str, low: str, f, r, t) -> str | None
     if low.startswith("hpf auto-fit applied"):
         m = re.match(r"HPF auto-fit applied ([\d.]+) Hz/([\d.]+) dB/oct.*?confidence ([\d.]+)", after, re.IGNORECASE)
         if m:
-            return f("auto_detail_hpf_applied", hz=m.group(1), slope=m.group(2), conf=int(round(float(m.group(3)) * 100)))
+            return f(
+                "auto_detail_hpf_applied", hz=m.group(1), slope=m.group(2), conf=int(round(float(m.group(3)) * 100))
+            )
     if low.startswith("target loaded directly from cache"):
         m = re.search(r"->\s*(\S+?),", after, re.IGNORECASE)
         if m:
@@ -320,7 +378,8 @@ def _auto_status_detail_target_result_winner(after: str, low: str, f, r, t) -> s
     if low.startswith("target preselect winner") or low.startswith("target search winner"):
         m = re.match(
             r"target (?:preselect|search) winner (\S+).*?fit_rms ([\d.]+) dB,\s*tested (\d+) curves x (\d+) trials",
-            after, re.IGNORECASE,
+            after,
+            re.IGNORECASE,
         )
         if m:
             winner, fit, curves, trials = m.group(1), r(m.group(2)), m.group(3), m.group(4)
@@ -328,7 +387,11 @@ def _auto_status_detail_target_result_winner(after: str, low: str, f, r, t) -> s
                 return f("auto_detail_target_winner_cache", winner=winner, fit=fit)
             return f("auto_detail_target_winner", winner=winner, fit=fit, curves=curves, trials=trials)
     if low.startswith("target preselect init") or low.startswith("target search init"):
-        m = re.match(r"target (?:preselect|search) init \(top-(\d+),\s*(\d+) trials/curve,\s*fs ([\d.]+) Hz", after, re.IGNORECASE)
+        m = re.match(
+            r"target (?:preselect|search) init \(top-(\d+),\s*(\d+) trials/curve,\s*fs ([\d.]+) Hz",
+            after,
+            re.IGNORECASE,
+        )
         if m:
             return f("auto_detail_target_preselect_init", n=m.group(1), trials=m.group(2), fs=m.group(3))
     return None
@@ -336,7 +399,11 @@ def _auto_status_detail_target_result_winner(after: str, low: str, f, r, t) -> s
 
 def _auto_status_detail_target_result_phase(after: str, low: str, f, r, t) -> str | None:
     if low.startswith("target preselect init") or low.startswith("target search init"):
-        m = re.match(r"target (?:preselect|search) init \(top-(\d+),\s*(\d+) trials/curve,\s*fs ([\d.]+) Hz", after, re.IGNORECASE)
+        m = re.match(
+            r"target (?:preselect|search) init \(top-(\d+),\s*(\d+) trials/curve,\s*fs ([\d.]+) Hz",
+            after,
+            re.IGNORECASE,
+        )
         if m:
             return f("auto_detail_target_preselect_init", n=m.group(1), trials=m.group(2), fs=m.group(3))
     if low.startswith("target shortlist milder skipped"):
@@ -350,13 +417,17 @@ def _auto_status_detail_target_result_phase(after: str, low: str, f, r, t) -> st
     if low.startswith("phase1 done target="):
         m = re.match(
             r"Phase1 done target=(\S+?),\s*rank=([\d.]+),\s*avg_score=([\d.]+),\s*mode_ripple=([\d.]+) dB,\s*boost=(-?[\d.]+) dB.*?tdc=([\d.]+)",
-            after, re.IGNORECASE,
+            after,
+            re.IGNORECASE,
         )
         if m:
             return f(
                 "auto_detail_phase1_done_target",
-                target=m.group(1), rank=r(m.group(2)), avg=r(m.group(3)),
-                ripple=r(m.group(4)), tdc=r(m.group(6)),
+                target=m.group(1),
+                rank=r(m.group(2)),
+                avg=r(m.group(3)),
+                ripple=r(m.group(4)),
+                tdc=r(m.group(6)),
             )
     return None
 
@@ -370,7 +441,8 @@ def _auto_status_detail_target_result_misc(after: str, low: str, f, r, t) -> str
     if low.startswith("target finalize"):
         m = re.match(
             r"target finalize \(winner (\S+?),\s*method \S+,\s*rank ([\d.]+),\s*avg ([\d.]+).*?fit ([\d.]+) dB\)",
-            after, re.IGNORECASE,
+            after,
+            re.IGNORECASE,
         )
         if m:
             return f("auto_detail_target_finalize", winner=m.group(1), fit=r(m.group(4)))
@@ -378,7 +450,12 @@ def _auto_status_detail_target_result_misc(after: str, low: str, f, r, t) -> str
         target_m = re.search(r"target (\S+?),", after, re.IGNORECASE)
         extra_m = re.search(r"up to (\d+) x (\d+) extra micro-trials", after, re.IGNORECASE)
         if target_m and extra_m:
-            return f("auto_detail_preset_from_cache", target=target_m.group(1), rounds=extra_m.group(1), trials=extra_m.group(2))
+            return f(
+                "auto_detail_preset_from_cache",
+                target=target_m.group(1),
+                rounds=extra_m.group(1),
+                trials=extra_m.group(2),
+            )
     return None
 
 
@@ -400,20 +477,35 @@ def _auto_status_detail_refine_phase(after: str, low: str, f, r, t) -> str | Non
         m = re.match(
             r"(?:preset|phase) search init \(phase1 (\d+) \+ (?:phase2|refine) (\d+)"
             r"(?: \+ micro (\d+))? trials @ ([\d.]+) Hz.*?target (\S+)\)",
-            after, re.IGNORECASE,
+            after,
+            re.IGNORECASE,
         )
         if m:
             if m.group(3) is None:
                 return f("auto_detail_preset_search_init_legacy", p1=m.group(1), refine=m.group(2), target=m.group(5))
-            return f("auto_detail_preset_search_init", p1=m.group(1), refine=m.group(2), micro=m.group(3) or "?", target=m.group(5))
+            return f(
+                "auto_detail_preset_search_init",
+                p1=m.group(1),
+                refine=m.group(2),
+                micro=m.group(3) or "?",
+                target=m.group(5),
+            )
     if low.startswith("phase1 done rank="):
         m = re.match(
             r"Phase1 done rank=([\d.]+),\s*avg_score=([\d.]+),\s*mode_ripple=([\d.]+) dB"
             r".*?boost=(-?[\d.]+) dB.*?optuna run=(\d+), ok=(\d+)",
-            after, re.IGNORECASE,
+            after,
+            re.IGNORECASE,
         )
         if m:
-            return f("auto_detail_phase1_done", rank=r(m.group(1)), avg=r(m.group(2)), ripple=r(m.group(3)), run=m.group(5), ok=m.group(6))
+            return f(
+                "auto_detail_phase1_done",
+                rank=r(m.group(1)),
+                avg=r(m.group(2)),
+                ripple=r(m.group(3)),
+                run=m.group(5),
+                ok=m.group(6),
+            )
     if low.startswith("cache refine init"):
         m = re.match(r"cache refine init \(rounds up to (\d+), (\d+) trials/round", after, re.IGNORECASE)
         if m:
@@ -425,10 +517,17 @@ def _auto_status_detail_refine_cache(after: str, low: str, f, r, t) -> str | Non
     if low.startswith("cache refine round summary"):
         m = re.match(
             r"cache refine round summary \(round (\d+), executed \d+/\d+, improvements (\d+).*?optuna run=(\d+), ok=(\d+)",
-            after, re.IGNORECASE,
+            after,
+            re.IGNORECASE,
         )
         if m:
-            return f("auto_detail_cache_refine_round_summary", n=m.group(1), improvements=m.group(2), run=m.group(3), ok=m.group(4))
+            return f(
+                "auto_detail_cache_refine_round_summary",
+                n=m.group(1),
+                improvements=m.group(2),
+                run=m.group(3),
+                ok=m.group(4),
+            )
     if low.startswith("cache refine best improved"):
         m = re.match(r"cache refine best improved \(round (\d+), \d+/\d+, rank ([\d.]+)", after, re.IGNORECASE)
         if m:
@@ -440,24 +539,40 @@ def _auto_status_detail_refine_local(after: str, low: str, f, r, t) -> str | Non
     if low.startswith("cache refine summary"):
         m = re.match(
             r"cache refine summary \(rounds (\d+)/(\d+), executed (\d+) trials, improvements (\d+)",
-            after, re.IGNORECASE,
+            after,
+            re.IGNORECASE,
         )
         if m:
-            return f("auto_detail_cache_refine_summary", done=m.group(1), total=m.group(2), executed=m.group(3), improvements=m.group(4))
+            return f(
+                "auto_detail_cache_refine_summary",
+                done=m.group(1),
+                total=m.group(2),
+                executed=m.group(3),
+                improvements=m.group(4),
+            )
     if low.startswith("cache refine round"):
         m = re.match(r"cache refine round (\d+)/(\d+) \(optuna (\d+) trials\)", after, re.IGNORECASE)
         if m:
             return f("auto_detail_cache_refine_round", n=m.group(1), total=m.group(2), trials=m.group(3))
     if "auto-fit seed" in low:
-        m = re.match(r"(?:Sub )?HPF auto-fit seed ([\d.]+) Hz/([\d.]+) dB/oct.*?confidence ([\d.]+)", after, re.IGNORECASE)
+        m = re.match(
+            r"(?:Sub )?HPF auto-fit seed ([\d.]+) Hz/([\d.]+) dB/oct.*?confidence ([\d.]+)", after, re.IGNORECASE
+        )
         if m:
             is_sub = bool(re.match(r"Sub HPF", after, re.IGNORECASE))
             key = "auto_detail_sub_hpf_autofit_seed" if is_sub else "auto_detail_hpf_autofit_seed"
             return f(key, hz=m.group(1), slope=int(float(m.group(2))), conf=int(round(float(m.group(3)) * 100)))
     if "auto-fit fallback" in low:
-        m = re.match(r"(?:Sub )?HPF auto-fit fallback ([\d.]+) Hz/([\d.]+) dB/oct.*?confidence ([\d.]+)", after, re.IGNORECASE)
+        m = re.match(
+            r"(?:Sub )?HPF auto-fit fallback ([\d.]+) Hz/([\d.]+) dB/oct.*?confidence ([\d.]+)", after, re.IGNORECASE
+        )
         if m:
-            return f("auto_detail_hpf_autofit_fallback", hz=m.group(1), slope=int(float(m.group(2))), conf=int(round(float(m.group(3)) * 100)))
+            return f(
+                "auto_detail_hpf_autofit_fallback",
+                hz=m.group(1),
+                slope=int(float(m.group(2))),
+                conf=int(round(float(m.group(3)) * 100)),
+            )
     if "auto-fit skipped" in low:
         return f("auto_detail_hpf_autofit_skipped")
     return None
@@ -465,7 +580,9 @@ def _auto_status_detail_refine_local(after: str, low: str, f, r, t) -> str | Non
 
 def _auto_status_detail_refine_misc_local(after: str, low: str, f, r, t) -> str | None:
     if low.startswith("local refine target="):
-        m = re.match(r"Local refine target=(\S+) center #\d+ phase refine phase_limit=([\d.]+) Hz", after, re.IGNORECASE)
+        m = re.match(
+            r"Local refine target=(\S+) center #\d+ phase refine phase_limit=([\d.]+) Hz", after, re.IGNORECASE
+        )
         if m:
             return f("auto_detail_local_refine_target_start", name=m.group(1), hz=m.group(2))
         m2 = re.match(r"Local refine target=(\S+) center #\d+ mixed_freq=([\d.]+) Hz", after, re.IGNORECASE)
@@ -487,10 +604,18 @@ def _auto_status_detail_refine_misc_reports_a(after: str, low: str, f, r, t) -> 
         m = re.match(
             r"Local refine summary center #(\d+),\s*current_best_rank=([\d.]+),\s*avg_score=([\d.]+)"
             r",\s*optuna run=(\d+), ok=(\d+)",
-            after, re.IGNORECASE,
+            after,
+            re.IGNORECASE,
         )
         if m:
-            return f("auto_detail_local_refine", n=m.group(1), rank=r(m.group(2)), avg=r(m.group(3)), run=m.group(4), ok=m.group(5))
+            return f(
+                "auto_detail_local_refine",
+                n=m.group(1),
+                rank=r(m.group(2)),
+                avg=r(m.group(3)),
+                run=m.group(4),
+                ok=m.group(5),
+            )
     if low.startswith("micro refine fallback"):
         return f("auto_detail_micro_refine_fallback")
     if low.startswith("phase2 summary"):
@@ -509,9 +634,9 @@ def _auto_status_detail_refine_misc_reports_a(after: str, low: str, f, r, t) -> 
 def _auto_status_detail_refine_misc_reports_c(after: str, low: str, f, r, t) -> str | None:
     if low.startswith("micro refine summary"):
         m = re.match(
-            r"micro refine summary current_best_rank=([\d.]+),\s*avg_score=([\d.]+)"
-            r",\s*optuna run=(\d+), ok=(\d+)",
-            after, re.IGNORECASE,
+            r"micro refine summary current_best_rank=([\d.]+),\s*avg_score=([\d.]+)" r",\s*optuna run=(\d+), ok=(\d+)",
+            after,
+            re.IGNORECASE,
         )
         if m:
             return f("auto_detail_micro_refine", rank=r(m.group(1)), avg=r(m.group(2)), run=m.group(3), ok=m.group(4))
@@ -522,25 +647,37 @@ def _auto_status_detail_refine_misc_reports_c(after: str, low: str, f, r, t) -> 
     if low.startswith("mag_c_min winner polish improved"):
         m = re.match(
             r"mag_c_min winner polish improved \(mag_c_min ([\d.]+) -> ([\d.]+) Hz, rank ([\d.]+) -> ([\d.]+)",
-            after, re.IGNORECASE,
+            after,
+            re.IGNORECASE,
         )
         if m:
-            return f("auto_detail_mag_c_min_improved", from_hz=m.group(1), to_hz=m.group(2), old_r=r(m.group(3)), new_r=r(m.group(4)))
+            return f(
+                "auto_detail_mag_c_min_improved",
+                from_hz=m.group(1),
+                to_hz=m.group(2),
+                old_r=r(m.group(3)),
+                new_r=r(m.group(4)),
+            )
     return None
 
 
 def _auto_status_detail_refine_misc_reports_d(after: str, low: str, f, r, t) -> str | None:
     if low.startswith("phase 2 pareto comparison") or low.startswith("phase 2 pareto selected winner"):
-        m = re.search(r"rank_best [\d.]+ -> pareto ([\d.]+).*?mode_ripple [\d.]+ dB -> ([\d.]+) dB", after, re.IGNORECASE)
+        m = re.search(
+            r"rank_best [\d.]+ -> pareto ([\d.]+).*?mode_ripple [\d.]+ dB -> ([\d.]+) dB", after, re.IGNORECASE
+        )
         if m:
             return f("auto_detail_pareto_winner", rank=r(m.group(1)), ripple=r(m.group(2)))
     if low.startswith("finalize"):
         m = re.match(
             r"finalize \(winner rank ([\d.]+)/100,\s*avg ([\d.]+),\s*boost (-?[\d.]+) dB,\s*events (\d+)(?:,|\))",
-            after, re.IGNORECASE,
+            after,
+            re.IGNORECASE,
         )
         if m:
-            return f("auto_detail_finalize", rank=r(m.group(1)), avg=r(m.group(2)), boost=r(m.group(3)), events=m.group(4))
+            return f(
+                "auto_detail_finalize", rank=r(m.group(1)), avg=r(m.group(2)), boost=r(m.group(3)), events=m.group(4)
+            )
     return None
 
 
@@ -583,11 +720,22 @@ def _humanize_auto_status_detail(msg: str) -> str:
     prefix = "DecayCore automatic mode:"
     try:
         s = str(msg or "").strip()
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         return msg
     if not s.startswith(prefix):
         return s
-    after = s[len(prefix):].strip()
+    after = s[len(prefix) :].strip()
     low = after.lower()
     try:
         for parser in (
@@ -599,7 +747,18 @@ def _humanize_auto_status_detail(msg: str) -> str:
             parsed = parser(after, low, _f, _r, t)
             if parsed is not None:
                 return parsed
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         logger.exception("auto status detail parse")
     return s
 
@@ -607,7 +766,18 @@ def _humanize_auto_status_detail(msg: str) -> str:
 def _suppress_auto_status_detail(core: str) -> bool:
     try:
         s = str(core or "").strip()
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         return False
     return bool(
         re.match(
@@ -621,7 +791,18 @@ def _suppress_auto_status_detail(core: str) -> bool:
 def _status_compact_with_detail(msg) -> tuple[str, str | None]:
     try:
         raw = str(msg or "").strip()
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         raw = ""
     if not raw:
         return "DecayCore running", None
@@ -632,8 +813,7 @@ def _status_compact_with_detail(msg) -> tuple[str, str | None]:
         out = f"{compact_core} {elapsed}"
     detail = None
     _is_auto_mode_text = isinstance(core, str) and (
-        core.startswith("DecayCore automatic mode:")
-        or bool(re.match(r"^DecayCore automatic mode \[", core))
+        core.startswith("DecayCore automatic mode:") or bool(re.match(r"^DecayCore automatic mode \[", core))
     )
     if _is_auto_mode_text and str(core).strip() != str(compact_core).strip():
         if not _suppress_auto_status_detail(core):
@@ -651,7 +831,18 @@ def _status_base_from_text(msg) -> str:
 def _normalize_auto_selected_text(msg) -> str:
     try:
         txt = str(msg or "").strip()
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         txt = ""
     return txt
 
@@ -659,7 +850,18 @@ def _normalize_auto_selected_text(msg) -> str:
 def _normalize_status_notice_text(msg) -> str:
     try:
         txt = str(msg or "").strip()
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         txt = ""
     return txt
 
@@ -667,7 +869,18 @@ def _normalize_status_notice_text(msg) -> str:
 def get_status_base_message(default: str = "DecayCore running") -> str:
     try:
         value = str(_STATUS_BASE_MSG or "").strip()
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         value = ""
     return value or str(default)
 
@@ -676,14 +889,36 @@ def set_run_wall_clock_text(value) -> None:
     global _RUN_WALL_CLOCK_TEXT
     try:
         _RUN_WALL_CLOCK_TEXT = str(value or "").strip()
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         _RUN_WALL_CLOCK_TEXT = ""
 
 
 def get_run_wall_clock_text(default: str = "") -> str:
     try:
         value = str(_RUN_WALL_CLOCK_TEXT or "").strip()
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         value = ""
     return value or str(default or "")
 
@@ -709,7 +944,18 @@ def _notify_renderer(event: str) -> None:
         return
     try:
         renderer(event=str(event or ""), snapshot=get_status_snapshot())
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         logger.debug("UI status renderer update failed", exc_info=True)
 
 
@@ -745,14 +991,36 @@ def set_last_run_info(info: dict) -> None:
     global _LAST_RUN_INFO
     try:
         _LAST_RUN_INFO = dict(info) if isinstance(info, dict) else {}
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         _LAST_RUN_INFO = {}
 
 
 def get_last_run_info() -> dict:
     try:
         return dict(_LAST_RUN_INFO)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         return {}
 
 

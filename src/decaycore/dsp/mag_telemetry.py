@@ -85,7 +85,7 @@ def _log_stage_stats(
             if m is not None and m.shape == r.shape and np.any(m):
                 dv = (a - r)[m]
             else:
-                dv = (a - r)
+                dv = a - r
             dv = dv[np.isfinite(dv)]
             if dv.size >= 4:
                 d_abs_max = float(np.max(np.abs(dv)))
@@ -140,13 +140,7 @@ def _band_delta_metrics(
         a = a[:n]
         b = b[:n]
         f = f[:n]
-        m = (
-            np.isfinite(a)
-            & np.isfinite(b)
-            & np.isfinite(f)
-            & (f >= float(f_lo))
-            & (f <= float(f_hi))
-        )
+        m = np.isfinite(a) & np.isfinite(b) & np.isfinite(f) & (f >= float(f_lo)) & (f <= float(f_hi))
         if int(np.count_nonzero(m)) < 8:
             return 0.0, 0.0, None
         d = a[m] - b[m]
@@ -181,11 +175,7 @@ def _band_error_rms(
             return None
         err = target[:n] - ((meas[:n] - float(calc_offset_db)) + gain[:n])
         band = (
-            mask[:n]
-            & np.isfinite(err)
-            & np.isfinite(freq[:n])
-            & (freq[:n] >= float(f_lo))
-            & (freq[:n] <= float(f_hi))
+            mask[:n] & np.isfinite(err) & np.isfinite(freq[:n]) & (freq[:n] >= float(f_lo)) & (freq[:n] <= float(f_hi))
         )
         if int(np.count_nonzero(band)) < 8:
             return None

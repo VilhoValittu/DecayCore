@@ -18,6 +18,7 @@ logger = logging.getLogger("DecayCore.dsp")
 try:
     from decaycore_dsp import slope_passes_rs as _slope_passes_rs
     from decaycore_dsp import slope_passes_asym_rs as _slope_passes_asym_rs
+
     _DSP_RUST_AVAILABLE = True
 except ImportError:
     _DSP_RUST_AVAILABLE = False
@@ -251,8 +252,8 @@ def build_slope_limit_envelope(
     # Right side: pivot_idx+1 .. end — cumsum of dx starting at pivot_idx
     if pivot_idx < f.size - 1:
         right_cs = np.cumsum(dx[pivot_idx:])
-        upper_delta[pivot_idx + 1:] = (max(0.0, b)) * right_cs
-        lower_delta[pivot_idx + 1:] = (max(0.0, c)) * right_cs
+        upper_delta[pivot_idx + 1 :] = (max(0.0, b)) * right_cs
+        lower_delta[pivot_idx + 1 :] = (max(0.0, c)) * right_cs
 
     # Left side: 0 .. pivot_idx-1 — suffix sums of dx[:pivot_idx]
     if pivot_idx > 0:

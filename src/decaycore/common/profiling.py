@@ -69,10 +69,7 @@ class AutoModeProfiler:
         # worker threads. Only elapsed time since profiler creation is wall time.
         wall_s = max(0.0, time.perf_counter() - self._started_at)
         accumulated_s = sum(float(values[0]) for values in sections.values())
-        lines = [
-            f"[PROFILE] [{label}] wall={wall_s:.3f}s "
-            f"accumulated_sections={accumulated_s:.3f}s"
-        ]
+        lines = [f"[PROFILE] [{label}] wall={wall_s:.3f}s " f"accumulated_sections={accumulated_s:.3f}s"]
         for name, (s, n) in sorted(sections.items(), key=lambda x: -x[1][0]):
             pct = 100.0 * s / wall_s if wall_s > 0 else 0.0
             per = s / n if n > 0 else 0.0

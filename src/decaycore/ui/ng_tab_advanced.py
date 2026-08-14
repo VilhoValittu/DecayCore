@@ -329,9 +329,7 @@ class _AdvancedTabContext:
                                 t=t,
                                 get_val=get_val,
                             )
-                    bass_cut_col.set_visibility(
-                        bool(get_val("low_bass_cut_enable", True))
-                    )
+                    bass_cut_col.set_visibility(bool(get_val("low_bass_cut_enable", True)))
 
                     ctrl.register(
                         "auto_optimize_low_bass_cut",
@@ -480,9 +478,7 @@ class _AdvancedTabContext:
                     _notice_col = ui.column().classes("")
                     ctrl.register_container("conf_pull_notice_scope", _notice_col)
                     with _notice_col:
-                        ui.label(t("ui_advanced_mode_only")).classes(
-                            "text-xs text-gray-400 italic"
-                        )
+                        ui.label(t("ui_advanced_mode_only")).classes("text-xs text-gray-400 italic")
                 _build_preset_row(
                     labels={
                         SAFE: t("preset_safe"),
@@ -626,9 +622,7 @@ class _AdvancedTabContext:
                         _raw_notice_col = ui.column().classes("")
                         ctrl.register_container("raw_dsp_notice_scope", _raw_notice_col)
                         with _raw_notice_col:
-                            ui.label(t("ui_advanced_mode_only_raw_dsp")).classes(
-                                "text-xs text-gray-400 italic"
-                            )
+                            ui.label(t("ui_advanced_mode_only_raw_dsp")).classes("text-xs text-gray-400 italic")
                     ctrl.register(
                         "unsafe_raw_dsp",
                         ui.checkbox(
@@ -677,9 +671,7 @@ def build_advanced_tab(*, t: Callable, get_val: Callable) -> None:
         ctx.build_plot_smoothing_section()
 
 
-def _build_preset_row(
-    *, labels: dict[str, str], on_pick: Callable[[str], None]
-) -> None:
+def _build_preset_row(*, labels: dict[str, str], on_pick: Callable[[str], None]) -> None:
     from nicegui import ui
 
     with ui.row().classes("cf-adv-preset-row"):

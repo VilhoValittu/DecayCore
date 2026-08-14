@@ -140,6 +140,7 @@ def _apply_auto_hpf_runtime_override(
         "order": int(order),
     }
 
+
 def build_xos_hpf(data: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
     auto_mode_active = _auto_mode_active(data)
     is_direct_dac_bi = _is_direct_dac_bass_integration(data)
@@ -161,6 +162,7 @@ def build_xos_hpf(data: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str,
     hpf = _apply_auto_hpf_runtime_override(data, hpf)
     return xos, hpf
 
+
 def filter_type_short(filter_type: str) -> str:
     raw = str(filter_type or "").strip()
     s = raw.lower()
@@ -175,6 +177,7 @@ def filter_type_short(filter_type: str) -> str:
         return "Linear"
 
     return "Linear"
+
 
 def filter_type_supports_xo_phase_model(filter_type: Any) -> bool:
     """Return True when the main-speaker XO phase model is applicable."""
@@ -198,15 +201,15 @@ def multi_rate_target_rates(*, include_ultra_high: bool = False) -> list[int]:
         rates.extend(_MULTI_RATE_ULTRA_HIGH_TARGET_RATES)
     return rates
 
+
 def choose_target_rates(data: dict[str, Any]) -> list[int]:
     if bool(data.get("multi_rate_opt")):
-        return multi_rate_target_rates(
-            include_ultra_high=bool(data.get("multi_rate_ultra_high_opt", False))
-        )
+        return multi_rate_target_rates(include_ultra_high=bool(data.get("multi_rate_ultra_high_opt", False)))
     try:
         return [int(data.get("fs") or 44100)]
     except (TypeError, ValueError):
         return [44100]
+
 
 def choose_dash_fs(target_rates: list[int], *, multi_rate_on: bool, forced_plot_fs_hz: int) -> int:
     if not target_rates:
@@ -215,6 +218,7 @@ def choose_dash_fs(target_rates: list[int], *, multi_rate_on: bool, forced_plot_
     if multi_rate_on and dash_fs not in target_rates:
         dash_fs = int(target_rates[0])
     return dash_fs
+
 
 def detect_is_wav_source(data: dict[str, Any]) -> bool:
     try:
@@ -251,12 +255,12 @@ def detect_is_wav_source(data: dict[str, Any]) -> bool:
 
 
 __all__ = [
-    '_apply_auto_hpf_runtime_override',
-    'build_xos_hpf',
-    'filter_type_short',
-    'filter_type_supports_xo_phase_model',
-    'multi_rate_target_rates',
-    'choose_target_rates',
-    'choose_dash_fs',
-    'detect_is_wav_source',
+    "_apply_auto_hpf_runtime_override",
+    "build_xos_hpf",
+    "filter_type_short",
+    "filter_type_supports_xo_phase_model",
+    "multi_rate_target_rates",
+    "choose_target_rates",
+    "choose_dash_fs",
+    "detect_is_wav_source",
 ]

@@ -24,6 +24,7 @@ from ..mag_telemetry import (
     _record_stage_probe,
 )
 
+
 def _safe_cut_cap(cap: np.ndarray, *, ref: np.ndarray, max_cut_db: float) -> np.ndarray:
     out = np.asarray(cap, dtype=float)
     if out.shape != ref.shape:
@@ -146,7 +147,9 @@ def _prepare_hard_clamp_locals(
         )
 
 
-def _hard_clamp_dominance(*, clipped_total: int, band_bins: int, hard_over_boost: float, hard_over_cut: float) -> tuple[str, float]:
+def _hard_clamp_dominance(
+    *, clipped_total: int, band_bins: int, hard_over_boost: float, hard_over_cut: float
+) -> tuple[str, float]:
     clip_pct = 100.0 * int(clipped_total) / float(max(1, int(band_bins)))
     over_peak = float(max(hard_over_boost, hard_over_cut))
     if over_peak >= 12.0 or clip_pct >= 15.0:
@@ -169,15 +172,26 @@ def _hard_clamp_metrics(
     if not np.any(mask_c):
         return 0, 0, 0.0, 0.0, 0
     hardclamp_boost_bins = int(
-        np.sum((pre_hard[mask_c] > (max_boost_local[mask_c] + 1e-9)) & (gain_db[mask_c] <= (max_boost_local[mask_c] + 1e-9)))
+        np.sum(
+            (pre_hard[mask_c] > (max_boost_local[mask_c] + 1e-9))
+            & (gain_db[mask_c] <= (max_boost_local[mask_c] + 1e-9))
+        )
     )
     hardclamp_cut_bins = int(
-        np.sum((pre_hard[mask_c] < (-max_cut_local[mask_c] - 1e-9)) & (gain_db[mask_c] >= (-max_cut_local[mask_c] - 1e-9)))
+        np.sum(
+            (pre_hard[mask_c] < (-max_cut_local[mask_c] - 1e-9)) & (gain_db[mask_c] >= (-max_cut_local[mask_c] - 1e-9))
+        )
     )
     hard_over_boost = max(0.0, float(np.max(pre_hard[mask_c] - max_boost_local[mask_c])))
     hard_over_cut = max(0.0, float(np.max((-pre_hard[mask_c]) - max_cut_local[mask_c])))
     band_bins = int(np.sum(mask_c))
-    return int(hardclamp_boost_bins), int(hardclamp_cut_bins), float(hard_over_boost), float(hard_over_cut), int(band_bins)
+    return (
+        int(hardclamp_boost_bins),
+        int(hardclamp_cut_bins),
+        float(hard_over_boost),
+        float(hard_over_cut),
+        int(band_bins),
+    )
 
 
 def _hard_clamp_maybe_smooth(
@@ -285,7 +299,14 @@ def _apply_soft_clamps(
     except Exception:  # noqa: BLE001
         pass
     _record_stage_probe(stage_probes, "post_softclip", stage_probe_fn, freq_axis, tmp, mask_c, cfg, logger)
-    return np.asarray(tmp, dtype=float), float(over_boost), float(over_cut), int(softclip_boost_bins), int(softclip_cut_bins)
+    return (
+        np.asarray(tmp, dtype=float),
+        float(over_boost),
+        float(over_cut),
+        int(softclip_boost_bins),
+        int(softclip_cut_bins),
+    )
+
 
 def _apply_hard_clamps(
     *,
@@ -391,5 +412,4 @@ def _apply_hard_clamps(
     )
 
 
-__all__ = ['_apply_soft_clamps', '_apply_hard_clamps']
-
+__all__ = ["_apply_soft_clamps", "_apply_hard_clamps"]

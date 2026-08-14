@@ -21,6 +21,7 @@ from .low_frequency import (
     _stats_array,
 )
 
+
 def _authority_metrics_payload(
     *,
     st,
@@ -227,6 +228,7 @@ def _apply_acoustic_authority_caps(
             pass
     return result
 
+
 def _apply_candidate_metrics(
     *,
     gain_apply: np.ndarray,
@@ -243,17 +245,16 @@ def _apply_candidate_metrics(
         n_boost_cand = int(np.sum(cand_boost_mask))
         n_boost_cand_low = int(np.sum((cand > 1e-6) & mask_c & (freq_axis <= float(gain_policy.low_cut_hz))))
         if bool(gain_policy.exc_prot):
-            n_boost_cand_exc = int(
-                np.sum((cand > 1e-6) & mask_c & (freq_axis < float(gain_policy.exc_freq)))
-            )
+            n_boost_cand_exc = int(np.sum((cand > 1e-6) & mask_c & (freq_axis < float(gain_policy.exc_freq))))
         else:
             n_boost_cand_exc = 0
         cand_boost_pos_mask = cand_boost_mask & (freq_axis > 0.0)
-        boost_cand_min_hz = float(np.min(freq_axis[cand_boost_pos_mask])) if np.any(cand_boost_pos_mask) else float("nan")
+        boost_cand_min_hz = (
+            float(np.min(freq_axis[cand_boost_pos_mask])) if np.any(cand_boost_pos_mask) else float("nan")
+        )
         return boost_cand_peak, boost_cand_min_hz, n_boost_cand, n_boost_cand_low, n_boost_cand_exc
     except (TypeError, ValueError, FloatingPointError, IndexError):
         return 0.0, float("nan"), 0, 0, 0
 
 
-__all__ = ['_apply_acoustic_authority_caps', '_apply_candidate_metrics']
-
+__all__ = ["_apply_acoustic_authority_caps", "_apply_candidate_metrics"]

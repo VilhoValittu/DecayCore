@@ -245,9 +245,7 @@ def estimate_lf_rolloff_f6(
     model_f6, model_conf = _model_f6_from_crossings(f3, stable_f6, f12)
     low_coverage_oct = float(np.log2(float(stable_f6) / max(float(f_lo[0]), 1e-9)))
     model_delta_oct = (
-        float(abs(np.log2(float(model_f6) / max(float(stable_f6), 1e-9))))
-        if np.isfinite(model_f6)
-        else float("nan")
+        float(abs(np.log2(float(model_f6) / max(float(stable_f6), 1e-9)))) if np.isfinite(model_f6) else float("nan")
     )
     candidates = [float(stable_f6)]
     method = "stable_crossing"
@@ -260,11 +258,7 @@ def estimate_lf_rolloff_f6(
     f6 = float(np.clip(f6, float(min_hz), float(max_hz)))
     reference_quality = float(np.clip(1.0 - max(0.0, float(ref_spread_db) - 2.0) / 12.0, 0.0, 1.0))
     coverage_quality = float(np.clip(low_coverage_oct / 0.20, 0.0, 1.0))
-    model_quality = (
-        float(np.clip(0.30 / max(model_delta_oct, 1e-9), 0.0, 1.0))
-        if np.isfinite(model_delta_oct)
-        else 1.0
-    )
+    model_quality = float(np.clip(0.30 / max(model_delta_oct, 1e-9), 0.0, 1.0)) if np.isfinite(model_delta_oct) else 1.0
     confidence = float(np.clip(confidence * reference_quality * coverage_quality * model_quality, 0.0, 1.0))
     reasons: list[str] = []
     if low_coverage_oct < 0.20:

@@ -12,6 +12,7 @@ import copy as copy
 import logging
 
 import numpy as np
+
 logger = logging.getLogger("DecayCore.dsp")
 from decaycore.common.profiling import profiled_section
 from decaycore.config.models import FilterConfig
@@ -43,6 +44,7 @@ from ..filter_pipeline import (
     _run_generate_filter_stereo_link_presolve,
 )
 from ..filter_result import _assemble_generate_filter_result
+
 
 def _run_generate_filter_stereo_link_presolve_stats(
     freqs,
@@ -77,6 +79,7 @@ def _run_generate_filter_stereo_link_presolve_stats(
         "auto_headroom_db": float(presolve["auto_headroom_db"]),
         "peak_gain_db": float(presolve["current_peak_gain"]),
     }
+
 
 def _normalize_impulse_if_requested(impulse: np.ndarray, cfg: FilterConfig) -> tuple[float, float]:
     max_peak = np.max(np.abs(impulse))
@@ -194,11 +197,11 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
     gain_db = pipeline["gain_db"]
     hybrid_iir_stats = dict(pipeline.get("hybrid_iir_stats", {}) or {})
     hybrid_iir_mag_db = np.asarray(hybrid_iir_stats.get("hybrid_iir_mag_db", []), dtype=float).reshape(-1)
-    hybrid_iir_active = bool(hybrid_iir_stats.get("hybrid_iir_enabled", False)) and hybrid_iir_mag_db.size == np.asarray(gain_db).size
+    hybrid_iir_active = (
+        bool(hybrid_iir_stats.get("hybrid_iir_enabled", False)) and hybrid_iir_mag_db.size == np.asarray(gain_db).size
+    )
     combined_gain_db = (
-        np.asarray(gain_db, dtype=float) + hybrid_iir_mag_db
-        if hybrid_iir_active
-        else np.asarray(gain_db, dtype=float)
+        np.asarray(gain_db, dtype=float) + hybrid_iir_mag_db if hybrid_iir_active else np.asarray(gain_db, dtype=float)
     )
     afdw_on = pipeline["afdw_on"]
     mask_c = pipeline["mask_c"]
@@ -233,128 +236,100 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
     max_peak, normalize_gain_db_applied = _normalize_impulse_if_requested(impulse, cfg)
 
     stats = {
-
-        'analysis_mode': analysis_mode,
-        'freq_axis': _curve_payload(freq_axis, include_response_arrays=bool(include_response_arrays)),
-        'mag_c_min': float(getattr(cfg, 'mag_c_min', 0.0) or 0.0),
-        'mag_c_max': float(getattr(cfg, 'mag_c_max', 0.0) or 0.0),
-        'target_mags': _curve_payload(target_mags, include_response_arrays=bool(include_response_arrays)),
-        'measured_mags': _curve_payload(m_anal - calc_offset_db, include_response_arrays=bool(include_response_arrays)),
-        'predicted_filter_mags': _curve_payload(combined_gain_db, include_response_arrays=bool(include_response_arrays)),
-        'predicted_filter_mags_source': "hybrid_iir_plus_mag_post_limits_pre_ir" if hybrid_iir_active else "mag_post_limits_pre_ir",
-        'filter_mags': _curve_payload(combined_gain_db, include_response_arrays=bool(include_response_arrays)),
-        'filter_mags_source': "hybrid_iir_plus_mag_post_limits_pre_ir" if hybrid_iir_active else "mag_post_limits_pre_ir",
-        'confidence_mask': _curve_payload(conf_mask, include_response_arrays=bool(include_response_arrays)),
-        'afdw_active': bool(afdw_on),
-        'reflections': reflections,
-        'smart_scan_range': [float(s_min), float(s_max)],
-        'eff_target_db': float(target_level_db),
-        'offset_db': float(calc_offset_db),
-        'meas_level_db_window': float(meas_level_db_window),
-        'target_level_db_window': float(target_level_db_window),
-        'offset_method': str(offset_method),
-            'tilt_slope_db_per_oct': (
-                float(cfg._lvl_tilt_slope_db_per_oct)
-                if getattr(cfg, "_lvl_tilt_slope_db_per_oct", None) is not None
-                else None
-            ),
-        'rt60_val': float(current_rt60),
-        'rt60_band_avg': float(band_avg),
-        'rt60_bands': rt60_bands,
-        'avg_confidence': float(np.mean(conf_mask)*100),
-        'delay_samples': float((delay_slope * cfg.fs) / (2 * np.pi)) if 'delay_slope' in locals() else 0.0,
-        'peak_before_norm': float(20*np.log10(max_peak + 1e-12)),
-        'do_normalize': bool(getattr(cfg, 'do_normalize', False)),
-        'gain_margin_db': float(gain_margin_db),
-        'auto_global_gain_db': float(auto_global_gain_db),
-        'auto_headroom_db': float(auto_headroom_db),
-        'normalize_gain_db_applied': float(normalize_gain_db_applied),
-        'peak_gain_db': float(current_peak_gain),
-        'final_max_db': float(np.max(final_gain_total)),
-
-        'max_boost_db': float(getattr(cfg, 'max_boost_db', 0.0) or 0.0),
-        'max_boost_db_effective': float(getattr(cfg, 'max_boost_db', 0.0) or 0.0),
-        'max_boost_db_user': float(getattr(cfg, 'max_boost_db_user', getattr(cfg, 'max_boost_db', 0.0)) or 0.0),
-        'max_safe_boost_db': float(getattr(cfg, 'max_safe_boost_db', 0.0) or 0.0),
-        'max_cut_db': float(abs(float(getattr(cfg, 'max_cut_db', 15.0) or 15.0))),
-        'low_bass_cut_hz': _cfg_float_allow_zero(cfg, "low_bass_cut_hz", 40.0),
-        'exc_prot': bool(getattr(cfg, 'exc_prot', False)),
-        'exc_freq': float(getattr(cfg, 'exc_freq', 0.0) or 0.0),
-        'max_slope_db_per_oct': float(getattr(cfg, 'max_slope_db_per_oct', 0.0) or 0.0),
-        'max_slope_boost_db_per_oct': float(getattr(cfg, 'max_slope_boost_db_per_oct', 0.0) or 0.0),
-        'max_slope_cut_db_per_oct': float(getattr(cfg, 'max_slope_cut_db_per_oct', 0.0) or 0.0),
-
-
-        'boost_peak_db': float(boost_peak_db or 0.0),
-        'cut_peak_db': float(cut_peak_db or 0.0),
-        'boost_bins': int(n_boost or 0),
-        'boost_candidate_peak_db': float(boost_cand_peak or 0.0),
-        'boost_candidate_min_hz': float(boost_cand_min_hz if boost_cand_min_hz is not None else float("nan")),
-        'boost_candidate_bins': int(n_boost_cand or 0),
-        'boost_candidate_bins_lowbass': int(n_boost_cand_low or 0),
-        'boost_candidate_bins_excprot': int(n_boost_cand_exc or 0),
-
-
-        'bass_first_ai': bool(use_bassfirst),
-
-        'bass_first_mode_peak_hz': (
+        "analysis_mode": analysis_mode,
+        "freq_axis": _curve_payload(freq_axis, include_response_arrays=bool(include_response_arrays)),
+        "mag_c_min": float(getattr(cfg, "mag_c_min", 0.0) or 0.0),
+        "mag_c_max": float(getattr(cfg, "mag_c_max", 0.0) or 0.0),
+        "target_mags": _curve_payload(target_mags, include_response_arrays=bool(include_response_arrays)),
+        "measured_mags": _curve_payload(m_anal - calc_offset_db, include_response_arrays=bool(include_response_arrays)),
+        "predicted_filter_mags": _curve_payload(
+            combined_gain_db, include_response_arrays=bool(include_response_arrays)
+        ),
+        "predicted_filter_mags_source": (
+            "hybrid_iir_plus_mag_post_limits_pre_ir" if hybrid_iir_active else "mag_post_limits_pre_ir"
+        ),
+        "filter_mags": _curve_payload(combined_gain_db, include_response_arrays=bool(include_response_arrays)),
+        "filter_mags_source": (
+            "hybrid_iir_plus_mag_post_limits_pre_ir" if hybrid_iir_active else "mag_post_limits_pre_ir"
+        ),
+        "confidence_mask": _curve_payload(conf_mask, include_response_arrays=bool(include_response_arrays)),
+        "afdw_active": bool(afdw_on),
+        "reflections": reflections,
+        "smart_scan_range": [float(s_min), float(s_max)],
+        "eff_target_db": float(target_level_db),
+        "offset_db": float(calc_offset_db),
+        "meas_level_db_window": float(meas_level_db_window),
+        "target_level_db_window": float(target_level_db_window),
+        "offset_method": str(offset_method),
+        "tilt_slope_db_per_oct": (
+            float(cfg._lvl_tilt_slope_db_per_oct)
+            if getattr(cfg, "_lvl_tilt_slope_db_per_oct", None) is not None
+            else None
+        ),
+        "rt60_val": float(current_rt60),
+        "rt60_band_avg": float(band_avg),
+        "rt60_bands": rt60_bands,
+        "avg_confidence": float(np.mean(conf_mask) * 100),
+        "delay_samples": float((delay_slope * cfg.fs) / (2 * np.pi)) if "delay_slope" in locals() else 0.0,
+        "peak_before_norm": float(20 * np.log10(max_peak + 1e-12)),
+        "do_normalize": bool(getattr(cfg, "do_normalize", False)),
+        "gain_margin_db": float(gain_margin_db),
+        "auto_global_gain_db": float(auto_global_gain_db),
+        "auto_headroom_db": float(auto_headroom_db),
+        "normalize_gain_db_applied": float(normalize_gain_db_applied),
+        "peak_gain_db": float(current_peak_gain),
+        "final_max_db": float(np.max(final_gain_total)),
+        "max_boost_db": float(getattr(cfg, "max_boost_db", 0.0) or 0.0),
+        "max_boost_db_effective": float(getattr(cfg, "max_boost_db", 0.0) or 0.0),
+        "max_boost_db_user": float(getattr(cfg, "max_boost_db_user", getattr(cfg, "max_boost_db", 0.0)) or 0.0),
+        "max_safe_boost_db": float(getattr(cfg, "max_safe_boost_db", 0.0) or 0.0),
+        "max_cut_db": float(abs(float(getattr(cfg, "max_cut_db", 15.0) or 15.0))),
+        "low_bass_cut_hz": _cfg_float_allow_zero(cfg, "low_bass_cut_hz", 40.0),
+        "exc_prot": bool(getattr(cfg, "exc_prot", False)),
+        "exc_freq": float(getattr(cfg, "exc_freq", 0.0) or 0.0),
+        "max_slope_db_per_oct": float(getattr(cfg, "max_slope_db_per_oct", 0.0) or 0.0),
+        "max_slope_boost_db_per_oct": float(getattr(cfg, "max_slope_boost_db_per_oct", 0.0) or 0.0),
+        "max_slope_cut_db_per_oct": float(getattr(cfg, "max_slope_cut_db_per_oct", 0.0) or 0.0),
+        "boost_peak_db": float(boost_peak_db or 0.0),
+        "cut_peak_db": float(cut_peak_db or 0.0),
+        "boost_bins": int(n_boost or 0),
+        "boost_candidate_peak_db": float(boost_cand_peak or 0.0),
+        "boost_candidate_min_hz": float(boost_cand_min_hz if boost_cand_min_hz is not None else float("nan")),
+        "boost_candidate_bins": int(n_boost_cand or 0),
+        "boost_candidate_bins_lowbass": int(n_boost_cand_low or 0),
+        "boost_candidate_bins_excprot": int(n_boost_cand_exc or 0),
+        "bass_first_ai": bool(use_bassfirst),
+        "bass_first_mode_peak_hz": (
             float(freq_axis[int(np.argmax(np.asarray(bf_room_mode)))])
-            if (
-                bool(use_bassfirst)
-                and (bf_room_mode is not None)
-                and len(np.asarray(bf_room_mode)) > 0
-            )
+            if (bool(use_bassfirst) and (bf_room_mode is not None) and len(np.asarray(bf_room_mode)) > 0)
             else None
         ),
-
-        'bass_first_mode_peak_score': (
+        "bass_first_mode_peak_score": (
             float(np.max(np.asarray(bf_room_mode)))
-            if (
-                bool(use_bassfirst)
-                and (bf_room_mode is not None)
-                and len(np.asarray(bf_room_mode)) > 0
-            )
+            if (bool(use_bassfirst) and (bf_room_mode is not None) and len(np.asarray(bf_room_mode)) > 0)
             else None
         ),
-
-        'bass_first_conf_floor_applied': (
+        "bass_first_conf_floor_applied": (
             bool(
                 bool(use_bassfirst)
                 and (bf_conf_for_smoothing is not None)
                 and (bf_rel is not None)
-                and np.any(
-                    np.asarray(bf_conf_for_smoothing) > (np.asarray(bf_rel) + 1e-6)
-                )
+                and np.any(np.asarray(bf_conf_for_smoothing) > (np.asarray(bf_rel) + 1e-6))
             )
-            if (
-                bf_conf_for_smoothing is not None
-                and bf_rel is not None
-            )
+            if (bf_conf_for_smoothing is not None and bf_rel is not None)
             else False
         ),
-
-
-        'bass_first_rel_mean_20_200': (
+        "bass_first_rel_mean_20_200": (
             float(np.mean(np.asarray(bf_rel)[(freq_axis >= 20.0) & (freq_axis <= 200.0)]))
-            if (
-                bool(use_bassfirst)
-                and (bf_rel is not None)
-                and np.any((freq_axis >= 20.0) & (freq_axis <= 200.0))
-            )
+            if (bool(use_bassfirst) and (bf_rel is not None) and np.any((freq_axis >= 20.0) & (freq_axis <= 200.0)))
             else None
         ),
-
-        'bass_first_rel_min_20_200': (
+        "bass_first_rel_min_20_200": (
             float(np.min(np.asarray(bf_rel)[(freq_axis >= 20.0) & (freq_axis <= 200.0)]))
-            if (
-                bool(use_bassfirst)
-                and (bf_rel is not None)
-                and np.any((freq_axis >= 20.0) & (freq_axis <= 200.0))
-            )
+            if (bool(use_bassfirst) and (bf_rel is not None) and np.any((freq_axis >= 20.0) & (freq_axis <= 200.0)))
             else None
         ),
-
-        'bass_first_conf_eff_mean_20_200': (
+        "bass_first_conf_eff_mean_20_200": (
             float(np.mean(np.asarray(bf_conf_for_smoothing)[(freq_axis >= 20.0) & (freq_axis <= 200.0)]))
             if (
                 bool(use_bassfirst)
@@ -363,8 +338,7 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
             )
             else None
         ),
-
-        'bass_first_conf_eff_min_20_200': (
+        "bass_first_conf_eff_min_20_200": (
             float(np.min(np.asarray(bf_conf_for_smoothing)[(freq_axis >= 20.0) & (freq_axis <= 200.0)]))
             if (
                 bool(use_bassfirst)
@@ -373,8 +347,7 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
             )
             else None
         ),
-
-        'bass_first_roommode_max_20_200': (
+        "bass_first_roommode_max_20_200": (
             float(np.max(np.asarray(bf_room_mode)[(freq_axis >= 20.0) & (freq_axis <= 200.0)]))
             if (
                 bool(use_bassfirst)
@@ -383,7 +356,6 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
             )
             else None
         ),
-
     }
 
     try:
@@ -466,8 +438,7 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
         )
         cached_authority_stats = (
             phase_feedback_replay_cache.get(authority_cache_key)
-            if isinstance(phase_feedback_replay_cache, dict)
-            and authority_cache_key is not None
+            if isinstance(phase_feedback_replay_cache, dict) and authority_cache_key is not None
             else None
         )
         if isinstance(cached_authority_stats, dict):
@@ -494,16 +465,12 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
                 include_arrays=authority_array_mode,
             )
             stats.update(authority_stats)
-            if (
-                isinstance(phase_feedback_replay_cache, dict)
-                and authority_cache_key is not None
-            ):
+            if isinstance(phase_feedback_replay_cache, dict) and authority_cache_key is not None:
                 phase_feedback_replay_cache.setdefault(
                     authority_cache_key,
                     authority_stats,
                 )
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -519,8 +486,8 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
 
     if isinstance(cmp, dict) and cmp:
         stats.update(cmp)
-        if stats.get('analysis_mode') != "comparison":
-            stats['analysis_mode'] = "native"
+        if stats.get("analysis_mode") != "comparison":
+            stats["analysis_mode"] = "native"
     try:
         cmp_g_pred = np.asarray(stats.get("cmp_predicted_filter_mags", []), dtype=float).reshape(-1)
         cmp_g_cur = np.asarray(stats.get("cmp_filter_mags", []), dtype=float).reshape(-1)
@@ -574,7 +541,9 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
                     g_real_native = g_real_native_fir
                 if bool(include_response_arrays):
                     stats["realized_filter_mags"] = g_real_native.tolist()
-                    stats["realized_filter_mags_source"] = "hybrid_iir_plus_ir_fft_final" if hybrid_iir_active else "ir_fft_final"
+                    stats["realized_filter_mags_source"] = (
+                        "hybrid_iir_plus_ir_fft_final" if hybrid_iir_active else "ir_fft_final"
+                    )
                 stats["filter_mags"] = g_real_native.tolist()
                 stats["filter_mags_source"] = "hybrid_iir_plus_ir_fft_final" if hybrid_iir_active else "ir_fft_final"
 
@@ -587,7 +556,8 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
                         if g_cur_cmp.size >= 4:
                             stats["cmp_predicted_filter_mags"] = g_cur_cmp.tolist()
                             stats["cmp_predicted_filter_mags_source"] = str(
-                                stats.get("cmp_filter_mags_source", "mag_post_limits_pre_ir") or "mag_post_limits_pre_ir"
+                                stats.get("cmp_filter_mags_source", "mag_post_limits_pre_ir")
+                                or "mag_post_limits_pre_ir"
                             )
                     g_real_cmp = np.interp(f_cmp_q, f_fft, g_db)
                     if bool(include_response_arrays):
@@ -683,9 +653,9 @@ def generate_filter(  # noqa: C901 - single-channel pipeline keeps policy, limit
 
 
 __all__ = [
-    '_run_generate_filter_stereo_link_presolve_stats',
-    '_normalize_impulse_if_requested',
-    'generate_filter',
-    '_limit_gd_gradient_ms_per_oct',
-    'apply_confidence_weighted_target_pull',
+    "_run_generate_filter_stereo_link_presolve_stats",
+    "_normalize_impulse_if_requested",
+    "generate_filter",
+    "_limit_gd_gradient_ms_per_oct",
+    "apply_confidence_weighted_target_pull",
 ]

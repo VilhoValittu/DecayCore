@@ -88,9 +88,7 @@ def has_packaged_bass_engine() -> bool:
         module = importlib.import_module(PACKAGED_BASS_ENGINE_MODULE)
         policy_version = int(getattr(module, "ENGINE_POLICY_VERSION", 0) or 0)
         return bool(
-            PACKAGED_BASS_ENGINE_MIN_POLICY_VERSION
-            <= policy_version
-            <= PACKAGED_BASS_ENGINE_MAX_POLICY_VERSION
+            PACKAGED_BASS_ENGINE_MIN_POLICY_VERSION <= policy_version <= PACKAGED_BASS_ENGINE_MAX_POLICY_VERSION
             and callable(getattr(module, "channel_overlap_metrics_rs", None))
             and callable(getattr(module, "transform_sub_and_sum_rs", None))
             and callable(getattr(module, "robust_score_rs", None))
@@ -110,9 +108,7 @@ def has_packaged_auto_engine() -> bool:
         module = importlib.import_module(PACKAGED_AUTO_ENGINE_MODULE)
         policy_version = int(getattr(module, "ENGINE_POLICY_VERSION", 0) or 0)
         return bool(
-            PACKAGED_AUTO_ENGINE_MIN_POLICY_VERSION
-            <= policy_version
-            <= PACKAGED_AUTO_ENGINE_MAX_POLICY_VERSION
+            PACKAGED_AUTO_ENGINE_MIN_POLICY_VERSION <= policy_version <= PACKAGED_AUTO_ENGINE_MAX_POLICY_VERSION
             and callable(getattr(module, "compute_rank_score_components", None))
             and callable(getattr(module, "compute_rank_scores_batch", None))
             and callable(getattr(module, "select_best_index_rs", None))
@@ -124,9 +120,7 @@ def has_packaged_auto_engine() -> bool:
 def require_packaged_bass_engine() -> None:
     """Fail explicitly when package-only automatic bass integration is unavailable."""
     if not has_packaged_bass_engine():
-        raise PackagedFeatureUnavailableError(
-            "Automatic Bass Integration requires the packaged DecayCore application."
-        )
+        raise PackagedFeatureUnavailableError("Automatic Bass Integration requires the packaged DecayCore application.")
 
 
 def require_packaged_auto_engine() -> None:

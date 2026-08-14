@@ -14,6 +14,7 @@ Replaces build_export_section() + controls_ir_window.py dynamic rendering.
 
 All controls are created upfront; ng_mode_controls handles show/hide.
 """
+
 from __future__ import annotations
 
 from typing import Callable
@@ -49,7 +50,9 @@ def build_window_tab(*, t: Callable, get_val: Callable) -> None:
                     },
                     value=str(get_val("ir_export_window_mode", "auto") or "auto").strip().lower(),
                     label=t("ir_export_window_mode"),
-                ).props("dense outlined").classes("w-full"),
+                )
+                .props("dense outlined")
+                .classes("w-full"),
             )
             ctrl.register_container("ir_export_window_mode_scope", ui.column().classes("w-full"))
 
@@ -63,7 +66,9 @@ def build_window_tab(*, t: Callable, get_val: Callable) -> None:
                         },
                         value=str(get_val("ir_export_window_shape", "hann") or "hann").strip().lower(),
                         label=t("ir_export_window_shape"),
-                    ).props("dense outlined").classes("flex-1"),
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1"),
                 )
 
                 tukey_col = ui.column().classes("flex-1")
@@ -77,7 +82,9 @@ def build_window_tab(*, t: Callable, get_val: Callable) -> None:
                             format="%.3f",
                             min=0.0,
                             max=1.0,
-                        ).props("dense outlined").classes("w-full"),
+                        )
+                        .props("dense outlined")
+                        .classes("w-full"),
                     )
                 tukey_col.set_visibility(False)
 
@@ -91,7 +98,9 @@ def build_window_tab(*, t: Callable, get_val: Callable) -> None:
                             label=t("ir_window_left_label"),
                             value=float(get_val("ir_window_left", 85.0) or 85.0),
                             format="%.1f",
-                        ).props("dense outlined").classes("flex-1"),
+                        )
+                        .props("dense outlined")
+                        .classes("flex-1"),
                     )
                     _ir_right_def = get_val("ir_window_right", None) or get_val("ir_window", 500.0)
                     ctrl.register(
@@ -100,7 +109,9 @@ def build_window_tab(*, t: Callable, get_val: Callable) -> None:
                             label=t("ir_window_right_label"),
                             value=float(_ir_right_def or 500.0),
                             format="%.1f",
-                        ).props("dense outlined").classes("flex-1"),
+                        )
+                        .props("dense outlined")
+                        .classes("flex-1"),
                     )
                     ctrl.register(
                         "ir_window",
@@ -144,7 +155,9 @@ def build_window_tab(*, t: Callable, get_val: Callable) -> None:
                             label=t("fdw"),
                             value=float(get_val("fdw_cycles", 10.0) or 10.0),
                             format="%.1f",
-                        ).props("dense outlined").classes("w-full"),
+                        )
+                        .props("dense outlined")
+                        .classes("w-full"),
                     )
                 afdw_details_col.set_visibility(bool(get_val("enable_afdw", True)))
 
@@ -179,7 +192,9 @@ def build_window_tab(*, t: Callable, get_val: Callable) -> None:
                                 label=t("tdc_strength"),
                                 value=float(get_val("tdc_strength", 50.0) or 50.0),
                                 format="%.1f",
-                            ).props("dense outlined").classes("flex-1"),
+                            )
+                            .props("dense outlined")
+                            .classes("flex-1"),
                         )
                         ctrl.register(
                             "tdc_max_reduction_db",
@@ -187,7 +202,9 @@ def build_window_tab(*, t: Callable, get_val: Callable) -> None:
                                 label=t("tdc_max_reduction_db"),
                                 value=float(get_val("tdc_max_reduction_db", 9.0) or 9.0),
                                 format="%.1f",
-                            ).props("dense outlined").classes("flex-1"),
+                            )
+                            .props("dense outlined")
+                            .classes("flex-1"),
                         )
                         ctrl.register(
                             "tdc_slope_db_per_oct",
@@ -195,7 +212,9 @@ def build_window_tab(*, t: Callable, get_val: Callable) -> None:
                                 label=t("tdc_slope_db_per_oct"),
                                 value=float(get_val("tdc_slope_db_per_oct", 6.0) or 6.0),
                                 format="%.1f",
-                            ).props("dense outlined").classes("flex-1"),
+                            )
+                            .props("dense outlined")
+                            .classes("flex-1"),
                         )
                 tdc_details_col.set_visibility(bool(get_val("enable_tdc", True)))
 

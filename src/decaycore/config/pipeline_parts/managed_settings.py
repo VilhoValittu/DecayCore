@@ -38,13 +38,13 @@ logger = logging.getLogger("DecayCore")
 
 _AUTO_MODE_DEFAULT_CFG_TO_UI = AUTO_MODE_DEFAULT_CFG_TO_UI
 
+
 def _finite_float_or_default(value: Any, default: float = 0.0) -> float:
     try:
         parsed = float(value)
         if math.isfinite(parsed):
             return float(parsed)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -59,11 +59,11 @@ def _finite_float_or_default(value: Any, default: float = 0.0) -> float:
         logger.exception("float parse in pipeline config")
     return float(default)
 
+
 def _advanced_manual_output_tilt_enabled(data: dict[str, Any]) -> bool:
     try:
         mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -82,18 +82,17 @@ def _advanced_manual_output_tilt_enabled(data: dict[str, Any]) -> bool:
 
     return normalize_lvl_mode_value(data.get("lvl_mode", LVL_MODE_AUTO)) == LVL_MODE_MANUAL
 
+
 def _effective_output_tilt_source(data: dict[str, Any]) -> str:
     if _advanced_manual_output_tilt_enabled(data):
         return OUTPUT_TILT_SOURCE_MANUAL_TARGET_TILT
-    return normalize_output_tilt_source_value(
-        data.get("output_tilt_source", OUTPUT_TILT_SOURCE_OFF)
-    )
+    return normalize_output_tilt_source_value(data.get("output_tilt_source", OUTPUT_TILT_SOURCE_OFF))
+
 
 def _resolve_output_tilt_db_per_oct(data: dict[str, Any]) -> float:
     try:
         mode_u = str(data.get("mode", "BASIC") or "BASIC").strip().upper()
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -116,11 +115,11 @@ def _resolve_output_tilt_db_per_oct(data: dict[str, Any]) -> float:
         return _finite_float_or_default(data.get("manual_target_tilt_db_per_oct", 0.0), 0.0)
     return 0.0
 
+
 def _auto_mode_filter_type_or_default(value: Any) -> str:
     try:
         raw = str(value or "").strip()
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -208,10 +207,10 @@ def _apply_auto_mode_managed_settings(data: dict[str, Any]) -> None:
 
 
 __all__ = [
-    '_finite_float_or_default',
-    '_advanced_manual_output_tilt_enabled',
-    '_effective_output_tilt_source',
-    '_resolve_output_tilt_db_per_oct',
-    '_apply_auto_mode_managed_settings',
-    'get_auto_mode_filter_auto_defaults',
+    "_finite_float_or_default",
+    "_advanced_manual_output_tilt_enabled",
+    "_effective_output_tilt_source",
+    "_resolve_output_tilt_db_per_oct",
+    "_apply_auto_mode_managed_settings",
+    "get_auto_mode_filter_auto_defaults",
 ]

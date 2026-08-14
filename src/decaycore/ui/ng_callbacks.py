@@ -14,6 +14,7 @@ This module is called after all tab builders have registered their elements in
 `ng_controls`, so every callback can safely assume the referenced controls
 already exist.
 """
+
 from __future__ import annotations
 
 import logging
@@ -48,6 +49,7 @@ def register_callbacks(*, t: Callable, get_val: Callable, max_safe_boost: float)
 # Callback groups
 # ---------------------------------------------------------------------------
 
+
 def _register_mode_callbacks(*, t: Callable) -> None:
     """Mode -> lvl_mode options, desc, auto controls, raw dsp visibility."""
 
@@ -77,7 +79,6 @@ def _register_target_callbacks(*, t: Callable, max_safe_boost: float) -> None:
         try:
             upload_col.set_visibility(str(v or "").strip().lower() == "upload")
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -357,7 +358,6 @@ def _initial_state_sync(*, t: Callable, get_val: Callable) -> None:
         update_advanced_guidance_ui(t=t)
         _update_target_preview()
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -376,6 +376,7 @@ def _initial_state_sync(*, t: Callable, get_val: Callable) -> None:
 # Shared helpers
 # ---------------------------------------------------------------------------
 
+
 def _update_target_preview() -> None:
     """Refresh the target curve preview if the preview tab is available."""
     try:
@@ -383,7 +384,6 @@ def _update_target_preview() -> None:
 
         refresh_target_preview()
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -402,7 +402,6 @@ def _normalized_hc_mode(value: Any) -> str:
     try:
         return str(_normalize_hc_mode_key(value or _MANUAL_HC_DEFAULT))
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -449,12 +448,15 @@ def _restore_manual_hc_mode_if_needed(
         return False
 
     mode_u = str(mode_override if mode_override is not None else ctrl.value("mode", "BASIC") or "BASIC").strip().upper()
-    auto_target_mode = str(
-        auto_target_mode_override
-        if auto_target_mode_override is not None
-        else ctrl.value("auto_target_mode", "auto")
-        or "auto"
-    ).strip().lower()
+    auto_target_mode = (
+        str(
+            auto_target_mode_override
+            if auto_target_mode_override is not None
+            else ctrl.value("auto_target_mode", "auto") or "auto"
+        )
+        .strip()
+        .lower()
+    )
     if mode_u == "AUTO" and auto_target_mode == "adaptive":
         return False
 
@@ -484,7 +486,6 @@ def _sync_bass_integration_visibility() -> None:
         try:
             scope.set_visibility(bool(visible))
         except (
-
             AttributeError,
             TypeError,
             ValueError,

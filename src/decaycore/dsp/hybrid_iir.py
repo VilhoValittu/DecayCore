@@ -155,12 +155,8 @@ class HybridIIRResult:
                 self.residual_extra_mag_db,
                 dtype=float,
             ).tolist(),
-            "hybrid_iir_transfer_filter_count": int(
-                sum(1 for b in self.biquads if b.transfer_cut_db > 1e-6)
-            ),
-            "hybrid_iir_residual_cut_count": int(
-                sum(1 for b in self.biquads if b.residual_cut_db > 1e-6)
-            ),
+            "hybrid_iir_transfer_filter_count": int(sum(1 for b in self.biquads if b.transfer_cut_db > 1e-6)),
+            "hybrid_iir_residual_cut_count": int(sum(1 for b in self.biquads if b.residual_cut_db > 1e-6)),
         }
 
 
@@ -206,15 +202,14 @@ def design_hybrid_iir(
     if residual_plan_requested and not use_residual_plan:
         return HybridIIRResult(
             enabled=True,
-            rejected=tuple(
-                _rejection(event, "invalid_residual_plan")
-                for event in tuple(events or ())
-            ),
+            rejected=tuple(_rejection(event, "invalid_residual_plan") for event in tuple(events or ())),
         )
 
     selected: list[HybridBiquad] = []
     rejected: list[dict[str, Any]] = []
-    for event in sorted(tuple(events or ()), key=lambda ev: (-_event_float(ev, "cut_priority"), -_event_float(ev, "peak_db"))):
+    for event in sorted(
+        tuple(events or ()), key=lambda ev: (-_event_float(ev, "cut_priority"), -_event_float(ev, "peak_db"))
+    ):
         biquad, reason = _candidate_to_biquad(event, policy)
         if biquad is None:
             rejected.append(_rejection(event, reason))
@@ -350,16 +345,13 @@ def _refine_biquad_against_measurement(
         # Lineaarinen pohja sovitetaan yhdessa piikin kanssa, jotta moodin
         # hannat eivat vuoda pohjaan ja vaarista Q:ta.
         lo = np.asarray([f0 * 2.0 ** (-f_bound_oct), policy.min_q, 0.25 * peak_db, -6.0, -12.0], dtype=float)
-        hi = np.asarray([f0 * 2.0 ** f_bound_oct, policy.max_q, 2.0 * peak_db, 6.0, 12.0], dtype=float)
+        hi = np.asarray([f0 * 2.0**f_bound_oct, policy.max_q, 2.0 * peak_db, 6.0, 12.0], dtype=float)
 
         y_base = float(np.median(np.concatenate([y_w[:3], y_w[-3:]])))
 
         def residuals(params: np.ndarray) -> np.ndarray:
             model = (
-                _peaking_mag_db_model(f_w, fs, params[0], params[1], params[2])
-                + y_base
-                + params[3]
-                + params[4] * lx_c
+                _peaking_mag_db_model(f_w, fs, params[0], params[1], params[2]) + y_base + params[3] + params[4] * lx_c
             )
             return model - y_w
 
@@ -511,7 +503,9 @@ def peaking_eq_response(freq_axis: np.ndarray, fs: float, freq_hz: float, q: flo
     return np.nan_to_num(h, nan=1.0, posinf=1.0, neginf=1.0)
 
 
-def peaking_eq_coefficients(fs: float, freq_hz: float, q: float, gain_db: float) -> tuple[float, float, float, float, float, float]:
+def peaking_eq_coefficients(
+    fs: float, freq_hz: float, q: float, gain_db: float
+) -> tuple[float, float, float, float, float, float]:
     fs = max(1.0, float(fs))
     f0 = float(np.clip(freq_hz, 1e-6, fs * 0.499))
     q = max(1e-6, float(q))
@@ -600,7 +594,6 @@ def _event_float(event: Any, key: str, default: float = 0.0) -> float:
     try:
         value = getattr(event, key)
     except (
-
         AttributeError,
         TypeError,
         ValueError,

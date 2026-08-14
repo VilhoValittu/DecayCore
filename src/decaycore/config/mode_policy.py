@@ -23,7 +23,6 @@ def _clamp_float(v, lo: float, hi: float) -> float:
     try:
         x = float(v)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -68,7 +67,6 @@ def _apply_clamps(cfg: FilterConfig, clamps: dict[str, tuple[Any, Any]]) -> None
             cur = getattr(cfg, k)
             setattr(cfg, k, _clamp_float(cur, float(lo), float(hi)))
         except (
-
             AttributeError,
             TypeError,
             ValueError,

@@ -29,22 +29,8 @@ from ...measurement.routing import (
 )
 from ..plot_common import _view_mags_for_plot
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 _SESSION_PREVIEW_CHANNEL_ORDER = ("left", "right", "sub1", "sub2")
+
 
 def _build_upload_payload(*, filename: str, content: bytes, mime_type: str = "") -> dict[str, object]:
     content_bytes = bytes(content or b"")
@@ -55,6 +41,7 @@ def _build_upload_payload(*, filename: str, content: bytes, mime_type: str = "")
         "size_bytes": len(content_bytes),
         "content_sha256": hashlib.sha256(content_bytes).hexdigest(),
     }
+
 
 def _device_option_label(device, *, samplerate_hz: int | None = None) -> str:
     caps: list[str] = []
@@ -72,11 +59,14 @@ def _device_option_label(device, *, samplerate_hz: int | None = None) -> str:
     suffix = f" ({', '.join(caps)})" if caps else ""
     return f"{int(device.index)}: {device.name}{suffix}"
 
+
 def _measurement_use_wasapi_value(value) -> bool:
     return bool(value) if sys.platform == "win32" else False
 
+
 def _measurement_sub_output_channel_default() -> int:
     return int(DEFAULT_LINUX_SUBWOOFER_OUTPUT_CHANNEL_INDEX)
+
 
 def _measurement_sub_output_channel_value(value) -> int:
     try:
@@ -85,11 +75,13 @@ def _measurement_sub_output_channel_value(value) -> int:
         return _measurement_sub_output_channel_default()
     return max(0, parsed)
 
+
 def _measurement_sub_output_channel_visible(role_value: str | None) -> bool:
     if sys.platform == "win32":
         return False
     role = str(role_value or "").strip().lower()
     return role == "sub"
+
 
 def _measurement_output_channel_for_role(
     role_value: str | None,
@@ -100,6 +92,7 @@ def _measurement_output_channel_for_role(
     if role != "sub" or sys.platform == "win32":
         return 0
     return _measurement_sub_output_channel_value(sub_output_channel)
+
 
 def _measurement_required_output_channels(
     role_value: str | None,
@@ -116,6 +109,7 @@ def _measurement_required_output_channels(
             sub_output_channel=resolved_sub_channel,
         )
     )
+
 
 def _pick_measurement_device_value(
     current_value,
@@ -139,11 +133,13 @@ def _pick_measurement_device_value(
         return next(iter(options))
     return None
 
+
 def _filter_measurement_devices_for_wasapi(devices, *, enabled: bool):
     device_list = list(devices or [])
     if not bool(enabled):
         return device_list
     return [device for device in device_list if is_measurement_device_wasapi(device)]
+
 
 def _measurement_audio_backend_message() -> str | None:
     ok, reason = check_measurement_audio_backend()
@@ -151,6 +147,7 @@ def _measurement_audio_backend_message() -> str | None:
         return None
     message = str(reason or "").strip()
     return message or "Measurement audio backend is unavailable."
+
 
 def _preview_magnitude_for_plot(freq_hz, magnitude_db):
     freq = np.asarray(freq_hz, dtype=float)
@@ -164,7 +161,6 @@ def _preview_magnitude_for_plot(freq_hz, magnitude_db):
             plot_smoothing_level="Psychoacoustic",
         )
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -177,6 +173,7 @@ def _preview_magnitude_for_plot(freq_hz, magnitude_db):
         NameError,
     ):
         return mag
+
 
 def _build_preview_figure(bundle: MeasurementBundle):
     import plotly.graph_objects as go  # noqa: PLC0415
@@ -289,6 +286,7 @@ def _build_preview_figure(bundle: MeasurementBundle):
     )
     return fig
 
+
 def _session_preview_bundles(session: MeasurementSessionAggregate) -> dict[str, MeasurementBundle]:
     bundles: dict[str, MeasurementBundle] = {}
     if session.final_left_bundle is not None:
@@ -303,22 +301,21 @@ def _session_preview_bundles(session: MeasurementSessionAggregate) -> dict[str, 
 
 
 __all__ = [
-    '_build_upload_payload',
-    '_device_option_label',
-    '_measurement_use_wasapi_value',
-    '_measurement_sub_output_channel_default',
-    '_measurement_sub_output_channel_value',
-    '_measurement_sub_output_channel_visible',
-    '_measurement_output_channel_for_role',
-    '_measurement_required_output_channels',
-    '_pick_measurement_device_value',
-    '_filter_measurement_devices_for_wasapi',
-    '_measurement_audio_backend_message',
-    '_preview_magnitude_for_plot',
-    '_build_preview_figure',
-    '_session_preview_bundles',
-    'sys',
-    'check_measurement_audio_backend',
-    '_view_mags_for_plot',
+    "_build_upload_payload",
+    "_device_option_label",
+    "_measurement_use_wasapi_value",
+    "_measurement_sub_output_channel_default",
+    "_measurement_sub_output_channel_value",
+    "_measurement_sub_output_channel_visible",
+    "_measurement_output_channel_for_role",
+    "_measurement_required_output_channels",
+    "_pick_measurement_device_value",
+    "_filter_measurement_devices_for_wasapi",
+    "_measurement_audio_backend_message",
+    "_preview_magnitude_for_plot",
+    "_build_preview_figure",
+    "_session_preview_bundles",
+    "sys",
+    "check_measurement_audio_backend",
+    "_view_mags_for_plot",
 ]
-

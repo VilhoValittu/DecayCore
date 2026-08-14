@@ -130,9 +130,7 @@ def update_lvl_ui(*, t: Callable) -> None:
     ctrl.set_visibility("lvl_manual_scope", is_manual)
     ctrl.set_visibility("output_tilt_scope", force_output_tilt)
     if force_output_tilt:
-        ctrl.set_value(
-            "output_tilt_source", OUTPUT_TILT_SOURCE_MANUAL_TARGET_TILT, emit=False
-        )
+        ctrl.set_value("output_tilt_source", OUTPUT_TILT_SOURCE_MANUAL_TARGET_TILT, emit=False)
     ctrl.set_enabled("output_tilt_source", not force_output_tilt)
 
 
@@ -293,6 +291,7 @@ def update_taps_auto_info(*, t: Callable) -> None:
 
     try:
         base_taps = int(float(ctrl.value("taps", 65536) or 65536))
+        base_fs = int(float(ctrl.value("fs", 44100) or 44100))
     except (
         AttributeError,
         TypeError,
@@ -307,10 +306,12 @@ def update_taps_auto_info(*, t: Callable) -> None:
     ):
         logger.debug("taps value parse failed, using default", exc_info=True)
         base_taps = 65536
+        base_fs = 44100
 
     markdown = _build_taps_auto_info_markdown(
         multi_rate=multi_rate,
         base_taps=base_taps,
+        base_fs=base_fs,
         include_ultra_high=include_ultra_high,
         t=t,
     )
@@ -352,13 +353,16 @@ def update_taps_auto_info(*, t: Callable) -> None:
             ModuleNotFoundError,
             NameError,
         ):
-            logger.debug(
-                "update_taps_auto_info failed for %s", scope_name, exc_info=True
-            )
+            logger.debug("update_taps_auto_info failed for %s", scope_name, exc_info=True)
 
 
 def _build_taps_auto_info_markdown(
-    *, multi_rate: bool, base_taps: int, include_ultra_high: bool, t: Callable
+    *,
+    multi_rate: bool,
+    base_taps: int,
+    base_fs: int = 44100,
+    include_ultra_high: bool,
+    t: Callable,
 ) -> str:
     """Build the multi-rate taps help text shown in Files and Basic tabs."""
     if not multi_rate:
@@ -366,13 +370,14 @@ def _build_taps_auto_info_markdown(
 
     rates = multi_rate_target_rates(include_ultra_high=include_ultra_high)
     lines = [
-        f"- **{rate / 1000:.1f} kHz** -> **{scale_taps_with_fs(rate, base_taps=base_taps):,}** taps"
+        f"- **{rate / 1000:.1f} kHz** -> "
+        f"**{scale_taps_with_fs(rate, base_taps=base_taps, base_fs=base_fs):,}** taps"
         for rate in rates
     ]
     return (
         f"### {t('auto_taps_title')}\n"
         f"{t('auto_taps_body')}\n\n"
-        f"**Reference:** 44.1 kHz -> {base_taps:,} taps\n\n" + "\n".join(lines)
+        f"**Reference:** {base_fs / 1000:.1f} kHz -> {base_taps:,} taps\n\n" + "\n".join(lines)
     )
 
 
@@ -389,7 +394,6 @@ def update_multi_rate_ui() -> None:
 # ---------------------------------------------------------------------------
 
 _AUTO_LOCKED_FIELDS = [
-    "comparison_mode",
     "gain",
     "lvl_algo",
     "lvl_min",

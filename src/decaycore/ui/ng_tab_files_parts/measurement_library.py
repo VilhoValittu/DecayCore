@@ -12,6 +12,7 @@
 
 Replaces build_input_section() from layout_builders.py.
 """
+
 from __future__ import annotations
 
 import logging
@@ -38,23 +39,6 @@ logger = logging.getLogger("DecayCore")
 from ...config.decaycore_config import load_config, save_config
 from ...app_paths import default_measurements_dir
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 _MEASUREMENT_LIBRARY_EXTENSIONS = frozenset({".txt", ".wav"})
 _MEASUREMENT_SLOT_UPLOAD_KEYS = {
     "local_path_l": "file_l",
@@ -64,30 +48,6 @@ _MEASUREMENT_SLOT_UPLOAD_KEYS = {
     "local_path_l_sub": "file_l_sub",
     "local_path_r_sub": "file_r_sub",
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 _SLOT_FILTER_THRESHOLD = -50.0
@@ -102,7 +62,6 @@ def _persist_measurement_library_dir(value: Any) -> str:
         cfg["measurement_library_dir"] = persisted_value
         save_config(cfg)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -116,6 +75,7 @@ def _persist_measurement_library_dir(value: Any) -> str:
     ):
         logger.exception("measurement library dir persist failed")
     return persisted_value
+
 
 def _score_left_slot(
     tokens: list[str],
@@ -302,10 +262,14 @@ def _score_measurement_tokens(tokens: list[str], slot_key: str, *, scale: float)
 
     return 0.0
 
+
 def _score_measurement_candidate(entry: dict[str, Any], slot_key: str) -> float:
     name_tokens = list(entry.get("name_tokens") or [])
     path_tokens = list(entry.get("path_tokens") or [])
-    return _score_measurement_tokens(name_tokens, slot_key, scale=1.0) + _score_measurement_tokens(path_tokens, slot_key, scale=0.65)
+    return _score_measurement_tokens(name_tokens, slot_key, scale=1.0) + _score_measurement_tokens(
+        path_tokens, slot_key, scale=0.65
+    )
+
 
 def _scan_measurement_library(path_raw: Any) -> list[dict[str, Any]]:
     root = _normalize_local_path_value(path_raw)
@@ -346,12 +310,14 @@ def _scan_measurement_library(path_raw: Any) -> list[dict[str, Any]]:
     entries.sort(key=lambda entry: (-_measurement_entry_mtime_ns(entry), str(entry.get("display_label", "")).lower()))
     return entries
 
+
 def _build_measurement_library_options(entries: list[dict[str, Any]]) -> dict[str, str]:
     return {
         str(entry.get("path", "")): str(entry.get("display_label", "") or entry.get("path", ""))
         for entry in entries
         if str(entry.get("path", "")).strip()
     }
+
 
 def _entry_passes_slot_filter(entry: dict[str, Any], slot_key: str) -> bool:
     """Kova whitelist-tarkistus sub-sloteille.
@@ -367,6 +333,7 @@ def _entry_passes_slot_filter(entry: dict[str, Any], slot_key: str) -> bool:
         return False
     return any(name_tokens[0].startswith(prefix) for prefix in _SUB_FILENAME_PREFIXES)
 
+
 def _build_slot_options(entries: list[dict[str, Any]], slot_key: str) -> dict[str, str]:
     """Palauttaa vain slotin kannalta relevantit tiedostot.
 
@@ -375,11 +342,13 @@ def _build_slot_options(entries: list[dict[str, Any]], slot_key: str) -> dict[st
     Muissa sloteissa vain scoring-kynnys.
     """
     filtered = [
-        entry for entry in entries
+        entry
+        for entry in entries
         if _entry_passes_slot_filter(entry, slot_key)
         and _score_measurement_candidate(entry, slot_key) >= _SLOT_FILTER_THRESHOLD
     ]
     return _build_measurement_library_options(filtered)
+
 
 def _suggest_measurement_library_matches(
     entries: list[dict[str, Any]],
@@ -411,12 +380,14 @@ def _suggest_measurement_library_matches(
             break
     return suggestions
 
+
 def _build_measurement_library_slot_options(
     entries: list[dict[str, Any]],
     *,
     path_keys: list[str],
 ) -> dict[str, dict[str, str]]:
     return {path_key: _build_slot_options(entries, path_key) for path_key in path_keys}
+
 
 def _build_measurement_library_state(
     entries: list[dict[str, Any]],
@@ -429,6 +400,7 @@ def _build_measurement_library_state(
         "options": _build_measurement_library_options(entries_list),
         "slot_options": _build_measurement_library_slot_options(entries_list, path_keys=path_keys),
     }
+
 
 def _build_measurement_library_refresh_payload(
     path_raw: Any,
@@ -448,6 +420,7 @@ def _build_measurement_library_refresh_payload(
     payload["exists"] = exists
     return payload
 
+
 def _measurement_library_refresh_payload_for_token(
     payload: dict[str, Any],
     *,
@@ -459,6 +432,7 @@ def _measurement_library_refresh_payload_for_token(
     payload_copy = dict(payload)
     payload_copy["token"] = int(token)
     return payload_copy
+
 
 def _measurement_library_status_key(
     *,
@@ -477,6 +451,7 @@ def _measurement_library_status_key(
         return "measurement_library_status_found"
     return "measurement_library_status_empty"
 
+
 def _suggest_measurement_library_matches_if_ready(
     entries: list[dict[str, Any]],
     *,
@@ -487,5 +462,3 @@ def _suggest_measurement_library_matches_if_ready(
     if is_scanning:
         return {}
     return _suggest_measurement_library_matches(entries, path_keys=path_keys, min_score=min_score)
-
-

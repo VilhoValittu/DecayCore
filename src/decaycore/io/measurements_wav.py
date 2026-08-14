@@ -20,18 +20,62 @@ from .measurement_bundle import TransferData
 
 try:
     from .decaycore_wav_window import ir_wav_to_freq_response as _wav_ir_to_fr
-except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+except (
+    RuntimeError,
+    OSError,
+    ImportError,
+    TypeError,
+    ValueError,
+    AttributeError,
+    KeyError,
+    IndexError,
+    OverflowError,
+    FloatingPointError,
+):
     try:
         from decaycore.io.decaycore_wav_window import ir_wav_to_freq_response as _wav_ir_to_fr
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         _wav_ir_to_fr = None
 
 try:
     from .decaycore_wav_window import ir_wav_to_complex_response as _wav_ir_to_complex
-except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+except (
+    RuntimeError,
+    OSError,
+    ImportError,
+    TypeError,
+    ValueError,
+    AttributeError,
+    KeyError,
+    IndexError,
+    OverflowError,
+    FloatingPointError,
+):
     try:
         from decaycore.io.decaycore_wav_window import ir_wav_to_complex_response as _wav_ir_to_complex
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         _wav_ir_to_complex = None
 
 _TXT_BASELINE_PRE_MS = 125.0
@@ -58,9 +102,9 @@ def _wav_to_float(sig: np.ndarray) -> np.ndarray:
     if x.dtype.kind == "f":
         return x.astype(np.float32, copy=False)
     if x.dtype == np.int16:
-        return (x.astype(np.float32) / 32768.0)
+        return x.astype(np.float32) / 32768.0
     if x.dtype == np.int32:
-        return (x.astype(np.float32) / 2147483648.0)
+        return x.astype(np.float32) / 2147483648.0
     return x.astype(np.float32)
 
 
@@ -81,7 +125,18 @@ def _detect_impulse_anchor_sample(sig: np.ndarray, channel_index: int = 0) -> in
             return None
         x = x - float(np.mean(x))
         return int(np.argmax(np.abs(x)))
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         return None
 
 
@@ -127,7 +182,18 @@ def _octave_smooth_loggrid(freqs: np.ndarray, mags_db: np.ndarray, smoothing_lev
         out = m.copy()
         out[mask] = m2_s
         return out
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         return np.asarray(mags_db, dtype=float)
 
 
@@ -181,7 +247,18 @@ def _ir_wav_to_freq_response(
             sl = int(smoothing_level)
             if sl > 0:
                 mag_db = _octave_smooth_loggrid(freqs, mag_db, sl)
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        except (
+            RuntimeError,
+            OSError,
+            ImportError,
+            TypeError,
+            ValueError,
+            AttributeError,
+            KeyError,
+            IndexError,
+            OverflowError,
+            FloatingPointError,
+        ):
             logger.exception("octave smoothing in wav response")
 
     hf = freqs > min(0.45 * fs_i, 18000.0)
@@ -222,7 +299,18 @@ def _ir_wav_to_complex_response(
             sl = int(smoothing_level)
             if sl > 0:
                 mag_db = _octave_smooth_loggrid(freqs, mag_db, sl)
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        except (
+            RuntimeError,
+            OSError,
+            ImportError,
+            TypeError,
+            ValueError,
+            AttributeError,
+            KeyError,
+            IndexError,
+            OverflowError,
+            FloatingPointError,
+        ):
             logger.exception("octave smoothing in wav response")
 
     hf = freqs > min(0.45 * fs_i, 18000.0)
@@ -266,7 +354,18 @@ def _wav_complex_segment(
     seg = np.zeros(seg_len, dtype=np.float32)
     try:
         anchor_i = int(anchor_sample)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         anchor_i = -1
     src_i0 = max(0, anchor_i - pre_s)
     src_i1 = min(int(sig.size), anchor_i + post_s)
@@ -274,7 +373,7 @@ def _wav_complex_segment(
     n_copy = max(0, src_i1 - src_i0)
     if n_copy > 0 and dst_i0 < seg.size:
         n_copy = min(int(n_copy), int(seg.size - dst_i0))
-        seg[dst_i0:dst_i0 + n_copy] = sig[src_i0:src_i0 + n_copy]
+        seg[dst_i0 : dst_i0 + n_copy] = sig[src_i0 : src_i0 + n_copy]
     return seg
 
 
@@ -313,7 +412,18 @@ def _transfer_data_from_tuple(parsed, *, fs: int, label: str) -> TransferData | 
             sample_rate=int(fs),
             label=str(label or ""),
         )
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         return None
 
 
@@ -350,8 +460,21 @@ def parse_measurements_from_wav_bytes(
                 min_n_fft=int(min_n_fft),
                 phase_hf_hold=True,
             )
-        return _ir_wav_to_freq_response(int(fs), sig, pre_ms=float(pre_ms), post_ms=float(post_ms), smoothing_level=smoothing_level)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as e:
+        return _ir_wav_to_freq_response(
+            int(fs), sig, pre_ms=float(pre_ms), post_ms=float(post_ms), smoothing_level=smoothing_level
+        )
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ) as e:
         if logger:
             logger.error(f"WAV parse failed: {e}")
         return None, None, None
@@ -397,8 +520,21 @@ def parse_measurements_from_wav_path(
                 min_n_fft=int(min_n_fft),
                 phase_hf_hold=True,
             )
-        return _ir_wav_to_freq_response(int(fs), sig, pre_ms=float(pre_ms), post_ms=float(post_ms), smoothing_level=smoothing_level)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as e:
+        return _ir_wav_to_freq_response(
+            int(fs), sig, pre_ms=float(pre_ms), post_ms=float(post_ms), smoothing_level=smoothing_level
+        )
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ) as e:
         if logger:
             logger.error(f"WAV path parse failed ({path}): {e}")
         return None, None, None
@@ -414,7 +550,18 @@ def detect_coherent_anchor_sample_from_wav_bytes(
         bio = io.BytesIO(file_content)
         _fs, sig = scipy.io.wavfile.read(bio)
         return _detect_impulse_anchor_sample(sig, channel_index=channel_index)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as e:
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ) as e:
         if logger:
             logger.error(f"Coherent WAV anchor detect failed: {e}")
         return None
@@ -432,7 +579,18 @@ def detect_coherent_anchor_sample_from_wav_path(
             return None
         _fs, sig = scipy.io.wavfile.read(p)
         return _detect_impulse_anchor_sample(sig, channel_index=channel_index)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as e:
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ) as e:
         if logger:
             logger.error(f"Coherent WAV anchor detect failed ({path}): {e}")
         return None
@@ -483,7 +641,18 @@ def parse_coherent_transfer_from_wav_bytes(
                 anchor_sample=anchor_sample,
             )
         return _transfer_data_from_tuple(parsed, fs=int(fs), label=str(label or ""))
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as e:
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ) as e:
         if logger:
             logger.error(f"Coherent WAV parse failed: {e}")
         return None
@@ -541,7 +710,18 @@ def parse_coherent_transfer_from_wav_path(
                 anchor_sample=anchor_sample,
             )
         return _transfer_data_from_tuple(parsed, fs=int(fs), label=str(label or ""))
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError) as e:
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ) as e:
         if logger:
             logger.error(f"Coherent WAV path parse failed ({path}): {e}")
         return None

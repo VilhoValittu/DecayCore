@@ -111,19 +111,11 @@ def build_residual_authority_caps(
     modal_effective = np.maximum(modal_support, 0.85 * decay_need)
 
     reflection_ok = reflection_risk <= refl_max
-    boost_allowed = (
-        (boost_authority >= boost_min)
-        & (null_risk <= null_boost_max)
-        & reflection_ok
-    )
+    boost_allowed = (boost_authority >= boost_min) & (null_risk <= null_boost_max) & reflection_ok
     modal_polish_mask = (modal_effective >= modal_min) & reflection_ok
 
     if mode == "general_fit":
-        cut_allowed = (
-            (cut_authority >= cut_min)
-            & (null_risk <= null_cut_max)
-            & reflection_ok
-        )
+        cut_allowed = (cut_authority >= cut_min) & (null_risk <= null_cut_max) & reflection_ok
         boost_cap = max_boost * boost_authority
         boost_cap *= 1.0 - null_strength * 0.85 * null_risk
         boost_cap *= 1.0 - 0.65 * reflection_risk
@@ -131,10 +123,7 @@ def build_residual_authority_caps(
         cut_cap *= 1.0 - 0.45 * reflection_risk
     else:
         cut_allowed = (
-            (modal_effective >= modal_min)
-            & (cut_authority >= cut_min)
-            & reflection_ok
-            & (null_risk <= null_cut_max)
+            (modal_effective >= modal_min) & (cut_authority >= cut_min) & reflection_ok & (null_risk <= null_cut_max)
         )
         boost_cap = max_boost * boost_authority
         boost_cap *= 1.0 - 0.90 * null_risk
@@ -162,9 +151,7 @@ def build_residual_authority_caps(
         "residual_block_reason": {
             "null_risk_bins": int(np.count_nonzero(null_risk > null_boost_max)),
             "reflection_risk_bins": int(np.count_nonzero(~reflection_ok)),
-            "low_authority_bins": int(
-                np.count_nonzero((boost_authority < boost_min) & (cut_authority < cut_min))
-            ),
+            "low_authority_bins": int(np.count_nonzero((boost_authority < boost_min) & (cut_authority < cut_min))),
             "low_modal_support_bins": int(np.count_nonzero(modal_effective < modal_min)),
         },
     }

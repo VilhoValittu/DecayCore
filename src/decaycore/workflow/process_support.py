@@ -13,6 +13,7 @@
 These were previously defined inline in decaycore.py alongside
 _process_run_legacy(). They belong to orchestration, not UI.
 """
+
 from __future__ import annotations
 
 import logging
@@ -53,8 +54,7 @@ def auto_target_mode_norm(mode: typing.Any) -> str:
 
 
 def auto_target_selection_method_text(method: typing.Any) -> str:
-    """Muuntaa auto-target-valinnan metodit luettaviksi loki- ja UI-teksteiksi.
-    """
+    """Muuntaa auto-target-valinnan metodit luettaviksi loki- ja UI-teksteiksi."""
     key = str(method).strip().lower() if method is not None else ""
 
     mapping = {
@@ -79,7 +79,6 @@ def slugify_filename_token(value: typing.Any, *, default: str = "target", max_le
     try:
         raw = str(value or "").strip()
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -98,7 +97,6 @@ def slugify_filename_token(value: typing.Any, *, default: str = "target", max_le
     try:
         txt = unicodedata.normalize("NFKD", raw).encode("ascii", "ignore").decode("ascii")
     except (
-
         AttributeError,
         TypeError,
         ValueError,

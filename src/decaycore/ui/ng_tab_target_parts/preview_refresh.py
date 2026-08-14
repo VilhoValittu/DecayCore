@@ -9,6 +9,7 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 """Target tab preview refresh machinery: plot mount, debounced refresh, drag relayout."""
+
 from __future__ import annotations
 
 from .. import ng_controls as ctrl
@@ -20,6 +21,7 @@ from ...ui_i18n import LVL_MODE_AUTO, LVL_MODE_MANUAL, normalize_lvl_mode_value
 from .preview_fig import _build_target_preview_fig
 from .preview_metadata import _render_target_decay_hint, _render_target_preview_metadata
 from .preview_state import STATE
+
 
 def refresh_target_preview() -> None:
     """Regenerate the target curve preview plot (NiceGUI version).
@@ -47,7 +49,6 @@ def refresh_target_preview() -> None:
         try:
             STATE.plot.update_figure(fig)
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -62,6 +63,7 @@ def refresh_target_preview() -> None:
             STATE.plot = _mount_target_preview_plot(preview_col, fig)
     STATE.drag_active = False
 
+
 def _mount_target_preview_plot(preview_col, fig):
     from nicegui import ui  # noqa: PLC0415
 
@@ -70,6 +72,7 @@ def _mount_target_preview_plot(preview_col, fig):
         plot = ui.plotly(fig).classes("w-full")
         plot.on("plotly_relayout", _on_target_preview_relayout)
     return plot
+
 
 def _schedule_target_preview_refresh(delay_s: float = 0.10) -> None:
 
@@ -93,6 +96,7 @@ def _schedule_target_preview_refresh(delay_s: float = 0.10) -> None:
 
     with preview_col:
         ui.timer(delay_s, _run, once=True, immediate=False)
+
 
 def _on_target_preview_relayout(e) -> None:
 

@@ -25,7 +25,7 @@ When adaptive target is selected, DecayCore:
 2. Aligns each channel to the reference before measuring broad bass residuals, so the reference curve's own bass shelf is not mistaken for room buildup.
 3. Smooths and evaluates the channels separately, then reduces adaptation when they disagree.
 4. Bounds target changes to −2.0/+0.75 dB and fades adaptation out by 500 Hz.
-5. When reliable stereo RT60 bands are available, uses them only to prevent additional bass lift in a slow-decay room.
+5. Allows additional bass lift only when reliable stereo RT60 bands are available, and suppresses that lift in a slow-decay room.
 6. Preserves the Harman6 shape above 500 Hz by default and proceeds directly to filter generation.
 
 RT60 never creates a tonal adjustment on its own. Optional high-frequency adaptation is disabled in AUTO and requires explicit high-SNR, stereo-consistent evidence at DSP-helper level.
@@ -42,9 +42,9 @@ Adaptive target is useful when:
 
 **RT60 data is useful but not required.**
 
-RT60 data is captured automatically when you use DecayCore's built-in measurement tool. Adaptive target uses reliable stereo RT60 data as a bass-lift guard, not as a broadband target generator.
+RT60 data is captured automatically when you use DecayCore's built-in measurement tool. Adaptive target uses reliable stereo RT60 data as a bass-lift authority and decay guard, not as a broadband target generator.
 
-When using external measurements (REW text exports, WAV impulse files from REW, or other sources), RT60 data is typically not present. The target remains valid; only the decay-based bass-lift guard is omitted.
+When using external measurements (REW text exports, WAV impulse files from REW, or other sources), RT60 data is typically not present. The target remains valid and can still reduce an overly strong broad bass shelf, but it will not add bass lift without reliable decay evidence.
 
 **If you are using external measurements and RT60 data is not available, the default `Auto: search best built-in` strategy is generally the safer choice.** The built-in curve search evaluates how well different targets match the measured room and picks the best-ranked result regardless of RT60 data.
 

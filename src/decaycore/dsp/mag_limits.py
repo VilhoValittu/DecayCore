@@ -116,7 +116,7 @@ def _blend_masked_fractional_octave(
         if i0 > 0:
             g0[:i0] = g0[i0]
         if i1 < (g0.size - 1):
-            g0[i1 + 1:] = g0[i1]
+            g0[i1 + 1 :] = g0[i1]
 
     g_sm = smooth_gain_fractional_octave(freq_axis, g0, smooth_value)
     out[mask_c] = out[mask_c] + (g_sm[mask_c] - out[mask_c]) * float(mix)

@@ -157,11 +157,11 @@ def _phase_ir_window_build_window(
         win_fall = _phase_ir_window_edge_taper(s_right, alpha=tukey_alpha, side="right", win_shape=win_shape)
         end_idx = peak_idx + 1 + s_right
         if end_idx <= n:
-            window[peak_idx + 1:end_idx] = win_fall
+            window[peak_idx + 1 : end_idx] = win_fall
         else:
             avail = n - (peak_idx + 1)
             if avail > 0:
-                window[peak_idx + 1:n] = win_fall[:avail]
+                window[peak_idx + 1 : n] = win_fall[:avail]
     window[peak_idx] = 1.0
     return window, s_left, s_right
 
@@ -267,9 +267,7 @@ def _apply_ir_window(ir, cfg, st, logger=None) -> np.ndarray:
     auto_asym_left_ms_after = float(left_ms)
     auto_asym_left_ratio, auto_asym_left_max_ms = _phase_ir_window_auto_asym_params(cfg, st)
     if logger is not None:
-        logger.info(
-            f"IR export: mode={win_mode}, peak={peak_idx}, user_s_left={s_left}, user_s_right={s_right}"
-        )
+        logger.info(f"IR export: mode={win_mode}, peak={peak_idx}, user_s_left={s_left}, user_s_right={s_right}")
         logger.info(f"IR export: shape={win_shape}, tukey_alpha={tukey_alpha:.2f}")
 
     s_left, s_right, auto_asym_left_cap_applied, auto_asym_left_ms_after = _phase_ir_window_apply_auto_asym_cap(

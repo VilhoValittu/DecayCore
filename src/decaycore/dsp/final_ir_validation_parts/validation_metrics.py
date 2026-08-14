@@ -43,25 +43,9 @@ _SEVERITY_ORDER: dict[str, int] = {"ok": 0, "warn": 1, "reject": 2}
 # ---------------------------------------------------------------------------
 
 
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -69,13 +53,9 @@ _SEVERITY_ORDER: dict[str, int] = {"ok": 0, "warn": 1, "reject": 2}
 # ---------------------------------------------------------------------------
 
 
-
-
 # ---------------------------------------------------------------------------
 # FIR spectrum computation (cached for both GD and magnitude metrics)
 # ---------------------------------------------------------------------------
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -83,19 +63,9 @@ _SEVERITY_ORDER: dict[str, int] = {"ok": 0, "warn": 1, "reject": 2}
 # ---------------------------------------------------------------------------
 
 
-
-
 # ---------------------------------------------------------------------------
 # Magnitude metrics
 # ---------------------------------------------------------------------------
-
-
-
-
-
-
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -103,18 +73,15 @@ _SEVERITY_ORDER: dict[str, int] = {"ok": 0, "warn": 1, "reject": 2}
 # ---------------------------------------------------------------------------
 
 
-
-
 # ---------------------------------------------------------------------------
 # Safe missing result
 # ---------------------------------------------------------------------------
 
 
-
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def _safe_missing_result() -> FinalIRValidationResult:
     nan = float("nan")
@@ -389,6 +356,7 @@ def _final_ir_validation_severity_and_penalty(
         penalty += worsening
     return severity, min(penalty, 5.0), reasons
 
+
 def validate_final_fir_against_ir(
     *,
     sample_rate: int,
@@ -473,9 +441,7 @@ def validate_final_fir_against_ir(
         if np.isfinite(float(v))
     ]
     gd_improvement_frac = (
-        float(np.mean(np.asarray(improvement_values, dtype=float)))
-        if improvement_values
-        else float("nan")
+        float(np.mean(np.asarray(improvement_values, dtype=float))) if improvement_values else float("nan")
     )
     freq_arr = _safe_arr(freq_axis)
     mag_metrics, stereo = _final_ir_validation_mag_and_stereo_metrics(
@@ -552,6 +518,7 @@ def validate_final_fir_against_ir(
         metrics=all_metrics,
     )
 
+
 def final_ir_validation_to_stats(result: FinalIRValidationResult) -> dict[str, Any]:
     def _f(v: float) -> float:
         return float(v) if np.isfinite(float(v)) else float("nan")
@@ -567,21 +534,11 @@ def final_ir_validation_to_stats(result: FinalIRValidationResult) -> dict[str, A
         "final_ir_validation_early_energy_ratio_db": _f(result.early_energy_ratio_db),
         "final_ir_validation_gd_peak_ms": _f(result.gd_peak_ms),
         "final_ir_validation_gd_rms_ms": _f(result.gd_rms_ms),
-        "final_ir_validation_gd_before_peak_ms": _f(
-            result.metrics.get("gd_before_peak_ms", float("nan"))
-        ),
-        "final_ir_validation_gd_after_peak_ms": _f(
-            result.metrics.get("gd_after_peak_ms", float("nan"))
-        ),
-        "final_ir_validation_gd_before_rms_ms": _f(
-            result.metrics.get("gd_before_rms_ms", float("nan"))
-        ),
-        "final_ir_validation_gd_after_rms_ms": _f(
-            result.metrics.get("gd_after_rms_ms", float("nan"))
-        ),
-        "final_ir_validation_gd_improvement_frac": _f(
-            result.metrics.get("gd_improvement_frac", float("nan"))
-        ),
+        "final_ir_validation_gd_before_peak_ms": _f(result.metrics.get("gd_before_peak_ms", float("nan"))),
+        "final_ir_validation_gd_after_peak_ms": _f(result.metrics.get("gd_after_peak_ms", float("nan"))),
+        "final_ir_validation_gd_before_rms_ms": _f(result.metrics.get("gd_before_rms_ms", float("nan"))),
+        "final_ir_validation_gd_after_rms_ms": _f(result.metrics.get("gd_after_rms_ms", float("nan"))),
+        "final_ir_validation_gd_improvement_frac": _f(result.metrics.get("gd_improvement_frac", float("nan"))),
         "final_ir_validation_voice_band_peak_excess_db": _f(result.voice_band_peak_excess_db),
         "final_ir_validation_voice_band_energy_excess_db": _f(result.voice_band_energy_excess_db),
         "final_ir_validation_stereo_delta_rms_db": _f(result.stereo_delta_rms_db),
@@ -591,4 +548,4 @@ def final_ir_validation_to_stats(result: FinalIRValidationResult) -> dict[str, A
     }
 
 
-__all__ = ['_safe_missing_result', 'validate_final_fir_against_ir', 'final_ir_validation_to_stats']
+__all__ = ["_safe_missing_result", "validate_final_fir_against_ir", "final_ir_validation_to_stats"]

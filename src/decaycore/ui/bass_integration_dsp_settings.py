@@ -43,13 +43,17 @@ def build_bass_integration_dsp_settings(data: dict | None) -> list[BassIntegrati
     alignment = dict(bi_meta.get("alignment", {}) or {})
     allpass_meta = dict(bi_meta.get("recommended_allpass", {}) or {})
     diag = dict(bi_meta.get("diagnostics", {}) or {})
-    combine_mode = str(
-        diag.get(
-            "sub_combine_mode",
-            bi_meta.get("sub_combine_mode", ui_data.get("bass_integration_sub_combine_mode", "average")),
+    combine_mode = (
+        str(
+            diag.get(
+                "sub_combine_mode",
+                bi_meta.get("sub_combine_mode", ui_data.get("bass_integration_sub_combine_mode", "average")),
+            )
+            or "average"
         )
-        or "average"
-    ).strip().lower()
+        .strip()
+        .lower()
+    )
     is_dual_sub_shared = bool(diag.get("dual_sub_preprocessing_applied", False)) or combine_mode in {
         "dual_sub_peak_aligned_average",
         "dual_sub_single_bus_complex_sum",
@@ -96,13 +100,19 @@ def build_bass_integration_dsp_settings(data: dict | None) -> list[BassIntegrati
         float("nan"),
     )
     allpass_on = bool(allpass_meta.get("enabled", False))
-    delay_label_key = "results_metric_bass_shared_sub_array_delay" if is_dual_sub_shared else "results_metric_bass_alignment_delay"
+    delay_label_key = (
+        "results_metric_bass_shared_sub_array_delay" if is_dual_sub_shared else "results_metric_bass_alignment_delay"
+    )
     delay_value = sub_array_delay_value if is_dual_sub_shared else sub_delay_value
     polarity_label_key = (
         "results_metric_bass_shared_sub_polarity" if is_dual_sub_shared else "results_metric_bass_alignment_polarity"
     )
-    gain_label_key = "results_metric_bass_shared_sub_gain" if is_dual_sub_shared else "results_metric_bass_alignment_gain"
-    allpass_label_key = "results_metric_bass_shared_sub_allpass" if is_dual_sub_shared else "results_metric_bass_allpass"
+    gain_label_key = (
+        "results_metric_bass_shared_sub_gain" if is_dual_sub_shared else "results_metric_bass_alignment_gain"
+    )
+    allpass_label_key = (
+        "results_metric_bass_shared_sub_allpass" if is_dual_sub_shared else "results_metric_bass_allpass"
+    )
     allpass_freq_label_key = (
         "results_metric_bass_shared_sub_allpass_freq" if is_dual_sub_shared else "results_metric_bass_allpass_freq"
     )

@@ -12,6 +12,7 @@
 
 Replaces build_input_section() from layout_builders.py.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -45,22 +46,6 @@ from ...ui_i18n import (
     normalize_layout_value,
     tr_options,
 )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 from .measurement_library import (
@@ -124,7 +109,6 @@ class _FilesTabContext:
 
             refresh_target_preview()
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -169,11 +153,15 @@ class _FilesTabContext:
         with self.ui.row().classes("items-center gap-2 text-xs overflow-hidden"):
             self.ui.label("●").classes("text-green-500 shrink-0")
             self.ui.label(filename).classes("truncate")
-            self.ui.label(f"· {upload_format} · {_format_upload_size(upload_size_bytes)}").classes("text-gray-400 shrink-0")
+            self.ui.label(f"· {upload_format} · {_format_upload_size(upload_size_bytes)}").classes(
+                "text-gray-400 shrink-0"
+            )
         self.ui.button(
             self.t("file_status_clear"),
             on_click=_clear_uploaded_file,
-        ).props('color="secondary" flat size="xs"').classes("shrink-0")
+        ).props(
+            'color="secondary" flat size="xs"'
+        ).classes("shrink-0")
 
     def render_local_path_status(self, *, local_path_info: dict) -> None:
         path_format = str(local_path_info["format"] or "Unknown")
@@ -189,7 +177,9 @@ class _FilesTabContext:
                 if bool(local_path_info.get("has_harmonics", False)):
                     self.ui.label("· H2–H5").classes("text-green-500 shrink-0")
                 if local_path_info.get("rt60_val") is not None:
-                    self.ui.label(f"· RT60 {float(local_path_info['rt60_val']):.2f}s").classes("text-green-500 shrink-0")
+                    self.ui.label(f"· RT60 {float(local_path_info['rt60_val']):.2f}s").classes(
+                        "text-green-500 shrink-0"
+                    )
             return
         with self.ui.row().classes("items-center gap-2 text-xs overflow-hidden"):
             self.ui.label("⚠").classes("text-yellow-500 shrink-0")
@@ -230,7 +220,6 @@ class _FilesTabContext:
         try:
             input_control.set_value(value)
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -249,7 +238,6 @@ class _FilesTabContext:
         try:
             control.set_options(options)
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -273,7 +261,6 @@ class _FilesTabContext:
             else:
                 control.disable()
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -291,7 +278,6 @@ class _FilesTabContext:
                 else:
                     control.props("disable")
             except (
-
                 AttributeError,
                 TypeError,
                 ValueError,
@@ -323,7 +309,9 @@ class _FilesTabContext:
         self.library_state.is_scanning = bool(is_scanning)
         self.set_enabled(self.measurement_library_suggest_button, not is_scanning)
 
-    def update_measurement_library_status(self, *, dir_value: str, exists: bool, entry_count: int, is_scanning: bool) -> None:
+    def update_measurement_library_status(
+        self, *, dir_value: str, exists: bool, entry_count: int, is_scanning: bool
+    ) -> None:
         if self.measurement_library_status is None:
             return
         status_key = _measurement_library_status_key(
@@ -341,10 +329,7 @@ class _FilesTabContext:
         entries = list(payload.get("entries") or [])
         options = dict(payload.get("options") or {})
         slot_options_raw = payload.get("slot_options") or {}
-        slot_options = {
-            str(path_key): dict(slot_options_raw.get(path_key) or {})
-            for path_key in self.library_selects
-        }
+        slot_options = {str(path_key): dict(slot_options_raw.get(path_key) or {}) for path_key in self.library_selects}
         self.library_state.entries = entries
         self.library_state.options = options
         self.library_state.slot_options = slot_options
@@ -426,7 +411,6 @@ class _FilesTabContext:
                 path_keys=path_keys,
             )
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -477,7 +461,6 @@ class _FilesTabContext:
             try:
                 asyncio.create_task(self.refresh_measurement_library_async(token))
             except (
-
                 AttributeError,
                 TypeError,
                 ValueError,
@@ -527,11 +510,13 @@ class _FilesTabContext:
 
     # --- upload / slot building -------------------------------------------
     async def handle_upload(self, e, *, upload_key: str) -> None:
-        self.file_holders[upload_key].set_value(_build_upload_payload(
-            filename=e.file.name,
-            content=await e.file.read(),
-            mime_type=getattr(e.file, "content_type", ""),
-        ))
+        self.file_holders[upload_key].set_value(
+            _build_upload_payload(
+                filename=e.file.name,
+                content=await e.file.read(),
+                mime_type=getattr(e.file, "content_type", ""),
+            )
+        )
         self.render_measurement_slots(upload_key)
         self.refresh_target_preview()
 
@@ -550,14 +535,19 @@ class _FilesTabContext:
 
         with self.ui.column().classes("flex-1 gap-2"):
             self.ui.label(channel_label).classes("text-sm font-medium")
-            library_select = self.ui.select(
-                {},
-                value=None,
-                label=self.t("measurement_library_select"),
-            ).props("clearable").classes("w-full")
+            library_select = (
+                self.ui.select(
+                    {},
+                    value=None,
+                    label=self.t("measurement_library_select"),
+                )
+                .props("clearable")
+                .classes("w-full")
+            )
             status_scope = self.ui.column().classes("w-full")
             ctrl.register_container(scope_name, status_scope)
             with self.ui.expansion(self.t("file_slot_manual_expand")).classes("w-full text-xs"):
+
                 async def _on_upload(
                     e,
                     *,
@@ -572,8 +562,12 @@ class _FilesTabContext:
                     label=channel_label,
                     on_upload=_on_upload,
                     auto_upload=True,
-                ).props('accept=".txt,.wav"').classes("w-full")
-                path_input = self.ui.input(label=self.t(path_label_key), value=self.path_holders[path_key].value).classes("w-full")
+                ).props(
+                    'accept=".txt,.wav"'
+                ).classes("w-full")
+                path_input = self.ui.input(
+                    label=self.t(path_label_key), value=self.path_holders[path_key].value
+                ).classes("w-full")
                 ctrl.register(path_control_name, path_input)
         self.path_inputs[path_key].append(path_input)
         self.library_selects[path_key].append(library_select)
@@ -616,10 +610,7 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> _FilesTabContext:
     bass_integration_visible = bool(mode_value == "AUTO")
     bass_integration_enabled = bool(get_val("bass_integration_enable", False))
     bass_integration_active = bool(bass_integration_visible and bass_integration_enabled)
-    is_direct_dac = (
-        bass_integration_active
-        and str(get_val("bass_integration_mode", "") or "").strip() == "direct_dac"
-    )
+    is_direct_dac = bass_integration_active and str(get_val("bass_integration_mode", "") or "").strip() == "direct_dac"
 
     # File uploads – store as {"filename": ..., "content": bytes} in holders
     file_holders = {
@@ -642,6 +633,10 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> _FilesTabContext:
     }
     for key, holder in path_holders.items():
         ctrl.register(key, holder)
+    ctrl.register(
+        "comparison_mode",
+        ctrl._ValueHolder(bool(get_val("comparison_mode", True))),
+    )
 
     ctx = _FilesTabContext(
         t=t,
@@ -696,9 +691,7 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> _FilesTabContext:
                         t("measurement_library_suggest"),
                         on_click=lambda: ctx.apply_measurement_library_suggestions(),
                     ).props('color="primary"')
-                ctx.measurement_library_input.on_value_change(
-                    lambda _e: ctx.schedule_measurement_library_refresh(0.35)
-                )
+                ctx.measurement_library_input.on_value_change(lambda _e: ctx.schedule_measurement_library_refresh(0.35))
                 ctrl.on_commit(
                     "measurement_library_dir",
                     ctx.persist_measurement_library_dir_from_ui,
@@ -746,40 +739,50 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> _FilesTabContext:
 
         with ui.expansion(t("files_export_compact_title")).classes("w-full"):
             ui.label(t("files_export_section_intro")).classes("text-xs text-gray-400 mb-2")
-            with ui.card().classes("w-full gap-4"):
-                with ui.row().classes("w-full gap-4 items-end"):
-                    with ui.column().classes("gap-1"):
-                        ui.label(t("layout")).classes("text-sm font-medium")
-                        ctrl.register(
-                            "layout",
-                            ui.radio(
-                                tr_options(t, LAYOUT_OPTION_LABEL_KEYS),
-                                value=normalize_layout_value(get_val("layout", LAYOUT_MONO), t),
-                            ),
-                        )
+            with ui.grid(columns=2).classes("w-full gap-4"):
+                with ui.card().classes("w-full gap-3").props("flat bordered"):
+                    ui.label(t("files_export_layout_title")).classes("text-sm font-semibold")
+                    ui.label(t("files_export_layout_help")).classes("text-xs text-gray-400")
+                    ctrl.register(
+                        "layout",
+                        ui.radio(
+                            tr_options(t, LAYOUT_OPTION_LABEL_KEYS),
+                            value=normalize_layout_value(get_val("layout", LAYOUT_MONO), t),
+                        ).props("inline"),
+                    )
 
-                with ui.row().classes("w-full gap-4 items-end"):
-                    with ui.column().classes("gap-1"):
+                with ui.card().classes("w-full gap-3").props("flat bordered"):
+                    ui.label(t("files_export_file_formats_title")).classes("text-sm font-semibold")
+                    with ui.column().classes("w-full gap-1"):
                         ui.label(t("filter_wav_format")).classes("text-sm font-medium")
+                        ui.label(t("filter_wav_format_help")).classes("text-xs text-gray-400")
                         ctrl.register(
                             "filter_wav_format",
                             ui.radio(
                                 tr_options(t, FILTER_WAV_FORMAT_OPTION_LABEL_KEYS),
-                                value=str(get_val("filter_wav_format", FILTER_WAV_FORMAT_FLOAT32) or FILTER_WAV_FORMAT_FLOAT32),
-                            ),
+                                value=str(
+                                    get_val("filter_wav_format", FILTER_WAV_FORMAT_FLOAT32) or FILTER_WAV_FORMAT_FLOAT32
+                                ),
+                            ).props("inline"),
                         )
-
-                with ui.row().classes("w-full gap-4 items-end"):
-                    with ui.column().classes("gap-1"):
+                    ui.separator()
+                    with ui.column().classes("w-full gap-1"):
                         ui.label(t("device_audio_format")).classes("text-sm font-medium")
+                        ui.label(t("device_audio_format_help")).classes("text-xs text-gray-400")
                         ctrl.register(
                             "device_audio_format",
                             ui.radio(
                                 tr_options(t, DEVICE_AUDIO_FORMAT_OPTION_LABEL_KEYS),
-                                value=str(get_val("device_audio_format", DEVICE_AUDIO_FORMAT_S32LE) or DEVICE_AUDIO_FORMAT_S32LE),
-                            ),
+                                value=str(
+                                    get_val("device_audio_format", DEVICE_AUDIO_FORMAT_S32LE)
+                                    or DEVICE_AUDIO_FORMAT_S32LE
+                                ),
+                            ).props("inline"),
                         )
 
+            with ui.card().classes("w-full gap-3 mt-4").props("flat bordered"):
+                ui.label(t("files_export_rates_title")).classes("text-sm font-semibold")
+                ui.label(t("files_export_rates_help")).classes("text-xs text-gray-400")
                 ctrl.register(
                     "multi_rate_opt",
                     ui.checkbox(
@@ -795,32 +798,26 @@ def build_files_tab(*, t: Callable, get_val: Callable) -> _FilesTabContext:
                             value=bool(get_val("multi_rate_ultra_high_opt", False)),
                         ),
                     )
-                ctrl.register_container("taps_auto_info_scope_files", ui.column().classes("w-full"))
-                ctrl.register(
-                    "comparison_mode",
-                    ui.checkbox(
-                        t("comparison_mode"),
-                        value=bool(get_val("comparison_mode", True)),
-                    ),
-                )
+                with ui.expansion(t("files_export_tap_details_title")).classes("w-full"):
+                    ctrl.register_container("taps_auto_info_scope_files", ui.column().classes("w-full"))
 
     return ctx
 
 
 __all__ = [
-    '_persist_measurement_library_dir',
-    '_score_measurement_tokens',
-    '_score_measurement_candidate',
-    '_scan_measurement_library',
-    '_build_measurement_library_options',
-    '_entry_passes_slot_filter',
-    '_build_slot_options',
-    '_suggest_measurement_library_matches',
-    '_build_measurement_library_slot_options',
-    '_build_measurement_library_state',
-    '_build_measurement_library_refresh_payload',
-    '_measurement_library_refresh_payload_for_token',
-    '_measurement_library_status_key',
-    '_suggest_measurement_library_matches_if_ready',
-    'build_files_tab',
+    "_persist_measurement_library_dir",
+    "_score_measurement_tokens",
+    "_score_measurement_candidate",
+    "_scan_measurement_library",
+    "_build_measurement_library_options",
+    "_entry_passes_slot_filter",
+    "_build_slot_options",
+    "_suggest_measurement_library_matches",
+    "_build_measurement_library_slot_options",
+    "_build_measurement_library_state",
+    "_build_measurement_library_refresh_payload",
+    "_measurement_library_refresh_payload_for_token",
+    "_measurement_library_status_key",
+    "_suggest_measurement_library_matches_if_ready",
+    "build_files_tab",
 ]

@@ -21,39 +21,10 @@ logger = logging.getLogger("DecayCore.dsp")
 # Try to import Rust DSP extension
 try:
     from decaycore_dsp import smooth_log_box_kernel_rs as _smooth_log_box_kernel_rs
+
     _DSP_RUST_AVAILABLE = True
 except ImportError:
     _DSP_RUST_AVAILABLE = False
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 MODAL_ANALYSIS_VERSION = 2
@@ -84,6 +55,7 @@ class RoomModeEvent:
     kind: str = "unknown"
     reasons: tuple[str, ...] = field(default_factory=tuple)
 
+
 @dataclass(frozen=True)
 class ModalAnalysisResult:
     events: tuple[RoomModeEvent, ...]
@@ -93,6 +65,7 @@ class ModalAnalysisResult:
     modal_area_db_oct: float
     voice_band_modal_risk: float
     analysis_version: int = MODAL_ANALYSIS_VERSION
+
 
 def _empty_result() -> ModalAnalysisResult:
     return ModalAnalysisResult(
@@ -104,13 +77,13 @@ def _empty_result() -> ModalAnalysisResult:
         voice_band_modal_risk=0.0,
     )
 
+
 def _as_float_array(value) -> np.ndarray:
     if value is None:
         return np.asarray([], dtype=float)
     try:
         return np.asarray(value, dtype=float).reshape(-1)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -122,6 +95,7 @@ def _as_float_array(value) -> np.ndarray:
         ModuleNotFoundError,
     ):
         return np.asarray([], dtype=float)
+
 
 def _smooth_log_box_kernel(x: np.ndarray, y_raw: np.ndarray, half: float) -> np.ndarray:
     n = x.size
@@ -181,6 +155,7 @@ def _smooth_log_box(freq_hz: np.ndarray, values: np.ndarray, width_oct: float) -
             logger.warning("Rust log-box smoothing rejected its input; using Python fallback: %s", exc)
     out[order] = _smooth_log_box_kernel(x, y_raw, half)
     return out
+
 
 def _safe_confidence(confidence_mask: np.ndarray, n: int) -> np.ndarray:
     if confidence_mask.size < n:
@@ -343,8 +318,12 @@ def _prepare_arrays(
     analysis_use = np.asarray(analysis[valid], dtype=float)
     conf_use = np.asarray(conf[valid], dtype=float)
     gd_use = np.asarray(gd[valid], dtype=float) if gd.size >= n else np.asarray([], dtype=float)
-    left_use = np.asarray(left[valid], dtype=float) if left.size >= n and right.size >= n else np.asarray([], dtype=float)
-    right_use = np.asarray(right[valid], dtype=float) if right.size >= n and left.size >= n else np.asarray([], dtype=float)
+    left_use = (
+        np.asarray(left[valid], dtype=float) if left.size >= n and right.size >= n else np.asarray([], dtype=float)
+    )
+    right_use = (
+        np.asarray(right[valid], dtype=float) if right.size >= n and left.size >= n else np.asarray([], dtype=float)
+    )
 
     order = np.argsort(f_use)
     return (
@@ -355,6 +334,7 @@ def _prepare_arrays(
         left_use[order] if left_use.size else left_use,
         right_use[order] if right_use.size else right_use,
     )
+
 
 def _width_bounds(excess: np.ndarray, peak_idx: int, min_floor: float) -> tuple[int, int]:
     peak = float(max(0.0, excess[int(peak_idx)]))
@@ -369,12 +349,12 @@ def _width_bounds(excess: np.ndarray, peak_idx: int, min_floor: float) -> tuple[
 
 
 __all__ = [
-    'RoomModeEvent',
-    'ModalAnalysisResult',
-    '_empty_result',
-    '_as_float_array',
-    '_smooth_log_box',
-    '_safe_confidence',
-    '_prepare_arrays',
-    '_width_bounds',
+    "RoomModeEvent",
+    "ModalAnalysisResult",
+    "_empty_result",
+    "_as_float_array",
+    "_smooth_log_box",
+    "_safe_confidence",
+    "_prepare_arrays",
+    "_width_bounds",
 ]

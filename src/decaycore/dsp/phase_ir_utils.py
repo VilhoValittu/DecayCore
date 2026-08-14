@@ -133,13 +133,11 @@ def _ms_value(cfg, name_ms: str, name_alias: str, default: float = 0.0) -> float
 
 def _resolve_ir_window_mode(cfg, logger=None) -> tuple[str, str, bool]:
     requested_win_mode = str(getattr(cfg, "ir_export_window_mode", "auto") or "auto").strip().lower()
-    is_min_filter = ("Min" in cfg.filter_type_str)
+    is_min_filter = "Min" in cfg.filter_type_str
     min_strict_off = bool(getattr(cfg, "min_strict_off", False))
     win_mode = "off" if (is_min_filter and min_strict_off) else requested_win_mode
     if is_min_filter and min_strict_off and requested_win_mode != "off" and logger is not None:
-        logger.info(
-            f"IR export: forcing mode=off for Minimum filter (requested={requested_win_mode}, strict)"
-        )
+        logger.info(f"IR export: forcing mode=off for Minimum filter (requested={requested_win_mode}, strict)")
     return requested_win_mode, win_mode, is_min_filter
 
 

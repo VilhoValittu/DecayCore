@@ -111,7 +111,17 @@ def _build_diagnostics_dict(data, fs_v, l_st, r_st):
                 win = [float(win[0]), float(win[1])]
             else:
                 win = None
-        except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
+        except (
+            TypeError,
+            ValueError,
+            AttributeError,
+            KeyError,
+            IndexError,
+            OverflowError,
+            ImportError,
+            ModuleNotFoundError,
+            RecursionError,
+        ):
             win = None
         return {
             "method": st.get("offset_method", None),
@@ -145,6 +155,7 @@ def _build_diagnostics_dict(data, fs_v, l_st, r_st):
         "right": _json_safe(r_st),
     }
 
+
 TEST_MODE = os.environ.get("DECAYCORE_TEST", os.environ.get("CAMILLAFIR_TEST", "0")) == "1"
 
 
@@ -153,7 +164,17 @@ def _export_version_tag(data: dict | None, *, program_version: str | None = None
     if raw_version is None:
         try:
             raw_version = str((data or {}).get("program_version", "") or "").strip()
-        except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
+        except (
+            TypeError,
+            ValueError,
+            AttributeError,
+            KeyError,
+            IndexError,
+            OverflowError,
+            ImportError,
+            ModuleNotFoundError,
+            RecursionError,
+        ):
             raw_version = ""
     return str(program_version_token(raw_version, default="v0"))
 
@@ -161,7 +182,17 @@ def _export_version_tag(data: dict | None, *, program_version: str | None = None
 def _export_winner_rank_score(data: dict | None) -> float:
     try:
         auto_used = bool((data or {}).get(CAMILLAFIR_AUTO_MODE, False))
-    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
+    except (
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        ImportError,
+        ModuleNotFoundError,
+        RecursionError,
+    ):
         auto_used = False
     if not auto_used:
         return float("nan")
@@ -169,7 +200,17 @@ def _export_winner_rank_score(data: dict | None) -> float:
     try:
         auto_meta = dict((data or {}).get("_auto_mode_meta", {}) or {})
         best_metrics = attach_official_rank_score(auto_meta.get("best_metrics", {}))
-    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
+    except (
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        ImportError,
+        ModuleNotFoundError,
+        RecursionError,
+    ):
         return float("nan")
 
     return float(official_rank_score(best_metrics))
@@ -281,7 +322,9 @@ def _apply_direct_dac_sub_allpass_settings(settings: dict[str, Any], data: dict 
         settings["sub_allpass_q"] = float(q)
 
 
-def _effective_main_hpf_iir_export_settings(data: dict | None, *, result_taps: int | None = None) -> tuple[float, int] | None:
+def _effective_main_hpf_iir_export_settings(
+    data: dict | None, *, result_taps: int | None = None
+) -> tuple[float, int] | None:
     try:
         _xos, hpf = build_xos_hpf(dict(data or {}))
     except _RECOVERABLE_JSON_SAFE_EXCEPTIONS:
@@ -329,7 +372,17 @@ def _hybrid_iir_biquads_from_result(result: Any, side: str) -> list[dict]:
     st_name = "l_st" if str(side).lower().startswith("l") else "r_st"
     try:
         st = dict(getattr(result, st_name, {}) or {})
-    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
+    except (
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        ImportError,
+        ModuleNotFoundError,
+        RecursionError,
+    ):
         st = {}
     return [dict(item) for item in list(st.get("hybrid_iir_biquads", []) or []) if isinstance(item, dict)]
 
@@ -463,7 +516,17 @@ def _build_summary_text(
         hc_src = str(data.get("hc_source", "") or "").strip()
         if hc_src:
             summary_content = f"House curve: {hc_src}\n" + summary_content
-    except (TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, ImportError, ModuleNotFoundError, RecursionError):
+    except (
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        ImportError,
+        ModuleNotFoundError,
+        RecursionError,
+    ):
         logger.exception("house curve summary prefix")
     summary_content = _append_export_decision_summary(summary_content, data, fs_v, l_st, r_st)
     summary_content = _append_dsp_effective_params(summary_content, data, fs_v)

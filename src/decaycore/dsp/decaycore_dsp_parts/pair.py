@@ -111,6 +111,7 @@ def _stereo_policy_replacements(cfg: FilterConfig, channel: str) -> dict:
 def _maybe_per_channel_cfg(cfg: FilterConfig, channel: str) -> FilterConfig:
     """Return a copy of cfg with channel-local overrides applied, or cfg unchanged."""
     import dataclasses as _dc
+
     replacements = {}
     replacements.update(_channel_hpf_replacement(cfg, channel))
     replacements.update(_stereo_policy_replacements(cfg, channel))
@@ -186,9 +187,7 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
         return l_imp, l_st, r_imp, r_st
 
     pair_replay = (
-        phase_feedback_replay_cache.get("stereo_link")
-        if isinstance(phase_feedback_replay_cache, dict)
-        else None
+        phase_feedback_replay_cache.get("stereo_link") if isinstance(phase_feedback_replay_cache, dict) else None
     )
     if isinstance(pair_replay, dict):
         cfg2 = copy.deepcopy(cfg)
@@ -393,14 +392,20 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
     tilt_r = _as_stat_float(r_st1, "tilt_slope_db_per_oct", np.nan)
     off_diff = abs(float(off_l) - float(off_r))
     tilt_diff = abs(float(tilt_l) - float(tilt_r)) if (np.isfinite(tilt_l) and np.isfinite(tilt_r)) else 0.0
-    tilt_abs_max = max(abs(float(tilt_l)) if np.isfinite(tilt_l) else 0.0, abs(float(tilt_r)) if np.isfinite(tilt_r) else 0.0)
+    tilt_abs_max = max(
+        abs(float(tilt_l)) if np.isfinite(tilt_l) else 0.0, abs(float(tilt_r)) if np.isfinite(tilt_r) else 0.0
+    )
 
     guard_triggered = bool(
         (off_diff > _GUARD_OFFSET_DIFF_DB)
         or (tilt_diff > _GUARD_TILT_DIFF_DB_PER_OCT)
         or (tilt_abs_max > _GUARD_TILT_ABS_MAX_DB_PER_OCT)
     )
-    strategy_resolved = "hybrid" if (strategy_req == "auto" and guard_triggered) else ("shared" if strategy_req == "auto" else strategy_req)
+    strategy_resolved = (
+        "hybrid"
+        if (strategy_req == "auto" and guard_triggered)
+        else ("shared" if strategy_req == "auto" else strategy_req)
+    )
 
     cfg2 = copy.deepcopy(cfg)
     try:
@@ -475,7 +480,11 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
                 l_st2["stereo_link_shared_target_level_db"] = float(target_shared)
             if target_shift_shared is not None and np.isfinite(float(target_shift_shared)):
                 l_st2["stereo_link_shared_target_shift_db"] = float(target_shift_shared)
-            l_st2["stereo_link_window_used"] = [float(win_l[0]), float(win_l[1])] if strategy_resolved == "hybrid" else [float(win_shared[0]), float(win_shared[1])]
+            l_st2["stereo_link_window_used"] = (
+                [float(win_l[0]), float(win_l[1])]
+                if strategy_resolved == "hybrid"
+                else [float(win_shared[0]), float(win_shared[1])]
+            )
             if strategy_resolved != "hybrid":
                 l_st2["stereo_link_shared_window"] = [float(win_shared[0]), float(win_shared[1])]
             l_st2["stereo_link_auto_gain_mode"] = "per_channel"
@@ -495,7 +504,11 @@ def generate_filter_pair(  # noqa: C901 - stereo-link routing keeps the channel 
                 r_st2["stereo_link_shared_target_level_db"] = float(target_shared)
             if target_shift_shared is not None and np.isfinite(float(target_shift_shared)):
                 r_st2["stereo_link_shared_target_shift_db"] = float(target_shift_shared)
-            r_st2["stereo_link_window_used"] = [float(win_r[0]), float(win_r[1])] if strategy_resolved == "hybrid" else [float(win_shared[0]), float(win_shared[1])]
+            r_st2["stereo_link_window_used"] = (
+                [float(win_r[0]), float(win_r[1])]
+                if strategy_resolved == "hybrid"
+                else [float(win_shared[0]), float(win_shared[1])]
+            )
             if strategy_resolved != "hybrid":
                 r_st2["stereo_link_shared_window"] = [float(win_shared[0]), float(win_shared[1])]
             r_st2["stereo_link_auto_gain_mode"] = "per_channel"

@@ -12,6 +12,7 @@
 
 Replaces build_target_section() from layout_builders.py.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -43,22 +44,22 @@ from .preview_refresh import refresh_target_preview
 from .preview_state import STATE
 
 _HC_OPTS = {
-    "Harman6":   "Harman 6 dB",
-    "Harman8":   "Harman 8 dB",
-    "Harman4":   "Harman 4 dB",
-    "Harman10":  "Harman 10 dB",
-    "Harman12":  "Harman 12 dB",
-    "Studio":    "Studio Tilt",
+    "Harman6": "Harman 6 dB",
+    "Harman8": "Harman 8 dB",
+    "Harman4": "Harman 4 dB",
+    "Harman10": "Harman 10 dB",
+    "Harman12": "Harman 12 dB",
+    "Studio": "Studio Tilt",
     "Nearfield": "Nearfield",
-    "HiFi":      "HiFi Loudness",
-    "Speech":    "Speech",
-    "Toole":     "Toole",
-    "BK_Light":  "BK Light",
+    "HiFi": "HiFi Loudness",
+    "Speech": "Speech",
+    "Toole": "Toole",
+    "BK_Light": "BK Light",
     "BK_Medium": "BK Medium",
     "BK_Strong": "BK Strong",
-    "Flat":      "Flat",
-    "Cinema":    "Cinema",
-    "Upload":    "Upload Custom",
+    "Flat": "Flat",
+    "Cinema": "Cinema",
+    "Upload": "Upload Custom",
 }
 
 
@@ -73,7 +74,6 @@ def _step_manual_target(delta_db: float) -> None:
     try:
         cur = float(ctrl.value("lvl_manual_db", 0.0) or 0.0)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -91,11 +91,11 @@ def _step_manual_target(delta_db: float) -> None:
     ctrl.set_value("lvl_manual_db", float(nxt))
     refresh_target_preview()
 
+
 def _step_manual_target_tilt(delta_db_per_oct: float) -> None:
     try:
         cur = float(ctrl.value("manual_target_tilt_db_per_oct", 0.0) or 0.0)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -164,9 +164,7 @@ class _TargetTabContext:
                 ui.button(icon="close", on_click=save_dialog.close).props("flat dense round")
 
             name_input = (
-                ui.input(label=t("target_curve_save_preset_name_label"))
-                .props("dense outlined")
-                .classes("w-full")
+                ui.input(label=t("target_curve_save_preset_name_label")).props("dense outlined").classes("w-full")
             )
 
             preset_list_col = ui.column().classes("w-full gap-1")
@@ -177,9 +175,7 @@ class _TargetTabContext:
                 if not presets:
                     return
                 with preset_list_col:
-                    ui.label(t("target_curve_save_preset_list_title")).classes(
-                        "text-xs font-medium text-gray-400 mt-2"
-                    )
+                    ui.label(t("target_curve_save_preset_list_title")).classes("text-xs font-medium text-gray-400 mt-2")
                     for preset in presets:
                         with ui.row().classes("w-full items-center justify-between gap-2"):
                             ui.label(preset["name"]).classes("text-sm")
@@ -255,25 +251,31 @@ class _TargetTabContext:
                     options=_hc_opts_with_user_presets(),
                     value=hc_value,
                     label=t("hc_mode"),
-                ).props("dense outlined").classes("w-full"),
+                )
+                .props("dense outlined")
+                .classes("w-full"),
             )
 
             with ui.column().classes("w-full") as hc_upload_col:
                 ui.label(t("hc_custom")).classes("text-sm font-medium")
 
                 async def _on_hc_upload(e) -> None:
-                    _hc_file.set_value({
-                        "filename": e.file.name,
-                        "content": await e.file.read(),
-                        "mime_type": getattr(e.file, "content_type", ""),
-                    })
+                    _hc_file.set_value(
+                        {
+                            "filename": e.file.name,
+                            "content": await e.file.read(),
+                            "mime_type": getattr(e.file, "content_type", ""),
+                        }
+                    )
                     refresh_target_preview()
 
                 ui.upload(
                     label=t("hc_custom"),
                     on_upload=_on_hc_upload,
                     auto_upload=True,
-                ).props('accept=".txt"').classes("w-full")
+                ).props(
+                    'accept=".txt"'
+                ).classes("w-full")
             ctrl.register_container("hc_custom_upload_col", hc_upload_col)
             hc_upload_col.set_visibility(hc_value == "Upload")
 
@@ -291,7 +293,9 @@ class _TargetTabContext:
                         tr_options(t, LVL_ALGO_OPTION_LABEL_KEYS),
                         value=normalize_lvl_algo_value(get_val("lvl_algo", LVL_ALGO_MEDIAN), t),
                         label=t("lvl_algo"),
-                    ).props("dense outlined").classes("flex-1"),
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1"),
                 )
                 ctrl.register(
                     "gain",
@@ -299,7 +303,9 @@ class _TargetTabContext:
                         label=t("gain"),
                         value=float(get_val("gain", 0.0) or 0.0),
                         format="%.1f",
-                    ).props("dense outlined").classes("flex-1"),
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1"),
                 )
 
             with ui.row().classes("w-full gap-4"):
@@ -309,7 +315,9 @@ class _TargetTabContext:
                         label=t("lvl_min"),
                         value=float(get_val("lvl_min", 500.0) or 500.0),
                         format="%.0f",
-                    ).props("dense outlined").classes("flex-1"),
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1"),
                 )
                 ctrl.register(
                     "lvl_max",
@@ -317,7 +325,9 @@ class _TargetTabContext:
                         label=t("lvl_max"),
                         value=float(get_val("lvl_max", 2000.0) or 2000.0),
                         format="%.0f",
-                    ).props("dense outlined").classes("flex-1"),
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1"),
                 )
 
             with ui.row().classes("w-full gap-4 items-start"):
@@ -327,7 +337,9 @@ class _TargetTabContext:
                         options=tr_options(t, LVL_MODE_OPTION_LABEL_KEYS),
                         value=normalize_lvl_mode_value(get_val("lvl_mode", LVL_MODE_AUTO), t),
                         label=t("lvl_mode"),
-                    ).props("dense outlined").classes("flex-1"),
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1"),
                 )
                 lvl_manual_col = ui.column().classes("flex-1 gap-1")
                 ctrl.register_container("lvl_manual_scope", lvl_manual_col)
@@ -339,16 +351,22 @@ class _TargetTabContext:
                                 label=t("lvl_target_db"),
                                 value=float(get_val("lvl_manual_db", 0.0) or 0.0),
                                 format="%.1f",
-                            ).props("dense outlined step=0.1").classes("flex-1"),
+                            )
+                            .props("dense outlined step=0.1")
+                            .classes("flex-1"),
                         )
                         ui.button(
                             "+",
                             on_click=lambda: _step_manual_target(+0.1),
-                        ).props('color="secondary" outline').style("min-width:34px;")
+                        ).props(
+                            'color="secondary" outline'
+                        ).style("min-width:34px;")
                         ui.button(
                             "-",
                             on_click=lambda: _step_manual_target(-0.1),
-                        ).props('color="secondary" outline').style("min-width:34px;")
+                        ).props(
+                            'color="secondary" outline'
+                        ).style("min-width:34px;")
                     with ui.row().classes("w-full gap-2 items-end"):
                         ctrl.register(
                             "manual_target_tilt_db_per_oct",
@@ -356,16 +374,22 @@ class _TargetTabContext:
                                 label=t("manual_target_tilt"),
                                 value=float(get_val("manual_target_tilt_db_per_oct", 0.0) or 0.0),
                                 format="%.1f",
-                            ).props("dense outlined step=0.1").classes("flex-1"),
+                            )
+                            .props("dense outlined step=0.1")
+                            .classes("flex-1"),
                         )
                         ui.button(
                             "+",
                             on_click=lambda: _step_manual_target_tilt(+0.1),
-                        ).props('color="secondary" outline').style("min-width:34px;")
+                        ).props(
+                            'color="secondary" outline'
+                        ).style("min-width:34px;")
                         ui.button(
                             "-",
                             on_click=lambda: _step_manual_target_tilt(-0.1),
-                        ).props('color="secondary" outline').style("min-width:34px;")
+                        ).props(
+                            'color="secondary" outline'
+                        ).style("min-width:34px;")
                     ui.label(t("lvl_manual_help")).classes("text-xs text-gray-400")
                     ui.label(t("manual_target_tilt_help")).classes("text-xs text-gray-400")
                     ui.label(t("lvl_manual_bias_hint")).classes("text-xs text-gray-400")
@@ -412,7 +436,9 @@ class _TargetTabContext:
                         label=t("min_freq"),
                         value=float(get_val("mag_c_min", 10.0) or 10.0),
                         format="%.1f",
-                    ).props("dense outlined").classes("flex-1"),
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1"),
                 )
                 ctrl.register(
                     "mag_c_max",
@@ -420,7 +446,9 @@ class _TargetTabContext:
                         label=t("max_freq"),
                         value=float(get_val("mag_c_max", 200.0) or 200.0),
                         format="%.1f",
-                    ).props("dense outlined").classes("flex-1"),
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1"),
                 )
 
             ctrl.register(
@@ -429,7 +457,9 @@ class _TargetTabContext:
                     label=t("max_boost"),
                     value=float(get_val("max_boost", 5.0) or 5.0),
                     format="%.1f",
-                ).props("dense outlined").classes("w-full"),
+                )
+                .props("dense outlined")
+                .classes("w-full"),
             )
 
 
@@ -438,7 +468,7 @@ def build_target_tab(*, t: Callable, get_val: Callable) -> None:
     STATE.translate = t
 
     ctx = _TargetTabContext(t=t, get_val=get_val)
-    with page_shell(title=t("tab_target"), intro=t("target_page_intro"), wide=True):
+    with page_shell(title=t("tab_target"), intro=t("target_page_intro")):
         ctx.build_preview_section()
         ctx.build_hc_section()
         ctx.build_leveling_section()

@@ -24,9 +24,11 @@ ng_bridge.py calls set_progress_element_getter to wire up the progress bar.
 ng_results_sections.py calls get_results_container() to get the container
 it should render results into.
 """
+
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import time
 
@@ -45,6 +47,7 @@ logger = logging.getLogger("DecayCore")
 _run_clock: dict = {"started_at": None, "active": False, "elapsed_s": None}
 _start_button_lock = threading.Lock()
 _pending_start_button_enable = None
+_info_panel_ref = None
 
 
 def _queue_start_button_enable(start_btn) -> None:
@@ -73,7 +76,6 @@ def _drain_pending_result_render() -> None:
 
         render_results(*args, **kwargs)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -92,7 +94,6 @@ def _format_progress_percent(value) -> str:
     try:
         pct = int(round(max(0.0, min(1.0, float(value))) * 100.0))
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -112,7 +113,6 @@ def _format_elapsed_clock(value) -> str:
     try:
         elapsed = max(0.0, float(value))
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -142,9 +142,16 @@ def _build_measurement_status_line(*, bass_integration_enabled, value_getter, tr
     if bass_integration_enabled:
         l_ok = _has_meas("file_l_main", "local_path_l_main")
         r_ok = _has_meas("file_r_main", "local_path_r_main")
+        sub1_ok = _has_meas("file_l_sub", "local_path_l_sub")
+        sub2_ok = _has_meas("file_r_sub", "local_path_r_sub")
+        bi_mode = str(value_getter("bass_integration_mode") or "direct_dac").strip().lower()
+        sub2_required = bi_mode != "direct_dac"
     else:
         l_ok = _has_meas("file_l", "local_path_l")
         r_ok = _has_meas("file_r", "local_path_r")
+        sub1_ok = False
+        sub2_ok = False
+        sub2_required = False
 
     mark_ok = "\u2713"
     mark_missing = "\u2013"
@@ -154,14 +161,20 @@ def _build_measurement_status_line(*, bass_integration_enabled, value_getter, tr
         f"L {mark_ok if l_ok else mark_missing}",
         f"R {mark_ok if r_ok else mark_missing}",
     ]
-    if _has_meas("file_l_sub", "local_path_l_sub"):
-        parts.append(f"{tr('info_panel_sub1')} \u2713")
-    if _has_meas("file_r_sub", "local_path_r_sub"):
-        parts.append(f"{tr('info_panel_sub2')} \u2713")
+    if bass_integration_enabled:
+        parts.append(f"{tr('info_panel_sub1')} {mark_ok if sub1_ok else mark_missing}")
+        if sub2_required or sub2_ok:
+            parts.append(f"{tr('info_panel_sub2')} {mark_ok if sub2_ok else mark_missing}")
 
-    if l_ok and r_ok:
+    required_ready = [l_ok, r_ok]
+    if bass_integration_enabled:
+        required_ready.append(sub1_ok)
+        if sub2_required:
+            required_ready.append(sub2_ok)
+
+    if all(required_ready):
         severity = "ok"
-    elif l_ok or r_ok:
+    elif any(required_ready):
         severity = "warn"
     else:
         severity = "dim"
@@ -208,13 +221,23 @@ def build_global_progress_bar() -> None:
     progress = ui.linear_progress(value=0.0, size="24px", show_value=False).classes("w-full")
     with progress:
         with ui.row().classes("absolute-full items-center no-wrap px-3 gap-3"):
-            progress_phase_label = ui.label("").classes("cf-progress-phase text-xs text-white font-medium truncate min-w-0 grow")
-            with ui.row().classes("cf-progress-meta cf-progress-meta--running items-center no-wrap gap-3 shrink-0") as progress_meta_row:
-                progress_elapsed_label = ui.label("").classes("cf-progress-meta-label text-xs text-white font-medium whitespace-nowrap")
-                progress_percent_label = ui.label("").classes("cf-progress-meta-label text-sm text-white font-medium whitespace-nowrap").bind_text_from(
-                    progress,
-                    "value",
-                    backward=_format_progress_percent,
+            progress_phase_label = ui.label("").classes(
+                "cf-progress-phase text-xs text-white font-medium truncate min-w-0 grow"
+            )
+            with ui.row().classes(
+                "cf-progress-meta cf-progress-meta--running items-center no-wrap gap-3 shrink-0"
+            ) as progress_meta_row:
+                progress_elapsed_label = ui.label("").classes(
+                    "cf-progress-meta-label text-xs text-white font-medium whitespace-nowrap"
+                )
+                progress_percent_label = (
+                    ui.label("")
+                    .classes("cf-progress-meta-label text-sm text-white font-medium whitespace-nowrap")
+                    .bind_text_from(
+                        progress,
+                        "value",
+                        backward=_format_progress_percent,
+                    )
                 )
     progress.visible = False
     ng_run_runtime.set_progress_elements(
@@ -245,7 +268,6 @@ def build_global_progress_bar() -> None:
             try:
                 progress.set_value(float(pending_progress))
             except (
-
                 AttributeError,
                 TypeError,
                 ValueError,
@@ -266,7 +288,6 @@ def build_global_progress_bar() -> None:
             try:
                 pending_start_btn.enable()
             except (
-
                 AttributeError,
                 TypeError,
                 ValueError,
@@ -337,17 +358,67 @@ def _info_fmt_fs(raw) -> str:
         return "\u2014"
 
 
-def _info_fmt_latency(taps_raw, fs_raw, ftype_str: str) -> str:
-    ftype_low = str(ftype_str).lower()
-    if "min" in ftype_low or "asym" in ftype_low:
-        return t("health_low_latency_mode")
-    if "linear" not in ftype_low:
-        return "\u2014"
+def _info_fmt_grouped_int(raw) -> str:
     try:
-        ms = (int(taps_raw) / 2.0 / int(fs_raw)) * 1000.0
-        return f"~{ms:.0f} ms"
-    except (TypeError, ValueError, ZeroDivisionError):
+        return f"{int(raw):,}".replace(",", "\u202f")
+    except (TypeError, ValueError):
         return "\u2014"
+
+
+def _info_mode_label(raw, tr) -> str:
+    mode_key = str(raw or "").strip().upper()
+    key = {
+        "AUTO": "info_panel_mode_auto",
+        "BASIC": "info_panel_mode_basic",
+        "ADVANCED": "info_panel_mode_advanced",
+    }.get(mode_key)
+    return tr(key) if key else (mode_key or "\u2014")
+
+
+def _info_filter_label(raw, tr) -> str:
+    filter_key = str(raw or "").strip().lower()
+    if "asym" in filter_key:
+        return tr("info_panel_filter_asymmetric")
+    if "linear" in filter_key:
+        return tr("info_panel_filter_linear")
+    if "mix" in filter_key:
+        return tr("info_panel_filter_mixed")
+    if "min" in filter_key:
+        return tr("info_panel_filter_minimum")
+    return str(raw or "\u2014")
+
+
+def _info_target_label(raw, tr) -> str:
+    target = str(raw or "").strip()
+    harman_match = re.fullmatch(r"Harman\s*([0-9]+(?:\.[0-9]+)?)", target, re.IGNORECASE)
+    if harman_match:
+        amount = f"{float(harman_match.group(1)):g}"
+        return tr("info_panel_harman_target").format(db=amount)
+    return target or "\u2014"
+
+
+def _info_target_summary(mode_raw, auto_target_mode_raw, target_raw, tr) -> str:
+    app_mode = str(mode_raw or "").strip().upper()
+    auto_target_mode = str(auto_target_mode_raw or "auto").strip().lower()
+    if app_mode == "AUTO" and auto_target_mode == "adaptive":
+        return tr("info_panel_target_adaptive")
+    if app_mode == "AUTO" and auto_target_mode not in ("selected", "manual", "fixed", "user"):
+        return tr("info_panel_target_auto")
+    return tr("info_panel_target_value").format(target=_info_target_label(target_raw, tr))
+
+
+def _info_multi_rate_label(common_enabled, ultra_high_enabled, tr) -> str | None:
+    if not bool(common_enabled):
+        return None
+    if bool(ultra_high_enabled):
+        return tr("info_panel_all_rates_ultra")
+    return tr("info_panel_all_common_rates")
+
+
+def _info_render_multi_rate_chip(chip, common_enabled, ultra_high_enabled, tr) -> None:
+    label = _info_multi_rate_label(common_enabled, ultra_high_enabled, tr)
+    chip.set_text(label or "")
+    chip.set_visibility(bool(label))
 
 
 def _info_set_measurement_line_style(line_meas, meas_severity: str) -> None:
@@ -360,6 +431,25 @@ def _info_set_measurement_line_style(line_meas, meas_severity: str) -> None:
     line_meas.classes(add="cf-info-line-dim", remove="cf-info-line-ok cf-info-line-warn")
 
 
+def _info_set_readiness_style(readiness, meas_severity: str) -> None:
+    if str(meas_severity) == "ok":
+        readiness.classes(
+            add="cf-info-readiness-ok",
+            remove="cf-info-readiness-warn cf-info-readiness-dim",
+        )
+        return
+    if str(meas_severity) == "warn":
+        readiness.classes(
+            add="cf-info-readiness-warn",
+            remove="cf-info-readiness-ok cf-info-readiness-dim",
+        )
+        return
+    readiness.classes(
+        add="cf-info-readiness-dim",
+        remove="cf-info-readiness-ok cf-info-readiness-warn",
+    )
+
+
 def _info_render_last_run_info(line3) -> None:
     info = ui_state.get_last_run_info()
     if not info:
@@ -369,16 +459,8 @@ def _info_render_last_run_info(line3) -> None:
     match = info.get("match")
     conf = info.get("conf")
     parts = []
-    parts.append(
-        t("run_info_score").format(score=score)
-        if score is not None else
-        t("run_info_score_missing")
-    )
-    parts.append(
-        t("run_info_match").format(match=match)
-        if match is not None else
-        t("run_info_match_missing")
-    )
+    parts.append(t("run_info_score").format(score=score) if score is not None else t("run_info_score_missing"))
+    parts.append(t("run_info_match").format(match=match) if match is not None else t("run_info_match_missing"))
     if conf is not None:
         parts.append(t("run_info_conf").format(conf=conf))
     line3.set_text(" \u00b7 ".join(parts))
@@ -386,20 +468,88 @@ def _info_render_last_run_info(line3) -> None:
     line3.set_visibility(True)
 
 
-def _refresh_info_panel_lines(*, line1, line2, line_meas, line3, ng_controls) -> None:
+def _dock_info_panel_for_run() -> None:
+    """Return the pre-run floating summary to its header slot after START."""
+    panel = _info_panel_ref
+    if panel is None or bool(getattr(panel, "is_deleted", False)):
+        return
+    panel.classes(
+        add="cf-info-panel-docked cf-info-panel-run-locked",
+        remove="cf-info-panel-floating",
+    )
+
+
+def _info_panel_float_javascript(anchor_id, panel_id) -> str:
+    """Keep the panel docked at page top and float it after its header slot scrolls away."""
+    anchor_key = f"c{anchor_id}"
+    panel_key = f"c{panel_id}"
+    return f"""
+        (() => {{
+            const anchor = document.getElementById({anchor_key!r});
+            const panel = document.getElementById({panel_key!r});
+            if (!anchor || !panel || panel.dataset.cfFloatHandlerInstalled === 'true') {{
+                return;
+            }}
+            panel.dataset.cfFloatHandlerInstalled = 'true';
+            let scheduled = false;
+            const sync = () => {{
+                scheduled = false;
+                const locked = panel.classList.contains('cf-info-panel-run-locked');
+                const anchorHasScrolledAway = anchor.getBoundingClientRect().bottom <= 104;
+                const navigation = document.querySelector('.cf-tabs-shell');
+                const navigationBottom = navigation
+                    ? navigation.getBoundingClientRect().bottom
+                    : 0;
+                const floatingTop = Math.max(164, Math.ceil(navigationBottom + 16));
+                panel.style.setProperty('--cf-info-panel-float-top', `${{floatingTop}}px`);
+                const shouldFloat = !locked && anchorHasScrolledAway;
+                panel.classList.toggle('cf-info-panel-floating', shouldFloat);
+                panel.classList.toggle('cf-info-panel-docked', !shouldFloat);
+            }};
+            const schedule = () => {{
+                if (!scheduled) {{
+                    scheduled = true;
+                    window.requestAnimationFrame(sync);
+                }}
+            }};
+            window.addEventListener('scroll', schedule, {{passive: true}});
+            window.addEventListener('resize', schedule, {{passive: true}});
+            sync();
+        }})();
+    """
+
+
+def _refresh_info_panel_lines(
+    *,
+    readiness,
+    mode_chip,
+    fs_chip,
+    taps_chip,
+    filter_chip,
+    multi_rate_chip,
+    target_line,
+    line_meas,
+    line3,
+    ng_controls,
+) -> None:
     mode = ng_controls.value("mode") or "\u2014"
     fs_raw = ng_controls.value("fs")
     taps_raw = ng_controls.value("taps")
     ftype = ng_controls.value("filter_type") or "\u2014"
     hc_mode = ng_controls.value("hc_mode") or ""
+    auto_target_mode = ng_controls.value("auto_target_mode") or "auto"
+    _info_render_multi_rate_chip(
+        multi_rate_chip,
+        ng_controls.value("multi_rate_opt"),
+        ng_controls.value("multi_rate_ultra_high_opt"),
+        t,
+    )
 
-    mode_str = str(mode).strip().upper()
-    ftype_str = str(ftype).strip()
-    taps_str = str(int(taps_raw)) if taps_raw is not None else "\u2014"
-    lat_str = _info_fmt_latency(taps_raw, fs_raw, ftype_str)
-    hc_str = str(hc_mode).strip() if hc_mode else "\u2014"
-    line1.set_text(f"{mode_str} \u00b7 {_info_fmt_fs(fs_raw)} \u00b7 {taps_str} taps")
-    line2.set_text(f"{ftype_str} \u00b7 {lat_str} \u00b7 {hc_str}")
+    mode_chip.set_text(_info_mode_label(mode, t))
+    fs_chip.set_text(_info_fmt_fs(fs_raw))
+    taps_chip.set_text(t("info_panel_taps_value").format(taps=_info_fmt_grouped_int(taps_raw)))
+    filter_chip.set_text(_info_filter_label(ftype, t))
+    target_line.set_text(_info_target_summary(mode, auto_target_mode, hc_mode, t))
 
     meas_text, meas_severity = _build_measurement_status_line(
         bass_integration_enabled=bool(ng_controls.value("bass_integration_enable")),
@@ -408,30 +558,67 @@ def _refresh_info_panel_lines(*, line1, line2, line_meas, line3, ng_controls) ->
     )
     line_meas.set_text(meas_text)
     _info_set_measurement_line_style(line_meas, str(meas_severity))
+    readiness.set_text(
+        {
+            "ok": t("info_panel_measurements_ready"),
+            "warn": t("info_panel_measurements_incomplete"),
+            "dim": t("info_panel_measurements_missing"),
+        }.get(str(meas_severity), t("info_panel_measurements_missing"))
+    )
+    _info_set_readiness_style(readiness, str(meas_severity))
     _info_render_last_run_info(line3)
 
 
 def build_info_panel() -> None:
-    """Compact config/score panel for the sticky header (top-right)."""
+    """Build a header summary which floats only after its dock scrolls away."""
+    global _info_panel_ref
+
     from nicegui import ui
     from . import ng_controls
 
-    with ui.element("div").classes("cf-info-panel"):
-        line1 = ui.label("").classes("cf-info-line-dim")
-        line2 = ui.label("").classes("cf-info-line-dim")
-        line_meas = ui.label("").classes("cf-info-line-dim")
-        line3 = ui.label("")
-        line3.set_visibility(False)
+    with ui.element("div").classes("cf-info-panel-slot") as info_panel_slot:
+        with ui.element("div").classes("cf-info-panel cf-info-panel-docked") as info_panel:
+            _info_panel_ref = info_panel
+            with ui.row().classes("cf-info-panel-header"):
+                ui.label(t("info_panel_title")).classes("cf-info-panel-title")
+                readiness = ui.label("").classes("cf-info-readiness cf-info-readiness-dim")
+            with ui.row().classes("cf-info-chip-row"):
+                mode_chip = ui.label("").classes("cf-info-chip cf-info-chip-primary")
+                fs_chip = ui.label("").classes("cf-info-chip")
+                taps_chip = ui.label("").classes("cf-info-chip")
+                filter_chip = ui.label("").classes("cf-info-chip")
+                multi_rate_chip = ui.label(t("info_panel_all_common_rates")).classes(
+                    "cf-info-chip cf-info-chip-option"
+                )
+                multi_rate_chip.set_visibility(False)
+            target_line = ui.label("").classes("cf-info-detail")
+            line_meas = ui.label("").classes("cf-info-detail cf-info-line-dim")
+            line3 = ui.label("")
+            line3.set_visibility(False)
 
     def _refresh_info() -> None:
         _refresh_info_panel_lines(
-            line1=line1,
-            line2=line2,
+            readiness=readiness,
+            mode_chip=mode_chip,
+            fs_chip=fs_chip,
+            taps_chip=taps_chip,
+            filter_chip=filter_chip,
+            multi_rate_chip=multi_rate_chip,
+            target_line=target_line,
             line_meas=line_meas,
             line3=line3,
             ng_controls=ng_controls,
         )
 
+    def _install_float_behavior() -> None:
+        ui.run_javascript(
+            _info_panel_float_javascript(
+                getattr(info_panel_slot, "id", ""),
+                getattr(info_panel, "id", ""),
+            )
+        )
+
+    ui.timer(0.1, _install_float_behavior, once=True, immediate=False)
     ui.timer(1.0, _refresh_info)
 
 
@@ -440,11 +627,13 @@ def build_run_section(*, on_start_click) -> None:
     from nicegui import ui
 
     with page_shell(title=t("tab_run"), intro=t("run_page_intro"), wide=True):
-        start_btn = ui.button(
-            t("run_start_button"),
-            on_click=lambda: _handle_start(on_start_click, start_btn, _run_clock),
-        ).classes("w-full text-2xl font-bold tracking-widest py-4").props(
-            'color="positive" unelevated'
+        start_btn = (
+            ui.button(
+                t("run_start_button"),
+                on_click=lambda: _handle_start(on_start_click, start_btn, _run_clock),
+            )
+            .classes("w-full text-2xl font-bold tracking-widest py-4")
+            .props('color="positive" unelevated')
         )
 
         with section_card(title=t("run_results_section_title"), hero=True):
@@ -462,7 +651,6 @@ def _clear_previous_run_output() -> None:
     try:
         container.clear()
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -480,6 +668,7 @@ def _clear_previous_run_output() -> None:
 def _handle_start(on_start_click, start_btn, run_clock) -> None:
     """Run the DSP pipeline in a background thread so the UI stays responsive."""
     start_btn.disable()
+    _dock_info_panel_for_run()
     run_clock["started_at"] = time.perf_counter()
     run_clock["elapsed_s"] = 0.0
     run_clock["active"] = True
@@ -499,7 +688,6 @@ def _handle_start(on_start_click, start_btn, run_clock) -> None:
         try:
             on_start_click()
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -515,7 +703,6 @@ def _handle_start(on_start_click, start_btn, run_clock) -> None:
             try:
                 ui_state.update_status(t("stat_failed").format(error=f"{type(exc).__name__}: {exc}"))
             except (
-
                 AttributeError,
                 TypeError,
                 ValueError,
@@ -532,7 +719,6 @@ def _handle_start(on_start_click, start_btn, run_clock) -> None:
             try:
                 run_clock["elapsed_s"] = max(0.0, float(time.perf_counter() - float(run_clock["started_at"])))
             except (
-
                 AttributeError,
                 TypeError,
                 ValueError,

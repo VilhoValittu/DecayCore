@@ -9,6 +9,7 @@
 # SPDX-License-Identifier: LicenseRef-DecayCore-Source-Available-NC-1.0
 
 """Advanced-tab preset and summary helpers for NiceGUI."""
+
 from __future__ import annotations
 
 from typing import Callable
@@ -291,9 +292,10 @@ def _render_summary(scope_name: str, summary: str) -> None:
 
         container.clear()
         with container:
-            ui.label(summary).classes("w-full text-sm cf-adv-summary-text").style("white-space: normal; line-height: 1.5;")
+            ui.label(summary).classes("w-full text-sm cf-adv-summary-text").style(
+                "white-space: normal; line-height: 1.5;"
+            )
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -312,7 +314,6 @@ def _as_float(value: object, default: float) -> float:
     try:
         return float(value)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -344,4 +345,3 @@ def _fmt_rail(value: object, *, t: Callable) -> str:
 
 def _state_label(enabled: bool, *, t: Callable) -> str:
     return t("state_on") if enabled else t("state_off")
-

@@ -59,9 +59,7 @@ def apply_direct_dac_bass_integration_result(
             fir_sample_rate=int(getattr(cfg, "fs", getattr(bundle.l_main, "sample_rate", 0)) or 0),
             robust=True,
         )
-        profile = str(
-            getattr(cfg, "bass_integration_profile", getattr(bundle, "profile", "safe")) or "safe"
-        )
+        profile = str(getattr(cfg, "bass_integration_profile", getattr(bundle, "profile", "safe")) or "safe")
         combine_mode = str(getattr(cfg, "bass_integration_sub_combine_mode", "average") or "average")
         metric_payload = {
             key: value
@@ -141,12 +139,8 @@ def apply_direct_dac_bass_integration_result(
             "sub_scaling_assumption": str(
                 metrics.summary.get("sub_scaling_assumption", "measured_physical_pressure_response")
             ),
-            "metric_channel_mode": str(
-                metrics.summary.get("metric_channel_mode", "worst_case_l_r_mono_center")
-            ),
-            "mono_center_score": float(
-                getattr(metrics.summary.get("mono_center"), "score", float("nan"))
-            ),
+            "metric_channel_mode": str(metrics.summary.get("metric_channel_mode", "worst_case_l_r_mono_center")),
+            "mono_center_score": float(getattr(metrics.summary.get("mono_center"), "score", float("nan"))),
             "export_verification_match": bool(metrics.summary.get("export_verification_match", False)),
             "_bass_metric_payload": metric_payload,
         }
@@ -235,7 +229,11 @@ def apply_direct_dac_bass_integration_result(
             float(candidate.sub_delay_ms),
             float(candidate.sub_gain_trim_db),
             "invert" if bool(candidate.sub_polarity_invert) else "normal",
-            (f"{candidate.sub_allpass_freq_hz:.1f} Hz Q {candidate.sub_allpass_q:.3f}" if candidate.sub_allpass_enabled else "off"),
+            (
+                f"{candidate.sub_allpass_freq_hz:.1f} Hz Q {candidate.sub_allpass_q:.3f}"
+                if candidate.sub_allpass_enabled
+                else "off"
+            ),
             float(metrics.score),
             str(metrics.dominant_channel),
             str(metrics.summary.get("feasibility_class", "")),
@@ -259,4 +257,4 @@ def apply_direct_dac_bass_integration_result(
         return {}
 
 
-__all__ = ['apply_direct_dac_bass_integration_result']
+__all__ = ["apply_direct_dac_bass_integration_result"]

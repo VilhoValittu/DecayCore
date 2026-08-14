@@ -42,9 +42,11 @@ _AUTO_PROGRESS_PHASE3_START = 0.82
 _AUTO_PROGRESS_PHASE3_END = 0.85
 _AUTO_PROGRESS_FINALIZE = 0.88
 
+
 def _progress_lerp(start: float, end: float, fraction: float) -> float:
     frac = float(np.clip(_auto_safe_float(fraction, 0.0), 0.0, 1.0))
     return float(start + (end - start) * frac)
+
 
 def _auto_progress_fraction(
     done: int,
@@ -185,10 +187,7 @@ def _estimate_auto_progress_target(text: str, lower: str) -> float | None:
         return float(_AUTO_PROGRESS_TARGET_PRESELECT)
     if "target preselect init" in lower or "target search init" in lower:
         return float(_AUTO_PROGRESS_TARGET_PRESELECT)
-    if (
-        "target curve mode=" in lower
-        or "custom target selected but no file found" in lower
-    ):
+    if "target curve mode=" in lower or "custom target selected but no file found" in lower:
         return float(_AUTO_PROGRESS_TARGET_MODE)
     return None
 
@@ -252,6 +251,7 @@ def _estimate_auto_progress_from_status(msg: str) -> float | None:
             return float(progress)
     return None
 
+
 def _set_auto_progress(ctx: RunContext, *, support: ProcessRunSupport, value: float) -> None:
     current = _auto_safe_float(ctx.auto_progress_value, 0.0)
     next_value = float(np.clip(_auto_safe_float(value, current), current, _AUTO_PROGRESS_FINALIZE))
@@ -262,6 +262,7 @@ def _set_auto_progress(ctx: RunContext, *, support: ProcessRunSupport, value: fl
         support.ui_bridge.set_progress(float(next_value))
     except Exception:
         logger.exception("auto progress bridge update failed")
+
 
 def _get_auto_status_callback(
     ctx: RunContext,
@@ -287,22 +288,22 @@ def _get_auto_status_callback(
 
 
 __all__ = [
-    '_progress_lerp',
-    '_auto_progress_fraction',
-    '_estimate_auto_progress_from_status',
-    '_set_auto_progress',
-    '_get_auto_status_callback',
-    '_AUTO_PROGRESS_INIT',
-    '_AUTO_PROGRESS_TARGET_MODE',
-    '_AUTO_PROGRESS_TARGET_PRESELECT',
-    '_AUTO_PROGRESS_TARGET_TRIALS_START',
-    '_AUTO_PROGRESS_TARGET_TRIALS_END',
-    '_AUTO_PROGRESS_PRESET_SEARCH_START',
-    '_AUTO_PROGRESS_PHASE1_START',
-    '_AUTO_PROGRESS_PHASE1_END',
-    '_AUTO_PROGRESS_PHASE2_START',
-    '_AUTO_PROGRESS_PHASE2_END',
-    '_AUTO_PROGRESS_PHASE3_START',
-    '_AUTO_PROGRESS_PHASE3_END',
-    '_AUTO_PROGRESS_FINALIZE',
+    "_progress_lerp",
+    "_auto_progress_fraction",
+    "_estimate_auto_progress_from_status",
+    "_set_auto_progress",
+    "_get_auto_status_callback",
+    "_AUTO_PROGRESS_INIT",
+    "_AUTO_PROGRESS_TARGET_MODE",
+    "_AUTO_PROGRESS_TARGET_PRESELECT",
+    "_AUTO_PROGRESS_TARGET_TRIALS_START",
+    "_AUTO_PROGRESS_TARGET_TRIALS_END",
+    "_AUTO_PROGRESS_PRESET_SEARCH_START",
+    "_AUTO_PROGRESS_PHASE1_START",
+    "_AUTO_PROGRESS_PHASE1_END",
+    "_AUTO_PROGRESS_PHASE2_START",
+    "_AUTO_PROGRESS_PHASE2_END",
+    "_AUTO_PROGRESS_PHASE3_START",
+    "_AUTO_PROGRESS_PHASE3_END",
+    "_AUTO_PROGRESS_FINALIZE",
 ]

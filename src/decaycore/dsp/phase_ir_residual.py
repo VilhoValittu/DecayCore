@@ -109,12 +109,21 @@ def _full_residual_authority_caps(freq_axis: np.ndarray, *, max_boost_db: float,
 
 def _residual_authority_arrays(st, freq_axis: np.ndarray, smooth_oct: float) -> tuple[np.ndarray | None, ...]:
     return (
-        _smooth_authority_array(_pick_authority_array(st, "authority_null_risk", "null_risk"), freq_axis, smooth_oct, preserve_peaks=True),
+        _smooth_authority_array(
+            _pick_authority_array(st, "authority_null_risk", "null_risk"), freq_axis, smooth_oct, preserve_peaks=True
+        ),
         _smooth_authority_array(_pick_authority_array(st, "authority_boost", "boost_authority"), freq_axis, smooth_oct),
         _smooth_authority_array(_pick_authority_array(st, "authority_cut", "cut_authority"), freq_axis, smooth_oct),
-        _smooth_authority_array(_pick_authority_array(st, "authority_modal_support", "modal_support"), freq_axis, smooth_oct),
+        _smooth_authority_array(
+            _pick_authority_array(st, "authority_modal_support", "modal_support"), freq_axis, smooth_oct
+        ),
         _smooth_authority_array(_pick_authority_array(st, "authority_decay_need", "decay_need"), freq_axis, smooth_oct),
-        _smooth_authority_array(_pick_authority_array(st, "authority_reflection_risk", "reflection_risk"), freq_axis, smooth_oct, preserve_peaks=True),
+        _smooth_authority_array(
+            _pick_authority_array(st, "authority_reflection_risk", "reflection_risk"),
+            freq_axis,
+            smooth_oct,
+            preserve_peaks=True,
+        ),
     )
 
 
@@ -162,21 +171,11 @@ def _residual_build_authority_caps(
         residual_pass_mode=residual_mode,
         max_boost_db=authority_max_boost_db,
         max_cut_db=authority_max_cut_db,
-        null_guard_strength=float(
-            np.clip(cfg_reader.float_allow_zero("residual_null_guard_strength", 1.0), 0.0, 1.0)
-        ),
-        modal_min_support=float(
-            np.clip(cfg_reader.float_allow_zero("residual_modal_min_support", 0.45), 0.0, 1.0)
-        ),
-        boost_authority_min=float(
-            np.clip(cfg_reader.float_allow_zero("residual_boost_authority_min", 0.40), 0.0, 1.0)
-        ),
-        cut_authority_min=float(
-            np.clip(cfg_reader.float_allow_zero("residual_cut_authority_min", 0.35), 0.0, 1.0)
-        ),
-        reflection_risk_max=float(
-            np.clip(cfg_reader.float_allow_zero("residual_reflection_risk_max", 0.65), 0.0, 1.0)
-        ),
+        null_guard_strength=float(np.clip(cfg_reader.float_allow_zero("residual_null_guard_strength", 1.0), 0.0, 1.0)),
+        modal_min_support=float(np.clip(cfg_reader.float_allow_zero("residual_modal_min_support", 0.45), 0.0, 1.0)),
+        boost_authority_min=float(np.clip(cfg_reader.float_allow_zero("residual_boost_authority_min", 0.40), 0.0, 1.0)),
+        cut_authority_min=float(np.clip(cfg_reader.float_allow_zero("residual_cut_authority_min", 0.35), 0.0, 1.0)),
+        reflection_risk_max=float(np.clip(cfg_reader.float_allow_zero("residual_reflection_risk_max", 0.65), 0.0, 1.0)),
         null_risk_max_for_boost=float(
             np.clip(cfg_reader.float_allow_zero("residual_null_risk_max_for_boost", 0.35), 0.0, 1.0)
         ),
@@ -286,19 +285,21 @@ def _residual_process_enabled_pass(
     logger,
     cfg_float_allow_zero_fn,
 ) -> tuple[np.ndarray, ResidualTelemetry]:
-    residual_mode, freq_axis, gain_db, mask_c, resid, k, strength, mult, _base_sigma, _df_mode, gain_policy = _residual_prepare_inputs(
-        cfg,
-        freq_axis,
-        gain_db,
-        mask_c,
-        m_anal,
-        calc_offset_db,
-        target_mags,
-        base_sigma,
-        filter_smooth,
-        df_mode,
-        conf_mask,
-        cfg_reader,
+    residual_mode, freq_axis, gain_db, mask_c, resid, k, strength, mult, _base_sigma, _df_mode, gain_policy = (
+        _residual_prepare_inputs(
+            cfg,
+            freq_axis,
+            gain_db,
+            mask_c,
+            m_anal,
+            calc_offset_db,
+            target_mags,
+            base_sigma,
+            filter_smooth,
+            df_mode,
+            conf_mask,
+            cfg_reader,
+        )
     )
     if residual_mode == "off":
         return gain_db, ResidualTelemetry(
@@ -341,13 +342,15 @@ def _residual_process_enabled_pass(
 
     residual_delta = _apply_residual_authority_caps(residual_delta, authority_caps)
     gain_before = gain_db.copy()
-    gain_db, low_guard_apply_mask, blocked_boost_bins, applied_boost_max_db, applied_cut_max_db = _residual_apply_delta_and_limits(
-        gain_db=gain_db,
-        gain_before=gain_before,
-        residual_delta=residual_delta,
-        freq_axis=freq_axis,
-        mask_c=mask_c,
-        gain_policy=gain_policy,
+    gain_db, low_guard_apply_mask, blocked_boost_bins, applied_boost_max_db, applied_cut_max_db = (
+        _residual_apply_delta_and_limits(
+            gain_db=gain_db,
+            gain_before=gain_before,
+            residual_delta=residual_delta,
+            freq_axis=freq_axis,
+            mask_c=mask_c,
+            gain_policy=gain_policy,
+        )
     )
 
     boost_cap = np.asarray(authority_caps.get("residual_boost_cap_db"), dtype=float)
@@ -424,12 +427,24 @@ def _residual_prepare_inputs(
     if gain_db.shape != freq_axis.shape or mask_c.shape != gain_db.shape:
         raise ValueError("shape mismatch")
     if residual_mode == "off":
-        return residual_mode, freq_axis, gain_db, mask_c, np.zeros_like(gain_db, dtype=float), 0.0, 0.0, 1.0, 1.0, False, np.asarray([], dtype=float)
+        return (
+            residual_mode,
+            freq_axis,
+            gain_db,
+            mask_c,
+            np.zeros_like(gain_db, dtype=float),
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            False,
+            np.asarray([], dtype=float),
+        )
 
     gain_policy = resolve_gain_policy(cfg, cfg_float_allow_zero_fn=cfg_reader.float_allow_zero)
-    measured_aligned = (m_anal - calc_offset_db)
+    measured_aligned = m_anal - calc_offset_db
     pred0 = measured_aligned + gain_db
-    resid0 = (target_mags - pred0)
+    resid0 = target_mags - pred0
     resid = np.zeros_like(gain_db, dtype=float)
     resid[mask_c] = resid0[mask_c]
     try:
@@ -447,7 +462,19 @@ def _residual_prepare_inputs(
     if (not np.isfinite(_base_sigma)) or _base_sigma <= 0.0:
         _base_sigma = float(60 // (filter_smooth / 12 if filter_smooth > 0 else 1))
     _df_mode = bool(df_mode) if df_mode is not None else cfg_reader.bool("df_smoothing", False)
-    return residual_mode, freq_axis, gain_db, mask_c, resid, float(k), float(strength), float(mult), float(_base_sigma), bool(_df_mode), gain_policy
+    return (
+        residual_mode,
+        freq_axis,
+        gain_db,
+        mask_c,
+        resid,
+        float(k),
+        float(strength),
+        float(mult),
+        float(_base_sigma),
+        bool(_df_mode),
+        gain_policy,
+    )
 
 
 def _residual_build_delta_and_authority(
@@ -464,7 +491,24 @@ def _residual_build_delta_and_authority(
     st,
     gain_policy,
     residual_mode: str,
-) -> tuple[np.ndarray, dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, bool, float, float, float, float, float, float, float]:
+) -> tuple[
+    np.ndarray,
+    dict,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    bool,
+    float,
+    float,
+    float,
+    float,
+    float,
+    float,
+    float,
+]:
     if df_mode:
         df_ref = 44100.0 / 65536.0
         sigma_hz = float(base_sigma) * df_ref * mult

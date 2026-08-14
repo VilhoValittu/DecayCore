@@ -15,6 +15,7 @@ Replaces camillafir_ui._render_results() + results_sections.py.
 render_results() has the same signature as _render_results() so ng_bridge.py
 can call it without changes to workflow code.
 """
+
 from __future__ import annotations
 
 import logging
@@ -40,6 +41,7 @@ from ..results_formatters import (
 from ...dsp.lr_difference_metrics import compute_lr_difference_metrics
 
 logger = logging.getLogger("DecayCore")
+
 
 def _format_ir_alignment_ms(v) -> str:
     try:
@@ -162,75 +164,101 @@ def _build_ir_alignment_rows(ir_align: dict, ir_align_sub: dict) -> list[dict]:
     rows: list[dict] = []
     if ir_align:
         rows.append(metric_row(f"── {t('ir_align_group_lr')} ──", "", ""))
-        rows.append(metric_row(
-            t("ir_align_metric_xcorr_offset"),
-            _format_ir_alignment_ms(ir_align.get("ir_align_xcorr_offset_ms")),
-            _format_ir_alignment_ms(ir_align.get("ir_align_xcorr_offset_ms")),
-        ))
-        rows.append(metric_row(
-            t("ir_align_metric_xcorr_confidence"),
-            _format_ir_alignment_pct(ir_align.get("ir_align_xcorr_confidence")),
-            _format_ir_alignment_pct(ir_align.get("ir_align_xcorr_confidence")),
-        ))
-        rows.append(metric_row(
-            t("ir_align_metric_polarity"),
-            _ir_alignment_polarity_label(ir_align),
-            _ir_alignment_polarity_label(ir_align),
-        ))
-        rows.append(metric_row(
-            t("ir_align_metric_level_peak"),
-            _format_ir_alignment_dbfs(ir_align.get("ir_align_level_peak_a_dbfs")),
-            _format_ir_alignment_dbfs(ir_align.get("ir_align_level_peak_b_dbfs")),
-        ))
-        rows.append(metric_row(
-            t("ir_align_metric_level_diff"),
-            _format_ir_alignment_db(ir_align.get("ir_align_level_rms_diff_db")),
-            _format_ir_alignment_db(ir_align.get("ir_align_level_rms_diff_db")),
-        ))
+        rows.append(
+            metric_row(
+                t("ir_align_metric_xcorr_offset"),
+                _format_ir_alignment_ms(ir_align.get("ir_align_xcorr_offset_ms")),
+                _format_ir_alignment_ms(ir_align.get("ir_align_xcorr_offset_ms")),
+            )
+        )
+        rows.append(
+            metric_row(
+                t("ir_align_metric_xcorr_confidence"),
+                _format_ir_alignment_pct(ir_align.get("ir_align_xcorr_confidence")),
+                _format_ir_alignment_pct(ir_align.get("ir_align_xcorr_confidence")),
+            )
+        )
+        rows.append(
+            metric_row(
+                t("ir_align_metric_polarity"),
+                _ir_alignment_polarity_label(ir_align),
+                _ir_alignment_polarity_label(ir_align),
+            )
+        )
+        rows.append(
+            metric_row(
+                t("ir_align_metric_level_peak"),
+                _format_ir_alignment_dbfs(ir_align.get("ir_align_level_peak_a_dbfs")),
+                _format_ir_alignment_dbfs(ir_align.get("ir_align_level_peak_b_dbfs")),
+            )
+        )
+        rows.append(
+            metric_row(
+                t("ir_align_metric_level_diff"),
+                _format_ir_alignment_db(ir_align.get("ir_align_level_rms_diff_db")),
+                _format_ir_alignment_db(ir_align.get("ir_align_level_rms_diff_db")),
+            )
+        )
 
     if ir_align_sub:
         xo_lbl = _ir_alignment_xo_label(ir_align_sub)
         rows.append(metric_row(f"── {t('ir_align_group_sub')} ──", "", ""))
-        rows.append(metric_row(
-            t("ir_align_metric_xcorr_offset"),
-            _format_ir_alignment_ms(ir_align_sub.get("ir_align_xcorr_offset_ms")),
-            _format_ir_alignment_ms(ir_align_sub.get("ir_align_xcorr_offset_ms")),
-        ))
-        rows.append(metric_row(
-            t("ir_align_metric_xcorr_confidence"),
-            _format_ir_alignment_pct(ir_align_sub.get("ir_align_xcorr_confidence")),
-            _format_ir_alignment_pct(ir_align_sub.get("ir_align_xcorr_confidence")),
-        ))
-        rows.append(metric_row(
-            t("ir_align_metric_polarity"),
-            _ir_alignment_polarity_label(ir_align_sub),
-            _ir_alignment_polarity_label(ir_align_sub),
-        ))
-        rows.append(metric_row(
-            t("ir_align_metric_level_peak"),
-            _format_ir_alignment_dbfs(ir_align_sub.get("ir_align_level_peak_a_dbfs")),
-            _format_ir_alignment_dbfs(ir_align_sub.get("ir_align_level_peak_b_dbfs")),
-        ))
-        rows.append(metric_row(
-            t("ir_align_metric_level_diff"),
-            _format_ir_alignment_db(ir_align_sub.get("ir_align_level_rms_diff_db")),
-            _format_ir_alignment_db(ir_align_sub.get("ir_align_level_rms_diff_db")),
-        ))
-        rows.append(metric_row(
-            t("ir_align_metric_phase_diff").format(xo=xo_lbl),
-            _format_ir_alignment_deg(ir_align_sub.get("ir_align_phase_diff_deg")),
-            _format_ir_alignment_deg(ir_align_sub.get("ir_align_phase_diff_deg")),
-        ))
-        rows.append(metric_row(
-            t("ir_align_metric_gd").format(xo=xo_lbl),
-            _format_ir_alignment_ms(ir_align_sub.get("ir_align_gd_a_ms")),
-            _format_ir_alignment_ms(ir_align_sub.get("ir_align_gd_b_ms")),
-        ))
-        rows.append(metric_row(
-            t("ir_align_metric_gd_diff"),
-            _format_ir_alignment_ms(ir_align_sub.get("ir_align_gd_diff_ms")),
-            _format_ir_alignment_ms(ir_align_sub.get("ir_align_gd_diff_ms")),
-        ))
+        rows.append(
+            metric_row(
+                t("ir_align_metric_xcorr_offset"),
+                _format_ir_alignment_ms(ir_align_sub.get("ir_align_xcorr_offset_ms")),
+                _format_ir_alignment_ms(ir_align_sub.get("ir_align_xcorr_offset_ms")),
+            )
+        )
+        rows.append(
+            metric_row(
+                t("ir_align_metric_xcorr_confidence"),
+                _format_ir_alignment_pct(ir_align_sub.get("ir_align_xcorr_confidence")),
+                _format_ir_alignment_pct(ir_align_sub.get("ir_align_xcorr_confidence")),
+            )
+        )
+        rows.append(
+            metric_row(
+                t("ir_align_metric_polarity"),
+                _ir_alignment_polarity_label(ir_align_sub),
+                _ir_alignment_polarity_label(ir_align_sub),
+            )
+        )
+        rows.append(
+            metric_row(
+                t("ir_align_metric_level_peak"),
+                _format_ir_alignment_dbfs(ir_align_sub.get("ir_align_level_peak_a_dbfs")),
+                _format_ir_alignment_dbfs(ir_align_sub.get("ir_align_level_peak_b_dbfs")),
+            )
+        )
+        rows.append(
+            metric_row(
+                t("ir_align_metric_level_diff"),
+                _format_ir_alignment_db(ir_align_sub.get("ir_align_level_rms_diff_db")),
+                _format_ir_alignment_db(ir_align_sub.get("ir_align_level_rms_diff_db")),
+            )
+        )
+        rows.append(
+            metric_row(
+                t("ir_align_metric_phase_diff").format(xo=xo_lbl),
+                _format_ir_alignment_deg(ir_align_sub.get("ir_align_phase_diff_deg")),
+                _format_ir_alignment_deg(ir_align_sub.get("ir_align_phase_diff_deg")),
+            )
+        )
+        rows.append(
+            metric_row(
+                t("ir_align_metric_gd").format(xo=xo_lbl),
+                _format_ir_alignment_ms(ir_align_sub.get("ir_align_gd_a_ms")),
+                _format_ir_alignment_ms(ir_align_sub.get("ir_align_gd_b_ms")),
+            )
+        )
+        rows.append(
+            metric_row(
+                t("ir_align_metric_gd_diff"),
+                _format_ir_alignment_ms(ir_align_sub.get("ir_align_gd_diff_ms")),
+                _format_ir_alignment_ms(ir_align_sub.get("ir_align_gd_diff_ms")),
+            )
+        )
     return rows
 
 
@@ -269,6 +297,7 @@ def _render_ir_alignment(*, l_st_f: dict) -> None:
     rows = _build_ir_alignment_rows(ir_align, ir_align_sub)
     summary_line = _build_ir_alignment_summary(ir_align, ir_align_sub)
     _section(t("results_section_ir_alignment"), rows, summary_lines=[summary_line])
+
 
 def _render_dsp_quality(*, data: dict, l_st_f: dict, r_st_f: dict, psl_str: str) -> None:
     _section(
@@ -311,6 +340,7 @@ def _render_dsp_quality(*, data: dict, l_st_f: dict, r_st_f: dict, psl_str: str)
         ],
     )
 
+
 def _render_lr_difference(*, l_st_f: dict, r_st_f: dict) -> None:
     """Render L/R difference metrics section based on measured response data."""
     try:
@@ -320,8 +350,7 @@ def _render_lr_difference(*, l_st_f: dict, r_st_f: dict) -> None:
             return f"{v:.2f} dB" if math.isfinite(v) else "n/a"
 
         has_any = any(
-            math.isfinite(v)
-            for v in (lr.mag_rms_bass_db, lr.mag_rms_mid_db, lr.mag_rms_band_db, lr.mag_maxabs_band_db)
+            math.isfinite(v) for v in (lr.mag_rms_bass_db, lr.mag_rms_mid_db, lr.mag_rms_band_db, lr.mag_maxabs_band_db)
         )
         if not has_any:
             return
@@ -345,9 +374,7 @@ def _render_lr_difference(*, l_st_f: dict, r_st_f: dict) -> None:
         ]
         if math.isfinite(lr.gd_rms_band_ms):
             gd_txt = f"{lr.gd_rms_band_ms:.2f} ms"
-            rows.append(
-                metric_row(f"L/R GD RMS  {band_lo:.0f}–{band_hi:.0f} Hz", gd_txt, gd_txt)
-            )
+            rows.append(metric_row(f"L/R GD RMS  {band_lo:.0f}–{band_hi:.0f} Hz", gd_txt, gd_txt))
 
         _section(
             t("results_section_lr_difference"),
@@ -355,7 +382,6 @@ def _render_lr_difference(*, l_st_f: dict, r_st_f: dict) -> None:
             summary_lines=["Computed from measured left-right response data. Lower = more symmetric."],
         )
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -426,11 +452,13 @@ def _render_hybrid_iir_cuts(*, l_st_f: dict, r_st_f: dict) -> None:
     for i in range(n_cuts):
         lb = l_biquads[i] if i < len(l_biquads) else None
         rb = r_biquads[i] if i < len(r_biquads) else None
-        rows.append(metric_row(
-            f"{t('results_metric_hybrid_iir_cut')} #{i + 1}",
-            _fmt_biquad(lb),
-            _fmt_biquad(rb),
-        ))
+        rows.append(
+            metric_row(
+                f"{t('results_metric_hybrid_iir_cut')} #{i + 1}",
+                _fmt_biquad(lb),
+                _fmt_biquad(rb),
+            )
+        )
     if l_gd_src != "stats" or r_gd_src != "stats":
         rows.append(metric_row(t("results_metric_hybrid_iir_gd_source"), l_gd_src, r_gd_src))
 
@@ -448,11 +476,11 @@ def _render_hybrid_iir_cuts(*, l_st_f: dict, r_st_f: dict) -> None:
 
 
 __all__ = [
-    '_render_ir_alignment',
-    '_render_dsp_quality',
-    '_render_lr_difference',
-    '_render_hybrid_iir_cuts',
-    '_fmt_biquad',
-    '_fmt_external_iir_hpf',
-    '_rejected_reasons',
+    "_render_ir_alignment",
+    "_render_dsp_quality",
+    "_render_lr_difference",
+    "_render_hybrid_iir_cuts",
+    "_fmt_biquad",
+    "_fmt_external_iir_hpf",
+    "_rejected_reasons",
 ]

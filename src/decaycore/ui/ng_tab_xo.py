@@ -12,6 +12,7 @@
 
 Replaces build_results_section() from layout_builders.py.
 """
+
 from __future__ import annotations
 
 from typing import Callable
@@ -30,9 +31,7 @@ def build_xo_tab(*, t: Callable, get_val: Callable) -> None:
     mode_value = str(get_val("mode", "BASIC") or "BASIC").strip().upper()
     if bool(get_val(CAMILLAFIR_AUTO_MODE, False)):
         mode_value = "AUTO"
-    bass_integration_visible = bool(
-        mode_value == "AUTO" and bool(get_val("bass_integration_enable", False))
-    )
+    bass_integration_visible = bool(mode_value == "AUTO" and bool(get_val("bass_integration_enable", False)))
     xo_enabled = bool(filter_type_supports_xo_phase_model(get_val("filter_type", "Asymmetric")))
 
     with page_shell(title=t("tab_xo"), intro=t("tab_xo_help")):
@@ -62,7 +61,9 @@ def build_xo_tab(*, t: Callable, get_val: Callable) -> None:
                                 label=f"XO {i} Hz",
                                 value=get_val(f"xo{i}_f", None),
                                 format="%.1f",
-                            ).props("dense outlined").classes("flex-1"),
+                            )
+                            .props("dense outlined")
+                            .classes("flex-1"),
                         )
                         ctrl.register(
                             f"xo{i}_s",
@@ -70,7 +71,9 @@ def build_xo_tab(*, t: Callable, get_val: Callable) -> None:
                                 _SLOPE_OPTS,
                                 value=get_val(f"xo{i}_s", 12),
                                 label="dB/oct",
-                            ).props("dense outlined").classes("w-32"),
+                            )
+                            .props("dense outlined")
+                            .classes("w-32"),
                         )
     ctrl.register_container("xo_tab_content_scope", xo_content)
     xo_content.set_visibility(xo_enabled)

@@ -19,7 +19,6 @@ def _auto_thread_budget() -> tuple[int, int]:
     try:
         cores = int(os.cpu_count() or 1)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -56,7 +55,6 @@ def _apply_auto_thread_env() -> tuple[int, int, list[str]]:
                 if int(float(cur)) > 0:
                     continue
             except (
-
                 AttributeError,
                 TypeError,
                 ValueError,
@@ -75,7 +73,11 @@ def _apply_auto_thread_env() -> tuple[int, int, list[str]]:
 
 
 def _resolve_console_log_level() -> int:
-    raw = str(os.environ.get("DECAYCORE_LOG_LEVEL", os.environ.get("CAMILLAFIR_LOG_LEVEL", "WARNING")) or "WARNING").strip().upper()
+    raw = (
+        str(os.environ.get("DECAYCORE_LOG_LEVEL", os.environ.get("CAMILLAFIR_LOG_LEVEL", "WARNING")) or "WARNING")
+        .strip()
+        .upper()
+    )
     return int(getattr(logging, raw, logging.WARNING))
 
 
@@ -105,7 +107,6 @@ def initialize_logging():
                 + ", ".join([f"{k}={os.environ.get(k, '')}" for k in auto_threads_env_applied])
             )
     except (
-
         AttributeError,
         TypeError,
         ValueError,

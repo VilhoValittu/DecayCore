@@ -15,18 +15,6 @@ import hashlib
 import threading
 import numpy as np
 
-
-
-
-
-
-
-
-
-
-
-
-
 _LEVELING_CACHE: dict[str, tuple[tuple[float, float, float, float, str, float, float], dict[str, object]]] = {}
 _LEVELING_CACHE_LOCK = threading.Lock()
 _LEVELING_CACHE_MAX = 128
@@ -43,14 +31,15 @@ _LEVELING_CACHE_ATTRS = (
     "_lvl_window_debug",
 )
 
+
 @dataclass(frozen=True)
 class StereoLinkContext:
-
 
     forced_window_hz: tuple[float, float] | None = None
     forced_offset_db: float | None = None
     shared_target_level_db: float | None = None
     shared_target_shift_db: float | None = None
+
 
 def _to_float(x, default: float) -> float:
     """Sisainen apufunktio: to float."""
@@ -61,6 +50,7 @@ def _to_float(x, default: float) -> float:
     if not np.isfinite(v):
         return float(default)
     return float(v)
+
 
 def _to_bool(x, default: bool) -> bool:
     """Sisainen apufunktio: to bool."""
@@ -85,6 +75,7 @@ def _to_bool(x, default: bool) -> bool:
     except (TypeError, ValueError, OverflowError):
         return bool(default)
 
+
 def _remember_leveling_error(cfg, stage: str, exc: Exception | None = None) -> None:
     try:
         if exc is None:
@@ -95,11 +86,13 @@ def _remember_leveling_error(cfg, stage: str, exc: Exception | None = None) -> N
     except (AttributeError, TypeError, ValueError):
         return
 
+
 def _safe_setattr(cfg, name: str, value) -> None:
     try:
         setattr(cfg, name, value)
     except (AttributeError, TypeError, ValueError):
         return
+
 
 def _normalize_optional_float(value):
     if value is None:
@@ -111,6 +104,7 @@ def _normalize_optional_float(value):
     if not np.isfinite(v):
         return None
     return float(v)
+
 
 def _normalize_optional_window(value):
     if value is None:
@@ -124,6 +118,7 @@ def _normalize_optional_window(value):
         _normalize_optional_float(hi),
     )
 
+
 def _normalize_hpf_freq(cfg):
     hpf_settings = getattr(cfg, "hpf_settings", None)
     if not hpf_settings:
@@ -132,6 +127,7 @@ def _normalize_hpf_freq(cfg):
         return _normalize_optional_float(hpf_settings.get("freq", 0.0))
     except (AttributeError, TypeError, ValueError):
         return ("invalid",)
+
 
 def _normalize_level_window_params(
     *,
@@ -164,10 +160,12 @@ def _normalize_level_window_params(
         perceptual_tie_only,
     )
 
+
 def _hash_leveling_array(h: hashlib._Hash, value) -> None:
     arr = np.ascontiguousarray(np.asarray(value, dtype=np.float64))
     h.update(repr(arr.shape).encode("ascii"))
     h.update(arr.tobytes())
+
 
 def _stable_level_window_cache_key(
     freq_axis: np.ndarray,
@@ -209,6 +207,7 @@ def _stable_level_window_cache_key(
         ).encode("utf-8")
     )
     return h.hexdigest()
+
 
 def _shared_stereo_level_window_cache_key(
     freq_axis_l: np.ndarray,
@@ -260,6 +259,7 @@ def _shared_stereo_level_window_cache_key(
     )
     return h.hexdigest()
 
+
 def _leveling_cache_key(
     cfg,
     freq_axis: np.ndarray,
@@ -288,13 +288,30 @@ def _leveling_cache_key(
         _normalize_optional_window(getattr(cfg, "lvl_force_window", None)),
         _normalize_optional_float(getattr(cfg, "lvl_force_offset_db", None)),
         _normalize_hpf_freq(cfg),
-        None if stereo_link_ctx is None else _normalize_optional_window(getattr(stereo_link_ctx, "forced_window_hz", None)),
-        None if stereo_link_ctx is None else _normalize_optional_float(getattr(stereo_link_ctx, "forced_offset_db", None)),
-        None if stereo_link_ctx is None else _normalize_optional_float(getattr(stereo_link_ctx, "shared_target_level_db", None)),
-        None if stereo_link_ctx is None else _normalize_optional_float(getattr(stereo_link_ctx, "shared_target_shift_db", None)),
+        (
+            None
+            if stereo_link_ctx is None
+            else _normalize_optional_window(getattr(stereo_link_ctx, "forced_window_hz", None))
+        ),
+        (
+            None
+            if stereo_link_ctx is None
+            else _normalize_optional_float(getattr(stereo_link_ctx, "forced_offset_db", None))
+        ),
+        (
+            None
+            if stereo_link_ctx is None
+            else _normalize_optional_float(getattr(stereo_link_ctx, "shared_target_level_db", None))
+        ),
+        (
+            None
+            if stereo_link_ctx is None
+            else _normalize_optional_float(getattr(stereo_link_ctx, "shared_target_shift_db", None))
+        ),
     )
     h.update(repr(payload).encode("utf-8"))
     return h.hexdigest()
+
 
 def _capture_leveling_state(cfg) -> dict[str, object]:
     state: dict[str, object] = {}
@@ -305,14 +322,17 @@ def _capture_leveling_state(cfg) -> dict[str, object]:
             state[name] = None
     return state
 
+
 def _restore_leveling_state(cfg, state: dict[str, object]) -> None:
     for name in _LEVELING_CACHE_ATTRS:
         _safe_setattr(cfg, name, copy.deepcopy(state.get(name)))
+
 
 def _clear_leveling_cache() -> None:
     """Tyhjentaa leveling-valimuistin. Vain testeille."""
     with _LEVELING_CACHE_LOCK:
         _LEVELING_CACHE.clear()
+
 
 def _clear_level_window_cache() -> None:
     """Tyhjentaa level-window-valimuistin. Vain testeille."""
@@ -321,27 +341,27 @@ def _clear_level_window_cache() -> None:
 
 
 __all__ = [
-    'StereoLinkContext',
-    '_LEVELING_CACHE',
-    '_LEVELING_CACHE_LOCK',
-    '_LEVELING_CACHE_MAX',
-    '_LEVEL_WINDOW_CACHE',
-    '_LEVEL_WINDOW_CACHE_LOCK',
-    '_LEVEL_WINDOW_CACHE_MAX',
-    '_to_float',
-    '_to_bool',
-    '_remember_leveling_error',
-    '_safe_setattr',
-    '_normalize_optional_float',
-    '_normalize_optional_window',
-    '_normalize_hpf_freq',
-    '_normalize_level_window_params',
-    '_hash_leveling_array',
-    '_stable_level_window_cache_key',
-    '_shared_stereo_level_window_cache_key',
-    '_leveling_cache_key',
-    '_capture_leveling_state',
-    '_restore_leveling_state',
-    '_clear_leveling_cache',
-    '_clear_level_window_cache',
+    "StereoLinkContext",
+    "_LEVELING_CACHE",
+    "_LEVELING_CACHE_LOCK",
+    "_LEVELING_CACHE_MAX",
+    "_LEVEL_WINDOW_CACHE",
+    "_LEVEL_WINDOW_CACHE_LOCK",
+    "_LEVEL_WINDOW_CACHE_MAX",
+    "_to_float",
+    "_to_bool",
+    "_remember_leveling_error",
+    "_safe_setattr",
+    "_normalize_optional_float",
+    "_normalize_optional_window",
+    "_normalize_hpf_freq",
+    "_normalize_level_window_params",
+    "_hash_leveling_array",
+    "_stable_level_window_cache_key",
+    "_shared_stereo_level_window_cache_key",
+    "_leveling_cache_key",
+    "_capture_leveling_state",
+    "_restore_leveling_state",
+    "_clear_leveling_cache",
+    "_clear_level_window_cache",
 ]

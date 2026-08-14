@@ -126,6 +126,7 @@ def build_phase_authority_gain(
 # Integration helpers (used by phase_ir_phase.py)
 # ---------------------------------------------------------------------------
 
+
 def apply_phase_authority_gating(
     f: np.ndarray,
     extra_phase: np.ndarray,
@@ -146,11 +147,7 @@ def apply_phase_authority_gating(
             authority_modal_support=_st_array(st, "authority_modal_support"),
             authority_reflection_risk=_st_array(st, "authority_reflection_risk"),
             authority_null_risk=_st_array(st, "authority_null_risk"),
-            phase_limit_hz=float(
-                getattr(cfg, "phase_c_max", None)
-                or getattr(cfg, "phase_limit", 600.0)
-                or 600.0
-            ),
+            phase_limit_hz=float(getattr(cfg, "phase_c_max", None) or getattr(cfg, "phase_limit", 600.0) or 600.0),
             disable_above_hz=float(getattr(cfg, "phase_authority_disable_above_hz", 1200.0) or 1200.0),
             gamma=float(getattr(cfg, "phase_authority_gamma", 1.20) or 1.20),
             min_gain=float(getattr(cfg, "phase_authority_min_gain", 0.0)),
@@ -215,7 +212,6 @@ def _store_phase_authority_telemetry(
                 f"suppressed_bins={suppressed}"
             )
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -232,6 +228,7 @@ def _store_phase_authority_telemetry(
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _safe_interp(f: np.ndarray, arr) -> np.ndarray | None:
     """Return arr resampled to f's length, or None if arr is absent/broken."""

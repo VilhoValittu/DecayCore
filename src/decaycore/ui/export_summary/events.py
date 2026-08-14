@@ -11,7 +11,6 @@
 import logging
 import math
 
-
 logger = logging.getLogger(__name__)
 from ...dsp.lr_difference_metrics import compute_lr_difference_metrics
 
@@ -112,13 +111,9 @@ def _append_hybrid_iir(summary_content: str, side: str, st: dict) -> str:
     biquads = [dict(item) for item in list(st.get("hybrid_iir_biquads", []) or []) if isinstance(item, dict)]
     rejected = [dict(item) for item in list(st.get("hybrid_iir_rejected", []) or []) if isinstance(item, dict)]
     summary_content += f"State: {'ON' if enabled else 'OFF'}\n"
-    summary_content += (
-        f"Mode: {st.get('hybrid_iir_mode', 'residual_aware_magnitude_preconditioning')!s}\n"
-    )
+    summary_content += f"Mode: {st.get('hybrid_iir_mode', 'residual_aware_magnitude_preconditioning')!s}\n"
     if biquads:
-        summary_content += (
-            "IIR modal cuts transfer supported FIR cuts and add only gated residual reduction.\n"
-        )
+        summary_content += "IIR modal cuts transfer supported FIR cuts and add only gated residual reduction.\n"
         for idx, biquad in enumerate(biquads, start=1):
             fitted_peak_db = float(biquad.get("fitted_peak_db", 0.0) or 0.0)
             summary_content += (
@@ -184,10 +179,7 @@ def _append_mag_authority_trace(summary_content: str, side: str, st: dict) -> st
             f"{'softclip + hardclamp' if hard_boost and soft_boost else ('hardclamp' if hard_boost else 'softclip')}; "
             f"final boost {float(final_boost):.2f} dB stayed within max_boost {float(max_boost):.2f} dB.\n"
         )
-    summary_content += (
-        f"{'Stage':<30} {'Reasons':<72} {'Changed':>8} "
-        f"{'MaxDelta':>9} {'BoostPk':>8} {'CutPk':>8}\n"
-    )
+    summary_content += f"{'Stage':<30} {'Reasons':<72} {'Changed':>8} " f"{'MaxDelta':>9} {'BoostPk':>8} {'CutPk':>8}\n"
     summary_content += "-" * 139 + "\n"
     for item in trace:
         if not isinstance(item, dict):
@@ -202,8 +194,7 @@ def _append_mag_authority_trace(summary_content: str, side: str, st: dict) -> st
         boost_pk = float(item.get("boost_peak_after_db", 0.0) or 0.0)
         cut_pk = float(item.get("cut_peak_after_db", 0.0) or 0.0)
         summary_content += (
-            f"{stage:<30} {reason_text:<72} {changed:>8d} "
-            f"{max_delta:>9.2f} {boost_pk:>8.2f} {cut_pk:>8.2f}\n"
+            f"{stage:<30} {reason_text:<72} {changed:>8d} " f"{max_delta:>9.2f} {boost_pk:>8.2f} {cut_pk:>8.2f}\n"
         )
     return summary_content
 
@@ -213,7 +204,9 @@ def _append_stage_checkpoints(summary_content: str, side: str, st: dict) -> str:
     if not (isinstance(probes, dict) and probes):
         return summary_content
     summary_content += f"\n=== STAGE CHECKPOINTS ({side}) ===\n"
-    summary_content += f"{'Stage':<22} {'BoostPk':>8} {'CutPk':>8} {'BoostBins':>10} {'CutBins':>8} {'NetBoostPk':>11}\n"
+    summary_content += (
+        f"{'Stage':<22} {'BoostPk':>8} {'CutPk':>8} {'BoostBins':>10} {'CutBins':>8} {'NetBoostPk':>11}\n"
+    )
     summary_content += "-" * 75 + "\n"
     order = [
         "after_gain_apply",
@@ -252,7 +245,9 @@ def _append_bass_first_ai(summary_content: str, side: str, st: dict) -> str:
     else:
         summary_content += "Mode peak: n/a\n"
 
-    summary_content += f"Smoothing conf floor applied: {'YES' if bool(st.get('bass_first_conf_floor_applied', False)) else 'NO'}\n"
+    summary_content += (
+        f"Smoothing conf floor applied: {'YES' if bool(st.get('bass_first_conf_floor_applied', False)) else 'NO'}\n"
+    )
     rm_max = st.get("bass_first_roommode_max_20_200")
     rel_mean = st.get("bass_first_rel_mean_20_200")
     rel_min = st.get("bass_first_rel_min_20_200")
@@ -293,6 +288,7 @@ def _append_acoustic_events(summary_content, l_st, r_st):
         summary_content = _append_side_acoustic_events(summary_content, side, st)
     return summary_content
 
+
 def _append_lr_difference_summary(summary_content: str, l_st: dict, r_st: dict) -> str:
     """Append L/R difference metrics section to summary text.
 
@@ -327,22 +323,15 @@ def _append_lr_difference_summary(summary_content: str, l_st: dict, r_st: dict) 
         summary_content += "\n=== L/R DIFFERENCE METRICS ===\n"
         summary_content += f"L/R Mag RMS  (20–200 Hz):  {_fmt_db(lr.mag_rms_bass_db)}\n"
         summary_content += f"L/R Mag RMS  (200–2000 Hz): {_fmt_db(lr.mag_rms_mid_db)}\n"
-        summary_content += (
-            f"L/R Mag RMS  ({band_lo:.0f}–{band_hi:.0f} Hz): {_fmt_db(lr.mag_rms_band_db)}\n"
-        )
-        summary_content += (
-            f"L/R Mag MaxAbs ({band_lo:.0f}–{band_hi:.0f} Hz): {_fmt_db(lr.mag_maxabs_band_db)}\n"
-        )
+        summary_content += f"L/R Mag RMS  ({band_lo:.0f}–{band_hi:.0f} Hz): {_fmt_db(lr.mag_rms_band_db)}\n"
+        summary_content += f"L/R Mag MaxAbs ({band_lo:.0f}–{band_hi:.0f} Hz): {_fmt_db(lr.mag_maxabs_band_db)}\n"
         if math.isfinite(lr.gd_rms_band_ms):
-            summary_content += (
-                f"L/R GD RMS ({band_lo:.0f}–{band_hi:.0f} Hz): {_fmt_ms(lr.gd_rms_band_ms)}\n"
-            )
+            summary_content += f"L/R GD RMS ({band_lo:.0f}–{band_hi:.0f} Hz): {_fmt_ms(lr.gd_rms_band_ms)}\n"
         summary_content += (
             "Computed from measured/analyzed left-right response data. "
             "Lower values indicate more symmetric channel behavior.\n"
         )
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -358,4 +347,4 @@ def _append_lr_difference_summary(summary_content: str, l_st: dict, r_st: dict) 
     return summary_content
 
 
-__all__ = ['_append_acoustic_events', '_append_lr_difference_summary']
+__all__ = ["_append_acoustic_events", "_append_lr_difference_summary"]

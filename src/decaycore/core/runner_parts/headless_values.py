@@ -42,9 +42,7 @@ def _safe_filename_token(value: Any, default: str = "v0") -> str:
     raw = str(value or "").strip()
     if not raw:
         return default
-    out = "".join(
-        ch if ch.isalnum() or ch in "._-" else "-" for ch in raw
-    ).strip(".-_")
+    out = "".join(ch if ch.isalnum() or ch in "._-" else "-" for ch in raw).strip(".-_")
     return out or default
 
 

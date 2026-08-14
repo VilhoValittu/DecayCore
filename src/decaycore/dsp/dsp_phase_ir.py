@@ -64,7 +64,9 @@ _BUILD_ALLOWED_KEYS = frozenset(
 )
 
 
-def _apply_hpf_magnitude_to_gain(*, cfg, freq_axis: np.ndarray, gain_db: np.ndarray, apply_hpf_to_mags, logger) -> np.ndarray:
+def _apply_hpf_magnitude_to_gain(
+    *, cfg, freq_axis: np.ndarray, gain_db: np.ndarray, apply_hpf_to_mags, logger
+) -> np.ndarray:
     hs = cfg.hpf_settings
     if not (isinstance(hs, dict) and hs.get("enabled")):
         return gain_db
@@ -103,7 +105,9 @@ def _apply_hpf_magnitude_to_gain(*, cfg, freq_axis: np.ndarray, gain_db: np.ndar
     return np.asarray(out, dtype=float)
 
 
-def _apply_lpf_magnitude_to_gain(*, cfg, freq_axis: np.ndarray, gain_db: np.ndarray, apply_lpf_to_mags, logger) -> np.ndarray:
+def _apply_lpf_magnitude_to_gain(
+    *, cfg, freq_axis: np.ndarray, gain_db: np.ndarray, apply_lpf_to_mags, logger
+) -> np.ndarray:
     ls = cfg.lpf_settings
     if not (isinstance(ls, dict) and ls.get("enabled")):
         return gain_db
@@ -115,8 +119,7 @@ def _apply_lpf_magnitude_to_gain(*, cfg, freq_axis: np.ndarray, gain_db: np.ndar
     out = np.asarray(gain_db, dtype=float) + np.asarray(lpf_db, dtype=float)
     try:
         logger.info(
-            f"LPF magnitude applied to FIR: fc={lpf_f:.1f} Hz, "
-            f"order={lpf_order} ({lpf_order * 6:.0f} dB/oct)"
+            f"LPF magnitude applied to FIR: fc={lpf_f:.1f} Hz, " f"order={lpf_order} ({lpf_order * 6:.0f} dB/oct)"
         )
     except (AttributeError, TypeError, ValueError):
         pass
@@ -368,10 +371,7 @@ def _run_phase_ir_stage(inputs: PhaseIRInputs) -> PhaseIROutputs:
     )
     gain_db = np.asarray(gain_db, dtype=float)
     if gain_db.shape != gain_db_before_residual.shape:
-        raise RuntimeError(
-            "Phase-IR contract breach in phase_ir_residual: "
-            "gain_db shape changed unexpectedly."
-        )
+        raise RuntimeError("Phase-IR contract breach in phase_ir_residual: " "gain_db shape changed unexpectedly.")
     require_unchanged(
         "phase_ir_residual",
         "freq_axis",

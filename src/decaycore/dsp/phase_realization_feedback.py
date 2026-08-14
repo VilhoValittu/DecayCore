@@ -251,10 +251,18 @@ def phase_feedback_stats(
         "phase_realization_feedback_gd_before": [_safe_float(ch.get("gd_score")) for ch in base_channels],
         "phase_realization_feedback_gd_selected": [_safe_float(ch.get("gd_score")) for ch in selected_channels],
         "phase_realization_feedback_gd_source": [str(ch.get("gd_source", "unavailable")) for ch in selected_channels],
-        "phase_realization_feedback_pre_energy_before_db": [_safe_float(ch.get("pre_energy_db")) for ch in base_channels],
-        "phase_realization_feedback_pre_energy_selected_db": [_safe_float(ch.get("pre_energy_db")) for ch in selected_channels],
-        "phase_realization_feedback_mag_rms_selected_db": [_safe_float(ch.get("mag_rms_db")) for ch in selected_channels],
-        "phase_realization_feedback_mag_peak_selected_db": [_safe_float(ch.get("mag_peak_db")) for ch in selected_channels],
+        "phase_realization_feedback_pre_energy_before_db": [
+            _safe_float(ch.get("pre_energy_db")) for ch in base_channels
+        ],
+        "phase_realization_feedback_pre_energy_selected_db": [
+            _safe_float(ch.get("pre_energy_db")) for ch in selected_channels
+        ],
+        "phase_realization_feedback_mag_rms_selected_db": [
+            _safe_float(ch.get("mag_rms_db")) for ch in selected_channels
+        ],
+        "phase_realization_feedback_mag_peak_selected_db": [
+            _safe_float(ch.get("mag_peak_db")) for ch in selected_channels
+        ],
     }
 
 

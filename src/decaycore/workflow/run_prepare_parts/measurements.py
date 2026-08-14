@@ -54,6 +54,7 @@ if typing.TYPE_CHECKING:
 
 logger = logging.getLogger("DecayCore")
 
+
 def _prepare_measurement_ui_window_settings(data: dict) -> None:
     ir_export_window_mode = data.get("ir_export_window_mode")
     if not isinstance(ir_export_window_mode, str) or ir_export_window_mode.strip() == "":
@@ -125,12 +126,16 @@ def _prepare_measurement_read_paths(
     bass_integration_enabled: bool,
 ) -> tuple[str, str, dict]:
     if bass_integration_enabled:
-        return "local_path_l_main", "local_path_r_main", {
-            "file_key_l": "file_l_main",
-            "path_key_l": "local_path_l_main",
-            "file_key_r": "file_r_main",
-            "path_key_r": "local_path_r_main",
-        }
+        return (
+            "local_path_l_main",
+            "local_path_r_main",
+            {
+                "file_key_l": "file_l_main",
+                "path_key_l": "local_path_l_main",
+                "file_key_r": "file_r_main",
+                "path_key_r": "local_path_r_main",
+            },
+        )
     return "local_path_l", "local_path_r", {}
 
 
@@ -187,12 +192,8 @@ def _prepare_measurement_sidecar_metadata(
     float | None,
     float | None,
 ]:
-    measured_rt60_l, measured_rt60_bands_l = _extract_generated_source_rt60(
-        data.get("generated_measurement_l")
-    )
-    measured_rt60_r, measured_rt60_bands_r = _extract_generated_source_rt60(
-        data.get("generated_measurement_r")
-    )
+    measured_rt60_l, measured_rt60_bands_l = _extract_generated_source_rt60(data.get("generated_measurement_l"))
+    measured_rt60_r, measured_rt60_bands_r = _extract_generated_source_rt60(data.get("generated_measurement_r"))
     measured_snr_db_l = _extract_generated_source_snr(data.get("generated_measurement_l"))
     measured_snr_db_r = _extract_generated_source_snr(data.get("generated_measurement_r"))
 
@@ -400,7 +401,6 @@ def _get_wav_window_params(data: dict) -> tuple[float, float, int]:
     try:
         pre_ms = float(data.get("ir_window_left", 85.0) or 85.0)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -416,7 +416,6 @@ def _get_wav_window_params(data: dict) -> tuple[float, float, int]:
     try:
         post_ms = float(data.get("ir_window_right", data.get("ir_window", 500.0)) or 500.0)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -432,7 +431,6 @@ def _get_wav_window_params(data: dict) -> tuple[float, float, int]:
     try:
         smoothing_level = int(data.get("smoothing_level", 0) or 0)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -446,6 +444,7 @@ def _get_wav_window_params(data: dict) -> tuple[float, float, int]:
     ):
         smoothing_level = 0
     return float(pre_ms), float(post_ms), int(smoothing_level)
+
 
 def _extract_generated_source_rt60(source: object) -> tuple[float | None, dict[float, float] | None]:
     if not isinstance(source, dict):
@@ -474,6 +473,7 @@ def _extract_generated_source_rt60(source: object) -> tuple[float | None, dict[f
             rt60_bands = normalized
 
     return rt60_val, rt60_bands
+
 
 def _extract_generated_source_snr(source: object) -> float | None:
     if not isinstance(source, dict):
@@ -513,10 +513,22 @@ def _load_generated_measurement_pair(data: dict) -> tuple | None:
     if f_l is None or f_r is None:
         return None
     return (
-        f_l, m_l, p_l, f_r, m_r, p_r,
-        raw_ir_l, raw_ir_fs_l, raw_ir_r, raw_ir_fs_r,
-        harmonic_freq_l, harmonic_mags_l, harmonic_freq_r, harmonic_mags_r,
+        f_l,
+        m_l,
+        p_l,
+        f_r,
+        m_r,
+        p_r,
+        raw_ir_l,
+        raw_ir_fs_l,
+        raw_ir_r,
+        raw_ir_fs_r,
+        harmonic_freq_l,
+        harmonic_mags_l,
+        harmonic_freq_r,
+        harmonic_mags_r,
     )
+
 
 def _prepare_ui_and_measurements(
     *,
@@ -545,7 +557,6 @@ def _prepare_ui_and_measurements(
         if support.ui_bridge.toast_health_gate_result(hr, mode):
             return None
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -637,22 +648,23 @@ def _prepare_ui_and_measurements(
         taps_base=taps_base,
         perf_stats=perf_stats,
         per_fs_stats=per_fs_stats,
+        auto_mode_enabled=bool(is_auto_mode(data, mode_u) or data.get("bass_integration_enable", False)),
     )
 
 
 __all__ = [
-    '_get_wav_window_params',
-    '_extract_generated_source_rt60',
-    '_extract_generated_source_snr',
-    '_load_generated_measurement_pair',
-    '_prepare_ui_and_measurements',
-    '_try_load_harmonic_sidecar',
-    '_try_load_rt60_sidecar',
-    'compute_health',
-    'filter_type_short',
-    'load_bass_integration_measurements',
-    'load_measurements_lr',
-    'load_raw_ir_sub',
-    'load_raw_irs_lr',
-    'save_config',
+    "_get_wav_window_params",
+    "_extract_generated_source_rt60",
+    "_extract_generated_source_snr",
+    "_load_generated_measurement_pair",
+    "_prepare_ui_and_measurements",
+    "_try_load_harmonic_sidecar",
+    "_try_load_rt60_sidecar",
+    "compute_health",
+    "filter_type_short",
+    "load_bass_integration_measurements",
+    "load_measurements_lr",
+    "load_raw_ir_sub",
+    "load_raw_irs_lr",
+    "save_config",
 ]

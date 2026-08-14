@@ -64,7 +64,6 @@ def _comparison_stats_write_output(
                 out["eff_target_db"] = v
                 out["cmp_eff_target_db"] = v
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -86,7 +85,6 @@ def _comparison_stats_float_array(v):
     try:
         arr = np.asarray(v, dtype=float)
     except (
-
         AttributeError,
         TypeError,
         ValueError,

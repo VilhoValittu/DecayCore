@@ -21,7 +21,6 @@ def apply_manual_target_preview_shift(target_curve, shift_db: float):
     try:
         shift = float(shift_db)
     except (
-
         AttributeError,
         TypeError,
         ValueError,

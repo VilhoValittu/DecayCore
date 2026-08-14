@@ -52,14 +52,7 @@ def apply_bass_boost_post_restore(
     if s <= 0.0:
         return out, meta
     valid = np.isfinite(out) & np.isfinite(tgt) & np.isfinite(cap) & np.isfinite(f)
-    rmask = (
-        valid
-        & m
-        & (f >= float(hz_lo))
-        & (f <= float(hz_hi))
-        & (cap > out + 1e-9)
-        & (tgt > out + 1e-9)
-    )
+    rmask = valid & m & (f >= float(hz_lo)) & (f <= float(hz_hi)) & (cap > out + 1e-9) & (tgt > out + 1e-9)
     if not np.any(rmask):
         return out, meta
     pre = out.copy()
@@ -170,7 +163,7 @@ def _confpull_post_build_reference(
             if i0 > 0:
                 g_in[:i0] = g_in[i0]
             if i1 < (g_in.size - 1):
-                g_in[i1 + 1:] = g_in[i1]
+                g_in[i1 + 1 :] = g_in[i1]
             g_ref = psycho_smooth_safe_gain(freq_axis, g_in)
         except (TypeError, ValueError, FloatingPointError, IndexError):
             g_ref = np.asarray(gain_db_in, dtype=float)
@@ -245,9 +238,21 @@ def _confpull_post_log_telemetry(
     st: Any,
 ) -> None:
     try:
-        w_eff = np.asarray(tel.get("w_eff"), dtype=float) if isinstance(tel, dict) and tel.get("w_eff") is not None else None
-        pm = np.asarray(tel.get("pull_mask"), dtype=bool) if isinstance(tel, dict) and tel.get("pull_mask") is not None else None
-        ps = np.asarray(tel.get("pull_strength"), dtype=float) if isinstance(tel, dict) and tel.get("pull_strength") is not None else None
+        w_eff = (
+            np.asarray(tel.get("w_eff"), dtype=float)
+            if isinstance(tel, dict) and tel.get("w_eff") is not None
+            else None
+        )
+        pm = (
+            np.asarray(tel.get("pull_mask"), dtype=bool)
+            if isinstance(tel, dict) and tel.get("pull_mask") is not None
+            else None
+        )
+        ps = (
+            np.asarray(tel.get("pull_strength"), dtype=float)
+            if isinstance(tel, dict) and tel.get("pull_strength") is not None
+            else None
+        )
         pm2 = mask_c_in if (pm is None or pm.shape != mask_c_in.shape) else (pm & mask_c_in)
         if (w_eff is not None) and (w_eff.shape == pm2.shape) and np.any(pm2):
             wv = w_eff[pm2]

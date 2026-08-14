@@ -58,25 +58,25 @@ def gd_grad_metrics(freq_axis: np.ndarray, phase_rad: np.ndarray, *, mask: np.nd
         # 95th-percentile is robust against single-bin spikes from resonances or
         # measurement artifacts that would otherwise trigger limiting unnecessarily.
         robust_max = float(np.percentile(abs_grad, 95.0)) if abs_grad.size >= 8 else float(abs_grad[idx])
-        robust_idx = (
-            int(np.argmin(np.abs(abs_grad - robust_max)))
-            if abs_grad.size >= 8
-            else idx
-        )
+        robust_idx = int(np.argmin(np.abs(abs_grad - robust_max))) if abs_grad.size >= 8 else idx
         out["max_ms_per_oct"] = robust_max
         out["at_hz"] = float(ff[robust_idx]) if ff.size else None
         gd_curv = np.nan_to_num(np.gradient(gd_grad, np.log2(np.maximum(ff, 1e-9))), nan=0.0, posinf=0.0, neginf=0.0)
         abs_curv = np.abs(gd_curv)
         if abs_curv.size:
             cidx = int(np.argmax(abs_curv))
-            out["max_ms_per_oct2"] = float(np.percentile(abs_curv, 95.0)) if abs_curv.size >= 8 else float(abs_curv[cidx])
+            out["max_ms_per_oct2"] = (
+                float(np.percentile(abs_curv, 95.0)) if abs_curv.size >= 8 else float(abs_curv[cidx])
+            )
             out["curv_at_hz"] = float(ff[cidx])
         return out
     except (TypeError, ValueError, FloatingPointError, IndexError):
         return out
 
 
-def max_abs_gd_gradient_ms_per_oct(freq_axis: np.ndarray, phase_rad: np.ndarray, *, mask: np.ndarray | None = None) -> tuple[float, float | None]:
+def max_abs_gd_gradient_ms_per_oct(
+    freq_axis: np.ndarray, phase_rad: np.ndarray, *, mask: np.ndarray | None = None
+) -> tuple[float, float | None]:
     m = gd_grad_metrics(freq_axis, phase_rad, mask=mask)
     return float(m["max_ms_per_oct"]), m["at_hz"]
 
@@ -208,7 +208,14 @@ def _gd_grad_limiter_revert_if_needed(in_phase: np.ndarray, out: np.ndarray, inf
     try:
         gb = info["max_grad_before_ms_per_oct"]
         ga = info["max_grad_after_ms_per_oct"]
-        if info.get("applied", False) and gb is not None and ga is not None and np.isfinite(float(gb)) and np.isfinite(float(ga)) and (float(ga) > (float(gb) * 1.001)):
+        if (
+            info.get("applied", False)
+            and gb is not None
+            and ga is not None
+            and np.isfinite(float(gb))
+            and np.isfinite(float(ga))
+            and (float(ga) > (float(gb) * 1.001))
+        ):
             info["applied"] = False
             info["enabled"] = False
             info["reason"] = "reverted_non_monotonic"
@@ -227,11 +234,15 @@ def _gd_grad_limiter_revert_if_needed(in_phase: np.ndarray, out: np.ndarray, inf
     return out
 
 
-def gd_grad_limiter(ir, cfg, st, *, freq_axis=None, phase_mask=None, limiter_fn=None) -> tuple[np.ndarray, dict[str, Any]]:
+def gd_grad_limiter(
+    ir, cfg, st, *, freq_axis=None, phase_mask=None, limiter_fn=None
+) -> tuple[np.ndarray, dict[str, Any]]:
     in_phase = np.asarray(ir, dtype=float).copy()
     out = in_phase.copy()
     try:
-        lim_cfg = float(getattr(cfg, "gd_grad_limit_ms_per_oct", getattr(cfg, "gd_limiter_limit_ms_per_oct", 30.0)) or 0.0)
+        lim_cfg = float(
+            getattr(cfg, "gd_grad_limit_ms_per_oct", getattr(cfg, "gd_limiter_limit_ms_per_oct", 30.0)) or 0.0
+        )
     except (AttributeError, TypeError, ValueError):
         lim_cfg = 0.0
     lim_cfg = float(max(0.0, lim_cfg if np.isfinite(lim_cfg) else 0.0))
@@ -278,12 +289,24 @@ def gd_grad_limiter(ir, cfg, st, *, freq_axis=None, phase_mask=None, limiter_fn=
             st["gd_grad_limiter_max_grad_after_hz"] = info["max_grad_after_hz"]
             st["gd_grad_limiter_max_grad_hz"] = info["max_grad_after_hz"]
             st["gd_grad_limiter_limit_ms_per_oct"] = float(info["limit_ms_per_oct"] or 0.0)
-            st["gd_grad_limiter_before_max_ms_per_oct"] = None if info["max_grad_before_ms_per_oct"] is None else float(info["max_grad_before_ms_per_oct"])
-            st["gd_grad_limiter_after_max_ms_per_oct"] = None if info["max_grad_after_ms_per_oct"] is None else float(info["max_grad_after_ms_per_oct"])
-            st["gd_grad_limiter_peak_hz"] = None if info["max_grad_after_hz"] is None else float(info["max_grad_after_hz"])
-            st["gd_grad_before_max_ms_per_oct"] = None if info["max_grad_before_ms_per_oct"] is None else float(info["max_grad_before_ms_per_oct"])
-            st["gd_grad_before_at_hz"] = None if info["max_grad_before_hz"] is None else float(info["max_grad_before_hz"])
-            st["gd_grad_after_max_ms_per_oct"] = None if info["max_grad_after_ms_per_oct"] is None else float(info["max_grad_after_ms_per_oct"])
+            st["gd_grad_limiter_before_max_ms_per_oct"] = (
+                None if info["max_grad_before_ms_per_oct"] is None else float(info["max_grad_before_ms_per_oct"])
+            )
+            st["gd_grad_limiter_after_max_ms_per_oct"] = (
+                None if info["max_grad_after_ms_per_oct"] is None else float(info["max_grad_after_ms_per_oct"])
+            )
+            st["gd_grad_limiter_peak_hz"] = (
+                None if info["max_grad_after_hz"] is None else float(info["max_grad_after_hz"])
+            )
+            st["gd_grad_before_max_ms_per_oct"] = (
+                None if info["max_grad_before_ms_per_oct"] is None else float(info["max_grad_before_ms_per_oct"])
+            )
+            st["gd_grad_before_at_hz"] = (
+                None if info["max_grad_before_hz"] is None else float(info["max_grad_before_hz"])
+            )
+            st["gd_grad_after_max_ms_per_oct"] = (
+                None if info["max_grad_after_ms_per_oct"] is None else float(info["max_grad_after_ms_per_oct"])
+            )
             st["gd_grad_after_at_hz"] = None if info["max_grad_after_hz"] is None else float(info["max_grad_after_hz"])
             st["gd_grad_used_x_axis"] = str(info.get("used_x_axis", "log2(f)") or "log2(f)")
             st["gd_grad_df_min"] = None if info.get("df_min", None) is None else float(info["df_min"])
@@ -292,8 +315,16 @@ def gd_grad_limiter(ir, cfg, st, *, freq_axis=None, phase_mask=None, limiter_fn=
             st["gd_grad_units_note"] = str(info.get("units_note", ""))
             st["gd_grad_limit_input"] = None if info.get("limit_input", None) is None else float(info["limit_input"])
             st["gd_grad_limiter_reverted_non_monotonic"] = bool(info.get("reverted_non_monotonic", False))
-            st["gd_curv_before_max_ms_per_oct2"] = None if info.get("max_curv_before_ms_per_oct2", None) is None else float(info["max_curv_before_ms_per_oct2"])
-            st["gd_curv_after_max_ms_per_oct2"] = None if info.get("max_curv_after_ms_per_oct2", None) is None else float(info["max_curv_after_ms_per_oct2"])
+            st["gd_curv_before_max_ms_per_oct2"] = (
+                None
+                if info.get("max_curv_before_ms_per_oct2", None) is None
+                else float(info["max_curv_before_ms_per_oct2"])
+            )
+            st["gd_curv_after_max_ms_per_oct2"] = (
+                None
+                if info.get("max_curv_after_ms_per_oct2", None) is None
+                else float(info["max_curv_after_ms_per_oct2"])
+            )
     except (TypeError, ValueError):
         pass
     return out, info

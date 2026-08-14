@@ -23,6 +23,7 @@ PyWebIO → NiceGUI equivalents
     pin_on_change("name", onchange=fn)   → ng_controls.on_change("name", fn)
     put_scope("s") / use_scope("s")      → ng_controls.get_container("s")
 """
+
 from __future__ import annotations
 
 import logging
@@ -40,6 +41,7 @@ _SUPPRESSED_CALLBACKS: set[str] = set()
 # ---------------------------------------------------------------------------
 # Element registry
 # ---------------------------------------------------------------------------
+
 
 def register(name: str, element: Any) -> Any:
     """Register a NiceGUI element under *name*.  Returns the element."""
@@ -60,7 +62,18 @@ def value(name: str, default: Any = None) -> Any:
     try:
         v = el.value
         return v if v is not None else default
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         logger.debug("value(%r) read failed", name, exc_info=True)
         return default
 
@@ -68,6 +81,7 @@ def value(name: str, default: Any = None) -> Any:
 # ---------------------------------------------------------------------------
 # Value + option updates  (pin_update equivalent)
 # ---------------------------------------------------------------------------
+
 
 def set_value(name: str, v: Any, *, emit: bool = True) -> None:
     el = _CONTROLS.get(name)
@@ -78,11 +92,33 @@ def set_value(name: str, v: Any, *, emit: bool = True) -> None:
     try:
         try:
             el.set_value(v)
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        except (
+            RuntimeError,
+            OSError,
+            ImportError,
+            TypeError,
+            ValueError,
+            AttributeError,
+            KeyError,
+            IndexError,
+            OverflowError,
+            FloatingPointError,
+        ):
             try:
                 el.value = v
                 el.update()
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+            except (
+                RuntimeError,
+                OSError,
+                ImportError,
+                TypeError,
+                ValueError,
+                AttributeError,
+                KeyError,
+                IndexError,
+                OverflowError,
+                FloatingPointError,
+            ):
                 logger.debug("set_value(%r, %r) failed", name, v, exc_info=True)
     finally:
         if not emit:
@@ -96,7 +132,18 @@ def set_options(name: str, options: list | dict) -> None:
         return
     try:
         el.set_options(options)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         logger.debug("set_options(%r) failed", name, exc_info=True)
 
 
@@ -110,13 +157,35 @@ def set_enabled(name: str, enabled: bool) -> None:
             el.enable()
         else:
             el.disable()
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         try:
             if enabled:
                 el.props(remove="disable")
             else:
                 el.props("disable")
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        except (
+            RuntimeError,
+            OSError,
+            ImportError,
+            TypeError,
+            ValueError,
+            AttributeError,
+            KeyError,
+            IndexError,
+            OverflowError,
+            FloatingPointError,
+        ):
             logger.debug("set_enabled(%r, %r) failed", name, enabled, exc_info=True)
 
 
@@ -129,13 +198,25 @@ def set_visibility(name: str, visible: bool) -> None:
         return
     try:
         el.set_visibility(visible)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         logger.debug("set_visibility(%r, %r) failed", name, visible, exc_info=True)
 
 
 # ---------------------------------------------------------------------------
 # Change callbacks  (pin_on_change equivalent)
 # ---------------------------------------------------------------------------
+
 
 def on_change(name: str, callback: Callable) -> None:
     """Register a value-change callback on the named element.
@@ -154,10 +235,32 @@ def on_change(name: str, callback: Callable) -> None:
 
     try:
         el.on_value_change(_wrapped)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         try:
             el.on("change", _wrapped)
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        except (
+            RuntimeError,
+            OSError,
+            ImportError,
+            TypeError,
+            ValueError,
+            AttributeError,
+            KeyError,
+            IndexError,
+            OverflowError,
+            FloatingPointError,
+        ):
             logger.debug("on_change(%r) failed", name, exc_info=True)
 
 
@@ -180,16 +283,39 @@ def on_commit(name: str, callback: Callable) -> None:
 
     try:
         el.on("change", _wrapped)
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         try:
             el.on_value_change(_wrapped)
-        except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+        except (
+            RuntimeError,
+            OSError,
+            ImportError,
+            TypeError,
+            ValueError,
+            AttributeError,
+            KeyError,
+            IndexError,
+            OverflowError,
+            FloatingPointError,
+        ):
             logger.debug("on_commit(%r) failed", name, exc_info=True)
 
 
 # ---------------------------------------------------------------------------
 # Dynamic containers  (put_scope / use_scope equivalent)
 # ---------------------------------------------------------------------------
+
 
 def register_container(name: str, container: Any) -> Any:
     """Register a NiceGUI container (column/expansion/etc.) as a scope."""
@@ -209,7 +335,18 @@ def clear_container(name: str) -> None:
         return
     try:
         c.clear()
-    except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+    except (
+        RuntimeError,
+        OSError,
+        ImportError,
+        TypeError,
+        ValueError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        OverflowError,
+        FloatingPointError,
+    ):
         logger.debug("clear_container(%r) failed", name, exc_info=True)
 
 
@@ -223,6 +360,7 @@ def reset() -> None:
 # ---------------------------------------------------------------------------
 # Value holder for non-element values (e.g. uploaded file data)
 # ---------------------------------------------------------------------------
+
 
 class _ValueChangeEvent:
     """Minimal event object for reactive holders."""
@@ -252,7 +390,18 @@ class _ValueHolder:
         for callback in list(self._callbacks):
             try:
                 callback(event)
-            except (RuntimeError, OSError, ImportError, TypeError, ValueError, AttributeError, KeyError, IndexError, OverflowError, FloatingPointError):
+            except (
+                RuntimeError,
+                OSError,
+                ImportError,
+                TypeError,
+                ValueError,
+                AttributeError,
+                KeyError,
+                IndexError,
+                OverflowError,
+                FloatingPointError,
+            ):
                 logger.debug("_ValueHolder callback failed", exc_info=True)
 
     def update(self) -> None:
@@ -265,6 +414,7 @@ class _ValueHolder:
 # ---------------------------------------------------------------------------
 # PyWebIO pin-compatible proxy  (passed to collect_ui_data as pin_obj)
 # ---------------------------------------------------------------------------
+
 
 class NgPinProxy:
     """Dict-like proxy over ng_controls, compatible with collect_ui_data(pin).

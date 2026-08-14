@@ -50,61 +50,6 @@ from .headless_progress import (
 logger = logging.getLogger("DecayCore")
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def _copy_export_artifacts(saved_filters_dir: str | None, output_dir: Path) -> None:
     if not saved_filters_dir:
         return
@@ -116,10 +61,15 @@ def _copy_export_artifacts(saved_filters_dir: str | None, output_dir: Path) -> N
         if item.is_file() and not dest.exists():
             shutil.copy2(item, dest)
 
+
 def run_batch(config: dict, output_dir: Path, headless: bool = True) -> dict:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    sink = config.get("_progress_sink") if isinstance(config.get("_progress_sink"), ProgressSink) else ConsoleProgressSink()
+    sink = (
+        config.get("_progress_sink")
+        if isinstance(config.get("_progress_sink"), ProgressSink)
+        else ConsoleProgressSink()
+    )
     started_at = _utc_now()
     t0 = time.perf_counter()
     ctx: dict | None = None
@@ -135,11 +85,25 @@ def run_batch(config: dict, output_dir: Path, headless: bool = True) -> dict:
         required = ["local_path_l", "local_path_r"]
         if bool(data.get("bass_integration_enable", False)):
             required = ["local_path_l_main", "local_path_r_main", "local_path_l_sub", "local_path_r_sub"]
-        missing = [key for key in required if not str(data.get(key, "") or "").strip() or not Path(str(data.get(key))).exists()]
+        missing = [
+            key for key in required if not str(data.get(key, "") or "").strip() or not Path(str(data.get(key))).exists()
+        ]
         if missing:
             sink.warning("Missing input files for DSP run: " + ", ".join(missing))
             status = "partial"
-            return _build_metrics(status, data, None, metadata, rt60, harmonics, started_at=started_at, finished_at=_utc_now(), runtime_s=time.perf_counter() - t0, warnings=sink.warnings, errors=errors)
+            return _build_metrics(
+                status,
+                data,
+                None,
+                metadata,
+                rt60,
+                harmonics,
+                started_at=started_at,
+                finished_at=_utc_now(),
+                runtime_s=time.perf_counter() - t0,
+                warnings=sink.warnings,
+                errors=errors,
+            )
 
         bridge = _HeadlessBridge(output_dir, sink, no_plots=bool(data.get("_no_plots", True)))
         support = ProcessRunSupport(
@@ -192,6 +156,7 @@ def run_batch(config: dict, output_dir: Path, headless: bool = True) -> dict:
         _copy_export_artifacts(saved_filters_dir, output_dir)
     return metrics_doc
 
+
 def prepare_headless_config(config_path: Path, output_dir: Path, *, no_plots: bool = True) -> dict:
     config_path = Path(config_path).resolve()
     raw = _read_json(config_path)
@@ -205,4 +170,4 @@ def prepare_headless_config(config_path: Path, output_dir: Path, *, no_plots: bo
     return data
 
 
-__all__ = ['_copy_export_artifacts', 'run_batch', 'prepare_headless_config']
+__all__ = ["_copy_export_artifacts", "run_batch", "prepare_headless_config"]

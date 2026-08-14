@@ -20,6 +20,7 @@ from ..mag_telemetry import (
     _record_stage_probe,
 )
 
+
 def _apply_low_frequency_policy(
     *,
     freq_axis: np.ndarray,
@@ -69,6 +70,7 @@ def _apply_low_frequency_policy(
     except (TypeError, ValueError, FloatingPointError, IndexError):
         pass
     return low_cut_floor_ref
+
 
 def _prepare_boost_caps(
     *,
@@ -167,9 +169,8 @@ def _prepare_boost_caps_confidence_cap(
         )
         bass_boost_cap_mask = mask_c & (freq_axis >= 20.0) & (freq_axis <= float(bass_boost_cap_hz))
         if np.any(bass_boost_cap_mask):
-            local_cap = (
-                float(max_boost_db_base)
-                + float(bass_boost_cap_extra_db) * np.asarray(w[bass_boost_cap_mask], dtype=float)
+            local_cap = float(max_boost_db_base) + float(bass_boost_cap_extra_db) * np.asarray(
+                w[bass_boost_cap_mask], dtype=float
             )
             boost_cap_db[bass_boost_cap_mask] = local_cap
             bass_boost_cap_enabled = bool(np.any(boost_cap_db[bass_boost_cap_mask] > (max_boost_db_base + 1e-6)))
@@ -330,11 +331,7 @@ def _prepare_boost_caps_harmonic_risk(
     if not unsafe_raw_dsp:
         try:
             _mctx = get_measurement_ctx()
-            if (
-                _mctx is not None
-                and _mctx.harmonic_risk_freq_hz is not None
-                and _mctx.harmonic_risk_curve is not None
-            ):
+            if _mctx is not None and _mctx.harmonic_risk_freq_hz is not None and _mctx.harmonic_risk_curve is not None:
                 _hrisk_f = np.asarray(_mctx.harmonic_risk_freq_hz, dtype=float)
                 _hrisk_c = np.asarray(_mctx.harmonic_risk_curve, dtype=float)
                 if _hrisk_f.size >= 4 and _hrisk_c.size == _hrisk_f.size:
@@ -349,8 +346,8 @@ def _prepare_boost_caps_harmonic_risk(
                     _max_local_reduction_db = 2.0
                     _cap_reduction = np.zeros_like(freq_axis, dtype=float)
                     if np.any(_hrisk_band):
-                        _cap_reduction[_hrisk_band] = (
-                            float(_max_local_reduction_db) * np.asarray(_risk_on_axis[_hrisk_band], dtype=float)
+                        _cap_reduction[_hrisk_band] = float(_max_local_reduction_db) * np.asarray(
+                            _risk_on_axis[_hrisk_band], dtype=float
                         )
                         boost_cap_db[_hrisk_band] = np.maximum(
                             0.0,
@@ -385,6 +382,7 @@ def _prepare_boost_caps_harmonic_risk(
     except (TypeError, ValueError):
         pass
 
+
 def _stats_array(st, keys: tuple[str, ...], shape: tuple[int, ...]) -> tuple[np.ndarray | None, str]:
     if not isinstance(st, dict):
         return None, "missing"
@@ -398,6 +396,7 @@ def _stats_array(st, keys: tuple[str, ...], shape: tuple[int, ...]) -> tuple[np.
         if arr.shape == shape:
             return arr, "stats"
     return None, "missing"
+
 
 def _authority_band_metrics(
     *,
@@ -418,4 +417,4 @@ def _authority_band_metrics(
         return 0.0, 0.0, 0.0
 
 
-__all__ = ['_apply_low_frequency_policy', '_prepare_boost_caps', '_stats_array', '_authority_band_metrics']
+__all__ = ["_apply_low_frequency_policy", "_prepare_boost_caps", "_stats_array", "_authority_band_metrics"]

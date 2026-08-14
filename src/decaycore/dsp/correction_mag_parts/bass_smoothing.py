@@ -18,6 +18,7 @@ import scipy.ndimage
 from decaycore.common.profiling import profiled_section as profiled_section
 
 from .. import bassfirst as bf
+
 bf = bf
 from ..decaycore_analysis import _sigma_bins_from_hz
 from ..correction_types import (
@@ -71,6 +72,7 @@ from ..smoothing import (
     smooth_gain_fractional_octave,
 )
 
+
 def _apply_peak_priority_error_shaping(
     err_db: np.ndarray,
     freq_axis: np.ndarray,
@@ -81,17 +83,19 @@ def _apply_peak_priority_error_shaping(
     logger: Any,
 ) -> np.ndarray:
     """Peak-priority error formulation:
-      - Keep CUT requests (negative error) intact.
-      - Leave BOOST requests unchanged up to max_boost_db.
-      - Soft-limit only the portion above max_boost_db so deep dips don't
-        dominate the solution when max_boost is small anyway.
+    - Keep CUT requests (negative error) intact.
+    - Leave BOOST requests unchanged up to max_boost_db.
+    - Soft-limit only the portion above max_boost_db so deep dips don't
+      dominate the solution when max_boost is small anyway.
     """
     cfg_reader = CfgReader(cfg)
     enable = cfg_reader.bool("peak_priority_enable", True)
     if not enable:
         return err_db
 
-    strength = cfg_reader.float_allow_zero("peak_priority_strength", 0.1) #vaikuttaa boostin voimakkuuteen, mitä isompi, sitä miedompi boost
+    strength = cfg_reader.float_allow_zero(
+        "peak_priority_strength", 0.1
+    )  # vaikuttaa boostin voimakkuuteen, mitä isompi, sitä miedompi boost
     if not np.isfinite(strength):
         strength = 0.0
     strength = float(np.clip(strength, 0.0, 1.0))
@@ -125,9 +129,13 @@ def _apply_peak_priority_error_shaping(
     )
 
     # Stats (safe)
-    _record_peak_priority_stats(st, err_db=err_db, shaped_error=e, pos_mask=pos, strength=float(strength), max_boost=float(max_boost))
+    _record_peak_priority_stats(
+        st, err_db=err_db, shaped_error=e, pos_mask=pos, strength=float(strength), max_boost=float(max_boost)
+    )
 
-    _log_peak_priority_summary(logger, err_db=err_db, shaped_error=e, pos_mask=pos, strength=float(strength), max_boost=float(max_boost))
+    _log_peak_priority_summary(
+        logger, err_db=err_db, shaped_error=e, pos_mask=pos, strength=float(strength), max_boost=float(max_boost)
+    )
 
     return e
 
@@ -166,7 +174,7 @@ def _apply_peak_priority_optional_cut_emphasis(
     if not np.any(neg):
         return error_db
     out = np.asarray(error_db, dtype=float).copy()
-    out[neg] *= (1.0 + clipped * float(strength))
+    out[neg] *= 1.0 + clipped * float(strength)
     return out
 
 
@@ -276,7 +284,9 @@ def _blend_bass_smoothing(base: np.ndarray, more: np.ndarray, bass_mask: np.ndar
     out = np.asarray(base, dtype=float).copy()
     w_eff = np.zeros_like(weights, dtype=float)
     w_eff[bass_mask] = np.asarray(weights[bass_mask], dtype=float)
-    out[bass_mask] = (out[bass_mask] * (1.0 - w_eff[bass_mask])) + (np.asarray(more, dtype=float)[bass_mask] * w_eff[bass_mask])
+    out[bass_mask] = (out[bass_mask] * (1.0 - w_eff[bass_mask])) + (
+        np.asarray(more, dtype=float)[bass_mask] * w_eff[bass_mask]
+    )
     return out
 
 
@@ -352,9 +362,9 @@ def _apply_smoothing(
             _set_bass_adaptive_smoothing_state(
                 st,
                 enabled=True,
-                avg_w_20_200=float(np.mean(w_eff[(f >= 20.0) & (f <= 200.0)]))
-                if np.any((f >= 20.0) & (f <= 200.0))
-                else 0.0,
+                avg_w_20_200=(
+                    float(np.mean(w_eff[(f >= 20.0) & (f <= 200.0)])) if np.any((f >= 20.0) & (f <= 200.0)) else 0.0
+                ),
                 sigma_scale=sigma_scale,
                 conf_floor=conf_floor,
                 w_gamma=w_gamma,
@@ -491,18 +501,23 @@ def _apply_confidence_adaptive_bass_smoothing(
                     "bass_adaptive_smoothing_delta_max_hz_20_200": float(d_hz) if d_hz is not None else None,
                     "bass_adaptive_smoothing_delta_rms_db_20_200_stage_local": float(d_rms),
                     "bass_adaptive_smoothing_delta_max_db_20_200_stage_local": float(d_max),
-                    "bass_adaptive_smoothing_delta_max_hz_20_200_stage_local": float(d_hz) if d_hz is not None else None,
+                    "bass_adaptive_smoothing_delta_max_hz_20_200_stage_local": (
+                        float(d_hz) if d_hz is not None else None
+                    ),
                     "bass_adaptive_smoothing_sigma_bins": float(sigma_bins),
                     f"bass_adaptive_smoothing_{stage_key}_enabled": True,
                     f"bass_adaptive_smoothing_{stage_key}_avg_w_20_200": float(w_avg),
                     f"bass_adaptive_smoothing_{stage_key}_delta_rms_db_20_200": float(d_rms),
                     f"bass_adaptive_smoothing_{stage_key}_delta_max_db_20_200": float(d_max),
-                    f"bass_adaptive_smoothing_{stage_key}_delta_max_hz_20_200": float(d_hz) if d_hz is not None else None,
+                    f"bass_adaptive_smoothing_{stage_key}_delta_max_hz_20_200": (
+                        float(d_hz) if d_hz is not None else None
+                    ),
                 },
             )
     except (TypeError, ValueError):
         pass
     return out
+
 
 def _select_bass_adaptive_conf_mask(
     conf_mask: np.ndarray | None,
@@ -825,6 +840,7 @@ def _apply_mid_refit_pre_slope(
         logger=logger,
     )
 
+
 def _apply_bass_boost_post_restore(
     gain_db: np.ndarray,
     target_db: np.ndarray,
@@ -846,6 +862,7 @@ def _apply_bass_boost_post_restore(
         hz_hi=hz_hi,
         strength=strength,
     )
+
 
 def _apply_confpull_post_slope(
     gain_db_in: np.ndarray,
@@ -871,6 +888,7 @@ def _apply_confpull_post_slope(
         apply_confidence_weighted_target_pull=apply_confidence_weighted_target_pull,
     )
 
+
 def _apply_post_limits_and_metrics(inputs: _MagPostProcessInputs) -> _MagPostProcessOutputs:
     return _apply_post_limits_and_metrics_impl(
         inputs,
@@ -879,13 +897,13 @@ def _apply_post_limits_and_metrics(inputs: _MagPostProcessInputs) -> _MagPostPro
 
 
 __all__ = [
-    '_apply_peak_priority_error_shaping',
-    '_apply_smoothing',
-    '_apply_confidence_adaptive_bass_smoothing',
-    '_select_bass_adaptive_conf_mask',
-    '_apply_mid_refit_pre_slope',
-    '_apply_bass_boost_post_restore',
-    '_apply_confpull_post_slope',
-    '_apply_post_limits_and_metrics',
-    '_apply_hard_boost_cut_clamp',
+    "_apply_peak_priority_error_shaping",
+    "_apply_smoothing",
+    "_apply_confidence_adaptive_bass_smoothing",
+    "_select_bass_adaptive_conf_mask",
+    "_apply_mid_refit_pre_slope",
+    "_apply_bass_boost_post_restore",
+    "_apply_confpull_post_slope",
+    "_apply_post_limits_and_metrics",
+    "_apply_hard_boost_cut_clamp",
 ]

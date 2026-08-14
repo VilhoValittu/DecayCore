@@ -191,9 +191,7 @@ def _apply_config_migrations(saved: dict) -> None:
 
 def _normalize_saved_filter_type(saved: dict, default_conf: dict) -> None:
     try:
-        saved["filter_type"] = _normalize_filter_type(
-            saved.get("filter_type", default_conf.get("filter_type"))
-        )
+        saved["filter_type"] = _normalize_filter_type(saved.get("filter_type", default_conf.get("filter_type")))
     except _RECOVERABLE_CONFIG_EXCEPTIONS:
         saved["filter_type"] = str(default_conf.get("filter_type", "Asymmetric"))
 
@@ -277,7 +275,9 @@ def load_config_snapshot() -> AppConfigSnapshot:
     default_conf["layout"] = normalize_layout_value(default_conf.get("layout", LAYOUT_MONO))
     default_conf["lvl_mode"] = normalize_lvl_mode_value(default_conf.get("lvl_mode", LVL_MODE_AUTO))
     default_conf["lvl_algo"] = normalize_lvl_algo_value(default_conf.get("lvl_algo", LVL_ALGO_MEDIAN))
-    default_conf["output_tilt_source"] = normalize_output_tilt_source_value(default_conf.get("output_tilt_source", "off"))
+    default_conf["output_tilt_source"] = normalize_output_tilt_source_value(
+        default_conf.get("output_tilt_source", "off")
+    )
 
     return app_config_snapshot(default_conf)
 
@@ -292,20 +292,19 @@ def save_config_snapshot(snapshot: AppConfigSnapshot) -> None:
         saved_existing = _load_saved_config_dict()
         if "ui_theme_dark" not in clean_data and "ui_theme_dark" in saved_existing:
             clean_data["ui_theme_dark"] = bool(saved_existing["ui_theme_dark"])
-        clean_data["filter_type"] = _normalize_filter_type(
-            clean_data.get("filter_type", "Asymmetric")
-        )
+        clean_data["filter_type"] = _normalize_filter_type(clean_data.get("filter_type", "Asymmetric"))
         _normalize_saved_choice_fields(clean_data, _make_default_config())
         clean_data["layout"] = normalize_layout_value(clean_data.get("layout", LAYOUT_MONO))
         clean_data["lvl_mode"] = normalize_lvl_mode_value(clean_data.get("lvl_mode", LVL_MODE_AUTO))
         clean_data["lvl_algo"] = normalize_lvl_algo_value(clean_data.get("lvl_algo", LVL_ALGO_MEDIAN))
-        clean_data["output_tilt_source"] = normalize_output_tilt_source_value(clean_data.get("output_tilt_source", "off"))
+        clean_data["output_tilt_source"] = normalize_output_tilt_source_value(
+            clean_data.get("output_tilt_source", "off")
+        )
         config_path = Path(CONFIG_FILE)
         config_path.parent.mkdir(parents=True, exist_ok=True)
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(clean_data, f, indent=4)
     except (
-
         AttributeError,
         TypeError,
         ValueError,

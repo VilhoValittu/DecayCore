@@ -190,9 +190,7 @@ def _phase_bulk_delay_ms(freqs: np.ndarray, spec: np.ndarray) -> float:
     denominator = float(np.dot(x_centered, x_centered))
     if denominator <= 1e-12:
         return 0.0
-    slope_rad_per_hz = float(
-        np.dot(x_centered, y - float(np.mean(y))) / denominator
-    )
+    slope_rad_per_hz = float(np.dot(x_centered, y - float(np.mean(y))) / denominator)
     delay_ms = -slope_rad_per_hz * 1000.0 / (2.0 * np.pi)
     return float(delay_ms) if np.isfinite(delay_ms) else 0.0
 
@@ -205,9 +203,7 @@ def _system_phase_for_display(freqs: np.ndarray, spec: np.ndarray) -> np.ndarray
         return np.zeros_like(f)
 
     delay_ms = _phase_bulk_delay_ms(f, response)
-    delay_normalized = response * np.exp(
-        1j * 2.0 * np.pi * f * (delay_ms / 1000.0)
-    )
+    delay_normalized = response * np.exp(1j * 2.0 * np.pi * f * (delay_ms / 1000.0))
     phase_unwrapped_deg = np.rad2deg(np.unwrap(np.angle(delay_normalized)))
     zeros = np.zeros_like(f)
     _, phase_low = apply_smoothing_std(
@@ -248,13 +244,7 @@ def _align_system_phase_pair_for_display(
         & (f <= float(phase_max_hz))
     )
     if int(np.count_nonzero(ref)) < 8:
-        ref = (
-            np.isfinite(f)
-            & np.isfinite(before)
-            & np.isfinite(after)
-            & (f >= 20.0)
-            & (f <= float(phase_max_hz))
-        )
+        ref = np.isfinite(f) & np.isfinite(before) & np.isfinite(after) & (f >= 20.0) & (f <= float(phase_max_hz))
     if not np.any(ref):
         return before, after
     before_ref = float(np.median(before[ref]))
@@ -314,13 +304,8 @@ def _filter_impulse_near_peak(
     else:
         normalized = np.zeros_like(finite_impulse)
 
-    time_ms = (
-        np.arange(finite_impulse.size, dtype=float) - float(peak_index)
-    ) * 1000.0 / float(fs_hz)
-    focus_mask = (
-        (time_ms >= FILTER_IMPULSE_VIEW_RANGE_MS[0])
-        & (time_ms <= FILTER_IMPULSE_VIEW_RANGE_MS[1])
-    )
+    time_ms = (np.arange(finite_impulse.size, dtype=float) - float(peak_index)) * 1000.0 / float(fs_hz)
+    focus_mask = (time_ms >= FILTER_IMPULSE_VIEW_RANGE_MS[0]) & (time_ms <= FILTER_IMPULSE_VIEW_RANGE_MS[1])
     return time_ms[focus_mask], normalized[focus_mask]
 
 
@@ -537,9 +522,7 @@ def compute_channel_plot_data(
     elif np.isfinite(auto_global_gain_db):
         level_compensation_db = -auto_global_gain_db
 
-    orig_phase_unwrapped_deg = np.rad2deg(
-        np.unwrap(np.deg2rad(np.asarray(orig_phases, dtype=float)))
-    )
+    orig_phase_unwrapped_deg = np.rad2deg(np.unwrap(np.deg2rad(np.asarray(orig_phases, dtype=float))))
     phase_interp = np.interp(f_lin, orig_freqs, orig_phase_unwrapped_deg)
     hybrid_iir_biquads = stats.get("hybrid_iir_biquads", [])
     h_iir, hybrid_iir_cuts = _build_hybrid_iir_plot_cuts(
@@ -548,14 +531,10 @@ def compute_channel_plot_data(
         float(fs),
         enabled=bool(stats.get("hybrid_iir_enabled", bool(hybrid_iir_biquads))),
     )
-    measured_spec = 10 ** (np.asarray(measured_smoothed, dtype=float) / 20.0) * np.exp(
-        1j * np.deg2rad(phase_interp)
-    )
+    measured_spec = 10 ** (np.asarray(measured_smoothed, dtype=float) / 20.0) * np.exp(1j * np.deg2rad(phase_interp))
     total_spec = measured_spec * h_filt * h_iir
     measurement_delay_ms = _phase_bulk_delay_ms(f_lin, measured_spec)
-    measurement_timing_spec = measured_spec * np.exp(
-        1j * 2.0 * np.pi * f_lin * (measurement_delay_ms / 1000.0)
-    )
+    measurement_timing_spec = measured_spec * np.exp(1j * 2.0 * np.pi * f_lin * (measurement_delay_ms / 1000.0))
     corrected_timing_spec = measurement_timing_spec * h_filt_display * h_iir
 
     if direct_pred_export is not None:
@@ -578,13 +557,11 @@ def compute_channel_plot_data(
     gd_smoothed = smooth_complex(f_lin, h_filt_display, GD_SMOOTH_OCT)
     filter_group_delay_ms = calculate_clean_gd(f_lin, gd_smoothed)
     phase_display_max_hz = _phase_display_max_hz(stats, float(fs))
-    system_phase_before_deg, system_phase_after_deg = (
-        _align_system_phase_pair_for_display(
-            f_lin,
-            _system_phase_for_display(f_lin, measurement_timing_spec),
-            _system_phase_for_display(f_lin, corrected_timing_spec),
-            phase_max_hz=phase_display_max_hz,
-        )
+    system_phase_before_deg, system_phase_after_deg = _align_system_phase_pair_for_display(
+        f_lin,
+        _system_phase_for_display(f_lin, measurement_timing_spec),
+        _system_phase_for_display(f_lin, corrected_timing_spec),
+        phase_max_hz=phase_display_max_hz,
     )
     system_before_gd_spec = smooth_complex(
         f_lin,
@@ -642,10 +619,7 @@ def compute_channel_plot_data(
     correction_min_hz = float(stats.get("mag_c_min", 0.0) or 0.0)
     correction_max_hz = float(stats.get("mag_c_max", 0.0) or 0.0)
     if confidence is not None and 0.0 < correction_min_hz < correction_max_hz:
-        confidence[
-            (display_freq_hz < correction_min_hz)
-            | (display_freq_hz > correction_max_hz)
-        ] = np.nan
+        confidence[(display_freq_hz < correction_min_hz) | (display_freq_hz > correction_max_hz)] = np.nan
 
     return ChannelPlotData(
         channel_key=str(channel_key),

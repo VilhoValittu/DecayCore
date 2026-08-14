@@ -15,6 +15,15 @@ from typing import Any, Callable
 
 from ..config.models import FilterConfig
 
+_RUN_SELECTION_KEYS = frozenset(
+    {
+        "fs",
+        "taps",
+        "multi_rate_opt",
+        "multi_rate_ultra_high_opt",
+    }
+)
+
 
 @dataclass
 class RunRequest:
@@ -155,14 +164,15 @@ def apply_auto_mode_result(
 ) -> ResolvedRunConfig:
     best_preset = dict(auto_res.get("best_preset", {}) or {})
     best_applied_preset = dict(auto_res.get("best_applied_preset", best_preset) or {})
+    effective_applied_preset = {
+        key: value for key, value in best_applied_preset.items() if key not in _RUN_SELECTION_KEYS
+    }
     next_data = copy_resolved_data(resolved.resolved_data)
     if best_applied_preset:
-        next_data.update(best_applied_preset)
+        next_data.update(effective_applied_preset)
         next_data["program_version"] = str(version)
         next_data["auto_mode_compat_version"] = str(auto_mode_compat_version)
-        search_v2_debug = dict(
-            dict(auto_res.get("auto_mode_debug", {}) or {}).get("auto_search_v2", {}) or {}
-        )
+        search_v2_debug = dict(dict(auto_res.get("auto_mode_debug", {}) or {}).get("auto_search_v2", {}) or {})
         identity_base_data = search_v2_debug.get("identity_base_data")
         if isinstance(identity_base_data, dict) and identity_base_data:
             next_data["_auto_search_identity_base_data"] = dict(identity_base_data)
@@ -178,7 +188,7 @@ def apply_auto_mode_result(
         target_rates=list(resolved.target_rates or []),
         dash_fs=int(resolved.dash_fs or 0),
         target_curve_tag=str(resolved.target_curve_tag or ""),
-        auto_applied_preset=best_applied_preset,
+        auto_applied_preset=effective_applied_preset,
         auto_result_meta=dict(auto_res or {}),
     )
 

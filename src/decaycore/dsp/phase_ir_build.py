@@ -156,7 +156,7 @@ def _apply_phase_ir_pre_window_alignment(
     anchor_mode = _resolve_ir_anchor_mode(cfg)
     requested_win_mode, win_mode, is_min_filter = _resolve_ir_window_mode(cfg, logger=logger)
     left_ms = _ms_value(cfg, "ir_window_ms_left", "ir_window_left", 0.0)
-    want_left_anchor = (str(requested_win_mode or "").strip().lower() == "rew_asym")
+    want_left_anchor = str(requested_win_mode or "").strip().lower() == "rew_asym"
     impulse = _select_phase_ir_impulse(
         raw_imp,
         cfg,
@@ -465,9 +465,9 @@ def build_phase_and_ir(
         mixed_split_hz = float(static["mixed_split_hz"])
         mixed_transition_hz = float(static["mixed_transition_hz"])
     else:
-        total_mag = 10**(final_gain_total / 20.0)
+        total_mag = 10 ** (final_gain_total / 20.0)
         min_p = calculate_minimum_phase(total_mag, max_phase_deg=None)
-        is_mixed = ("Mixed" in cfg.filter_type_str)
+        is_mixed = "Mixed" in cfg.filter_type_str
         mixed_split_hz = float(
             np.clip(
                 float(getattr(cfg, "mixed_split_freq", 300.0) or 300.0),
@@ -475,9 +475,7 @@ def build_phase_and_ir(
                 float(cfg.fs) * 0.49,
             )
         )
-        mixed_transition_hz = float(
-            getattr(cfg, "trans_width", mixed_split_hz) or mixed_split_hz
-        )
+        mixed_transition_hz = float(getattr(cfg, "trans_width", mixed_split_hz) or mixed_split_hz)
         if not np.isfinite(mixed_transition_hz) or mixed_transition_hz < 0.0:
             mixed_transition_hz = mixed_split_hz
         raw_u, ref_u = _unwrap_phases(p_rad_interp, theo_xo)

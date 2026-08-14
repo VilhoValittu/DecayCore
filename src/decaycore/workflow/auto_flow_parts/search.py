@@ -32,7 +32,6 @@ from ...auto_mode.api import (
 from ...auto_mode.rank_score import attach_official_rank_score, official_rank_score
 from ...application.run_contracts import RunContext, apply_auto_mode_result
 from ...features import PACKAGED_AUTO_ENGINE_POLICY_VERSION
-from ...common.filter_lengths import scale_taps_with_fs
 from ..bridge_types import ProcessRunCallbacks
 
 from .progress import (
@@ -43,6 +42,7 @@ from .status_text import (
     _build_auto_finalize_status,
     _build_auto_selected_text,
 )
+from .search_reference import resolve_auto_search_reference
 
 if typing.TYPE_CHECKING:
     from ..process_run_support import ProcessRunSupport
@@ -93,11 +93,13 @@ def _auto_mode_apply_best_preset(
     if best_applied_preset:
         try:
             from ...auto_mode.filter_priors import update_auto_mode_filter_priors_from_winner
+
             update_auto_mode_filter_priors_from_winner(
                 data.get("filter_type"),
                 best_preset,
                 data,
                 measurements=measurements,
+                measurement_sig=(str(data.get("_adaptive_curve_prior_measurement_sig", "") or "") or None),
             )
         except (
             AttributeError,
@@ -128,7 +130,9 @@ def _auto_mode_apply_best_preset(
     )
     best_auto_exc_hz = float(exc_seed_hz) if np.isfinite(exc_seed_hz) else float(reported_best_auto_exc_hz)
     if np.isfinite(best_auto_exc_hz):
-        best_auto_exc_hz = float(np.clip(float(best_auto_exc_hz), float(AUTO_MODE_EXC_MIN_HZ), float(AUTO_MODE_EXC_MAX_HZ)))
+        best_auto_exc_hz = float(
+            np.clip(float(best_auto_exc_hz), float(AUTO_MODE_EXC_MIN_HZ), float(AUTO_MODE_EXC_MAX_HZ))
+        )
         data["exc_freq"] = float(round(best_auto_exc_hz, 1))
         data["_auto_exc_freq_hz"] = float(round(best_auto_exc_hz, 1))
         if np.isfinite(exc_seed_hz):
@@ -253,6 +257,7 @@ def _auto_mode_store_search_meta(
         f"event_sev={_auto_safe_float(best_metrics.get('events_severity'), 0.0):.2f}"
     )
 
+
 def _run_auto_mode_search_if_needed(
     ctx: RunContext,
     *,
@@ -279,11 +284,11 @@ def _run_auto_mode_search_if_needed(
 
     try:
         data["comparison_mode"] = True
-        auto_search_fs = int(target_rates[0]) if target_rates else int(data.get("fs", 44100) or 44100)
-        if bool(data.get("multi_rate_opt", False)):
-            auto_search_taps = int(scale_taps_with_fs(auto_search_fs, base_taps=taps_base))
-        else:
-            auto_search_taps = int(taps_base)
+        auto_search_fs, auto_search_taps = resolve_auto_search_reference(
+            data=data,
+            target_rates=target_rates,
+            taps_base=taps_base,
+        )
         _set_auto_progress(ctx, support=support, value=_AUTO_PROGRESS_PRESET_SEARCH_START)
         f6_hz = _auto_safe_float(
             data.get("_auto_mag_c_min_hz", data.get("mag_c_min", float("nan"))),
@@ -291,7 +296,12 @@ def _run_auto_mode_search_if_needed(
         )
         f6_txt = f", -6 dB point {f6_hz:.1f} Hz" if np.isfinite(f6_hz) else ""
         phase2_hint = int(AUTO_MODE_REFINE_TRIALS)
-        if bool(AUTO_MODE_LOCAL_REFINE_ENABLED) and str(auto_goal) in ("balanced", "room-safe", "low-ripple", "subwoofers"):
+        if bool(AUTO_MODE_LOCAL_REFINE_ENABLED) and str(auto_goal) in (
+            "balanced",
+            "room-safe",
+            "low-ripple",
+            "subwoofers",
+        ):
             phase2_hint = int(AUTO_MODE_LOCAL_REFINE_TOP_K * AUTO_MODE_LOCAL_REFINE_TRIALS_PER_TOP)
         n_trials_v = max(1, int(data.get("auto_mode_trials") or AUTO_MODE_TRIALS))
         auto_status(
@@ -313,13 +323,15 @@ def _run_auto_mode_search_if_needed(
             n_trials=n_trials_v,
         )
         if isinstance(auto_res, dict):
-            data, measurements, best_preset, best_metrics, winner_meta, optimizer_backend = _auto_mode_apply_best_preset(
-                ctx,
-                data=data,
-                measurements=measurements,
-                auto_res=auto_res,
-                auto_goal=auto_goal,
-                support=support,
+            data, measurements, best_preset, best_metrics, winner_meta, optimizer_backend = (
+                _auto_mode_apply_best_preset(
+                    ctx,
+                    data=data,
+                    measurements=measurements,
+                    auto_res=auto_res,
+                    auto_goal=auto_goal,
+                    support=support,
+                )
             )
             _auto_mode_store_search_meta(
                 auto_res=auto_res,
@@ -338,7 +350,6 @@ def _run_auto_mode_search_if_needed(
             logger.warning("Automatic mode could not produce a valid best preset; using current settings.")
         _set_auto_progress(ctx, support=support, value=_AUTO_PROGRESS_FINALIZE)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -356,6 +367,6 @@ def _run_auto_mode_search_if_needed(
 
 
 __all__ = [
-    '_run_auto_mode_search_if_needed',
-    '_run_auto_mode_search',
+    "_run_auto_mode_search_if_needed",
+    "_run_auto_mode_search",
 ]

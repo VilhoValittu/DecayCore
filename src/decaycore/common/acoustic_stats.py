@@ -17,7 +17,6 @@ def _clamp(x: float, lo: float, hi: float) -> float:
     try:
         return float(max(lo, min(hi, float(x))))
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -32,7 +31,9 @@ def _clamp(x: float, lo: float, hi: float) -> float:
         return float(lo)
 
 
-def calc_acoustic_score(conf_pct: float, match_pct: float, rt60_s: float | None = None, rt60_rel: float | None = None) -> float:
+def calc_acoustic_score(
+    conf_pct: float, match_pct: float, rt60_s: float | None = None, rt60_rel: float | None = None
+) -> float:
     conf = _clamp(conf_pct, 0.0, 100.0)
     match = _clamp(match_pct, 0.0, 100.0)
 
@@ -51,7 +52,6 @@ def calc_acoustic_score(conf_pct: float, match_pct: float, rt60_s: float | None 
                     rt_penalty = 10.0 * _clamp((rt60 - 0.60) / 0.90, 0.0, 1.0)
                     rt_penalty_eff = rt_penalty * rel
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -75,7 +75,7 @@ def calc_ai_summary_from_stats(
     scoring_range: tuple[float, float] | None = None,
 ) -> dict:
     stats = stats or {}
-    conf = float(stats.get('cmp_avg_confidence', stats.get('avg_confidence', 0.0)) or 0.0)
+    conf = float(stats.get("cmp_avg_confidence", stats.get("avg_confidence", 0.0)) or 0.0)
     try:
         rms, match = _target_match_ssot(
             stats,
@@ -85,7 +85,6 @@ def calc_ai_summary_from_stats(
             freq_range=scoring_range,
         )
     except (
-
         AttributeError,
         TypeError,
         ValueError,

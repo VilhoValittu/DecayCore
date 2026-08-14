@@ -32,21 +32,6 @@ from ...dsp.phase_ir_metrics import format_pre_energy_status
 from ...dsp.quality_metrics import _mag_error_db, _rms
 from ...dsp.target_match import target_match_from_stats as _target_match_from_stats_ssot
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 _calc_acoustic_score = calc_acoustic_score
 
 
@@ -80,6 +65,7 @@ def format_band_rt60_summary(bands, *, picks=None):
         out.append(f"{label}:{float(rt60):.2f}s")
     return " | ".join(out) if out else "-"
 
+
 def _float_allow_zero(v, default: float) -> float:
     """Sisainen apufunktio: float allow zero."""
     if v is None:
@@ -91,6 +77,7 @@ def _float_allow_zero(v, default: float) -> float:
     except _RECOVERABLE_QUALITY_EXCEPTIONS:
         return float(default)
 
+
 def _calc_target_match(stats):
     """Sisainen apufunktio: calc target match."""
     return _target_match_from_stats_ssot(
@@ -99,6 +86,7 @@ def _calc_target_match(stats):
         use_confidence=True,
         use_smart_scan_range=True,
     )
+
 
 def calc_target_match_from_stats(stats: dict):
     """Laskee: calc target match from stats."""
@@ -371,13 +359,7 @@ def _quality_report_compute_error_bundle(
     else:
         mm_loc = np.asarray([], dtype=float)
 
-    valid = (
-        np.isfinite(f_loc)
-        & np.isfinite(m_loc)
-        & np.isfinite(t_loc)
-        & np.isfinite(g_loc)
-        & (f_loc > 0.0)
-    )
+    valid = np.isfinite(f_loc) & np.isfinite(m_loc) & np.isfinite(t_loc) & np.isfinite(g_loc) & (f_loc > 0.0)
     err = _mag_error_db(t_loc, m_loc, g_loc)
 
     rms_20_200, max_20_200, _ = _quality_report_band_stats(f_loc, err, valid, lo_hz=20.0, hi_hz=200.0)
@@ -442,18 +424,10 @@ def _quality_report_collect(st, settings, *, debug_report=False):
         "gd_abs_max_20_500_ms": _quality_report_safe_float(st.get("gd_abs_max_20_500_ms", None)),
         "gd_grad_max": _quality_report_gd_grad_max_value(st),
         "gd_grad_max_hz": _quality_report_gd_grad_max_hz(st),
-        "phase_realized_gd_before_rms_ms": _quality_report_safe_float(
-            st.get("phase_realized_gd_before_rms_ms", None)
-        ),
-        "phase_realized_gd_after_rms_ms": _quality_report_safe_float(
-            st.get("phase_realized_gd_after_rms_ms", None)
-        ),
-        "phase_realized_gd_before_p95_ms": _quality_report_safe_float(
-            st.get("phase_realized_gd_before_p95_ms", None)
-        ),
-        "phase_realized_gd_after_p95_ms": _quality_report_safe_float(
-            st.get("phase_realized_gd_after_p95_ms", None)
-        ),
+        "phase_realized_gd_before_rms_ms": _quality_report_safe_float(st.get("phase_realized_gd_before_rms_ms", None)),
+        "phase_realized_gd_after_rms_ms": _quality_report_safe_float(st.get("phase_realized_gd_after_rms_ms", None)),
+        "phase_realized_gd_before_p95_ms": _quality_report_safe_float(st.get("phase_realized_gd_before_p95_ms", None)),
+        "phase_realized_gd_after_p95_ms": _quality_report_safe_float(st.get("phase_realized_gd_after_p95_ms", None)),
         "phase_realized_gd_improvement_score": _quality_report_safe_float(
             st.get("phase_realized_gd_improvement_score", None)
         ),
@@ -463,9 +437,7 @@ def _quality_report_collect(st, settings, *, debug_report=False):
         "phase_feedback_selected": _quality_report_safe_float(
             st.get("phase_realization_feedback_selected_strength", None)
         ),
-        "phase_feedback_reason": str(
-            st.get("phase_realization_feedback_reason", "") or ""
-        ),
+        "phase_feedback_reason": str(st.get("phase_realization_feedback_reason", "") or ""),
         "phase_boundary_peak_mdb": None,
         "phase_boundary_peak_hz": None,
         "bass_adaptive_enabled": bool(st.get("bass_adaptive_smoothing_enabled", False)),
@@ -476,49 +448,99 @@ def _quality_report_collect(st, settings, *, debug_report=False):
         "bass_adaptive_w_gamma": _quality_report_safe_float(st.get("bass_adaptive_smoothing_w_gamma", None)),
         "bass_adaptive_w_max": _quality_report_safe_float(st.get("bass_adaptive_smoothing_w_max", None)),
         "bass_adaptive_avg_w": _quality_report_safe_float(st.get("bass_adaptive_smoothing_avg_w_20_200", None)),
-        "bass_adaptive_delta_rms_20_200": _quality_report_safe_float(st.get("bass_adaptive_smoothing_delta_rms_db_20_200", None)),
-        "bass_adaptive_delta_max_20_200": _quality_report_safe_float(st.get("bass_adaptive_smoothing_delta_max_db_20_200", None)),
-        "bass_adaptive_delta_max_hz_20_200": _quality_report_safe_float(st.get("bass_adaptive_smoothing_delta_max_hz_20_200", None)),
+        "bass_adaptive_delta_rms_20_200": _quality_report_safe_float(
+            st.get("bass_adaptive_smoothing_delta_rms_db_20_200", None)
+        ),
+        "bass_adaptive_delta_max_20_200": _quality_report_safe_float(
+            st.get("bass_adaptive_smoothing_delta_max_db_20_200", None)
+        ),
+        "bass_adaptive_delta_max_hz_20_200": _quality_report_safe_float(
+            st.get("bass_adaptive_smoothing_delta_max_hz_20_200", None)
+        ),
         "bass_adaptive_delta_basis": str(st.get("bass_adaptive_smoothing_delta_basis", "") or ""),
         "bass_adaptive_effectiveness_pct": None,
         "post_to_ir_delta_rms_20_200": _quality_report_safe_float(st.get("post_to_ir_delta_rms_20_200_db", None)),
         "post_to_ir_delta_max_20_200": _quality_report_safe_float(st.get("post_to_ir_delta_max_20_200_db", None)),
         "post_to_ir_delta_max_hz_20_200": _quality_report_safe_float(st.get("post_to_ir_delta_max_hz_20_200", None)),
         "post_to_ir_delta_offset_20_200": _quality_report_safe_float(st.get("post_to_ir_delta_offset_20_200_db", None)),
-        "post_to_ir_shape_delta_rms_20_200": _quality_report_safe_float(st.get("post_to_ir_shape_delta_rms_20_200_db", None)),
-        "post_to_ir_shape_delta_max_20_200": _quality_report_safe_float(st.get("post_to_ir_shape_delta_max_20_200_db", None)),
-        "post_to_ir_shape_delta_max_hz_20_200": _quality_report_safe_float(st.get("post_to_ir_shape_delta_max_hz_20_200", None)),
-        "post_to_ir_staged_delta_rms_20_200": _quality_report_safe_float(st.get("post_to_ir_staged_delta_rms_20_200_db", None)),
-        "post_to_ir_staged_delta_max_20_200": _quality_report_safe_float(st.get("post_to_ir_staged_delta_max_20_200_db", None)),
-        "post_to_ir_staged_delta_max_hz_20_200": _quality_report_safe_float(st.get("post_to_ir_staged_delta_max_hz_20_200", None)),
-        "post_to_ir_staged_delta_offset_20_200": _quality_report_safe_float(st.get("post_to_ir_staged_delta_offset_20_200_db", None)),
-        "post_to_ir_staged_shape_delta_rms_20_200": _quality_report_safe_float(st.get("post_to_ir_staged_shape_delta_rms_20_200_db", None)),
-        "post_to_ir_staged_shape_delta_max_20_200": _quality_report_safe_float(st.get("post_to_ir_staged_shape_delta_max_20_200_db", None)),
-        "post_to_ir_staged_shape_delta_max_hz_20_200": _quality_report_safe_float(st.get("post_to_ir_staged_shape_delta_max_hz_20_200", None)),
+        "post_to_ir_shape_delta_rms_20_200": _quality_report_safe_float(
+            st.get("post_to_ir_shape_delta_rms_20_200_db", None)
+        ),
+        "post_to_ir_shape_delta_max_20_200": _quality_report_safe_float(
+            st.get("post_to_ir_shape_delta_max_20_200_db", None)
+        ),
+        "post_to_ir_shape_delta_max_hz_20_200": _quality_report_safe_float(
+            st.get("post_to_ir_shape_delta_max_hz_20_200", None)
+        ),
+        "post_to_ir_staged_delta_rms_20_200": _quality_report_safe_float(
+            st.get("post_to_ir_staged_delta_rms_20_200_db", None)
+        ),
+        "post_to_ir_staged_delta_max_20_200": _quality_report_safe_float(
+            st.get("post_to_ir_staged_delta_max_20_200_db", None)
+        ),
+        "post_to_ir_staged_delta_max_hz_20_200": _quality_report_safe_float(
+            st.get("post_to_ir_staged_delta_max_hz_20_200", None)
+        ),
+        "post_to_ir_staged_delta_offset_20_200": _quality_report_safe_float(
+            st.get("post_to_ir_staged_delta_offset_20_200_db", None)
+        ),
+        "post_to_ir_staged_shape_delta_rms_20_200": _quality_report_safe_float(
+            st.get("post_to_ir_staged_shape_delta_rms_20_200_db", None)
+        ),
+        "post_to_ir_staged_shape_delta_max_20_200": _quality_report_safe_float(
+            st.get("post_to_ir_staged_shape_delta_max_20_200_db", None)
+        ),
+        "post_to_ir_staged_shape_delta_max_hz_20_200": _quality_report_safe_float(
+            st.get("post_to_ir_staged_shape_delta_max_hz_20_200", None)
+        ),
         "ir_realized_level_match_enabled": bool(st.get("ir_realized_level_match_enabled", False)),
         "ir_realized_level_match_applied": bool(st.get("ir_realized_level_match_applied", False)),
         "ir_realized_level_match_reason": str(st.get("ir_realized_level_match_reason", "") or ""),
-        "ir_realized_level_match_mid_lo_hz": _quality_report_safe_float(st.get("ir_realized_level_match_mid_lo_hz", None)),
-        "ir_realized_level_match_mid_hi_hz": _quality_report_safe_float(st.get("ir_realized_level_match_mid_hi_hz", None)),
-        "ir_realized_level_match_delta_db_raw": _quality_report_safe_float(st.get("ir_realized_level_match_delta_db_raw", None)),
-        "ir_realized_level_match_delta_db_applied": _quality_report_safe_float(st.get("ir_realized_level_match_delta_db_applied", None)),
-        "ir_realized_level_match_delta_db_after": _quality_report_safe_float(st.get("ir_realized_level_match_delta_db_after", None)),
+        "ir_realized_level_match_mid_lo_hz": _quality_report_safe_float(
+            st.get("ir_realized_level_match_mid_lo_hz", None)
+        ),
+        "ir_realized_level_match_mid_hi_hz": _quality_report_safe_float(
+            st.get("ir_realized_level_match_mid_hi_hz", None)
+        ),
+        "ir_realized_level_match_delta_db_raw": _quality_report_safe_float(
+            st.get("ir_realized_level_match_delta_db_raw", None)
+        ),
+        "ir_realized_level_match_delta_db_applied": _quality_report_safe_float(
+            st.get("ir_realized_level_match_delta_db_applied", None)
+        ),
+        "ir_realized_level_match_delta_db_after": _quality_report_safe_float(
+            st.get("ir_realized_level_match_delta_db_after", None)
+        ),
         "ir_realized_level_match_scale": _quality_report_safe_float(st.get("ir_realized_level_match_scale", None)),
         "post_to_ir_delta_rms_magc": _quality_report_safe_float(st.get("post_to_ir_delta_rms_magc_db", None)),
         "post_to_ir_delta_max_magc": _quality_report_safe_float(st.get("post_to_ir_delta_max_magc_db", None)),
         "post_to_ir_delta_max_hz_magc": _quality_report_safe_float(st.get("post_to_ir_delta_max_hz_magc", None)),
         "bass_boost_cap_enabled": bool(st.get("bass_boost_cap_enabled", False)),
-        "bass_boost_cap_avg_extra_db_20_200": _quality_report_safe_float(st.get("bass_boost_cap_avg_extra_db_20_200", None)),
-        "bass_boost_cap_max_extra_db_20_200": _quality_report_safe_float(st.get("bass_boost_cap_max_extra_db_20_200", None)),
+        "bass_boost_cap_avg_extra_db_20_200": _quality_report_safe_float(
+            st.get("bass_boost_cap_avg_extra_db_20_200", None)
+        ),
+        "bass_boost_cap_max_extra_db_20_200": _quality_report_safe_float(
+            st.get("bass_boost_cap_max_extra_db_20_200", None)
+        ),
         "bass_boost_post_restore_applied": bool(st.get("bass_boost_post_restore_applied", False)),
-        "bass_boost_post_restore_strength": _quality_report_safe_float(st.get("bass_boost_post_restore_strength", None)),
+        "bass_boost_post_restore_strength": _quality_report_safe_float(
+            st.get("bass_boost_post_restore_strength", None)
+        ),
         "bass_boost_post_restore_bins": _quality_report_safe_float(st.get("bass_boost_post_restore_bins", None)),
-        "bass_boost_post_restore_delta_rms_20_200": _quality_report_safe_float(st.get("bass_boost_post_restore_delta_rms_20_200", None)),
-        "bass_boost_post_restore_delta_max_20_200": _quality_report_safe_float(st.get("bass_boost_post_restore_delta_max_20_200", None)),
+        "bass_boost_post_restore_delta_rms_20_200": _quality_report_safe_float(
+            st.get("bass_boost_post_restore_delta_rms_20_200", None)
+        ),
+        "bass_boost_post_restore_delta_max_20_200": _quality_report_safe_float(
+            st.get("bass_boost_post_restore_delta_max_20_200", None)
+        ),
         "conf_pull_bass_boost_floor_hz": _quality_report_safe_float(st.get("conf_pull_post_bass_boost_floor_hz", None)),
-        "conf_pull_bass_boost_floor_min": _quality_report_safe_float(st.get("conf_pull_post_bass_boost_floor_min", None)),
+        "conf_pull_bass_boost_floor_min": _quality_report_safe_float(
+            st.get("conf_pull_post_bass_boost_floor_min", None)
+        ),
         "conf_pull_bass_boost_restore": _quality_report_safe_float(st.get("conf_pull_post_bass_boost_restore", None)),
-        "conf_pull_bass_boost_restore_mean_eff": _quality_report_safe_float(st.get("conf_pull_post_bass_boost_restore_mean_eff", None)),
+        "conf_pull_bass_boost_restore_mean_eff": _quality_report_safe_float(
+            st.get("conf_pull_post_bass_boost_restore_mean_eff", None)
+        ),
         "pre_ringing_db": None,
         "ir_pre_post_ratio": None,
         "pre_metric_suspect": False,
@@ -529,7 +551,9 @@ def _quality_report_collect(st, settings, *, debug_report=False):
         pre_db = _quality_report_pre_ringing_db(st)
         out["pre_ringing_db"] = pre_db
         out["ir_pre_post_ratio"] = _quality_report_pre_post_ratio(st, pre_db)
-        out["pre_metric_suspect"], out["pre_metric_note"] = _quality_report_pre_metric_info(st, debug_report=debug_report)
+        out["pre_metric_suspect"], out["pre_metric_note"] = _quality_report_pre_metric_info(
+            st, debug_report=debug_report
+        )
         return out
 
     cmin = _quality_report_safe_float(st.get("mag_c_min", settings.get("mag_c_min", 20.0)))
@@ -697,13 +721,13 @@ def format_dsp_quality_report_block(settings, l_stats, r_stats):
 
 
 __all__ = [
-    'format_band_rt60_summary',
-    '_float_allow_zero',
-    '_calc_target_match',
-    'calc_target_match_from_stats',
-    'format_dsp_quality_report_block',
-    '_clamp',
-    'calc_acoustic_score',
-    '_calc_acoustic_score',
-    'calc_ai_summary_from_stats',
+    "format_band_rt60_summary",
+    "_float_allow_zero",
+    "_calc_target_match",
+    "calc_target_match_from_stats",
+    "format_dsp_quality_report_block",
+    "_clamp",
+    "calc_acoustic_score",
+    "_calc_acoustic_score",
+    "calc_ai_summary_from_stats",
 ]

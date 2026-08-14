@@ -19,6 +19,7 @@ logger = logging.getLogger("DecayCore")
 from ...measurement.models import MeasurementRequest, MeasurementSessionAggregate
 from ..measurement_session_runner import MeasurementSessionRunner, MeasurementSessionUiState
 
+
 def _format_session_progress_percent(completed_steps: int, total_steps: int) -> str:
     total = max(0, int(total_steps))
     completed = max(0, int(completed_steps))
@@ -26,6 +27,7 @@ def _format_session_progress_percent(completed_steps: int, total_steps: int) -> 
         return "0%"
     ratio = min(1.0, max(0.0, float(completed) / float(total)))
     return f"{ratio * 100.0:.0f}%"
+
 
 def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentionally coordinates many UI callbacks
     *,
@@ -45,7 +47,6 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
         try:
             parsed = int(round(float(value)))
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -67,7 +68,6 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
         try:
             element.set_content(content)
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -83,7 +83,6 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
                 element.content = content
                 element.update()
             except (
-
                 AttributeError,
                 TypeError,
                 ValueError,
@@ -144,8 +143,7 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
         if not channel_parts:
             return "Select at least one channel."
         return "\n".join(
-            f"P{position_index}: {', '.join(channel_parts)}"
-            for position_index in range(1, position_count + 1)
+            f"P{position_index}: {', '.join(channel_parts)}" for position_index in range(1, position_count + 1)
         )
 
     def _append_log(message: str) -> None:
@@ -285,7 +283,6 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
         try:
             raw_primary = int(round(float(primary_input.value)))
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -314,7 +311,6 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
         try:
             progress_bar.set_value(progress_value)
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -330,7 +326,9 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
             progress_bar.update()
         log_label.set_text("\n".join(state.event_log[-12:]) if state.event_log else "No events yet.")
 
-        visible_counter_channels = selected_input_channels or list(state.selected_channels or []) or list(counter_labels.keys())
+        visible_counter_channels = (
+            selected_input_channels or list(state.selected_channels or []) or list(counter_labels.keys())
+        )
         for role, label in counter_labels.items():
             summary = state.channel_summaries.get(role, {"kept": 0, "total": 0})
             label.set_text(
@@ -342,7 +340,9 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
         pause_title.set_text(state.pause_title or "Continue when ready.")
         pause_help.set_text(state.pause_help)
 
-        summary_title.set_text("Measurement session complete." if not state.error_text else "Measurement session ended with an error.")
+        summary_title.set_text(
+            "Measurement session complete." if not state.error_text else "Measurement session ended with an error."
+        )
         _set_html_content(summary_html, _summary_html())
         summary_error_label.set_text(state.error_text)
         summary_error_label.set_visibility(bool(state.error_text))
@@ -357,7 +357,11 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
                 position_index = int(item.get("position_index", 0) or 0)
                 take_index = int(item.get("take_index", 0) or 0)
                 reason = str(item.get("reason", "rejected") or "rejected")
-                prefix = f"P{position_index} {_role_label(role)} take {take_index}" if position_index > 0 else f"{_role_label(role)} take {take_index}"
+                prefix = (
+                    f"P{position_index} {_role_label(role)} take {take_index}"
+                    if position_index > 0
+                    else f"{_role_label(role)} take {take_index}"
+                )
                 rejected_items.append(f"{prefix}: {reason}")
                 continue
             rejected_items.append(str(item))
@@ -380,7 +384,9 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
         state.current_take = take_index
         state.repeats_per_channel = repeats
         state.completed_steps = max(0, _capture_step_index(position_index, role, take_index) - 1)
-        state.status_text = f"Position {position_index}/{state.position_count} - {state.current_channel} - Take {take_index}/{repeats}"
+        state.status_text = (
+            f"Position {position_index}/{state.position_count} - {state.current_channel} - Take {take_index}/{repeats}"
+        )
 
     def _handle_analyzing_repeats_event(event: dict[str, Any]) -> None:
         position_index = int(event.get("position_index", 0) or 0)
@@ -391,7 +397,9 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
             state.completed_steps,
             _capture_step_index(position_index, role, int(state.repeats_per_channel or 1)),
         )
-        state.status_text = f"Position {position_index}/{state.position_count} - {_role_label(role)} - analyzing repeats"
+        state.status_text = (
+            f"Position {position_index}/{state.position_count} - {_role_label(role)} - analyzing repeats"
+        )
 
     def _handle_position_ready_event(event: dict[str, Any]) -> None:
         position_index = int(event.get("position_index", 0) or 0)
@@ -544,7 +552,6 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
                 outlier_strictness=str(strictness_select.value or "normal"),
             )
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -614,42 +621,58 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
         with setup_col:
             ui.label(t("session_guided_desc")).classes("text-sm text-gray-500")
             with ui.row().classes("w-full gap-4"):
-                position_input = ui.number(
-                    label=t("session_num_positions"),
-                    value=3,
-                    min=1,
-                    max=12,
-                    step=1,
-                    format="%.0f",
-                ).props("dense outlined").classes("flex-1")
-                repeats_input = ui.number(
-                    label=t("session_repeats"),
-                    value=5,
-                    min=1,
-                    max=12,
-                    step=1,
-                    format="%.0f",
-                ).props("dense outlined").classes("flex-1")
-                primary_input = ui.number(
-                    label=t("session_primary_position"),
-                    value=1,
-                    min=1,
-                    max=12,
-                    step=1,
-                    format="%.0f",
-                ).props("dense outlined").classes("flex-1")
+                position_input = (
+                    ui.number(
+                        label=t("session_num_positions"),
+                        value=3,
+                        min=1,
+                        max=12,
+                        step=1,
+                        format="%.0f",
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1")
+                )
+                repeats_input = (
+                    ui.number(
+                        label=t("session_repeats"),
+                        value=5,
+                        min=1,
+                        max=12,
+                        step=1,
+                        format="%.0f",
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1")
+                )
+                primary_input = (
+                    ui.number(
+                        label=t("session_primary_position"),
+                        value=1,
+                        min=1,
+                        max=12,
+                        step=1,
+                        format="%.0f",
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1")
+                )
 
             with ui.row().classes("w-full gap-4 items-center"):
                 outlier_checkbox = ui.checkbox(t("session_enable_outlier"), value=True)
-                strictness_select = ui.select(
-                    options={
-                        "safe": t("session_strictness_safe"),
-                        "normal": t("session_strictness_normal"),
-                        "strict": t("session_strictness_strict"),
-                    },
-                    value="normal",
-                    label=t("session_outlier_strictness"),
-                ).props("dense outlined").classes("w-40")
+                strictness_select = (
+                    ui.select(
+                        options={
+                            "safe": t("session_strictness_safe"),
+                            "normal": t("session_strictness_normal"),
+                            "strict": t("session_strictness_strict"),
+                        },
+                        value="normal",
+                        label=t("session_outlier_strictness"),
+                    )
+                    .props("dense outlined")
+                    .classes("w-40")
+                )
 
             with ui.row().classes("w-full gap-6 items-center"):
                 left_checkbox = ui.checkbox(t("session_measure_left"), value=True)
@@ -697,7 +720,9 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
             summary_error_label.set_visibility(False)
             summary_html = ui.html("")
             with ui.row().classes("w-full gap-3 justify-end"):
-                use_final_btn = ui.button(t("session_use_final"), on_click=_use_final_measurements).props('unelevated color="positive"')
+                use_final_btn = ui.button(t("session_use_final"), on_click=_use_final_measurements).props(
+                    'unelevated color="positive"'
+                )
                 ui.button(t("manual_close_btn"), on_click=_close_dialog).props('flat color="secondary"')
 
     for control in (
@@ -726,5 +751,4 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
     return _open_dialog
 
 
-__all__ = ['_format_session_progress_percent', 'build_measurement_session_dialog']
-
+__all__ = ["_format_session_progress_percent", "build_measurement_session_dialog"]

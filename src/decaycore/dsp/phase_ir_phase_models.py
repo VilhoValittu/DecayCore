@@ -25,7 +25,6 @@ def _cfg_value(cfg, key: str, default):
         if isinstance(cfg, dict):
             return cfg.get(key, default)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -40,7 +39,6 @@ def _cfg_value(cfg, key: str, default):
     try:
         return getattr(cfg, key, default)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -66,7 +64,6 @@ def _collect_phase_anchor_hz(cfg) -> tuple[float, ...]:
             if np.isfinite(fc) and fc > 0.0:
                 anchors.append(float(fc))
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -159,7 +156,6 @@ def phase_confidence_profile(
     try:
         conf = np.asarray(confidence_mask, dtype=float).reshape(-1)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -310,9 +306,7 @@ def unified_correction_gain(
     """
     f = np.asarray(freq_axis, dtype=float)
     phase_lim_hz = float(_cfg_value(cfg, "phase_limit", 1000.0) or 1000.0)
-    full_hz = float(
-        _cfg_value(cfg, "low_freq_full_correction_hz", _cfg_value(cfg, "mixed_split_freq", 300.0)) or 300.0
-    )
+    full_hz = float(_cfg_value(cfg, "low_freq_full_correction_hz", _cfg_value(cfg, "mixed_split_freq", 300.0)) or 300.0)
     none_hz = float(_cfg_value(cfg, "high_freq_no_correction_hz", phase_lim_hz) or phase_lim_hz)
     if phase_lim_hz > 0.0:
         none_hz = min(none_hz, phase_lim_hz)
@@ -394,7 +388,9 @@ def smooth_linear_boundary(freq_axis: np.ndarray, extra_phase: np.ndarray, phase
     if f_end <= (f_start + 1.0):
         return x
     y = scipy.ndimage.gaussian_filter1d(x, sigma=sigma_bins, mode="nearest")
-    out = (1.0 - _smoothstep01(np.clip((f - f_start) / (f_end - f_start + 1e-12), 0.0, 1.0))) * x + _smoothstep01(np.clip((f - f_start) / (f_end - f_start + 1e-12), 0.0, 1.0)) * y
+    out = (1.0 - _smoothstep01(np.clip((f - f_start) / (f_end - f_start + 1e-12), 0.0, 1.0))) * x + _smoothstep01(
+        np.clip((f - f_start) / (f_end - f_start + 1e-12), 0.0, 1.0)
+    ) * y
     try:
         if isinstance(st, dict):
             st["phase_boundary_smooth_enabled"] = True
@@ -469,7 +465,9 @@ def _phase_tail_profile(x_tail: np.ndarray, *, sigma_abs: float, cosine_strength
     return np.asarray(mono * fade, dtype=float), float(sign0)
 
 
-def _phase_tail_write_stats(st, *, f_start: float, f_lim: float, sigma_abs: float, f_start_ratio: float, cosine_strength: float) -> None:
+def _phase_tail_write_stats(
+    st, *, f_start: float, f_lim: float, sigma_abs: float, f_start_ratio: float, cosine_strength: float
+) -> None:
     try:
         if isinstance(st, dict):
             st["phase_tail_monotonic_enabled"] = True
@@ -482,7 +480,9 @@ def _phase_tail_write_stats(st, *, f_start: float, f_lim: float, sigma_abs: floa
         pass
 
 
-def enforce_linear_tail_decay(freq_axis: np.ndarray, extra_phase: np.ndarray, phase_lim_hz: float, cfg, st) -> np.ndarray:
+def enforce_linear_tail_decay(
+    freq_axis: np.ndarray, extra_phase: np.ndarray, phase_lim_hz: float, cfg, st
+) -> np.ndarray:
     f = np.asarray(freq_axis, dtype=float)
     x = np.asarray(extra_phase, dtype=float)
     if f.size < 16 or x.size != f.size:

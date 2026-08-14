@@ -240,22 +240,22 @@ def analyze_acoustic_confidence(freq_axis, complex_meas, fs):
         )
 
     raw_nodes = []
-    q_vals, _bw_hz = estimate_peak_q(
-        freq_axis[valid_idx], gd_diff[valid_idx], peaks, min_bw_ratio=0.02
-    )
+    q_vals, _bw_hz = estimate_peak_q(freq_axis[valid_idx], gd_diff[valid_idx], peaks, min_bw_ratio=0.02)
     for p, q_val in zip(peaks, q_vals):
         idx = valid_idx[p]
         f_peak = float(freq_axis[idx])
         peak_val = float(gd_diff[idx])
         q_est = round(float(q_val), 1)
 
-        raw_nodes.append({
-            "freq": round(f_peak, 1),
-            "gd_error": round(peak_val, 2),
-            "dist": round((peak_val / 1000.0 * 343.0) / 2.0, 2),
-            "q_est": q_est,
-            "type": "Resonance" if f_peak < 200.0 else "Reflection",
-        })
+        raw_nodes.append(
+            {
+                "freq": round(f_peak, 1),
+                "gd_error": round(peak_val, 2),
+                "dist": round((peak_val / 1000.0 * 343.0) / 2.0, 2),
+                "q_est": q_est,
+                "type": "Resonance" if f_peak < 200.0 else "Reflection",
+            }
+        )
 
     reflection_nodes = sorted(raw_nodes, key=lambda x: x["gd_error"], reverse=True)[:15]
     return confidence_mask, reflection_nodes, gd_ms
@@ -295,8 +295,8 @@ def calculate_rt60(impulse, fs, policy: Rt60WindowPolicy | None = None):
         if win > 1:
             edc_db = _moving_average_same(edc_db, win)
 
-        t_u = t[:stop_idx + 1]
-        d_u = edc_db[:stop_idx + 1]
+        t_u = t[: stop_idx + 1]
+        d_u = edc_db[: stop_idx + 1]
 
         candidates = []
         r = _fit_rt60_window(t_u, d_u, pol.edt_lo_db, pol.edt_hi_db, min_points=pol.min_fit_points)

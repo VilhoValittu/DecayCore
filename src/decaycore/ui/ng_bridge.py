@@ -14,6 +14,7 @@ The bridge keeps workflow/process-run code decoupled from NiceGUI widgets while
 letting the UI layer provide progress, notifications, target loading, and
 result rendering hooks.
 """
+
 from __future__ import annotations
 
 import logging
@@ -25,7 +26,6 @@ logger = logging.getLogger("DecayCore")
 
 from . import ui_state
 from ..workflow.bridge_types import ProcessRunCallbacks, ProcessRunUiBridge
-
 
 # ---------------------------------------------------------------------------
 # Progress element holder
@@ -89,12 +89,12 @@ def _default_set_progress(v: float) -> None:
 # Callbacks factory
 # ---------------------------------------------------------------------------
 
+
 def _default_make_callbacks(run_started_at: float) -> ProcessRunCallbacks:
     def _elapsed() -> float:
         try:
             return max(0.0, float(time.perf_counter() - run_started_at))
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -112,7 +112,6 @@ def _default_make_callbacks(run_started_at: float) -> ProcessRunCallbacks:
         try:
             ui_state.update_status(f"{msg} | {_elapsed():.1f} s")
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -130,7 +129,6 @@ def _default_make_callbacks(run_started_at: float) -> ProcessRunCallbacks:
         try:
             ui_state.update_auto_selected_bar(msg)
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -151,6 +149,7 @@ def _default_make_callbacks(run_started_at: float) -> ProcessRunCallbacks:
 # Lazy import to avoid loading result sections before the page is assembled.
 # ---------------------------------------------------------------------------
 
+
 def _lazy_render_results(*args: typing.Any, **kwargs: typing.Any) -> None:
     queue_render_results(*args, **kwargs)
 
@@ -158,6 +157,7 @@ def _lazy_render_results(*args: typing.Any, **kwargs: typing.Any) -> None:
 # ---------------------------------------------------------------------------
 # Bridge factory
 # ---------------------------------------------------------------------------
+
 
 def build_default_ui_bridge() -> ProcessRunUiBridge:
     from .ng_health import toast_health_gate_result  # noqa: PLC0415

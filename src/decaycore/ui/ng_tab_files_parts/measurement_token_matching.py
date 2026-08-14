@@ -12,6 +12,7 @@
 
 Replaces build_input_section() from layout_builders.py.
 """
+
 from __future__ import annotations
 
 import logging
@@ -19,23 +20,6 @@ import re
 from typing import Any
 
 logger = logging.getLogger("DecayCore")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 _MEASUREMENT_LIBRARY_EXTENSIONS = frozenset({".txt", ".wav"})
@@ -49,39 +33,15 @@ _MEASUREMENT_SLOT_UPLOAD_KEYS = {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 _SLOT_FILTER_THRESHOLD = -50.0
 _SUB_SLOT_KEYS = frozenset({"local_path_l_sub", "local_path_r_sub"})
 _SUB_FILENAME_PREFIXES = ("sub", "lfe", "sw")
+
 
 def _measurement_hint_tokens(value: Any) -> list[str]:
     try:
         text = str(value or "").strip().lower().replace("\\", "/")
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -98,11 +58,11 @@ def _measurement_hint_tokens(value: Any) -> list[str]:
         return []
     return [token for token in re.split(r"[^a-z0-9]+", text) if token]
 
+
 def _measurement_entry_mtime_ns(entry: dict[str, Any]) -> int:
     try:
         return int(entry.get("mtime_ns") or 0)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -116,19 +76,23 @@ def _measurement_entry_mtime_ns(entry: dict[str, Any]) -> int:
     ):
         return 0
 
+
 def _token_has_numeric_suffix(token: str, prefix: str) -> bool:
     if not token.startswith(prefix):
         return False
-    suffix = token[len(prefix):]
+    suffix = token[len(prefix) :]
     return bool(suffix and suffix.isdigit())
+
 
 def _token_is_leftish(token: str) -> bool:
     token_l = str(token or "").strip().lower()
     return token_l in {"left", "fl", "frontleft", "frontl", "lmain"} or _token_has_numeric_suffix(token_l, "fl")
 
+
 def _token_is_rightish(token: str) -> bool:
     token_l = str(token or "").strip().lower()
     return token_l in {"right", "fr", "frontright", "frontr", "rmain"} or _token_has_numeric_suffix(token_l, "fr")
+
 
 def _token_is_subish(token: str) -> bool:
     token_l = str(token or "").strip().lower()
@@ -139,6 +103,7 @@ def _token_is_subish(token: str) -> bool:
         or token_l.startswith("lfe")
     )
 
+
 def _token_is_sub1ish(token: str) -> bool:
     token_l = str(token or "").strip().lower()
     return (
@@ -147,6 +112,7 @@ def _token_is_sub1ish(token: str) -> bool:
         or token_l.startswith("sw1")
         or token_l.startswith("lfe1")
     )
+
 
 def _token_is_sub2ish(token: str) -> bool:
     token_l = str(token or "").strip().lower()
@@ -159,13 +125,12 @@ def _token_is_sub2ish(token: str) -> bool:
 
 
 __all__ = [
-    '_measurement_hint_tokens',
-    '_measurement_entry_mtime_ns',
-    '_token_has_numeric_suffix',
-    '_token_is_leftish',
-    '_token_is_rightish',
-    '_token_is_subish',
-    '_token_is_sub1ish',
-    '_token_is_sub2ish',
+    "_measurement_hint_tokens",
+    "_measurement_entry_mtime_ns",
+    "_token_has_numeric_suffix",
+    "_token_is_leftish",
+    "_token_is_rightish",
+    "_token_is_subish",
+    "_token_is_sub1ish",
+    "_token_is_sub2ish",
 ]
-

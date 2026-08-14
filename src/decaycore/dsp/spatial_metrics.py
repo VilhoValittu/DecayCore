@@ -35,9 +35,9 @@ import numpy as np
 class IACCResult:
     """Result of an IACC computation."""
 
-    early: float   # IACC_E — cross-correlation magnitude over early window
-    late: float    # IACC_L — cross-correlation magnitude over late window
-    all: float     # IACC_A — cross-correlation magnitude over full IR
+    early: float  # IACC_E — cross-correlation magnitude over early window
+    late: float  # IACC_L — cross-correlation magnitude over late window
+    all: float  # IACC_A — cross-correlation magnitude over full IR
     tau_ms: float  # Time-lag at peak of full-IR cross-correlation (ms)
 
 
@@ -155,7 +155,6 @@ def compute_filter_similarity_metric(
             tau_ms=float(tau_ms),
         )
     except (
-
         AttributeError,
         TypeError,
         ValueError,

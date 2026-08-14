@@ -147,8 +147,6 @@ def _has_any_measurement_source(data: dict[str, Any], *, file_key: str, path_key
     )
 
 
-
-
 def _health_bass_integration_issues(data: dict[str, Any], mode_u: str) -> list[Issue]:
     issues: list[Issue] = []
     if not has_packaged_bass_engine():
@@ -410,8 +408,6 @@ def compute_health(data: dict[str, Any], mode: str) -> HealthResult:
 
     blocked = (mode_u in ("BASIC", "AUTO")) and has_crit
     return HealthResult(overall=overall, blocked=blocked, issues=issues)
-
-
 
 
 def format_health_summary(hr: HealthResult, max_items: int = 3) -> str:

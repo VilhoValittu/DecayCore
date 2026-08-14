@@ -161,9 +161,7 @@ def _default_specs() -> list[ConfigFieldSpec]:
 
 
 def _filter_attr_for_key(key: str) -> str | None:
-    reverse = {
-        ui_key: cfg_key for cfg_key, ui_key in AUTO_MODE_DEFAULT_CFG_TO_UI.items()
-    }
+    reverse = {ui_key: cfg_key for cfg_key, ui_key in AUTO_MODE_DEFAULT_CFG_TO_UI.items()}
     return reverse.get(
         key,
         key if key in {cfg_key for cfg_key in AUTO_MODE_DEFAULT_CFG_TO_UI} else None,
@@ -171,11 +169,7 @@ def _filter_attr_for_key(key: str) -> str | None:
 
 
 def _cache_relevance_for_key(key: str) -> CacheRelevance:
-    if (
-        key.startswith("measurement_")
-        or key.startswith("local_path")
-        or key.startswith("file_")
-    ):
+    if key.startswith("measurement_") or key.startswith("local_path") or key.startswith("file_"):
         return "measurement"
     if key.startswith("auto_mode_") or key in {
         "auto_goal",
@@ -202,9 +196,7 @@ def _is_runtime_only_key(key: str) -> bool:
 
 
 FIELD_SPECS: tuple[ConfigFieldSpec, ...] = tuple(_default_specs())
-FIELD_SPECS_BY_KEY: dict[str, ConfigFieldSpec] = {
-    spec.key: spec for spec in FIELD_SPECS
-}
+FIELD_SPECS_BY_KEY: dict[str, ConfigFieldSpec] = {spec.key: spec for spec in FIELD_SPECS}
 
 MODE_DEFAULTS: dict[str, dict[str, Any]] = {
     "BASIC": dict(MODE_DEFAULTS_BASE["BASIC"]),
@@ -299,9 +291,7 @@ def _coerce_by_spec(value: Any, spec: ConfigFieldSpec) -> Any:
     return value
 
 
-def normalize_flat_config(
-    data: dict[str, Any], *, include_runtime: bool = False
-) -> dict[str, Any]:
+def normalize_flat_config(data: dict[str, Any], *, include_runtime: bool = False) -> dict[str, Any]:
     out = default_config_dict()
     if include_runtime:
         out.update(REQUEST_RUNTIME_DEFAULTS)
@@ -353,9 +343,7 @@ def _parse_legacy_choice_index(value: Any) -> int | None:
         return None
 
 
-def normalize_choice_value(
-    value: Any, *, options: tuple[Any, ...], default: Any
-) -> Any:
+def normalize_choice_value(value: Any, *, options: tuple[Any, ...], default: Any) -> Any:
     if value in options:
         return value
     try:
@@ -377,16 +365,12 @@ def normalize_choice_fields(data: dict[str, Any], default_conf: dict[str, Any]) 
         data[key] = normalize_choice_value(
             data.get(key, default_conf.get(key)),
             options=options,
-            default=default_conf.get(
-                key, FIELD_SPECS_BY_KEY.get(key, ConfigFieldSpec(key)).default
-            ),
+            default=default_conf.get(key, FIELD_SPECS_BY_KEY.get(key, ConfigFieldSpec(key)).default),
         )
 
 
 def app_config_snapshot(data: dict[str, Any] | None = None) -> AppConfigSnapshot:
-    return AppConfigSnapshot(
-        values=normalize_flat_config(data or {}, include_runtime=False)
-    )
+    return AppConfigSnapshot(values=normalize_flat_config(data or {}, include_runtime=False))
 
 
 def run_config_snapshot(data: dict[str, Any] | None = None) -> RunConfigSnapshot:

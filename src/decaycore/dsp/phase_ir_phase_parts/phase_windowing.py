@@ -31,6 +31,7 @@ from ..phase_ir_phase_models import (
     smooth_linear_boundary as _smooth_linear_boundary_impl,
 )
 
+
 @dataclass
 class _PhaseComponents:
     raw_u: np.ndarray
@@ -53,10 +54,12 @@ class _PhaseComponents:
     extra_phase: np.ndarray | None = None
     phase_mask: np.ndarray | None = None
 
+
 def _unwrap_phases(raw_phase, min_phase) -> tuple[np.ndarray, np.ndarray]:
     raw_u = np.unwrap(np.asarray(raw_phase, dtype=float))
     min_u = np.unwrap(np.asarray(min_phase, dtype=float))
     return raw_u, min_u
+
 
 def _compute_excess_phase(raw_phase, ref_phase) -> np.ndarray:
     raw = np.asarray(raw_phase, dtype=float)
@@ -67,37 +70,36 @@ def _compute_excess_phase(raw_phase, ref_phase) -> np.ndarray:
     # available to the conservative phase guards.
     return np.unwrap(np.angle(np.exp(1j * (raw - ref))))
 
+
 def _apply_mixed_excess_mask(freq_axis, excess, cfg, st) -> np.ndarray:
     return _apply_mixed_excess_mask_impl(freq_axis, excess, cfg, st)
+
 
 def _linear_excess_weight(freq_axis: np.ndarray, phase_lim_hz: float) -> np.ndarray:
     return _linear_excess_weight_impl(freq_axis, phase_lim_hz)
 
-def _smooth_linear_boundary(
-    freq_axis: np.ndarray, extra_phase: np.ndarray, phase_lim_hz: float, cfg, st
-) -> np.ndarray:
+
+def _smooth_linear_boundary(freq_axis: np.ndarray, extra_phase: np.ndarray, phase_lim_hz: float, cfg, st) -> np.ndarray:
     return _smooth_linear_boundary_impl(freq_axis, extra_phase, phase_lim_hz, cfg, st)
+
 
 def _enforce_linear_tail_decay(
     freq_axis: np.ndarray, extra_phase: np.ndarray, phase_lim_hz: float, cfg, st
 ) -> np.ndarray:
-    return _enforce_linear_tail_decay_impl(
-        freq_axis, extra_phase, phase_lim_hz, cfg, st
-    )
+    return _enforce_linear_tail_decay_impl(freq_axis, extra_phase, phase_lim_hz, cfg, st)
 
-def _linear_to_minphase_blend_mask(
-    freq_axis: np.ndarray, phase_lim_hz: float, cfg, st
-) -> np.ndarray:
+
+def _linear_to_minphase_blend_mask(freq_axis: np.ndarray, phase_lim_hz: float, cfg, st) -> np.ndarray:
     return _linear_to_minphase_blend_mask_impl(freq_axis, phase_lim_hz, cfg, st)
 
 
 __all__ = [
-    '_PhaseComponents',
-    '_unwrap_phases',
-    '_compute_excess_phase',
-    '_apply_mixed_excess_mask',
-    '_linear_excess_weight',
-    '_smooth_linear_boundary',
-    '_enforce_linear_tail_decay',
-    '_linear_to_minphase_blend_mask',
+    "_PhaseComponents",
+    "_unwrap_phases",
+    "_compute_excess_phase",
+    "_apply_mixed_excess_mask",
+    "_linear_excess_weight",
+    "_smooth_linear_boundary",
+    "_enforce_linear_tail_decay",
+    "_linear_to_minphase_blend_mask",
 ]

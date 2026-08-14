@@ -10,7 +10,6 @@
 
 import logging
 
-
 logger = logging.getLogger("DecayCore")
 
 from ..measurements_wav import (
@@ -20,12 +19,12 @@ from ..measurements_wav import (
     parse_coherent_transfer_from_wav_path,
 )
 
+
 def _clean_local_path(p) -> str:
     """Normalisoi kayttajan antaman paikallisen tiedostopolun merkkijonoksi."""
     try:
         return str(p or "").strip().strip('"').strip("'")
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -39,6 +38,7 @@ def _clean_local_path(p) -> str:
     ):
         return ""
 
+
 def _get_uploaded_file(data: dict, key: str):
     """Palauttaa upload-dictionaryn datasta tai None."""
     try:
@@ -46,7 +46,6 @@ def _get_uploaded_file(data: dict, key: str):
         if isinstance(v, dict) and v.get("content") is not None:
             return v
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -61,15 +60,16 @@ def _get_uploaded_file(data: dict, key: str):
         logger.exception("uploaded file extract")
     return None
 
+
 def _get_local_path(data: dict, key: str) -> str:
     """Palauttaa paikallisen tiedostopolun datasta tai tyhjän merkkijonon."""
     return _clean_local_path(data.get(key, ""))
+
 
 def _get_wav_window_params(data: dict) -> tuple[float, float, int]:
     try:
         pre_ms = float(data.get("ir_window_left", 85.0) or 85.0)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -85,7 +85,6 @@ def _get_wav_window_params(data: dict) -> tuple[float, float, int]:
     try:
         post_ms = float(data.get("ir_window_right", data.get("ir_window", 500.0)) or 500.0)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -101,7 +100,6 @@ def _get_wav_window_params(data: dict) -> tuple[float, float, int]:
     try:
         sl = int(data.get("smoothing_level", 0) or 0)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -116,6 +114,7 @@ def _get_wav_window_params(data: dict) -> tuple[float, float, int]:
         sl = 0
     return float(pre_ms), float(post_ms), int(sl)
 
+
 def _is_wav_upload(file_dict) -> bool:
     try:
         if not isinstance(file_dict, dict):
@@ -126,7 +125,6 @@ def _is_wav_upload(file_dict) -> bool:
         content = file_dict.get("content", None)
         return isinstance(content, (bytes, bytearray)) and len(content) >= 4 and content[:4] == b"RIFF"
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -139,6 +137,7 @@ def _is_wav_upload(file_dict) -> bool:
         NameError,
     ):
         return False
+
 
 def _load_coherent_transfer_slot(
     data: dict,
@@ -186,6 +185,7 @@ def _load_coherent_transfer_slot(
 
     return None
 
+
 def _detect_coherent_slot_anchor_sample(
     data: dict,
     *,
@@ -207,6 +207,7 @@ def _detect_coherent_slot_anchor_sample(
         return detect_coherent_anchor_sample_from_wav_path(lp, logger=logger)
 
     return None
+
 
 def _detect_shared_coherent_anchor_sample(data: dict, *, logger=None) -> int | None:
     peaks = []
@@ -234,7 +235,6 @@ def _detect_shared_coherent_anchor_sample(data: dict, *, logger=None) -> int | N
             spread = int(max(peaks) - min(peaks))
             logger.info(f"Bass Integration shared WAV anchor sample: {shared_anchor} (spread {spread} samples)")
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -251,13 +251,12 @@ def _detect_shared_coherent_anchor_sample(data: dict, *, logger=None) -> int | N
 
 
 __all__ = [
-    '_clean_local_path',
-    '_get_uploaded_file',
-    '_get_local_path',
-    '_get_wav_window_params',
-    '_is_wav_upload',
-    '_load_coherent_transfer_slot',
-    '_detect_coherent_slot_anchor_sample',
-    '_detect_shared_coherent_anchor_sample',
+    "_clean_local_path",
+    "_get_uploaded_file",
+    "_get_local_path",
+    "_get_wav_window_params",
+    "_is_wav_upload",
+    "_load_coherent_transfer_slot",
+    "_detect_coherent_slot_anchor_sample",
+    "_detect_shared_coherent_anchor_sample",
 ]
-

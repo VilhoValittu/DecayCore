@@ -59,7 +59,7 @@ def calculate_minimum_phase(mags_lin_fft, max_phase_deg=45.0, oversample=4):
     fold = np.zeros(n_os, dtype=float)
     fold[0] = 1.0
     fold[n_os // 2] = 1.0
-    fold[1:n_os // 2] = 2.0
+    fold[1 : n_os // 2] = 2.0
     min_log_spec = np.fft.rfft(cepstrum * fold, n=n_os)
 
     min_phase_rad = np.interp(x_orig, x_dense, np.imag(min_log_spec))
@@ -109,6 +109,7 @@ def _shift_zeropad(x: np.ndarray, shift: int) -> np.ndarray:
         y[:-s] = x[s:]
     return y
 
+
 def _raised_cosine_lp(freqs: np.ndarray, f0: float, f1: float) -> np.ndarray:
     """Muodostaa raised-cosine -alipaasopainon valille [f0, f1].
 
@@ -121,6 +122,7 @@ def _raised_cosine_lp(freqs: np.ndarray, f0: float, f1: float) -> np.ndarray:
         x = (freqs[mid] - f0) / (f1 - f0)
         w[mid] = 0.5 * (1.0 + np.cos(np.pi * x))
     return w
+
 
 def combine_mixed_phase(ir_lin, ir_min, fs, split_freq=120.0, transition_hz=60.0):
     """Combine linear-phase and minimum-phase IRs using EXCESS-phase blending.
@@ -192,7 +194,6 @@ def combine_mixed_phase(ir_lin, ir_min, fs, split_freq=120.0, transition_hz=60.0
     H = mag * np.exp(1j * phi)
     ir = np.fft.irfft(H, n=n)
     return ir
-
 
 
 def remove_time_of_flight(freq_axis, phase_rad):

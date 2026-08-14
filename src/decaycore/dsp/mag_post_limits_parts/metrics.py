@@ -19,6 +19,7 @@ from ..mag_telemetry import (
     _band_error_rms,
 )
 
+
 def _store_realized_pre_ir_metrics(
     *,
     st,
@@ -105,5 +106,4 @@ def _store_realized_pre_ir_metrics(
         pass
 
 
-__all__ = ['_store_realized_pre_ir_metrics']
-
+__all__ = ["_store_realized_pre_ir_metrics"]

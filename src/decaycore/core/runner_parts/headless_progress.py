@@ -29,61 +29,6 @@ from .headless_values import (
 logger = logging.getLogger("DecayCore")
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 @dataclass
 class ProgressSink:
     messages: list[str] = field(default_factory=list)
@@ -107,7 +52,6 @@ class ProgressSink:
         try:
             self.progress_value = float(np.clip(float(value), 0.0, 1.0))
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -123,8 +67,10 @@ class ProgressSink:
         if msg:
             self.info(msg)
 
+
 class ConsoleProgressSink(ProgressSink):
     pass
+
 
 class _HeadlessCallbacks:
     def __init__(self, sink: ProgressSink, started_at: float) -> None:
@@ -138,6 +84,7 @@ class _HeadlessCallbacks:
     def set_auto_selected_bar(self, msg: Any = "") -> None:
         if str(msg or "").strip():
             self._sink.info(str(msg))
+
 
 class _HeadlessBridge:
     def __init__(self, output_dir: Path, sink: ProgressSink, *, no_plots: bool = True) -> None:
@@ -156,7 +103,6 @@ class _HeadlessBridge:
         try:
             blocked = bool(getattr(hr, "blocked", False) or getattr(hr, "should_block", False))
         except (
-
             AttributeError,
             TypeError,
             ValueError,
@@ -189,8 +135,10 @@ class _HeadlessBridge:
     def make_callbacks(self, run_started_at: float) -> _HeadlessCallbacks:
         return _HeadlessCallbacks(self.sink, run_started_at)
 
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
 
 def _git_commit() -> str | None:
     try:
@@ -206,7 +154,6 @@ def _git_commit() -> str | None:
             out = proc.stdout.strip()
             return out or None
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -221,13 +168,14 @@ def _git_commit() -> str | None:
         return None
     return None
 
+
 __all__ = [
-    'ProgressSink',
-    'ConsoleProgressSink',
-    '_HeadlessCallbacks',
-    '_HeadlessBridge',
-    '_utc_now',
-    '_git_commit',
-    '_safe_filename_token',
-    '_headless_winner_rank_score',
+    "ProgressSink",
+    "ConsoleProgressSink",
+    "_HeadlessCallbacks",
+    "_HeadlessBridge",
+    "_utc_now",
+    "_git_commit",
+    "_safe_filename_token",
+    "_headless_winner_rank_score",
 ]

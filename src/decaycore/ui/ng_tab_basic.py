@@ -12,6 +12,7 @@
 
 Replaces build_filter_section() from layout_builders.py.
 """
+
 from __future__ import annotations
 
 from typing import Any, Callable
@@ -49,7 +50,7 @@ def _auto_target_mode_options(*, t: Callable, auto_goal) -> dict[str, str]:
     if _auto_goal_is_prefer_bass(auto_goal):
         return selected_option
     return {
-        "auto":     t("auto_target_mode_auto"),
+        "auto": t("auto_target_mode_auto"),
         "adaptive": t("auto_target_mode_adaptive"),
         **selected_option,
     }
@@ -115,7 +116,9 @@ def build_basic_tab(*, t: Callable, get_val: Callable, files_tab_context: Any | 
                         options=_mode_options(t=t, auto_engine_available=auto_engine_available),
                         value=mode_value,
                         label=t("mode_label"),
-                    ).props("dense outlined").classes("flex-1"),
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1"),
                 )
                 ui.button(
                     t("mode_apply_defaults_btn"),
@@ -138,15 +141,17 @@ def build_basic_tab(*, t: Callable, get_val: Callable, files_tab_context: Any | 
                         "auto_goal",
                         ui.select(
                             options={
-                                "balanced":   t("auto_goal_balanced"),
-                                "room-safe":  t("auto_goal_room_safe"),
+                                "balanced": t("auto_goal_balanced"),
+                                "room-safe": t("auto_goal_room_safe"),
                                 "subwoofers": t("auto_goal_subwoofers"),
                                 "low-ripple": t("auto_goal_low_ripple"),
-                                "flat":       t("auto_goal_flat"),
+                                "flat": t("auto_goal_flat"),
                             },
                             value=auto_goal_value,
                             label=t("auto_goal_label"),
-                        ).props("dense outlined").classes("w-full"),
+                        )
+                        .props("dense outlined")
+                        .classes("w-full"),
                     )
                     ctrl.register(
                         "auto_target_mode",
@@ -154,7 +159,9 @@ def build_basic_tab(*, t: Callable, get_val: Callable, files_tab_context: Any | 
                             options=_auto_target_mode_options(t=t, auto_goal=auto_goal_value),
                             value=auto_target_mode_value,
                             label=t("auto_target_mode_label"),
-                        ).props("dense outlined").classes("w-full"),
+                        )
+                        .props("dense outlined")
+                        .classes("w-full"),
                     )
                     bass_value, bass_disabled = _bass_integration_control_state(
                         get_val("bass_integration_enable", False),
@@ -212,7 +219,9 @@ def build_basic_tab(*, t: Callable, get_val: Callable, files_tab_context: Any | 
                                     label=t("stereo_auto_policy_max_hz_label"),
                                     value=float(get_val("channel_specific_policy_max_hz", 220.0) or 220.0),
                                     format="%.1f",
-                                ).props("dense outlined").classes("w-full"),
+                                )
+                                .props("dense outlined")
+                                .classes("w-full"),
                             )
                             ui.label(t("stereo_auto_policy_help")).classes("text-xs text-gray-400")
                         stereo_policy_col.set_visibility(bool(get_val("enable_channel_specific_auto_policy", False)))
@@ -232,7 +241,9 @@ def build_basic_tab(*, t: Callable, get_val: Callable, files_tab_context: Any | 
                         ftype_opts,
                         value=_normalize_filter_type_value(get_val("filter_type", "Asymmetric")),
                         label=t("filter_type"),
-                    ).props("dense outlined").classes("flex-1"),
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1"),
                 )
                 mixed_scope = ui.column().classes("flex-1")
                 ctrl.register_container("update_mixed_freq_scope", mixed_scope)
@@ -243,7 +254,9 @@ def build_basic_tab(*, t: Callable, get_val: Callable, files_tab_context: Any | 
                             label=t("mixed_split_hz_label"),
                             value=get_val("mixed_freq", 200.0),
                             format="%.1f",
-                        ).props("dense outlined").classes("w-full"),
+                        )
+                        .props("dense outlined")
+                        .classes("w-full"),
                     )
 
         with section_card(title=t("ui_fir_engine")):
@@ -254,7 +267,9 @@ def build_basic_tab(*, t: Callable, get_val: Callable, files_tab_context: Any | 
                         _FS_OPTS,
                         value=get_val("fs", 44100),
                         label=t("fs"),
-                    ).props("dense outlined").classes("flex-1"),
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1"),
                 )
                 ctrl.register(
                     "taps",
@@ -262,7 +277,9 @@ def build_basic_tab(*, t: Callable, get_val: Callable, files_tab_context: Any | 
                         _TAPS_OPTS,
                         value=get_val("taps", 65536),
                         label=t("taps"),
-                    ).props("dense outlined").classes("flex-1"),
+                    )
+                    .props("dense outlined")
+                    .classes("flex-1"),
                 )
 
             ctrl.register("engine_metrics_label", ui.label("").classes("text-xs text-gray-400"))
@@ -285,7 +302,6 @@ def _apply_mode_defaults(*, t: Callable, get_val: Callable) -> None:
 
         toast_mode_defaults_applied(mode)
     except (
-
         AttributeError,
         TypeError,
         ValueError,
@@ -298,6 +314,7 @@ def _apply_mode_defaults(*, t: Callable, get_val: Callable) -> None:
         NameError,
     ):
         import logging
+
         logging.getLogger("DecayCore").debug("_apply_mode_defaults failed", exc_info=True)
 
 
@@ -310,7 +327,6 @@ _MODE_DEFAULTS_KEY_MAP: dict[str, str] = {
     "max_slope_db_per_oct": "max_slope_db_per_oct",
     "phase_limit": "phase_limit",
     "reg_strength": "reg_strength",
-
     "bass_first_ai": "bass_first_ai",
     "stereo_link": "stereo_link",
     "stereo_link_strategy": "stereo_link_strategy",

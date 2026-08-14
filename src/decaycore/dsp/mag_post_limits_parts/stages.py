@@ -863,6 +863,3 @@ def _run_transition_fade_stage(  # noqa: C901 - transition fade keeps the band-e
         reason_codes=[REASON_TRANSITION_FADE],
     )
     return gain_db
-
-
-
