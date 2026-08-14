@@ -1,0 +1,38 @@
+name: Cleanup old Pages runs
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Delete Pages runs older than 24 hours
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cutoff="$(date -u -d '24 hours ago' '+%Y-%m-%dT%H:%M:%SZ')"
+
+          gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100" \
+            --jq ".workflow_runs[]
+              | select(
+                  .path == \"dynamic/pages/pages-build-deployment\"
+                  and .status == \"completed\"
+                  and .created_at < \"${cutoff}\"
+                )
+              | .id" |
+          while read -r run_id; do
+            echo "Deleting Pages workflow run ${run_id}"
+            gh api \
+              --method DELETE \
+              "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}"
+          done
