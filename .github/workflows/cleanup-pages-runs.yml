@@ -2,7 +2,7 @@ name: Cleanup old Pages runs
 
 on:
   schedule:
-    - cron: "17 * * * *"
+    - cron: "17 3 * * 0,4"
   workflow_dispatch:
 
 permissions:
