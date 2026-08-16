@@ -51,9 +51,6 @@ def _headless_camilladsp_yaml_name(*, data: dict | None, ft_short: str, irw_tag:
         parts.append(f"{int(fs_v)}Hz")
     parts.append(str(irw_tag))
     parts.append(_safe_filename_token((data or {}).get("program_version", VERSION), default="v0"))
-    rank = _headless_winner_rank_score(data)
-    if math.isfinite(rank):
-        parts.append(f"rank{rank:.3f}")
     return "_".join(parts) + ".yml"
 
 
@@ -248,7 +245,6 @@ def _build_headless_export_zip(
                         target_curve_tag=target_curve_tag,
                         layout=data.get("layout", "Mono"),
                         program_version=str(data.get("program_version", VERSION) or VERSION),
-                        winner_rank_score=_headless_winner_rank_score(data),
                         include_sub=include_sub,
                         sub_allpass_freq_hz=data.get("bass_integration_allpass_freq_hz"),
                         sub_allpass_q=data.get("bass_integration_allpass_q"),
@@ -282,7 +278,6 @@ def _build_headless_export_zip(
                     target_curve_tag=target_curve_tag,
                     layout=data.get("layout", "Mono"),
                     program_version=str(data.get("program_version", VERSION) or VERSION),
-                    winner_rank_score=_headless_winner_rank_score(data),
                     include_sub=include_sub_multi,
                     sub_allpass_freq_hz=data.get("bass_integration_allpass_freq_hz"),
                     sub_allpass_q=data.get("bass_integration_allpass_q"),
@@ -318,11 +313,7 @@ def _save_headless_export_bundle(
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     ver_tag = _safe_filename_token(program_version or (data or {}).get("program_version", VERSION), default="v0")
-    rank = _headless_winner_rank_score(data)
-    parts = ["DecayCore", str(ft_short), str(irw_tag), str(target_curve_tag or "").strip(), str(ver_tag)]
-    if math.isfinite(rank):
-        parts.append(f"rank{rank:.3f}")
-    parts.append(str(ts))
+    parts = ["DecayCore", str(ft_short), str(irw_tag), str(target_curve_tag or "").strip(), str(ver_tag), str(ts)]
     fname = "_".join([p for p in parts if p]) + ".zip"
     path = out_dir / fname
     path.write_bytes(zip_buffer.getvalue())
@@ -443,4 +434,5 @@ __all__ = [
     "_resolve_path",
     "_first_existing",
     "_normalize_headless_config",
+    "_headless_winner_rank_score",
 ]

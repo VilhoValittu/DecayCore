@@ -1,5 +1,5 @@
 title: DecayCore
-description: "Measure the room. Reveal the music. DecayCore is a bounded, phase-aware FIR room correction and acoustic measurement tool."
+description: "Measure speakers and rooms, create FIR correction filters, and export them for convolution playback with DecayCore."
 url: "https://vilhovalittu.github.io"
 baseurl: "/DecayCore"
 logo: "https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo.svg"
@@ -15,9 +15,9 @@ plugins:
 header_pages:
   - getting-started.md
   - measurement-workflow.md
+  - User_Manual.md
   - engineering.md
   - performance/index.md
-  - User_Manual.md
 
 defaults:
   - scope:

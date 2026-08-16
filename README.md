@@ -53,14 +53,12 @@ REW-style measurement data may also be used in compatible workflows, but DecayCo
 
 ## Documentation
 
-- [Performance report](https://vilhovalittu.github.io/DecayCore/performance/)
 - [Getting started](https://vilhovalittu.github.io/DecayCore/getting-started/)
 - [Measurement workflow](https://vilhovalittu.github.io/DecayCore/measurement-workflow/)
-- [CamillaDSP FIR room correction](https://vilhovalittu.github.io/DecayCore/camilladsp-fir-room-correction/)
-- [FIR room correction](https://vilhovalittu.github.io/DecayCore/fir-room-correction/)
-- [Minimum phase FIR filter generation](https://vilhovalittu.github.io/DecayCore/minimum-phase-fir-generator/)
-- [Mixed phase room correction](https://vilhovalittu.github.io/DecayCore/mixed-phase-room-correction/)
-- [Temporal Decay Control](https://vilhovalittu.github.io/DecayCore/temporal-decay-control/)
+- [User manual](https://vilhovalittu.github.io/DecayCore/User_Manual.html)
+- [Engineering documentation](https://vilhovalittu.github.io/DecayCore/engineering/)
+- [Performance report](https://vilhovalittu.github.io/DecayCore/performance/)
+- [Glossary](https://vilhovalittu.github.io/DecayCore/glossary/)
 - [FAQ](https://vilhovalittu.github.io/DecayCore/faq/)
 
 ## Download

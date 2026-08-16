@@ -6,6 +6,10 @@ hide_page_heading: true
 
 # DecayCore vs Conventional EQ-Based Room Correction
 
+## In brief
+
+Conventional equalization usually concentrates on magnitude. DecayCore also controls correction confidence, phase strategy, timing, and low-frequency decay while keeping every stage bounded.
+
 ## Conventional approach (typical IIR / minimum-phase EQ)
 Many room-correction workflows:
 - treat response errors mainly as magnitude EQ problems
@@ -47,11 +51,4 @@ Many room-correction workflows:
 
 DecayCore intentionally avoids aggressive inversion and prioritizes corrections that remain stable and physically plausible.
 
-### Disclaimer
-AI was used to translate this document from Finnish to English.
-
-## Summary
-DecayCore intentionally avoids aggressive inversion and prioritizes corrections that remain stable and physically plausible.
-
-- **[Get Started with DecayCore]({{ site.baseurl }}/)** – Download the FIR filter maker.
-- **[Read the FAQ]({{ site.baseurl }}/faq/)** – Common questions about convolution and REW.
+For operating guidance, see [Getting Started]({{ '/getting-started/' | relative_url }}). For the engineering rationale, see [Why DecayCore Works]({{ '/Why_DecayCore_Works.html' | relative_url }}).

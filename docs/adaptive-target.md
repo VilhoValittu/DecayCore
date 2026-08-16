@@ -7,6 +7,10 @@ permalink: /adaptive-target/
 
 Adaptive Target is one of three target strategies available in DecayCore's AUTO mode. Instead of searching through the library of built-in target curves, it synthesizes a custom target from the room's measured characteristics.
 
+## In brief
+
+Adaptive Target makes small low-frequency changes to a stable Harman6 baseline when both channels provide consistent evidence. Use the built-in target search when measurement metadata is limited.
+
 ## What it is
 
 In AUTO mode, DecayCore can determine the target curve in three ways:
@@ -50,14 +54,7 @@ When using external measurements (REW text exports, WAV impulse files from REW, 
 
 ## Related pages
 
-- [Guide: Recommended AUTO workflow](../guide/)
+- [Getting Started]({{ '/getting-started/' | relative_url }})
 - [Modes: AUTO, BASIC, ADVANCED]({{ '/Modes.html' | relative_url }})
-- [Built-in Measurement](../measurement-workflow/)
-- [Official Manual — Adaptive Target section]({{ '/Official_Manual.html' | relative_url }})
-
----
-
-[Home](../) | [GitHub](https://github.com/VilhoValittu/DecayCore) | [Releases](https://github.com/VilhoValittu/DecayCore/releases)
-
-### Disclaimer
-AI was used to translate this document from Finnish to English.
+- [Built-in Measurement]({{ '/measurement-workflow/' | relative_url }})
+- [Technical Reference — Target formation]({{ '/Official_Manual.html' | relative_url }})

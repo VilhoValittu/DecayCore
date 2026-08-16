@@ -6,51 +6,25 @@ permalink: /temporal-decay-control/
 
 Temporal Decay Control is one of DecayCore's core ideas.
 
-Traditional room correction often focuses mainly on frequency response. DecayCore also considers low-frequency decay behavior, because bass problems are often temporal problems as much as amplitude problems.
+## In brief
+
+Temporal Decay Control (TDC) reduces supported low-frequency energy that lasts too long. It complements magnitude correction; it is not another target curve or a bass-boost tool.
 
 ## Why frequency response is not enough
 
-A flat-looking frequency response does not automatically mean that bass sounds controlled.
-
-Low-frequency room modes can store energy and decay slowly. If correction only looks at amplitude, it can miss problems that are heard as slow, heavy, or uncontrolled bass.
-
-DecayCore's correction approach is designed to avoid blindly forcing the measured response into a flat line.
-
-## Low-frequency decay and room behavior
-
-In small rooms, bass behavior is strongly affected by room modes, speaker placement, listening position, and boundary interaction.
-
-Temporal Decay Control helps DecayCore treat low-frequency correction as a time-domain and energy-control problem, not only as a static EQ curve problem.
+A flat-looking response does not guarantee controlled bass. Low-frequency room modes can store energy and decay slowly, producing bass that sounds heavy or detached even after ordinary equalization.
 
 ## What Temporal Decay Control does
 
-Temporal Decay Control is designed to reduce excessive low-frequency energy in a controlled way.
+TDC uses decay evidence to form a low-frequency reduction separate from target matching. Strength, maximum reduction, slope, and frequency limits contain the result. It does not add boost or treat every response peak as a decay problem.
 
-The goal is to improve bass clarity without applying unnecessarily aggressive EQ, unrealistic boosts, or narrow correction that only looks good at the microphone.
+## When to use it
 
-## Why DecayCore handles bass differently from simple EQ
-
-Simple EQ can reduce or boost frequency bands, but it does not necessarily account for decay behavior, phase behavior, group delay, or the practical limits of correction.
-
-DecayCore combines measurement-based correction, FIR filter generation, phase-aware behavior, and safety limits so that bass correction remains more physically sane.
-
-## Recommended workflow
-
-The recommended workflow is:
-
-1. Measure the system with DecayCore's built-in measurement workflow.
-2. Generate correction filters from the measurements.
-3. Use Temporal Decay Control as part of the low-frequency correction behavior.
-4. Export convolution-ready WAV FIR filters.
-5. Load the filters into CamillaDSP or another convolution-capable DSP engine.
+Use TDC when repeatable measurements show excessive low-frequency decay. Leave it conservative when decay evidence is missing, noisy, or changes strongly with microphone position. Speaker placement, listening position, crossover work, and acoustic treatment remain better solutions for problems that correction cannot address reliably.
 
 ## Related pages
 
-- [Measurement workflow](../measurement-workflow/)
-- [FIR room correction](../fir-room-correction/)
-- [Mixed Phase Room Correction](../mixed-phase-room-correction/)
-- [CamillaDSP FIR room correction](../camilladsp-fir-room-correction/)
-
----
-
-[Home](../) · [GitHub](https://github.com/VilhoValittu/DecayCore) · [Releases](https://github.com/VilhoValittu/DecayCore/releases)
+- [Measurement workflow]({{ '/measurement-workflow/' | relative_url }})
+- [FIR room correction]({{ '/fir-room-correction/' | relative_url }})
+- [Mixed Phase Room Correction]({{ '/mixed-phase-room-correction/' | relative_url }})
+- [CamillaDSP FIR room correction]({{ '/camilladsp-fir-room-correction/' | relative_url }})

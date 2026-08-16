@@ -18,6 +18,7 @@ logger = logging.getLogger("DecayCore")
 
 from ...measurement.models import MeasurementRequest, MeasurementSessionAggregate
 from ..measurement_session_runner import MeasurementSessionRunner, MeasurementSessionUiState
+from ..ng_timers import page_timer
 
 
 def _format_session_progress_percent(completed_steps: int, total_steps: int) -> str:
@@ -746,7 +747,7 @@ def build_measurement_session_dialog(  # noqa: C901 - dialog builder intentional
         if updated:
             _render()
 
-    ui.timer(0.2, _tick)
+    page_timer(0.2, _tick)
     _render()
     return _open_dialog
 

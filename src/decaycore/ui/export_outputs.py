@@ -216,13 +216,6 @@ def _export_winner_rank_score(data: dict | None) -> float:
     return float(official_rank_score(best_metrics))
 
 
-def _export_winner_rank_tag(data: dict | None) -> str:
-    rank_score = _export_winner_rank_score(data)
-    if not (rank_score == rank_score) or abs(rank_score) == float("inf"):
-        return ""
-    return f"rank{rank_score:.3f}"
-
-
 def _camilladsp_yaml_name(
     *,
     data: dict | None,
@@ -235,9 +228,6 @@ def _camilladsp_yaml_name(
         parts.append(f"{int(fs_v)}Hz")
     parts.append(str(irw_tag))
     parts.append(_export_version_tag(data))
-    rank_tag = _export_winner_rank_tag(data)
-    if rank_tag:
-        parts.append(rank_tag)
     return "_".join(parts) + ".yml"
 
 
@@ -634,7 +624,6 @@ def _write_fs_outputs(
             target_curve_tag=target_curve_tag,
             layout=data.get("layout", "Mono"),
             program_version=str(data.get("program_version", "") or "").strip(),
-            winner_rank_score=_export_winner_rank_score(data),
             include_sub=bool(yaml_settings.get("include_sub", False)),
             sub_allpass_freq_hz=yaml_settings.get("sub_allpass_freq_hz"),
             sub_allpass_q=yaml_settings.get("sub_allpass_q"),

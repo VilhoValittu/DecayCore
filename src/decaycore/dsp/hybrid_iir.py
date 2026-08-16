@@ -18,7 +18,12 @@ import scipy.optimize
 
 from .modal_analysis_parts import RoomModeEvent
 
-HYBRID_IIR_POLICY_VERSION = 6
+HYBRID_IIR_POLICY_VERSION = 7
+
+# Vahva modaalinen naytto saa loysentaa luottamuskynnysta, mutta vain naiden
+# rajojen sisalla - kyseessa on turvallisuuden ohituspolku, ei viritysnuppi.
+_STRONG_MODAL_CUT_PRIORITY = 0.70
+_STRONG_MODAL_CONFIDENCE_FLOOR = 0.25
 
 
 @dataclass(frozen=True)
@@ -138,6 +143,9 @@ class HybridIIRResult:
     residual_extra_mag_db: np.ndarray = field(default_factory=lambda: np.asarray([], dtype=float))
     policy_version: int = HYBRID_IIR_POLICY_VERSION
     mode: str = "residual_aware_magnitude_preconditioning"
+    residual_cut_cap_source: str = "policy_max"
+    aggregate_residual_depth_db: float = 0.0
+    aggregate_trim_factor: float = 1.0
 
     def to_stats(self) -> dict[str, Any]:
         return {
@@ -147,7 +155,7 @@ class HybridIIRResult:
             "hybrid_iir_biquads": [b.to_camilladsp() for b in self.biquads],
             "hybrid_iir_rejected": [dict(item) for item in self.rejected],
             "hybrid_iir_filter_count": int(len(self.biquads)),
-            "hybrid_iir_fit_refined_count": int(sum(1 for b in self.biquads if bool(getattr(b, "fit_refined", False)))),
+            "hybrid_iir_fit_refined_count": int(sum(1 for b in self.biquads if b.fit_refined)),
             "hybrid_iir_mag_db": np.asarray(self.mag_db, dtype=float).tolist(),
             "hybrid_iir_phase_rad": np.asarray(self.phase_rad, dtype=float).tolist(),
             "hybrid_iir_transfer_mag_db": np.asarray(self.transfer_mag_db, dtype=float).tolist(),
@@ -157,6 +165,9 @@ class HybridIIRResult:
             ).tolist(),
             "hybrid_iir_transfer_filter_count": int(sum(1 for b in self.biquads if b.transfer_cut_db > 1e-6)),
             "hybrid_iir_residual_cut_count": int(sum(1 for b in self.biquads if b.residual_cut_db > 1e-6)),
+            "hybrid_iir_residual_cut_cap_source": str(self.residual_cut_cap_source),
+            "hybrid_iir_aggregate_residual_depth_db": float(self.aggregate_residual_depth_db),
+            "hybrid_iir_aggregate_trim_factor": float(self.aggregate_trim_factor),
         }
 
 
@@ -170,7 +181,14 @@ def design_hybrid_iir(
     residual_events: Sequence[RoomModeEvent] | None = None,
     fir_gain_db: np.ndarray | None = None,
     residual_cut_cap_db: np.ndarray | None = None,
+    response_freq_axis: np.ndarray | None = None,
 ) -> HybridIIRResult:
+    """Suunnittelee modaaliset peaking-leikkaukset `freq_axis`-akselilla.
+
+    `response_freq_axis` antaa kutsujalle mahdollisuuden syntetisoida
+    tulostaulukot suoraan lopulliselle akselille, jolloin samaa vastetta ei
+    lasketa kahdesti.
+    """
     policy = policy.normalized()
     freq = np.asarray(freq_axis, dtype=float).reshape(-1)
     if not policy.enabled or policy.max_filters_per_channel <= 0 or freq.size == 0:
@@ -188,6 +206,7 @@ def design_hybrid_iir(
         if fg.size == freq.size and np.all(np.isfinite(fg)):
             fir_gain = fg
     residual_cut_cap = None
+    residual_cut_cap_source = "policy_max"
     if residual_cut_cap_db is not None:
         rc = np.asarray(residual_cut_cap_db, dtype=float).reshape(-1)
         if rc.size == freq.size:
@@ -196,8 +215,13 @@ def design_hybrid_iir(
                 0.0,
                 float(policy.max_cut_db),
             )
+            residual_cut_cap_source = "provided"
         else:
+            # Konservatiivinen fallback: tuntematon auktoriteetti -> ei ylimaaraista
+            # leikkausta. Merkitaan lahde, jotta tama erottuu telemetriassa
+            # tilanteesta jossa data itse ei tue leikkausta.
             residual_cut_cap = np.zeros_like(freq, dtype=float)
+            residual_cut_cap_source = "invalid_shape_zero"
     use_residual_plan = fir_gain is not None and residual_events is not None
     if residual_plan_requested and not use_residual_plan:
         return HybridIIRResult(
@@ -207,9 +231,10 @@ def design_hybrid_iir(
 
     selected: list[HybridBiquad] = []
     rejected: list[dict[str, Any]] = []
-    for event in sorted(
+    ordered = sorted(
         tuple(events or ()), key=lambda ev: (-_event_float(ev, "cut_priority"), -_event_float(ev, "peak_db"))
-    ):
+    )
+    for position, event in enumerate(ordered):
         biquad, reason = _candidate_to_biquad(event, policy)
         if biquad is None:
             rejected.append(_rejection(event, reason))
@@ -236,13 +261,49 @@ def design_hybrid_iir(
             )
         selected.append(biquad)
         if len(selected) >= int(policy.max_filters_per_channel):
+            # Loput ehdokkaat eivat mahdu budjettiin; kirjataan ne nakyviin sen
+            # sijaan etta ne katoaisivat raportista jaljettomiin.
+            rejected.extend(_rejection(rest, "max_filters_reached") for rest in ordered[position + 1 :])
             break
 
+    selected, aggregate_depth_db, aggregate_trim_factor = _limit_aggregate_residual_cut(
+        selected,
+        freq,
+        float(fs),
+        policy,
+    )
+    response_axis = freq if response_freq_axis is None else np.asarray(response_freq_axis, dtype=float).reshape(-1)
+    return _result_with_response(
+        HybridIIRResult(
+            enabled=True,
+            biquads=tuple(selected),
+            rejected=tuple(rejected),
+            residual_cut_cap_source=residual_cut_cap_source,
+            aggregate_residual_depth_db=float(aggregate_depth_db),
+            aggregate_trim_factor=float(aggregate_trim_factor),
+        ),
+        response_axis,
+        float(fs),
+    )
+
+
+def synthesize_hybrid_response(
+    biquads: Sequence[HybridBiquad],
+    freq_axis: np.ndarray,
+    fs: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Kokoaa valittujen biquadien vasteen: (response, mag_db, transfer_mag_db, phase_rad).
+
+    `transfer_mag_db` sisaltaa vain FIR:sta siirretyn osuuden, joten
+    `mag_db - transfer_mag_db` on se lisavaimennus jonka hybridivaihe tuo
+    FIR-suunnitelman paalle. Kaikki taulukot ovat muotoa (bins,).
+    """
+    freq = np.asarray(freq_axis, dtype=float).reshape(-1)
     response = np.ones(freq.size, dtype=complex)
     transfer_response = np.ones(freq.size, dtype=complex)
-    for biquad in selected:
+    for biquad in biquads:
         response *= peaking_eq_response(freq, float(fs), biquad.freq_hz, biquad.q, biquad.gain_db)
-        if biquad.transfer_cut_db > 0.0:
+        if float(biquad.transfer_cut_db) > 0.0:
             transfer_response *= peaking_eq_response(
                 freq,
                 float(fs),
@@ -253,10 +314,14 @@ def design_hybrid_iir(
     mag_db = 20.0 * np.log10(np.maximum(np.abs(response), 1e-12))
     transfer_mag_db = 20.0 * np.log10(np.maximum(np.abs(transfer_response), 1e-12))
     phase_rad = np.unwrap(np.angle(response)) if response.size else np.asarray([], dtype=float)
-    return HybridIIRResult(
-        enabled=True,
-        biquads=tuple(selected),
-        rejected=tuple(rejected),
+    return response, mag_db, transfer_mag_db, phase_rad
+
+
+def _result_with_response(result: HybridIIRResult, freq_axis: np.ndarray, fs: float) -> HybridIIRResult:
+    """Taeyttaa tulokseen vastetaulukot annetulla taajuusakselilla."""
+    response, mag_db, transfer_mag_db, phase_rad = synthesize_hybrid_response(result.biquads, freq_axis, fs)
+    return replace(
+        result,
         response=response,
         mag_db=np.nan_to_num(mag_db, nan=0.0, posinf=0.0, neginf=0.0),
         phase_rad=np.nan_to_num(phase_rad, nan=0.0, posinf=0.0, neginf=0.0),
@@ -275,6 +340,95 @@ def design_hybrid_iir(
     )
 
 
+# Paallekkaiset moodit summautuvat: yksittainen `max_cut_db` ei riita takaamaan
+# etta hybridivaiheen tuoma *lisa*vaimennus pysyy katon alla. Trimmauskerroin
+# ratkaistaan bisektiolla, koska syvyys on monotoninen kertoimen suhteen.
+_AGGREGATE_CUT_TOLERANCE_DB = 1e-6
+_AGGREGATE_TRIM_BISECTION_STEPS = 12
+_MIN_EFFECTIVE_CUT_DB = 1e-6
+
+
+def _residual_extra_depth_db(biquads: Sequence[HybridBiquad], freq: np.ndarray, fs: float) -> float:
+    """Syvin lisavaimennus (dB, positiivinen) jonka hybridivaihe tuo FIR:n paalle.
+
+    FIR:sta siirretty `transfer_cut_db` on nollasummainen - `filter_pipeline`
+    vahentaa saman verran FIR-kayrasta - joten se ei kuulu tahan mittaan.
+    """
+    freq = np.asarray(freq, dtype=float).reshape(-1)
+    if not biquads or freq.size == 0:
+        return 0.0
+    extra_db = np.zeros(freq.size, dtype=float)
+    for biquad in biquads:
+        total_mag_db = 20.0 * np.log10(
+            np.maximum(
+                np.abs(peaking_eq_response(freq, fs, biquad.freq_hz, biquad.q, biquad.gain_db)),
+                1e-12,
+            )
+        )
+        if float(biquad.transfer_cut_db) > 0.0:
+            transfer_mag_db = 20.0 * np.log10(
+                np.maximum(
+                    np.abs(peaking_eq_response(freq, fs, biquad.freq_hz, biquad.q, -float(biquad.transfer_cut_db))),
+                    1e-12,
+                )
+            )
+            total_mag_db = total_mag_db - transfer_mag_db
+        extra_db += total_mag_db
+    depth = -float(np.min(np.nan_to_num(extra_db, nan=0.0, posinf=0.0, neginf=0.0)))
+    return max(0.0, depth)
+
+
+def _scaled_residual_biquads(biquads: Sequence[HybridBiquad], scale: float) -> list[HybridBiquad]:
+    """Skaalaa vain residual-osuuden; transfer-osuus sailyy sellaisenaan."""
+    scaled: list[HybridBiquad] = []
+    for biquad in biquads:
+        residual_cut_db = float(biquad.residual_cut_db) * float(scale)
+        total_cut_db = float(biquad.transfer_cut_db) + residual_cut_db
+        scaled.append(
+            replace(
+                biquad,
+                gain_db=-total_cut_db,
+                safe_cut_db=total_cut_db,
+                residual_cut_db=residual_cut_db,
+            )
+        )
+    return scaled
+
+
+def _limit_aggregate_residual_cut(
+    selected: Sequence[HybridBiquad],
+    freq: np.ndarray,
+    fs: float,
+    policy: HybridIIRPolicy,
+) -> tuple[list[HybridBiquad], float, float]:
+    """Pitaa yhteenlasketun lisavaimennuksen `max_cut_db`-katon alla.
+
+    Palauttaa (biquadit, mitattu syvyys ennen trimmausta, kaytetty kerroin).
+    """
+    biquads = list(selected)
+    cap_db = float(policy.max_cut_db)
+    depth_db = _residual_extra_depth_db(biquads, freq, float(fs))
+    if not biquads or depth_db <= cap_db + _AGGREGATE_CUT_TOLERANCE_DB:
+        return biquads, depth_db, 1.0
+
+    # depth(scale) on kasvava ja depth(0) == 0, joten bisektio loytaa suurimman
+    # sallitun kertoimen deterministisesti ja rajatussa ajassa.
+    lo = 0.0
+    hi = 1.0
+    for _ in range(_AGGREGATE_TRIM_BISECTION_STEPS):
+        mid = 0.5 * (lo + hi)
+        if _residual_extra_depth_db(_scaled_residual_biquads(biquads, mid), freq, float(fs)) <= cap_db:
+            lo = mid
+        else:
+            hi = mid
+    trimmed = [
+        biquad
+        for biquad in _scaled_residual_biquads(biquads, lo)
+        if float(biquad.transfer_cut_db) + float(biquad.residual_cut_db) > _MIN_EFFECTIVE_CUT_DB
+    ]
+    return trimmed, depth_db, float(lo)
+
+
 _MODE_FIT_MIN_POINTS = 9
 # Sovitus hyvaksytaan vain, jos loydetty piikki on vahintaan puolet eventin
 # huipusta ja jaannos on pieni suhteessa piikkiin - muuten data ei tue mallia.
@@ -285,26 +439,11 @@ _MODE_FIT_MAX_RESIDUAL_PER_GAIN = 0.30
 def _peaking_mag_db_model(freq: np.ndarray, fs: float, f0: float, q: float, gain_db: float) -> np.ndarray:
     """RBJ-peaking-magnitudi (dB) mallifunktiona; sallii positiivisen gainin.
 
-    Erillaan `peaking_eq_coefficients()`-funktiosta, joka rajaa gainin
-    leikkaukseksi - moodi sovitetaan boostina mitattuun ylimaaraan.
+    Kayttaa samaa RBJ-ydinta kuin `peaking_eq_coefficients()`, mutta ilman
+    gainin leikkausrajausta - moodi sovitetaan boostina mitattuun ylimaaraan.
     """
-    fs = max(1.0, float(fs))
-    f0 = float(np.clip(f0, 1e-6, fs * 0.499))
-    q = max(1e-6, float(q))
-    w0 = 2.0 * np.pi * f0 / fs
-    alpha = np.sin(w0) / (2.0 * q)
-    a_amp = 10.0 ** (float(gain_db) / 40.0)
-    b0 = 1.0 + alpha * a_amp
-    b1 = -2.0 * np.cos(w0)
-    b2 = 1.0 - alpha * a_amp
-    a0 = 1.0 + alpha / max(a_amp, 1e-12)
-    a2 = 1.0 - alpha / max(a_amp, 1e-12)
-    omega = 2.0 * np.pi * np.clip(np.asarray(freq, dtype=float), 0.0, fs / 2.0) / fs
-    z1 = np.exp(-1j * omega)
-    z2 = np.exp(-2j * omega)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        h = (b0 + b1 * z1 + b2 * z2) / (a0 + b1 * z1 + a2 * z2)
-    return 20.0 * np.log10(np.maximum(np.abs(h), 1e-12))
+    response = _biquad_response(freq, fs, _rbj_peaking_coefficients(fs, f0, q, gain_db))
+    return 20.0 * np.log10(np.maximum(np.abs(response), 1e-12))
 
 
 def _refine_biquad_against_measurement(
@@ -341,11 +480,17 @@ def _refine_biquad_against_measurement(
         peak_db = max(float(biquad.source_peak_db), 0.5)
         q_init = float(np.clip(float(biquad.q), policy.min_q, policy.max_q))
         f_bound_oct = float(min(width_oct, 1.0 / 6.0))
+        # Sovitus ei saa siirtaa korjausta politiikan kaistan ulkopuolelle:
+        # `max_freq_hz` on kaventunut huoneen Schroeder-estimaattiin.
+        f_lo = max(f0 * 2.0 ** (-f_bound_oct), float(policy.min_freq_hz))
+        f_hi = min(f0 * 2.0**f_bound_oct, float(policy.max_freq_hz))
+        if not (f_hi > f_lo):
+            return biquad
         # Parametrit: (f0, Q, gain_db, offset_db, kallistuma_db_per_oct).
         # Lineaarinen pohja sovitetaan yhdessa piikin kanssa, jotta moodin
         # hannat eivat vuoda pohjaan ja vaarista Q:ta.
-        lo = np.asarray([f0 * 2.0 ** (-f_bound_oct), policy.min_q, 0.25 * peak_db, -6.0, -12.0], dtype=float)
-        hi = np.asarray([f0 * 2.0**f_bound_oct, policy.max_q, 2.0 * peak_db, 6.0, 12.0], dtype=float)
+        lo = np.asarray([f_lo, policy.min_q, 0.25 * peak_db, -6.0, -12.0], dtype=float)
+        hi = np.asarray([f_hi, policy.max_q, 2.0 * peak_db, 6.0, 12.0], dtype=float)
 
         y_base = float(np.median(np.concatenate([y_w[:3], y_w[-3:]])))
 
@@ -491,7 +636,46 @@ def _apply_residual_cut_plan(
 
 
 def peaking_eq_response(freq_axis: np.ndarray, fs: float, freq_hz: float, q: float, gain_db: float) -> np.ndarray:
-    b0, b1, b2, a0, a1, a2 = peaking_eq_coefficients(float(fs), float(freq_hz), float(q), float(gain_db))
+    return _biquad_response(
+        freq_axis,
+        fs,
+        peaking_eq_coefficients(float(fs), float(freq_hz), float(q), float(gain_db)),
+    )
+
+
+def peaking_eq_coefficients(
+    fs: float, freq_hz: float, q: float, gain_db: float
+) -> tuple[float, float, float, float, float, float]:
+    """RBJ-peaking leikkaukseksi rajattuna - hybrid-IIR ei koskaan boostaa."""
+    return _rbj_peaking_coefficients(fs, freq_hz, q, min(0.0, _safe_float(gain_db, 0.0)))
+
+
+def _rbj_peaking_coefficients(
+    fs: float, freq_hz: float, q: float, gain_db: float
+) -> tuple[float, float, float, float, float, float]:
+    """Normalisoidut RBJ-peaking-kertoimet ilman gainin merkkirajausta."""
+    fs = max(1.0, float(fs))
+    f0 = float(np.clip(freq_hz, 1e-6, fs * 0.499))
+    q = max(1e-6, float(q))
+    w0 = 2.0 * np.pi * f0 / fs
+    alpha = np.sin(w0) / (2.0 * q)
+    a_amp = 10.0 ** (float(gain_db) / 40.0)
+    b0 = 1.0 + alpha * a_amp
+    b1 = -2.0 * np.cos(w0)
+    b2 = 1.0 - alpha * a_amp
+    a0 = 1.0 + alpha / max(a_amp, 1e-12)
+    a1 = -2.0 * np.cos(w0)
+    a2 = 1.0 - alpha / max(a_amp, 1e-12)
+    return (float(b0 / a0), float(b1 / a0), float(b2 / a0), 1.0, float(a1 / a0), float(a2 / a0))
+
+
+def _biquad_response(
+    freq_axis: np.ndarray,
+    fs: float,
+    coefficients: tuple[float, float, float, float, float, float],
+) -> np.ndarray:
+    """Biquadin kompleksivaste taajuusakselilla; (bins,) sisaan, (bins,) ulos."""
+    b0, b1, b2, a0, a1, a2 = coefficients
     freq = np.asarray(freq_axis, dtype=float).reshape(-1)
     omega = 2.0 * np.pi * np.clip(freq, 0.0, max(1.0, float(fs) / 2.0)) / max(float(fs), 1.0)
     z1 = np.exp(-1j * omega)
@@ -501,25 +685,6 @@ def peaking_eq_response(freq_axis: np.ndarray, fs: float, freq_hz: float, q: flo
     with np.errstate(divide="ignore", invalid="ignore"):
         h = num / np.where(np.abs(den) > 1e-18, den, 1.0)
     return np.nan_to_num(h, nan=1.0, posinf=1.0, neginf=1.0)
-
-
-def peaking_eq_coefficients(
-    fs: float, freq_hz: float, q: float, gain_db: float
-) -> tuple[float, float, float, float, float, float]:
-    fs = max(1.0, float(fs))
-    f0 = float(np.clip(freq_hz, 1e-6, fs * 0.499))
-    q = max(1e-6, float(q))
-    gain_db = min(0.0, float(gain_db))
-    w0 = 2.0 * np.pi * f0 / fs
-    alpha = np.sin(w0) / (2.0 * q)
-    a_amp = 10.0 ** (gain_db / 40.0)
-    b0 = 1.0 + alpha * a_amp
-    b1 = -2.0 * np.cos(w0)
-    b2 = 1.0 - alpha * a_amp
-    a0 = 1.0 + alpha / max(a_amp, 1e-12)
-    a1 = -2.0 * np.cos(w0)
-    a2 = 1.0 - alpha / max(a_amp, 1e-12)
-    return (float(b0 / a0), float(b1 / a0), float(b2 / a0), 1.0, float(a1 / a0), float(a2 / a0))
 
 
 def _candidate_to_biquad(event: RoomModeEvent, policy: HybridIIRPolicy) -> tuple[HybridBiquad | None, str]:
@@ -537,12 +702,12 @@ def _candidate_to_biquad(event: RoomModeEvent, policy: HybridIIRPolicy) -> tuple
     modal_conf_floor = float(policy.min_confidence)
     strong_modal_evidence = (
         kind == "room_mode"
-        and cut_priority >= 0.70
+        and cut_priority >= _STRONG_MODAL_CUT_PRIORITY
         and gd_excess >= policy.min_gd_excess_ms
         and peak >= policy.min_peak_db
     )
     if strong_modal_evidence:
-        modal_conf_floor = min(modal_conf_floor, 0.25)
+        modal_conf_floor = min(modal_conf_floor, _STRONG_MODAL_CONFIDENCE_FLOOR)
     if confidence < modal_conf_floor:
         return None, "confidence_below_threshold"
     if gd_excess < policy.min_gd_excess_ms:
@@ -591,21 +756,7 @@ def _rejection(event: RoomModeEvent, reason: str) -> dict[str, Any]:
 
 
 def _event_float(event: Any, key: str, default: float = 0.0) -> float:
-    try:
-        value = getattr(event, key)
-    except (
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        IndexError,
-        RuntimeError,
-        OSError,
-        ImportError,
-        ModuleNotFoundError,
-    ):
-        value = default
-    return _safe_float(value, default)
+    return _safe_float(getattr(event, key, default), default)
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:

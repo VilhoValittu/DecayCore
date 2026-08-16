@@ -1,29 +1,15 @@
 ---
-title: Mixed Phase Room Correction
-description: DecayCore supports mixed phase FIR room correction with phase-aware correction, acoustic measurement workflow and practical safety limits.
+title: Mixed Phase Room Correction in DecayCore
+description: Learn how DecayCore applies bounded excess-phase correction and when Mixed Phase is appropriate.
 permalink: /mixed-phase-room-correction/
 ---
 
-DecayCore supports Mixed Phase FIR room correction.
+## When should I use Mixed Phase?
 
-Mixed phase correction can combine magnitude correction with controlled phase correction. The goal is not to blindly force a perfect phase response, but to apply correction where it is useful and safe.
+Choose **Mixed Phase** when measurements show useful excess-phase behavior that you want to correct inside a limited frequency band. DecayCore blends that correction with a safer phase baseline and fades it out above the configured range.
 
-DecayCore's preferred workflow is to measure directly with its built-in measurement feature, generate correction from those measurements, and export convolution-ready WAV FIR filters.
+Mixed Phase needs more judgment than Minimum Phase. Correction strength, full-correction frequency, fade frequency, group-delay limits, and pre-energy guards all affect the result. More phase correction is not automatically better, especially where reflections make measurements position-sensitive.
 
-## Phase-aware correction
+Start with mode defaults, inspect the final impulse and group delay, and verify the deployed filter with a new measurement. Use **Asymmetric** instead when you want the recommended general-purpose balance without deliberately tuning mixed-phase controls.
 
-DecayCore uses practical correction limits to avoid excessive correction, pre-ringing, and unrealistic behavior.
-
-Mixed phase correction is useful when the measured response shows behavior that can benefit from controlled phase correction without turning the filter into an aggressive or fragile correction.
-
-## Related pages
-
-- [Measurement workflow](../measurement-workflow/)
-- [FIR room correction](../fir-room-correction/)
-- [Minimum Phase FIR Generator](../minimum-phase-fir-generator/)
-- [Temporal Decay Control](../temporal-decay-control/)
-- [CamillaDSP FIR room correction](../camilladsp-fir-room-correction/)
-
----
-
-[Home](../) · [GitHub](https://github.com/VilhoValittu/DecayCore) · [Releases](https://github.com/VilhoValittu/DecayCore/releases)
+Read the [Technical Reference]({{ '/Official_Manual.html' | relative_url }}) for the phase pipeline or [Getting Started]({{ '/getting-started/' | relative_url }}) for the normal workflow.

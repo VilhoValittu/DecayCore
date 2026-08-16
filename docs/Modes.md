@@ -6,6 +6,10 @@ hide_page_heading: true
 
 # DecayCore Modes: AUTO vs BASIC vs ADVANCED
 
+## In brief
+
+AUTO searches guarded candidates, BASIC offers conservative manual control, and ADVANCED exposes expert controls. The underlying DSP safety mechanisms remain active in every mode.
+
 DecayCore has three operating modes:
 
 - `AUTO`: automatic preset search and target selection
@@ -170,6 +174,3 @@ Goal: manual expert workflow with fewer policy constraints.
 - `src/decaycore/config/decaycore_pipeline.py`
 - `src/decaycore/ui/system_health.py`
 - `src/decaycore/decaycore.py`
-
-### Disclaimer
-AI was used to translate this document from Finnish to English.

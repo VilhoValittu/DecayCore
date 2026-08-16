@@ -68,6 +68,7 @@ from ...measurement.capture import run_audibility_test
 from ...measurement.workflow_parts import run_measurement_workflow
 from .. import measurement_state, ng_controls as ctrl
 from ..ng_sections import page_shell, section_card
+from ..ng_timers import page_timer
 from ..measurement_session_dialog_parts import build_measurement_session_dialog
 
 _RECOVERABLE_MEASUREMENT_UI_EXCEPTIONS = (
@@ -1045,7 +1046,7 @@ def build_measurement_tab(*, t: Callable, get_val: Callable) -> None:
         ctx.refresh_calibration_upload_status()
         _refresh_session_preview_selector()
         _render_bundle(None)
-        ui.timer(0.4, _refresh_view)
+        page_timer(0.4, _refresh_view)
 
 
 __all__ = [

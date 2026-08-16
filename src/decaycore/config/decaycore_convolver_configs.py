@@ -24,18 +24,11 @@ def _tc_segment(target_curve_tag: str | None) -> str:
     return f"_{tag}" if tag else ""
 
 
-def _title_suffix(program_version: str | None = None, winner_rank_score: float | None = None) -> str:
-    parts: list[str] = []
+def _title_suffix(program_version: str | None = None) -> str:
+    # The automatic-mode rank score is an internal search number, so it is kept
+    # out of exported config files; the summary text still reports the score.
     ver = str(program_version or "").strip()
-    if ver:
-        parts.append(ver)
-    try:
-        rank = float(winner_rank_score) if winner_rank_score is not None else float("nan")
-    except _NUMERIC_PARSE_EXCEPTIONS:
-        rank = float("nan")
-    if math.isfinite(rank):
-        parts.append(f"rank {rank:.3f}")
-    return "" if not parts else " " + " ".join(parts)
+    return f" {ver}" if ver else ""
 
 
 def _normalize_layout(layout: str | None) -> str:
@@ -253,7 +246,6 @@ def _resolve_raspberry_yaml_context(
     target_curve_tag: str,
     layout: str | None,
     program_version: str | None,
-    winner_rank_score: float | None,
     include_sub: bool,
     sub_allpass_freq_hz: float | None,
     sub_allpass_q: float | None,
@@ -323,7 +315,7 @@ def _resolve_raspberry_yaml_context(
         "device_format": str(device_format).replace("_", "_"),
         "include_sub": include_sub,
         "master_gain_db": float(master_gain_db),
-        "title_meta": _title_suffix(program_version=program_version, winner_rank_score=winner_rank_score),
+        "title_meta": _title_suffix(program_version=program_version),
         "tc": _tc_segment(target_curve_tag),
         "sub_polarity_invert": sub_polarity_invert,
         "l_wav": str(spec["left_filename"]),
@@ -629,7 +621,7 @@ def _build_raspberry_yaml_text(ctx: dict) -> str:
         [
             "",
             "processors: null",
-            f"title: {ctx['ft_short']} Window {ctx['irw_tag']}{ctx['tc']} {ctx['file_ts']} {ctx['title_meta']}",
+            f"title: {ctx['ft_short']} Window {ctx['irw_tag']}{ctx['tc']} {ctx['file_ts']}{ctx['title_meta']}",
         ]
     )
     return "\n".join(lines).strip()
@@ -644,7 +636,6 @@ def generate_raspberry_yaml(
     target_curve_tag: str = "",
     layout: str | None = "Mono",
     program_version: str | None = None,
-    winner_rank_score: float | None = None,
     include_sub: bool = False,
     sub_allpass_freq_hz: float | None = None,
     sub_allpass_q: float | None = None,
@@ -670,7 +661,6 @@ def generate_raspberry_yaml(
         target_curve_tag=target_curve_tag,
         layout=layout,
         program_version=program_version,
-        winner_rank_score=winner_rank_score,
         include_sub=include_sub,
         sub_allpass_freq_hz=sub_allpass_freq_hz,
         sub_allpass_q=sub_allpass_q,

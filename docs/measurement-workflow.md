@@ -1,35 +1,50 @@
 ---
 title: DecayCore Measurement Workflow
 nav_title: Measurement
-description: Use DecayCore's built-in acoustic measurement workflow to generate FIR room correction filters.
+description: Measure loudspeakers with DecayCore or import compatible REW text and impulse-response files.
 permalink: /measurement-workflow/
 ---
 
-DecayCore includes its own acoustic measurement workflow in release builds.
+Good correction starts with a clean, repeatable measurement. DecayCore can capture measurements in packaged releases or read compatible files created elsewhere.
 
-**Platform support:** Measurement has been verified to work on Windows. Linux has been verified to work at least on Ubuntu 22.04. macOS could not be tested due to unavailable test hardware. Subwoofer measurement on Windows requires the user to have configured 5.1 or 7.1 multichannel output in Windows Sound settings.
+## Platform support
 
-The recommended path is to measure directly with DecayCore, generate correction filters from those measurements, and export convolution-ready WAV FIR filters. When measurement is unavailable on your platform, you can import compatible external measurements instead.
+| Platform | Main speaker measurement | Subwoofer measurement | Notes |
+|---|---|---|---|
+| Windows | Verified | Supported with multichannel output | Configure the playback device for 5.1 or 7.1 so the LFE channel is available. |
+| Ubuntu Linux | Verified on Ubuntu 22.04 | Routing depends on the audio setup | Measurement audio requires the PortAudio system library. |
+| macOS | Not verified on project test hardware | Not supported as a guaranteed workflow | Compatible external measurements can be imported. |
 
-## Why use DecayCore's own measurement workflow?
+The measurement engine is included in packaged releases, not in the public source checkout.
 
-DecayCore's measurement workflow is designed for its correction pipeline. It helps keep timing, phase, and filter generation behavior consistent from measurement to export.
+## Guided measurement
 
-This is especially important for FIR room correction because the correction process depends not only on frequency response, but also on timing, phase behavior, group delay, and impulse response handling.
+1. Connect the measurement microphone and select the input and output devices.
+2. Load the microphone calibration file.
+3. Select Left and Right, the number of listening positions, and repeats per channel.
+4. Set measurement volume at the end of the signal chain, such as the amplifier or an analog volume control. Avoid reducing level digitally before the amplifier because that also reduces measurement signal-to-noise ratio.
+5. Run the guided session and follow the prompts when moving the microphone.
+6. Review rejected takes. If many are rejected, check levels, connections, noise, and microphone placement before increasing rejection strictness.
+7. Save the session. Keep all files from the session at the same gain and timing reference.
 
-## Typical workflow
+For subwoofer measurement on Windows, configure the output device for 5.1 or 7.1 in Windows Sound settings before starting. DecayCore sends the subwoofer sweep to the LFE channel.
 
-1. Connect your measurement microphone and audio output.
-2. Measure the left and right speakers.
-3. Review the measurement data.
-4. Generate correction filters.
-5. Export WAV FIR filters.
-6. Use the filters in CamillaDSP or another convolution engine.
+## Importing existing measurements
 
-**Note on measurement volume:** Set the listening level during measurement with volume attenuation at the end of the signal chain, such as the amplifier or an analog volume control. Avoid digital attenuation earlier in the chain: it lowers the measurement signal-to-noise ratio, while end-of-chain attenuation protects your speakers and hearing without degrading the captured sweep.
+### REW text export
 
-## Optional external measurement workflows
+Export each channel separately and include frequency, magnitude, and phase. DecayCore accepts normal REW header and comment lines. Use consistent timing references for left and right.
 
-DecayCore may also work with compatible external measurement data, including REW-style measurement exports. This is useful for users who already have existing measurements.
+### Impulse-response WAV
 
-For new measurements, DecayCore's built-in measurement workflow is the preferred path.
+Use mono files with consistent sample rate, gain, and timing. For REW exports, use `float32`, normalization, and the same `t=0` placement for every channel. Do not normalize files from a shared DecayCore measurement session individually.
+
+## Measurement checklist
+
+- Use the same microphone position and procedure for corresponding channels.
+- Avoid clipping and background noise.
+- Keep speakers, crossovers, routing, and volume unchanged during a measurement set.
+- Save the uncorrected measurements for comparison.
+- After deploying a filter, measure again with correction active.
+
+Continue with [Getting Started]({{ '/getting-started/' | relative_url }}) or read the complete [User Manual]({{ '/User_Manual.html' | relative_url }}).

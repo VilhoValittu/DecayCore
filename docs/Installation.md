@@ -1,334 +1,112 @@
 ---
 title: DecayCore Installation Guide
 nav_title: Installation
-description: Install DecayCore from a packaged release or run it from Python source on Windows, Linux, and macOS.
+description: Install a packaged DecayCore release on Windows, Linux, or macOS, or run the manual workflow from source.
 permalink: /installation/
 ---
 
-## Recommended path
+## Recommended installation
 
-For most users, the recommended option is:
+Download the latest packaged release, extract it, and run the launcher for your platform. Packaged releases include guided measurement and the native Automatic mode engine.
 
-1. Download the latest packaged release
-2. Extract it
-3. Run DecayCore
-4. Open `http://127.0.0.1:8080` if the browser does not open automatically
+[Download the latest release](https://github.com/VilhoValittu/DecayCore/releases/latest)
 
-Latest release:
-- [Latest DecayCore release](https://github.com/VilhoValittu/DecayCore/releases/latest)
+| Platform | Package and launcher | First-launch notes |
+|---|---|---|
+| Windows | Extract `DecayCore_<version>_windows.7z`, then run `DecayCore.exe`. | If SmartScreen appears, select **More info → Run anyway**. Allow private firewall access if asked. |
+| Ubuntu / Debian | Extract `DecayCore_<version>_linux.7z`, then run `./run.sh` in a terminal. | Measurement audio needs PortAudio. Install it with `sudo apt install libportaudio2` if the backend reports an error. |
+| Raspberry Pi / Linux ARM64 | Extract `DecayCore_<version>_linux_arm64.7z`, then run `./run.sh`. | Intended for Raspberry Pi 4/5 and other 64-bit ARM Linux systems. It does not support 32-bit Raspberry Pi OS. |
+| macOS Apple Silicon | Extract `DecayCore_<version>_macos_arm64.7z`, then open `Start_Decay.command`. | If blocked, use **System Settings → Privacy & Security → Open Anyway**. Allow microphone access if requested. |
 
-All releases:
-- [DecayCore releases](https://github.com/VilhoValittu/DecayCore/releases)
+DecayCore normally opens its local browser interface automatically. If it does not, open `http://127.0.0.1:8080`. The interface runs on your computer; it is not a cloud service.
 
-## Python and dependency baseline
+See [Measurement]({{ '/measurement-workflow/' | relative_url }}) for current platform support and routing requirements.
 
-All DecayCore versions released and documented in this repository are based on Python `3.12.3`.
+## Run from source
 
-Current dependency baselines from the repository requirement files are:
+Use the source workflow for development or the public manual filtering engine. A source checkout supports **Basic** and **Advanced** modes. Guided measurement and the native Automatic mode decision engine are available only in packaged releases.
 
-- `requirements.txt`: `numpy==2.4.6`, `scipy==1.17.1`, `nicegui==3.13.0`, `plotly==6.8.0`
+The documented Python baseline is `3.12.3`. Current pinned dependencies are listed in `requirements.txt`.
 
-From v1.1.6 onwards `numba` is no longer used. The public manual-filtering DSP hot paths can be accelerated by the optional `decaycore-dsp` Rust extension. Automatic mode uses a separate native decision engine bundled only in packaged releases. A source checkout therefore supports Basic and Advanced manual filtering, but does not enable Automatic mode.
-
-## Run from release package
-
----
-
-### Windows
-
-1. Download `DecayCore_<version>_windows.7z` from Releases.
-2. Extract the ZIP.
-3. Run `DecayCore.exe`.
-4. If SmartScreen appears, choose `More info` -> `Run anyway`.
-5. Allow private firewall access if prompted. DecayCore runs on internal server on your computer.
-6. Open `http://127.0.0.1:8080` if the browser does not open automatically.
-
----
-
-### Ubuntu / Debian Linux
-
-1. Download `DecayCore_<version>_linux.7z` from Releases.
-2. Extract the archive.
-3. Open Terminal in the extracted folder and run:
-
-```bash
-./run.sh
-```
-
-4. **Built-in measurement:** Measurement has been verified to work on Windows. Linux has been verified to work at least on Ubuntu 22.04. macOS could not be tested due to unavailable test hardware. On platforms where measurement is unavailable, compatible external measurements can be used.
-
-5. Built-in measurement audio requires the system PortAudio library. If measurement audio reports a PortAudio/backend error, install it first:
-
-```bash
-sudo apt install libportaudio2
-```
-
-5. Open `http://127.0.0.1:8080` if the browser does not open automatically.
-
----
-
-### Raspberry Pi / Linux ARM64
-
-1. Download `DecayCore_<version>_linux_arm64.7z` from Releases.
-2. Extract the archive.
-3. Open Terminal in the extracted folder and run:
-
-```bash
-./run.sh
-```
-
-4. Use this build for Raspberry Pi 4/5 running a 64-bit operating system, Debian/Ubuntu Linux ARM64 systems, and other 64-bit ARM Linux machines.
-5. This build does not support 32-bit Raspberry Pi OS.
-6. Open `http://127.0.0.1:8080` if the browser does not open automatically.
-
----
-
-### macOS (Apple Silicon)
-
-1. Download `DecayCore_<version>_macos_arm64.7z` from Releases.
-2. Extract the archive.
-3. Double-click `Start_Decay.command` to launch DecayCore through Terminal.
-4. If macOS blocks the first launch, open `System Settings -> Privacy & Security -> Open Anyway`.
-5. If you prefer the bundle directly, you can also double-click `DecayCore_<version>.app`.
-6. If you prefer Terminal, open Terminal in the extracted folder and run:
-
-```bash
-./Start_Decay.command
-```
-
-7. **Built-in measurement:** Measurement has been verified to work on Windows. Linux has been verified to work at least on Ubuntu 22.04. macOS could not be tested due to unavailable test hardware. macOS users can use compatible external measurements.
-8. If macOS asks for microphone access, allow DecayCore. Measurement files are saved under `Documents/DecayCore/measurement` by default and fall back to a writable app-data location if needed.
-9. Open `http://127.0.0.1:8080` if the browser does not open automatically.
-
----
-
-## Run directly from Python source
-
-Use this path if you want to run DecayCore from a cloned source tree instead of a packaged release. The documented baseline is Python `3.12.3`.
-
-Repository:
-- [DecayCore source repository](https://github.com/VilhoValittu/DecayCore)
-
-### Get the source with Git
-
-Install Git first:
-- Windows: https://git-scm.com/download/win
-- Linux: use your distribution package manager, for example `sudo apt install git`
-- macOS: install Xcode Command Line Tools with `xcode-select --install`, or install Git with Homebrew
-
-Clone the repository:
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/VilhoValittu/DecayCore.git
 cd DecayCore
 ```
 
-To update an existing clone later:
+### 2. Create an environment and install dependencies
 
-```bash
-cd DecayCore
-git pull
-```
-
----
-
-### Optional public Rust DSP acceleration
-
-The public `decaycore-dsp` extension accelerates manual-filtering DSP paths that
-previously relied on `numba`. It is **prebuilt and bundled in packaged releases**.
-For source runs it is not installed by `requirements.txt`; manual filtering still
-works through the pure-Python fallback, but more slowly. The packaged-only
-automatic-mode engine is not distributed as source and has no Python fallback
-that enables Automatic mode.
-
-Building them requires a Rust toolchain. Install it once with
-[rustup](https://rustup.rs/):
-
-- Linux / macOS:
-
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-- Windows: download and run `rustup-init.exe` from https://rustup.rs/.
-
-Restart your shell (or run `. "$HOME/.cargo/env"` on Linux/macOS) so `cargo` is
-on `PATH`, then verify:
-
-```bash
-cargo --version
-```
-
-With your DecayCore virtual environment activated (see the per-platform steps
-below), build and install the public DSP extension from the source tree. `pip`
-reads its `maturin` build backend and compiles it automatically:
-
-```bash
-python -m pip install ./decaycore-dsp
-```
-
-On Windows, run the same command from PowerShell after activating the
-virtual environment. The Rust toolchain on Windows also needs the MSVC build
-tools (the `rustup-init.exe` installer prompts to install them if they are
-missing).
-
-You can confirm the extension loaded after starting DecayCore: when it is
-missing, a fallback warning is logged and the Python DSP implementation is used.
-
----
-
-### Windows
-
-1. Install Python from https://www.python.org/downloads/windows/ and enable `Add python.exe to PATH`.
-2. Open PowerShell in the cloned DecayCore source folder.
-3. Create and activate a virtual environment:
+#### Windows PowerShell
 
 ```powershell
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-4. Install dependencies:
-
-```powershell
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-5. (Recommended) Build the optional public Rust DSP extension. This requires a Rust toolchain — see [Optional public Rust DSP acceleration](#optional-public-rust-dsp-acceleration):
+If PowerShell blocks activation, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, then activate the environment again.
 
-```powershell
+#### Ubuntu / Debian Linux
+
+```bash
+sudo apt update
+sudo apt install git python3 python3-venv python3-pip
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+#### macOS
+
+Install Python 3 and Git first, then run:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+### 3. Optional Rust DSP acceleration
+
+Packaged releases already include the public `decaycore-dsp` extension. Source runs can use the pure-Python fallback, but the Rust extension speeds up manual filtering.
+
+Install a Rust toolchain from [rustup](https://rustup.rs/), activate the Python environment, and run:
+
+```bash
 python -m pip install ./decaycore-dsp
 ```
 
-6. Start DecayCore:
+On Windows, Rust also needs the MSVC build tools offered by the `rustup-init.exe` installer. When the extension is unavailable, DecayCore logs a fallback warning and continues with Python DSP.
+
+### 4. Start DecayCore
+
+Windows PowerShell:
 
 ```powershell
 $env:PYTHONPATH = "src"
 python -m decaycore
 ```
 
-7. Open `http://127.0.0.1:8080` if the browser does not open automatically.
-
-If PowerShell blocks activation, run:
-
-```powershell
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-```
-
-Then activate the virtual environment again.
-
----
-
-### Ubuntu / Debian Linux
-
-1. Install Git, Python, venv support, pip :
-
-```bash
-sudo apt update
-sudo apt install git python3 python3-venv python3-pip
-```
-
-2. Open Terminal in the cloned DecayCore source folder.
-3. Create and activate a virtual environment:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-4. Install dependencies:
-
-```bash
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-5. (Recommended) Build the optional public Rust DSP extension. This requires a Rust toolchain — see [Optional public Rust DSP acceleration](#optional-public-rust-dsp-acceleration):
-
-```bash
-python -m pip install ./decaycore-dsp
-```
-
-6. Start DecayCore:
+Linux and macOS:
 
 ```bash
 PYTHONPATH=src python -m decaycore
 ```
 
-7. Open `http://127.0.0.1:8080` if the browser does not open automatically.
+## Output location
 
----
-
-### macOS
-
-1. Install Python from https://www.python.org/downloads/macos/ or with Homebrew.
-2. Install Git with Xcode Command Line Tools or Homebrew:
-
-```bash
-xcode-select --install
-```
-
-or:
-
-```bash
-brew install git
-```
-
-3. Open Terminal in the cloned DecayCore source folder.
-4. Create and activate a virtual environment:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-5. Install dependencies:
-
-```bash
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-6. (Recommended) Build the optional public Rust DSP extension. This requires a Rust toolchain — see [Optional public Rust DSP acceleration](#optional-public-rust-dsp-acceleration):
-
-```bash
-python -m pip install ./decaycore-dsp
-```
-
-7. Start DecayCore:
-
-```bash
-PYTHONPATH=src python -m decaycore
-```
-
-8. Open `http://127.0.0.1:8080` if the browser does not open automatically.
-
----
-
-## Output path
-
-Output ZIP files are saved by default to:
+Filter ZIP files are saved by default under:
 
 ```text
 Documents/DecayCore/filters/<version>/
 ```
 
-If that path is not writable, DecayCore falls back to a safe writable directory and reports the final path in Results.
+If the directory is not writable, DecayCore chooses a writable application-data location and shows it on **START / Results**.
 
-## Browser and PNG notes
+## Browser notes
 
-- DecayCore UI is browser-based.
-- Interactive graphs can be saved from the graph download button in the UI.
-- ZIP export is focused on filter artifacts and summary data.
-- Dashboard image inclusion can be disabled in performance mode.
-
-## Known issue: Windows + Vivaldi
-
-In some Windows setups, using Vivaldi can trigger NumPy `MemoryError` under browser memory pressure.
-
-Workarounds:
-
-- use Chrome, Edge, or Firefox
-- close extra Vivaldi tabs or extensions
-- re-run the process in another browser if needed
+Use a current Chrome, Edge, Firefox, or Safari release. If Vivaldi on Windows causes a NumPy `MemoryError` during a demanding run, close other tabs or repeat the run in another supported browser.

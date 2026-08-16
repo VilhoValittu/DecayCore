@@ -612,6 +612,9 @@ def _prepare_ui_and_measurements(
     )
     perf_stats["read_s"] += max(0.0, float(time.perf_counter() - read_started_at))
     if f_l is None or f_r is None:
+        # The reader logs the cause but returns None; without this the status label
+        # stays on "Reading..." forever and the run looks stuck.
+        callbacks.status(t("stat_measurement_read_failed"))
         return None
 
     prepared_input = PreparedRunInput(

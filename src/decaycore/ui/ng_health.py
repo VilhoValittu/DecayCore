@@ -87,9 +87,9 @@ def _drain_pending_toasts() -> None:
 
 def install_toast_timer() -> None:
     """Install the drain timer. Call once after the page UI is built."""
-    from nicegui import ui  # noqa: PLC0415
+    from .ng_timers import page_timer  # noqa: PLC0415
 
-    ui.timer(0.25, _drain_pending_toasts)
+    page_timer(0.25, _drain_pending_toasts)
 
 
 # Patch the toast service to use the queued notify backend.

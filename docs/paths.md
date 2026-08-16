@@ -6,7 +6,11 @@ hide_page_heading: true
 
 # DecayCore Configuration and Data Paths
 
-This document describes where DecayCore stores configuration files, Optuna optimization databases, measurements, and other data across different operating systems.
+## In brief
+
+Use **About DecayCore → Maintenance** for normal cache or settings recovery. The paths below are for manual inspection, migration, and startup recovery when the application cannot open.
+
+DecayCore stores configuration files, Automatic-mode journals and caches, measurements, and exports in platform-specific user directories.
 
 ## Main Configuration File
 
@@ -144,8 +148,24 @@ What to remove:
 - **Main config:** `config.json`
 
 from the data directory (and the legacy `~/.camillafir/` fallback), as listed in
-the tables above. Your saved measurements and exported filters under
-`Documents/DecayCore/` are **not** affected.
+the tables above. Your saved measurements, target presets and exported filters
+under `Documents/DecayCore/` are **not** affected.
+
+### In-app reset
+
+The quickest route is inside DecayCore itself: open **About DecayCore** in the
+header and use the **Maintenance** section. The two actions are separate, so you
+can clear the caches without losing your settings:
+
+| Action | Removes | Keeps |
+|---|---|---|
+| Clear automatic-mode caches | Optuna journals, auto-mode result cache, filter priors | `config.json`, target presets |
+| Reset settings to defaults | `config.json` (page reloads with factory defaults) | automatic-mode caches, target presets |
+
+Both ask for confirmation and list what will be removed. Neither is available
+while a filter generation is running. The in-app reset covers the current data
+directory only — the legacy `~/.camillafir/` fallback is handled by the helper
+scripts below.
 
 ### Helper scripts
 

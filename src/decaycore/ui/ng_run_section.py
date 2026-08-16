@@ -35,6 +35,7 @@ import time
 from . import ui_state
 from . import ng_run_runtime
 from .ng_sections import page_shell, section_card
+from .ng_timers import page_timer
 from .ng_run_runtime import (
     get_progress_element,
     get_results_container,
@@ -48,6 +49,15 @@ _run_clock: dict = {"started_at": None, "active": False, "elapsed_s": None}
 _start_button_lock = threading.Lock()
 _pending_start_button_enable = None
 _info_panel_ref = None
+
+
+def is_run_active() -> bool:
+    """True while the DSP pipeline thread is running.
+
+    Used to block maintenance actions that would delete files the running
+    pipeline is still writing to.
+    """
+    return bool(_run_clock["active"])
 
 
 def _queue_start_button_enable(start_btn) -> None:
@@ -347,7 +357,7 @@ def build_global_progress_bar() -> None:
             ):
                 logger.debug("Failed to autoscroll auto details panel", exc_info=True)
 
-    ui.timer(0.5, _refresh_status)
+    page_timer(0.5, _refresh_status)
 
 
 def _info_fmt_fs(raw) -> str:
@@ -455,11 +465,11 @@ def _info_render_last_run_info(line3) -> None:
     if not info:
         line3.set_visibility(False)
         return
-    score = info.get("score")
     match = info.get("match")
     conf = info.get("conf")
+    # The score stays in the results view and the export summary; the run header
+    # reports how well the correction matched the target instead.
     parts = []
-    parts.append(t("run_info_score").format(score=score) if score is not None else t("run_info_score_missing"))
     parts.append(t("run_info_match").format(match=match) if match is not None else t("run_info_match_missing"))
     if conf is not None:
         parts.append(t("run_info_conf").format(conf=conf))
@@ -587,9 +597,7 @@ def build_info_panel() -> None:
                 fs_chip = ui.label("").classes("cf-info-chip")
                 taps_chip = ui.label("").classes("cf-info-chip")
                 filter_chip = ui.label("").classes("cf-info-chip")
-                multi_rate_chip = ui.label(t("info_panel_all_common_rates")).classes(
-                    "cf-info-chip cf-info-chip-option"
-                )
+                multi_rate_chip = ui.label(t("info_panel_all_common_rates")).classes("cf-info-chip cf-info-chip-option")
                 multi_rate_chip.set_visibility(False)
             target_line = ui.label("").classes("cf-info-detail")
             line_meas = ui.label("").classes("cf-info-detail cf-info-line-dim")
@@ -618,8 +626,8 @@ def build_info_panel() -> None:
             )
         )
 
-    ui.timer(0.1, _install_float_behavior, once=True, immediate=False)
-    ui.timer(1.0, _refresh_info)
+    page_timer(0.1, _install_float_behavior, once=True, immediate=False)
+    page_timer(1.0, _refresh_info)
 
 
 def build_run_section(*, on_start_click) -> None:

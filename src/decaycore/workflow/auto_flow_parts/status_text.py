@@ -110,17 +110,16 @@ def _build_auto_selected_text(run_data: dict) -> str:
     mixed_hz = _auto_safe_float(run_data.get("mixed_freq", float("nan")), float("nan"))
     mixed_txt = f"{mixed_hz:.1f} Hz" if np.isfinite(mixed_hz) else "n/a"
 
-    best_metrics = attach_official_rank_score(run_data.get("best_metrics", {}))
-    rank_score = official_rank_score(best_metrics)
-    rank_txt = f" · Score {rank_score:.3f}" if np.isfinite(rank_score) else ""
-
+    # The rank score is an internal search comparison number, not an absolute
+    # quality measure, so it is kept out of the run status bar. The results view
+    # and the export summary still report the acoustic score.
     detail_txt = ""
     if ft_short in ("Linear", "Asymmetric"):
         detail_txt = f" · phase limit {phase_txt}"
     elif ft_short == "Mixed":
         detail_txt = f" · mixed freq {mixed_txt}"
 
-    return f"Selected · {target_name} · {hpf_label} {hpf_txt} · -6 dB {f6_txt}{detail_txt}{rank_txt}"
+    return f"Selected · {target_name} · {hpf_label} {hpf_txt} · -6 dB {f6_txt}{detail_txt}"
 
 
 def _resolve_auto_hpf_seed_source(

@@ -6,6 +6,10 @@ hide_page_heading: true
 
 # Why DecayCore Works
 
+## In brief
+
+DecayCore corrects broad, repeatable problems and limits correction where the measurement is weak. It treats magnitude, timing, phase, and low-frequency decay as related but separate tasks.
+
 DecayCore is not "magic EQ". It is a bounded DSP workflow built for real room data.
 
 Core rule:
@@ -123,7 +127,4 @@ If you want a robust workflow:
 4. Use comparison mode when doing A/B decisions.
 5. Re-check output diagnostics and Summary before final deployment.
 
-See also image reference: `docs/pics/tdc_impulse_example.png`
-
-### Disclaimer
-AI was used to translate this document from Finnish to English.
+See the [TDC impulse example]({{ '/pics/tdc_impulse_example.png' | relative_url }}).

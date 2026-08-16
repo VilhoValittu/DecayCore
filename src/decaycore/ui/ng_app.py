@@ -353,6 +353,110 @@ def _build_rust_warning_banner() -> None:
         )
 
 
+def _maintenance_confirm_dialog(*, title_key: str, body_key: str, on_confirm):
+    """Build a confirmation dialog for one destructive maintenance action.
+
+    Reuses the modal card styling of the user-manual dialog. Returns the
+    dialog so the caller can open it.
+    """
+    from nicegui import ui
+
+    with ui.dialog() as dlg, ui.card().classes("w-full max-w-2xl cf-modal-card"):
+        ui.label(t(title_key)).classes("text-lg font-semibold")
+        ui.label(t(body_key)).classes("text-sm")
+        with ui.row().classes("w-full justify-end gap-2 mt-2"):
+            ui.button(t("maintenance_cancel_btn"), on_click=dlg.close).props("flat")
+
+            def _confirm() -> None:
+                dlg.close()
+                on_confirm()
+
+            ui.button(t("maintenance_confirm_btn"), on_click=_confirm).props('color="negative" unelevated')
+
+    return dlg
+
+
+def _report_reset_outcome(outcome, *, success_key: str, empty_key: str | None = None) -> bool:
+    """Notify the user about a reset result. Returns True when nothing failed."""
+    from nicegui import ui
+
+    if outcome.failed_count:
+        ui.notify(
+            t("maintenance_partial_failure").format(
+                removed=outcome.removed_count,
+                failed=outcome.failed_count,
+            ),
+            type="warning",
+            position="top",
+            timeout=10000,
+        )
+        return False
+
+    if empty_key is not None and outcome.removed_count == 0:
+        ui.notify(t(empty_key), type="info", position="top")
+        return True
+
+    ui.notify(
+        t(success_key).format(count=outcome.removed_count),
+        type="positive",
+        position="top",
+    )
+    return True
+
+
+def _build_maintenance_section() -> None:
+    """Recovery actions: the in-app equivalent of the config_delete/ scripts."""
+    from nicegui import ui
+
+    from ..application.reset_service import clear_auto_mode_disk_caches, reset_user_settings
+    from .ng_run_section import is_run_active
+
+    def _guarded(action) -> None:
+        if is_run_active():
+            ui.notify(t("maintenance_blocked_during_run"), type="warning", position="top")
+            return
+        action()
+
+    def _do_clear_caches() -> None:
+        outcome = clear_auto_mode_disk_caches()
+        _report_reset_outcome(
+            outcome,
+            success_key="maintenance_caches_cleared",
+            empty_key="maintenance_caches_already_clean",
+        )
+
+    def _do_reset_settings() -> None:
+        outcome = reset_user_settings()
+        if not _report_reset_outcome(outcome, success_key="maintenance_settings_reset"):
+            return
+        # Rebuild every control from pristine defaults; delay so the toast is seen.
+        ui.timer(1.5, lambda: ui.navigate.reload(), once=True)
+
+    caches_dlg = _maintenance_confirm_dialog(
+        title_key="maintenance_clear_caches_dialog_title",
+        body_key="maintenance_clear_caches_dialog_body",
+        on_confirm=_do_clear_caches,
+    )
+    settings_dlg = _maintenance_confirm_dialog(
+        title_key="maintenance_reset_settings_dialog_title",
+        body_key="maintenance_reset_settings_dialog_body",
+        on_confirm=_do_reset_settings,
+    )
+
+    with ui.column().classes("w-full gap-1 mt-4"):
+        ui.label(t("maintenance_title")).classes("text-sm font-semibold")
+        ui.label(t("maintenance_intro")).classes("text-xs text-gray-400")
+        with ui.row().classes("gap-2 mt-1"):
+            ui.button(
+                t("maintenance_clear_caches_btn"),
+                on_click=lambda: _guarded(caches_dlg.open),
+            ).props('color="negative" outline dense')
+            ui.button(
+                t("maintenance_reset_settings_btn"),
+                on_click=lambda: _guarded(settings_dlg.open),
+            ).props('color="negative" outline dense')
+
+
 def _build_brand_header(*, version: str, dark_mode, initial_theme_dark: bool) -> None:
     from nicegui import ui
 
@@ -434,3 +538,4 @@ def _build_brand_header(*, version: str, dark_mode, initial_theme_dark: bool) ->
                     ui.button(icon="close", on_click=manual_dlg.close).props("flat dense round")
                 ui.markdown(manual_text).classes("w-full overflow-y-auto")
             ui.button(t("open_manual_btn"), on_click=manual_dlg.open).props("flat").classes("mt-2")
+            _build_maintenance_section()

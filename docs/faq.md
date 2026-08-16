@@ -23,13 +23,11 @@ No. DecayCore is built around physically plausible room correction where control
 
 ## Does DecayCore include measurement?
 
-Yes. DecayCore includes its own built-in measurement workflow in release builds published in the Releases section. Measurement has been verified to work on Windows. Linux has been verified to work at least on Ubuntu 22.04. macOS could not be tested due to unavailable test hardware.
+Yes. Packaged releases include guided measurement. See [Measurement]({{ '/measurement-workflow/' | relative_url }}) for current platform support and routing requirements.
 
 ## Should I measure with DecayCore or REW?
 
-For new measurements, use DecayCore's own measurement workflow when available on your platform. It is designed for DecayCore's correction pipeline.
-
-When DecayCore's measurement is not available on your platform, use compatible external measurements such as REW-style exports. For subwoofer measurement on Windows, ensure your playback device is configured for 5.1 or 7.1 multichannel in Windows Sound settings.
+Use DecayCore's guided workflow when it is available and suits your routing. Existing REW text or impulse-response files are also valid when phase, timing, gain, and channel references are consistent.
 
 ## Where can I download DecayCore?
 
@@ -37,20 +35,13 @@ Download DecayCore from the official GitHub releases page:
 
 [DecayCore releases](https://github.com/VilhoValittu/DecayCore/releases)
 
-The built-in measurement feature is available in release builds published in the Releases section.
+The packaged release also includes guided measurement and Automatic mode.
 
 ## DecayCore behaves strangely — what should I try first?
 
-Deleting DecayCore's automatic-mode disk caches and `config.json` is a
-recommended first step. Stale Optuna journals, the auto-mode result cache, or a
-corrupted config can cause unexpected automatic-mode results or startup issues.
-These files are regenerated automatically on the next run, so removing them is
-safe — your saved measurements and exported filters are not affected.
+Open **About DecayCore → Maintenance**. Use **Clear automatic-mode caches** for unexpected Automatic results or **Reset settings to defaults** for a damaged configuration. Neither action removes measurements, target presets, or exported filters.
 
-The repository includes ready-made cleanup scripts under `config_delete/` (one
-per operating system) that remove exactly these files for you. See
-[Configuration and Data Paths]({{ '/paths.html#resetting-caches-and-configuration-troubleshooting' | relative_url }})
-for the full list of files and locations.
+If the app does not start, use the platform cleanup script in `config_delete/`. [Configuration and Data Paths]({{ '/paths.html#resetting-caches-and-configuration-troubleshooting' | relative_url }}) lists the affected files.
 
 ## Is DecayCore open source?
 

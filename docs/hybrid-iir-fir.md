@@ -7,6 +7,10 @@ permalink: /hybrid-iir-fir/
 
 The Hybrid IIR + FIR workflow is an optional extension to DecayCore's standard FIR correction pipeline. It adds a small set of narrow IIR peaking EQ cuts targeting stubborn room modes in the bass region before the FIR filter is synthesized.
 
+## In brief
+
+Hybrid mode assigns supported narrow bass cuts to IIR filters and leaves broadband magnitude and phase work to FIR. Deploy both stages together.
+
 ## What it is
 
 Standard FIR correction distributes correction energy across the entire filter length. For very narrow, high-Q room modes — common in small or acoustically untreated rooms — a long FIR filter may not be the most efficient tool. An IIR biquad peaking filter can resolve a narrow resonance precisely, with no minimum tap-count requirement.
@@ -70,14 +74,7 @@ These parameters are available in the Advanced tab under the hybrid IIR tuning s
 
 ## Related pages
 
-- [FIR Room Correction](../fir-room-correction/)
-- [CamillaDSP FIR Room Correction](../camilladsp-fir-room-correction/)
-- [Official Manual — Hybrid IIR section]({{ '/Official_Manual.html' | relative_url }})
-- [Temporal Decay Control](../temporal-decay-control/)
-
----
-
-[Home](../) | [GitHub](https://github.com/VilhoValittu/DecayCore) | [Releases](https://github.com/VilhoValittu/DecayCore/releases)
-
-### Disclaimer
-AI was used to translate this document from Finnish to English.
+- [FIR Room Correction]({{ '/fir-room-correction/' | relative_url }})
+- [CamillaDSP FIR Room Correction]({{ '/camilladsp-fir-room-correction/' | relative_url }})
+- [Technical Reference — Hybrid IIR + FIR]({{ '/Official_Manual.html' | relative_url }})
+- [Temporal Decay Control]({{ '/temporal-decay-control/' | relative_url }})

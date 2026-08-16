@@ -27,6 +27,9 @@ class Issue:
     level: Level
     title: str
     detail: str = ""
+    # Blocks the run in every mode, not just BASIC/AUTO. Reserved for inputs the
+    # pipeline cannot run without at all, such as missing L/R measurements.
+    blocking: bool = False
 
 
 @dataclass(frozen=True)
@@ -193,6 +196,7 @@ def _health_bass_integration_issues(data: dict[str, Any], mode_u: str) -> list[I
                 "crit",
                 _tr("health_bass_integration_measurements"),
                 _tr("health_bass_integration_wav_only_missing"),
+                blocking=True,
             )
         )
     else:
@@ -201,6 +205,7 @@ def _health_bass_integration_issues(data: dict[str, Any], mode_u: str) -> list[I
                 "crit",
                 _tr("health_bass_integration_measurements"),
                 _tr("health_bass_integration_missing"),
+                blocking=True,
             )
         )
 
@@ -238,8 +243,22 @@ def _health_standard_measurement_issues(data: dict[str, Any]) -> list[Issue]:
     if has_upload_pair or has_local_pair:
         return [Issue("ok", _tr("health_measurements"), _tr("health_upload_source_provided"))]
     if raw_up_l or raw_up_r or raw_lp_l or raw_lp_r:
-        return [Issue("warn", _tr("health_measurements"), _tr("health_measurements_missing_pair"))]
-    return [Issue("warn", _tr("health_measurements"), _tr("health_measurements_missing"))]
+        return [
+            Issue(
+                "crit",
+                _tr("health_measurements"),
+                _tr("health_measurements_missing_pair"),
+                blocking=True,
+            )
+        ]
+    return [
+        Issue(
+            "crit",
+            _tr("health_measurements"),
+            _tr("health_measurements_missing"),
+            blocking=True,
+        )
+    ]
 
 
 def _health_target_curve_issues(data: dict[str, Any]) -> list[Issue]:
@@ -404,9 +423,10 @@ def compute_health(data: dict[str, Any], mode: str) -> HealthResult:
 
     has_crit = any(i.level == "crit" for i in issues)
     has_warn = any(i.level == "warn" for i in issues)
+    has_blocking = any(i.blocking and i.level == "crit" for i in issues)
     overall: Level = "crit" if has_crit else ("warn" if has_warn else "ok")
 
-    blocked = (mode_u in ("BASIC", "AUTO")) and has_crit
+    blocked = has_blocking or ((mode_u in ("BASIC", "AUTO")) and has_crit)
     return HealthResult(overall=overall, blocked=blocked, issues=issues)
 
 
@@ -418,7 +438,8 @@ def format_health_summary(hr: HealthResult, max_items: int = 3) -> str:
     if crits:
         head = _tr("health_summary_errors", count=len(crits))
         items = crits[:max_items]
-        lines = [head] + [f"- {i.title}" for i in items]
+        # Errors block the run, so the summary must carry the fix instruction too.
+        lines = [head] + [f"- {i.title}: {i.detail}" if i.detail else f"- {i.title}" for i in items]
         if len(crits) > max_items:
             lines.append(f"- {_tr('health_summary_more', count=len(crits) - max_items)}")
         return "\n".join(lines)

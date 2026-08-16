@@ -29,8 +29,6 @@ from .export_outputs import (
     _camilladsp_yaml_name,
     _direct_dac_yaml_export_settings,
     _export_version_tag,
-    _export_winner_rank_score,
-    _export_winner_rank_tag,
     _hybrid_iir_biquads_from_result,
     _write_fs_outputs,
 )
@@ -188,7 +186,6 @@ def build_export_zip(
                 target_curve_tag=target_curve_tag,
                 layout=data.get("layout", "Mono"),
                 program_version=str(data.get("program_version", "") or "").strip(),
-                winner_rank_score=_export_winner_rank_score(data),
                 include_sub=bool(yaml_settings.get("include_sub", False)),
                 sub_allpass_freq_hz=yaml_settings.get("sub_allpass_freq_hz"),
                 sub_allpass_q=yaml_settings.get("sub_allpass_q"),
@@ -225,13 +222,9 @@ def save_export_bundle(
     program_version: str | None = None,
 ) -> tuple[str, str, str]:
     ver_tag = _export_version_tag(data, program_version=program_version)
-    rank_tag = _export_winner_rank_tag(data)
     filters_dir = safe_filters_dir(output_dir, program_version=program_version)
     logger.info(f"Export filters directory: {filters_dir}")
-    parts = ["DecayCore", str(ft_short), str(irw_tag), str(target_curve_tag), str(ver_tag)]
-    if rank_tag:
-        parts.append(rank_tag)
-    parts.append(str(ts))
+    parts = ["DecayCore", str(ft_short), str(irw_tag), str(target_curve_tag), str(ver_tag), str(ts)]
     fname = "_".join(parts) + ".zip"
     out_path = os.path.join(filters_dir, fname)
 

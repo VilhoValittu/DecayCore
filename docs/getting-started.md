@@ -1,36 +1,77 @@
 ---
 title: Getting Started with DecayCore
 nav_title: Getting Started
-description: Start using DecayCore for acoustic measurement, FIR room correction and CamillaDSP-compatible convolution filters.
+description: Download DecayCore, measure or import your speakers, create your first FIR filters, and verify the result.
 permalink: /getting-started/
 ---
 
-DecayCore is designed to measure your system, generate FIR room correction filters, and export convolution-ready WAV filters for CamillaDSP and other FIR-capable DSP engines. Its correction philosophy is cuts first, bounded shaping second, and boost only conservatively where the measurement supports it.
+This is the shortest path from downloading DecayCore to using a verified pair of correction filters.
 
-## Recommended workflow
+## Before you start
 
-1. Download the latest release build.
-2. Measure your speakers with DecayCore's built-in measurement workflow, or import existing compatible measurement files.
-   - Built-in measurement: Measurement has been verified to work on Windows. Linux has been verified to work at least on Ubuntu 22.04. macOS could not be tested due to unavailable test hardware.
-   - Subwoofer measurement on Windows: Ensure your playback device is configured for 5.1 or 7.1 multichannel in Windows Sound settings.
-3. Review the measured response.
-4. Choose a filter mode and target behavior.
-   - Start from conservative settings. DecayCore is not intended to flatten every dip with boost.
-5. Generate FIR correction filters.
-6. Export WAV filters.
-7. Load the filters into CamillaDSP or another convolution engine.
+You need a calibrated measurement microphone, a way to play the measurement sweep, and a playback system that accepts FIR convolution filters. For most users, the packaged release is the right choice because it includes guided measurement and Automatic mode.
 
-## Filter modes
+## 1. Download and open DecayCore
 
-DecayCore supports:
+1. Download the package for your operating system from [GitHub Releases](https://github.com/VilhoValittu/DecayCore/releases/latest).
+2. Extract the archive and start DecayCore.
+3. If the browser does not open, go to `http://127.0.0.1:8080`.
 
-- Linear Phase
-- Minimum Phase
-- Mixed Phase
-- Asymmetric FIR filters
+See the [Installation guide]({{ '/installation/' | relative_url }}) for platform-specific steps or source installation.
 
-Each mode has different tradeoffs in latency, phase behavior, pre-ringing risk, and correction behavior.
+## 2. Measure your speakers
 
-## External measurement compatibility
+The recommended method is the guided workflow on the **Measure** page:
 
-External measurement data, including REW-style data, may be used in compatible workflows. For new users, DecayCore's own measurement workflow is preferred because it is designed for the program's correction pipeline.
+1. Connect your calibrated microphone.
+2. Load its calibration file.
+3. Measure Left and Right separately.
+4. Save the session and load the resulting impulse-response WAV files on the **Files** page.
+
+You can instead import compatible REW text exports containing frequency, magnitude, and phase, or mono impulse-response WAV files. See [Measurement]({{ '/measurement-workflow/' | relative_url }}) for platform support, subwoofer routing, and export requirements.
+
+## 3. Start with Automatic mode
+
+For a first run in a packaged release:
+
+- Mode: **DecayCore automatic mode (recommended)**
+- Filter type: **Asymmetric**
+- AUTO goal: **balanced**
+- Target strategy: **Auto: search best built-in**
+- Max boost: leave the default conservative limit
+
+Automatic mode searches and ranks several guarded presets. Avoid trying to fill deep dips with extra boost; moving the speakers, changing the crossover, or treating the room is usually more effective.
+
+Source checkouts do not include the packaged Automatic mode engine. Use **Basic** for a conservative manual starting point when running from source.
+
+## 4. Generate and inspect
+
+1. Open **START / Results** and press **START**.
+2. Wait for the run to finish.
+3. Review warnings, the selected solution, response plots, and the summary.
+4. If a critical health check appears, correct its cause before exporting.
+
+## 5. Export and load the filters
+
+Download the result ZIP or open the output folder shown on the results page. It contains convolution-ready WAV filters and supporting configuration files.
+
+- **CamillaDSP:** use the generated YAML or load the left and right WAV files into convolution filters.
+- **Roon:** load the ZIP or compatible WAV set in Convolution.
+- **Equalizer APO:** use the Convolution filter and leave enough preamp headroom.
+
+## 6. Measure again
+
+Activate the filters at a reduced listening level and repeat the measurement. Confirm that:
+
+- the broad response moved in the intended direction
+- bass did not become weak or excessively boosted
+- the playback chain does not clip
+- left and right channel assignment is correct
+
+Do not judge success from the generated graph alone. The verification measurement includes the real playback chain and room.
+
+## Next steps
+
+- [User Manual]({{ '/User_Manual.html' | relative_url }}) — settings, outputs, deployment, and troubleshooting
+- [Reading DecayCore Output]({{ '/DecayCore_Reading_Output_Guide.html' | relative_url }}) — result graphs and summary fields
+- [Engineering DecayCore]({{ '/engineering/' | relative_url }}) — correction principles and technical references

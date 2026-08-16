@@ -1,5 +1,12 @@
 # config_delete
 
+> **The same cleanup is available inside the app.** Open **About DecayCore** in
+> the header and use the **Maintenance** section: *Clear automatic-mode caches*
+> and *Reset settings to defaults* are separate actions, each with a
+> confirmation step. Use the scripts below when DecayCore will not start, or
+> when you want to clean up the legacy `~/.camillafir` directory, which the
+> in-app reset does not touch.
+
 Maintenance scripts that remove DecayCore's **automatic-mode disk caches**
 (Optuna journals, the auto-mode result cache, and filter priors) and its
 **`config.json`** from the default per-user storage locations. Use these to

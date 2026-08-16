@@ -4,9 +4,11 @@ description: Interpret DecayCore result files, plots, metrics, confidence indica
 hide_page_heading: true
 ---
 
-# Reading DecayCore Output (Current Behavior)
+# Reading DecayCore Output
 
-This guide reflects the current code path in DecayCore (v4.0.x line).
+## In brief
+
+Start with System Health and the summary, then inspect magnitude, filter demand, phase, group delay, and the final impulse. A generated graph is a prediction; confirm the result with a new measurement.
 
 ## 1. What you get after a run
 
@@ -18,12 +20,11 @@ DecayCore produces:
    - Summary report (`Summary_<type>_<fs>Hz.txt`)
    - Convolver configs (`Config_...cfg`, `camilladsp_...yml`)
 
-Important current detail:
-- ZIP dashboard PNG export is currently disabled by default.
+The ZIP focuses on filters, configurations, and summary data. Use the interactive result graphs in the application for visual inspection.
 
 ## 2. Reading the dashboard (UI)
 
-The UI dashboard has 5 panels:
+The result view groups the plots by purpose:
 
 ### 2.1 Magnitude and Alignment
 
@@ -31,32 +32,34 @@ Shows:
 - Measured (blue)
 - Target (green dashed)
 - Predicted (orange)
-- Confidence line (magenta)
 - Level reference line and smart scan window shading
 - Correction range shading (`mag_c_min` to `mag_c_max`)
 
 Read it like this:
 - Predicted should track target without narrow high-Q spikes.
-- Red-tinted bands indicate low confidence regions.
 - Strong LF lift means headroom risk; check Summary headroom section.
 
-### 2.2 Phase
+### 2.2 Confidence
+
+Shows measurement confidence on a 0–100% scale. Low confidence reduces correction authority and is a reason to inspect the measurement before increasing correction strength.
+
+### 2.3 Phase
 
 Shows wrapped phase of the predicted response.
 Use it mainly to see whether behavior looks smooth around crossover and correction limits.
 
-### 2.3 Group Delay
+### 2.4 Group Delay
 
 Highlights delay structure over frequency.
 - Broad LF structures often relate to room modes.
 - Sharp local spikes can indicate reflection-related behavior.
 
-### 2.4 Filter (dB)
+### 2.5 Filter (dB)
 
 This is the FIR gain curve after level-compensated plotting.
 Use it to confirm boost/cut aggressiveness and low-frequency policy behavior.
 
-### 2.5 A-FDW Effective BW (oct)
+### 2.6 A-FDW Effective BW (oct)
 
 Shows effective adaptive bandwidth when available.
 If unavailable, the panel displays "No A-FDW BW data (...)". This is expected in some modes.
@@ -143,6 +146,3 @@ Use these first:
   - Re-verify measurement consistency
 
 Use re-measurement with filter enabled as the final validation.
-
-### Disclaimer
-AI was used to translate this document from Finnish to English.

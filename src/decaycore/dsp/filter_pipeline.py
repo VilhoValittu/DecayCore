@@ -32,7 +32,7 @@ from .dsp_phase_ir import run_phase_ir_stage
 from .dsp_preprocess import run_preprocess
 from .dsp_utils import cfg_float_allow_zero as _cfg_float_allow_zero
 from .hpf_policy import HPF_IIR_TAP_THRESHOLD, filter_config_should_use_iir_hpf
-from .hybrid_iir import HybridIIRPolicy, design_hybrid_iir, peaking_eq_response
+from .hybrid_iir import HybridIIRPolicy, design_hybrid_iir
 from .modal_analysis_parts import detect_room_modes
 from .phase import remove_time_of_flight
 from .residual_authority import build_residual_authority_caps
@@ -120,43 +120,6 @@ def _hybrid_iir_modal_analysis_axis(
         if dense.size >= 8:
             return dense, "fixed_262144"
     return np.asarray(native_freq, dtype=float).reshape(-1), "native_fallback"
-
-
-def _hybrid_iir_native_result(result, native_freq: np.ndarray, fs: float):
-    freq = np.asarray(native_freq, dtype=float).reshape(-1)
-    response = np.ones(freq.size, dtype=complex)
-    transfer_response = np.ones(freq.size, dtype=complex)
-    for biquad in result.biquads:
-        response *= peaking_eq_response(freq, float(fs), biquad.freq_hz, biquad.q, biquad.gain_db)
-        if float(getattr(biquad, "transfer_cut_db", 0.0) or 0.0) > 0.0:
-            transfer_response *= peaking_eq_response(
-                freq,
-                float(fs),
-                biquad.freq_hz,
-                biquad.q,
-                -float(biquad.transfer_cut_db),
-            )
-    mag_db = 20.0 * np.log10(np.maximum(np.abs(response), 1e-12))
-    transfer_mag_db = 20.0 * np.log10(np.maximum(np.abs(transfer_response), 1e-12))
-    phase_rad = np.unwrap(np.angle(response)) if response.size else np.asarray([], dtype=float)
-    return replace(
-        result,
-        response=response,
-        mag_db=np.nan_to_num(mag_db, nan=0.0, posinf=0.0, neginf=0.0),
-        phase_rad=np.nan_to_num(phase_rad, nan=0.0, posinf=0.0, neginf=0.0),
-        transfer_mag_db=np.nan_to_num(
-            transfer_mag_db,
-            nan=0.0,
-            posinf=0.0,
-            neginf=0.0,
-        ),
-        residual_extra_mag_db=np.nan_to_num(
-            mag_db - transfer_mag_db,
-            nan=0.0,
-            posinf=0.0,
-            neginf=0.0,
-        ),
-    )
 
 
 def _hybrid_iir_dense_gd_from_phase(
@@ -349,6 +312,8 @@ def _apply_hybrid_iir_preconditioning(
             modal_freq=modal_freq,
             max_cut_db=float(policy.max_cut_db),
         )
+        # Moodit etsitaan tihealta modaaliakselilta, mutta vaste syntetisoidaan
+        # suoraan natiiviakselille - samaa vastetta ei lasketa kahdesti.
         result = design_hybrid_iir(
             modal.events,
             modal_freq,
@@ -358,8 +323,8 @@ def _apply_hybrid_iir_preconditioning(
             residual_events=residual_modal.events,
             fir_gain_db=fir_gain_dense,
             residual_cut_cap_db=residual_cut_caps,
+            response_freq_axis=native_freq,
         )
-        result = _hybrid_iir_native_result(result, native_freq, float(getattr(cfg, "fs", 0) or 0))
     except (
         AttributeError,
         TypeError,

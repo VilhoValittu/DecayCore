@@ -34,6 +34,7 @@ logger = logging.getLogger("DecayCore")
 
 from .. import ng_controls as ctrl
 from ..ng_sections import page_shell, section_card
+from ..ng_timers import page_timer
 from ...config.legacy_keys import CAMILLAFIR_AUTO_MODE
 from ...app_paths import default_measurements_dir
 from ...ui_i18n import (
@@ -474,7 +475,7 @@ class _FilesTabContext:
             ):
                 logger.exception("measurement library refresh task scheduling failed")
 
-        self.ui.timer(0.0 if force else max(float(delay_s), 0.0), _run, once=True, immediate=False)
+        page_timer(0.0 if force else max(float(delay_s), 0.0), _run, once=True, immediate=False)
 
     def use_default_measurement_library(self) -> None:
         self.set_input_value(

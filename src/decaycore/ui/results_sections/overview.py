@@ -424,32 +424,40 @@ def _rank_delta_display(polish: dict) -> str:
     return ""
 
 
+def _polish_label(*, plain: bool, label_key: str, technical: str) -> str:
+    """Row label: plain wording for the run panel, parameter name for diagnostics."""
+    return t(label_key) if plain else technical
+
+
 def _build_numeric_polish_line(
     auto_meta: dict,
     *,
     meta_key: str,
     label: str,
+    label_key: str,
     start_key: str,
     final_key: str,
     precision: int,
     unit: str = "",
+    plain: bool = False,
 ) -> str | None:
     polish = dict(auto_meta.get(meta_key, {}) or {})
     if not bool(polish.get("applicable", False)):
         return None
     start = safe_float(polish.get(start_key, float("nan")), float("nan"))
     final = safe_float(polish.get(final_key, float("nan")), float("nan"))
-    rank_delta = _rank_delta_display(polish)
+    rank_delta = "" if plain else _rank_delta_display(polish)
+    shown = _polish_label(plain=plain, label_key=label_key, technical=label)
     if bool(polish.get("applied", False)):
-        return f"✓ {label}: applied ({start:.{precision}f} → {final:.{precision}f}{unit}{rank_delta})"
-    return f"– {label}: tested, no change (kept {final:.{precision}f}{unit})"
+        return f"✓ {shown}: applied ({start:.{precision}f} → {final:.{precision}f}{unit}{rank_delta})"
+    return f"– {shown}: tested, no change (kept {final:.{precision}f}{unit})"
 
 
 def _hpf_polish_label(enabled: bool, freq: float, slope: int) -> str:
     return "HPF off" if not enabled else f"HPF {freq:.1f} Hz/{slope} dB/oct"
 
 
-def _build_hpf_polish_line(auto_meta: dict) -> str | None:
+def _build_hpf_polish_line(auto_meta: dict, *, plain: bool = False) -> str | None:
     hpf = dict(auto_meta.get("hpf_winner_polish", {}) or {})
     if not bool(hpf.get("applicable", False)):
         return None
@@ -459,16 +467,17 @@ def _build_hpf_polish_line(auto_meta: dict) -> str | None:
     f_en = bool(hpf.get("final_enabled", False))
     f_fr = safe_float(hpf.get("final_freq_hz", float("nan")), float("nan"))
     f_sl = int(round(safe_float(hpf.get("final_slope_db_oct", 0.0), 0.0)))
-    rank_delta = _rank_delta_display(hpf)
+    rank_delta = "" if plain else _rank_delta_display(hpf)
+    shown = _polish_label(plain=plain, label_key="auto_polish_label_hpf", technical="HPF")
     if bool(hpf.get("applied", False)):
         return (
-            f"✓ HPF: applied ("
+            f"✓ {shown}: applied ("
             f"{_hpf_polish_label(s_en, s_fr, s_sl)} → {_hpf_polish_label(f_en, f_fr, f_sl)}{rank_delta})"
         )
-    return f"– HPF: tested, no change (kept {_hpf_polish_label(f_en, f_fr, f_sl)})"
+    return f"– {shown}: tested, no change (kept {_hpf_polish_label(f_en, f_fr, f_sl)})"
 
 
-def _build_residual_peak_polish_line(auto_meta: dict) -> str | None:
+def _build_residual_peak_polish_line(auto_meta: dict, *, plain: bool = False) -> str | None:
     rp = dict(auto_meta.get("residual_peak_winner_polish", {}) or {})
     if not bool(rp.get("applicable", False)):
         return None
@@ -476,33 +485,42 @@ def _build_residual_peak_polish_line(auto_meta: dict) -> str | None:
     pa = safe_float(rp.get("worst_peak_after_db", float("nan")), float("nan"))
     ph = safe_float(rp.get("worst_peak_freq_hz", float("nan")), float("nan"))
     peak_pos = f" @ {ph:.1f} Hz" if math.isfinite(ph) else ""
-    rank_delta = _rank_delta_display(rp)
+    rank_delta = "" if plain else _rank_delta_display(rp)
+    shown = _polish_label(plain=plain, label_key="auto_polish_label_residual_peak", technical="Residual-peak")
     if bool(rp.get("applied", False)):
-        return f"✓ Residual-peak: applied ({pb:.2f} → {pa:.2f} dB{peak_pos}{rank_delta})"
+        return f"✓ {shown}: applied ({pb:.2f} → {pa:.2f} dB{peak_pos}{rank_delta})"
     if bool(rp.get("enabled", False)):
-        return f"– Residual-peak: tested, no change (peak {pa:.2f} dB{peak_pos})"
+        return f"– {shown}: tested, no change (peak {pa:.2f} dB{peak_pos})"
     return None
 
 
-def _build_stereo_policy_polish_line(auto_meta: dict) -> str | None:
+def _build_stereo_policy_polish_line(auto_meta: dict, *, plain: bool = False) -> str | None:
     sp = dict(auto_meta.get("stereo_policy_refine", {}) or {})
     if not bool(sp.get("applicable", False)):
         return None
     sp_state = str(sp.get("state", "") or "")
+    shown = _polish_label(plain=plain, label_key="auto_polish_label_stereo_policy", technical="Stereo-policy")
     if sp_state == "applied":
-        return "✓ Stereo-policy: applied"
+        return f"✓ {shown}: applied"
     if sp_state:
-        return f"– Stereo-policy: tested, no change ({sp_state})"
+        return f"– {shown}: tested, no change ({sp_state})"
     return None
 
 
-def _build_auto_polish_lines(auto_meta: dict) -> list[str]:
+def _build_auto_polish_lines(auto_meta: dict, *, plain: bool = False) -> list[str]:
+    """Build the winner-polish summary rows.
+
+    ``plain`` renders the rows for the run status panel: plain-language labels
+    and no rank numbers. The default renders them for the results diagnostics
+    block, which reports parameter names and the acoustic score on purpose.
+    """
     lines: list[str] = []
 
     numeric_specs = (
         (
             "phase_limit_winner_polish",
             "Phase-limit",
+            "auto_polish_label_phase_limit",
             "start_phase_limit_hz",
             "final_phase_limit_hz",
             1,
@@ -511,6 +529,7 @@ def _build_auto_polish_lines(auto_meta: dict) -> list[str]:
         (
             "mag_c_min_winner_polish",
             "Mag-c-min",
+            "auto_polish_label_mag_c_min",
             "start_mag_c_min_hz",
             "final_mag_c_min_hz",
             1,
@@ -519,6 +538,7 @@ def _build_auto_polish_lines(auto_meta: dict) -> list[str]:
         (
             "low_bass_cut_winner_polish",
             "Low-bass-cut",
+            "auto_polish_label_low_bass_cut",
             "start_low_bass_cut_hz",
             "final_low_bass_cut_hz",
             1,
@@ -527,21 +547,24 @@ def _build_auto_polish_lines(auto_meta: dict) -> list[str]:
         (
             "excess_phase_strength_winner_polish",
             "Excess-phase-strength",
+            "auto_polish_label_excess_phase",
             "start_value",
             "final_value",
             4,
             "",
         ),
     )
-    for meta_key, label, start_key, final_key, precision, unit in numeric_specs:
+    for meta_key, label, label_key, start_key, final_key, precision, unit in numeric_specs:
         line = _build_numeric_polish_line(
             auto_meta,
             meta_key=meta_key,
             label=label,
+            label_key=label_key,
             start_key=start_key,
             final_key=final_key,
             precision=precision,
             unit=unit,
+            plain=plain,
         )
         if line:
             lines.append(line)
@@ -551,7 +574,7 @@ def _build_auto_polish_lines(auto_meta: dict) -> list[str]:
         _build_residual_peak_polish_line,
         _build_stereo_policy_polish_line,
     ):
-        line = builder(auto_meta)
+        line = builder(auto_meta, plain=plain)
         if line:
             lines.append(line)
 
@@ -581,7 +604,7 @@ def _append_auto_polish_to_status_log(*, data: dict) -> None:
     if not (auto_enabled and isinstance(auto_meta, dict)):
         return
 
-    lines = _build_auto_polish_lines(auto_meta)
+    lines = _build_auto_polish_lines(auto_meta, plain=True)
     if not lines:
         return
 

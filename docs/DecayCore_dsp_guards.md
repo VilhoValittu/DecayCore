@@ -6,6 +6,10 @@ hide_page_heading: true
 
 # DecayCore DSP Guards Reference
 
+## In brief
+
+Principled guards define acceptable acoustic behavior. Technical guards prevent invalid math, unsafe array state, and unstable FIR output. This page is the complete guard reference, not a tuning guide.
+
 This document defines all major guard mechanisms in the DSP pipeline and classifies them as either:
 
 - **Principled Guard** → Part of DSP philosophy (defines intended acoustic behavior)
@@ -323,7 +327,4 @@ Technical guards must never be disabled.
 ---
 
 ### 1. Overview
-![Overview](pics/DecayCore_dsp_guards.png)
-
-### Disclaimer
-AI was used to translate this document from Finnish to English.
+![Overview of DecayCore DSP guard relationships]({{ '/pics/DecayCore_dsp_guards.png' | relative_url }})

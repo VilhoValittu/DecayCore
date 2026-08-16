@@ -15,6 +15,8 @@ import re
 from collections import deque
 from typing import Callable
 
+from . import auto_status_detail as _auto_detail
+
 logger = logging.getLogger("DecayCore")
 
 _STATUS_BASE_MSG = ""
@@ -25,6 +27,8 @@ _STATUS_INFO_TEXT = ""
 _AUTO_SELECTED_BAR_MSG = ""
 _AUTO_STATUS_DETAILS: deque[str] = deque(maxlen=1000)
 _AUTO_STATUS_LAST_DETAIL = ""
+_AUTO_STATUS_LAST_GROUP = ""
+_AUTO_TRIAL_TRACKER = _auto_detail.TrialGroupTracker()
 _RUN_WALL_CLOCK_TEXT = ""
 _LAST_RUN_INFO: dict = {}
 _STATUS_RENDERER: Callable[..., None] | None = None
@@ -241,22 +245,9 @@ def _compact_auto_status_legacy(after: str) -> str:
         compact = helper(after)
         if compact is not None:
             return compact
-    try:
-        clean = re.sub(r"\s*\(.*\)\s*$", "", after).strip()
-    except (
-        RuntimeError,
-        OSError,
-        ImportError,
-        TypeError,
-        ValueError,
-        AttributeError,
-        KeyError,
-        IndexError,
-        OverflowError,
-        FloatingPointError,
-    ):
-        clean = after
-    return f"Auto · {clean}" if clean else "Auto · running"
+    # Unmapped lines fall back to a neutral label so internal wording never
+    # leaks into the progress bar.
+    return _auto_detail.compact_running_text()
 
 
 def _compact_auto_status_core(core: str) -> str:
@@ -279,6 +270,9 @@ def _compact_auto_status_core(core: str) -> str:
     if bracket_m:
         target = bracket_m.group(1).strip()
         after_colon = bracket_m.group(2).strip()
+        trial = _auto_detail.parse_trial_line(after_colon)
+        if trial is not None:
+            return _auto_detail.format_trial_compact(trial, target=target)
         return _compact_auto_status_bracket(after_colon).format(target=target)
     prefix = "DecayCore automatic mode:"
     if not s.startswith(prefix):
@@ -708,7 +702,8 @@ def _auto_status_detail_refine(after: str, low: str, f, r, t) -> str | None:
     return None
 
 
-def _humanize_auto_status_detail(msg: str) -> str:
+def _humanize_auto_status_detail_or_none(msg: str) -> _auto_detail.AutoDetailRow | None:
+    """Render a legacy ``DecayCore automatic mode:`` line, or None if unmapped."""
     from ..resources.i8n.decaycore_i18n import t  # noqa: PLC0415
 
     def _f(key, **kw):
@@ -732,12 +727,14 @@ def _humanize_auto_status_detail(msg: str) -> str:
         OverflowError,
         FloatingPointError,
     ):
-        return msg
+        return None
     if not s.startswith(prefix):
-        return s
+        return None
     after = s[len(prefix) :].strip()
     low = after.lower()
     try:
+        if _auto_detail.is_hidden_legacy(low):
+            return None
         for parser in (
             _auto_status_detail_init,
             _auto_status_detail_protection,
@@ -746,7 +743,8 @@ def _humanize_auto_status_detail(msg: str) -> str:
         ):
             parsed = parser(after, low, _f, _r, t)
             if parsed is not None:
-                return parsed
+                return _auto_detail.AutoDetailRow(parsed)
+        return _auto_detail.render_legacy_extra(after, low)
     except (
         RuntimeError,
         OSError,
@@ -760,7 +758,36 @@ def _humanize_auto_status_detail(msg: str) -> str:
         FloatingPointError,
     ):
         logger.exception("auto status detail parse")
-    return s
+    return None
+
+
+def _humanize_auto_status_detail(msg: str) -> str:
+    row = _humanize_auto_status_detail_or_none(msg)
+    if row is not None:
+        return row.text
+    return str(msg or "").strip()
+
+
+def _render_auto_status_row(core: str) -> _auto_detail.AutoDetailRow | None:
+    """Render one panel row for an automatic-mode status line.
+
+    Returns None when the line carries no user-facing meaning; such lines stay
+    in the logs but are kept out of the panel.
+    """
+    s = str(core or "").strip()
+    bracket_m = _auto_detail.BRACKET_RE.match(s)
+    if bracket_m is None:
+        return _humanize_auto_status_detail_or_none(s)
+    trial = _auto_detail.parse_trial_line(bracket_m.group(2).strip())
+    if trial is None:
+        return None
+    _AUTO_TRIAL_TRACKER.observe(trial)
+    text = _auto_detail.format_trial_row(
+        trial,
+        improvements=_AUTO_TRIAL_TRACKER.improvements,
+        reason=_AUTO_TRIAL_TRACKER.dominant_reason,
+    )
+    return _auto_detail.AutoDetailRow(text, group=trial.group)
 
 
 def _suppress_auto_status_detail(core: str) -> bool:
@@ -959,16 +986,29 @@ def _notify_renderer(event: str) -> None:
         logger.debug("UI status renderer update failed", exc_info=True)
 
 
+def _append_auto_status_row(row: _auto_detail.AutoDetailRow) -> None:
+    """Append a rendered row, replacing the previous one in the same group."""
+    global _AUTO_STATUS_LAST_DETAIL, _AUTO_STATUS_LAST_GROUP
+    same_group = bool(row.group) and row.group == str(_AUTO_STATUS_LAST_GROUP or "")
+    if same_group and len(_AUTO_STATUS_DETAILS) > 0:
+        _AUTO_STATUS_DETAILS[-1] = row.text
+    elif row.text != str(_AUTO_STATUS_LAST_DETAIL or ""):
+        _AUTO_STATUS_DETAILS.append(row.text)
+    _AUTO_STATUS_LAST_DETAIL = row.text
+    _AUTO_STATUS_LAST_GROUP = row.group
+
+
 def update_status(msg) -> None:
-    global _STATUS_BASE_MSG, _STATUS_LAST_TEXT, _AUTO_STATUS_DETAILS, _AUTO_STATUS_LAST_DETAIL
+    global _STATUS_BASE_MSG, _STATUS_LAST_TEXT
     text, detail = _status_compact_with_detail(msg)
     _STATUS_BASE_MSG = _status_base_from_text(text)
     _STATUS_LAST_TEXT = str(text or "")
     if isinstance(detail, str) and detail.strip():
-        detail_txt = _humanize_auto_status_detail(str(detail).strip())
-        if detail_txt != str(_AUTO_STATUS_LAST_DETAIL or ""):
-            _AUTO_STATUS_LAST_DETAIL = detail_txt
-            _AUTO_STATUS_DETAILS.append(detail_txt)
+        row = _render_auto_status_row(detail.strip())
+        if row is None:
+            logger.debug("auto status detail unmapped: %s", detail.strip())
+        else:
+            _append_auto_status_row(row)
     _notify_renderer("status")
 
 
@@ -1025,18 +1065,21 @@ def get_last_run_info() -> dict:
 
 
 def reset_auto_status_details() -> None:
-    global _AUTO_STATUS_DETAILS, _AUTO_STATUS_LAST_DETAIL
-    _AUTO_STATUS_DETAILS = []
+    global _AUTO_STATUS_DETAILS, _AUTO_STATUS_LAST_DETAIL, _AUTO_STATUS_LAST_GROUP
+    _AUTO_STATUS_DETAILS = deque(maxlen=1000)
     _AUTO_STATUS_LAST_DETAIL = ""
+    _AUTO_STATUS_LAST_GROUP = ""
+    _AUTO_TRIAL_TRACKER.reset()
     _notify_renderer("reset_auto_status_details")
 
 
 def append_auto_status_detail_raw(line: str) -> None:
-    global _AUTO_STATUS_DETAILS, _AUTO_STATUS_LAST_DETAIL
+    global _AUTO_STATUS_LAST_DETAIL, _AUTO_STATUS_LAST_GROUP
     txt = str(line or "").strip()
     if not txt:
         return
     _AUTO_STATUS_LAST_DETAIL = txt
+    _AUTO_STATUS_LAST_GROUP = ""
     _AUTO_STATUS_DETAILS.append(txt)
     _notify_renderer("status")
 

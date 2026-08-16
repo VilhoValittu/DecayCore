@@ -6,6 +6,10 @@ hide_page_heading: true
 
 # Stability and Reproducibility
 
+## In brief
+
+Repeatable results require identical measurements, settings, application behavior, and comparison context. DecayCore combines deterministic processing, bounded correction, versioned compatibility, and exported diagnostics to make differences inspectable.
+
 DecayCore is designed to avoid the classic failure mode:
 
 **small measurement or setting changes -> large unstable filter changes**
@@ -119,6 +123,3 @@ If two runs differ, diagnostics help explain why.
 8. Compare Summary outputs and timing data when validating repeated runs.
 
 **Bottom line:** DecayCore is reproducible because correction strength is bounded, phase is safety-limited, and the full run is observable end-to-end.
-
-### Disclaimer
-AI was used to translate this document from Finnish to English.

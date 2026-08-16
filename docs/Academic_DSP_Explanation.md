@@ -7,6 +7,10 @@ hide_page_heading: true
 # DecayCore: Time-Domain-First FIR Room Correction
 ## Academic DSP Rationale and Mathematical Foundations
 
+## In brief
+
+This page records the mathematical model behind DecayCore. It is the equation-level companion to the practical rationale and technical reference.
+
 ### Abstract
 DecayCore is a FIR room-correction framework that separates:
 - propagation delay (time of flight),
@@ -79,7 +83,7 @@ When comparison mode is enabled, analysis metrics are additionally projected to 
 
 ---
 
-## 5. Magnitude correction pipeline (current implementation)
+## 5. Magnitude correction pipeline
 
 ### 5.1 Raw gain
 \[
@@ -197,7 +201,7 @@ IR export windowing (auto/off/rew_sym/rew_asym; Hann/Tukey) is applied after DSP
 
 ---
 
-## 9. Stability summary (current)
+## 9. Stability summary
 
 DecayCore stability is based on layered constraints:
 - TOF removed before phase correction,
@@ -207,11 +211,8 @@ DecayCore stability is based on layered constraints:
 - bounded phase correction with adaptive clamp and mixed guards,
 - optional fixed comparison grid for repeatable scoring.
 
-### Disclaimer
-AI was used to translate this document from Finnish to English.
-
 ## Implementation Details
 The stability of DecayCore is based on layered constraints and confidence-aware smoothing.
 
-- **[Learn about FIR vs IIR]({{ site.baseurl }}/Comparison_vs_EQ.html)** – How these academic principles apply in practice.
-- **[DecayCore Home]({{ site.baseurl }}/)** – Back to the main FIR filter generator page.
+- [DecayCore vs conventional EQ]({{ '/Comparison_vs_EQ.html' | relative_url }}) — how these principles change the correction workflow
+- [Technical Reference]({{ '/Official_Manual.html' | relative_url }}) — pipeline stages, controls, and exports

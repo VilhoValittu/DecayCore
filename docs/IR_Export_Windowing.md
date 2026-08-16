@@ -6,6 +6,10 @@ hide_page_heading: true
 
 # IR Export Windowing vs DSP Correction
 
+## In brief
+
+DSP correction decides the response of the filter. Export windowing decides how that response is placed and limited in time. Changing the export window does not rerun target matching.
+
 In DecayCore, **IR export windowing** and **DSP correction** are intentionally treated as two separate stages.
 This separation is fundamental for clarity, reproducibility, and meaningful A/B comparisons.
 
@@ -74,6 +78,3 @@ For this reason, DecayCore:
 In short:
 **DSP correction defines the filter behavior.
 IR export windowing defines how that behavior is packaged in time.**
-
-### Disclaimer
-AI was used to translate this document from Finnish to English.
