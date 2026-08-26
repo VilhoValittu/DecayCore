@@ -114,14 +114,16 @@ def _measurement_required_output_channels(
 def _pick_measurement_device_value(
     current_value,
     saved_default,
-    options: dict[int, str],
+    options: dict[object, str],
 ):
     def _coerce(candidate):
+        if candidate in options:
+            return candidate
         try:
-            parsed = int(candidate)
+            legacy_prefix = f"{int(candidate)}: "
         except (TypeError, ValueError, OverflowError):
             return None
-        return parsed if parsed in options else None
+        return next((key for key, label in options.items() if str(label).startswith(legacy_prefix)), None)
 
     current = _coerce(current_value)
     if current is not None:

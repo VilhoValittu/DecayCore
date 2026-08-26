@@ -65,3 +65,15 @@ The complete font license is included at:
 src/decaycore/ui/assets/Silkscreen-OFL.txt
 
 Source: https://github.com/google/fonts/tree/main/ofl/silkscreen
+
+7. PortAudio
+
+DecayCore Linux packages include a PortAudio library built from pinned upstream
+source with ALSA and PulseAudio host APIs enabled. PortAudio is distributed
+under the MIT-style PortAudio license.
+
+The complete license is included in Linux packages at:
+
+THIRD_PARTY_LICENSES/PortAudio-LICENSE.txt
+
+Source: https://github.com/PortAudio/portaudio

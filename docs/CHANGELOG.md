@@ -10,27 +10,31 @@ This page contains the current development notes and three latest stable release
 
 ## DecayCore
 
-## [Unreleased]
+## [1.2.5] - 26-8-2026
 
 ### UI
 
-Added a Maintenance section under **About DecayCore** in the header. It provides
-two separate recovery actions that previously required running a script from the
-repository: *Clear automatic-mode caches* (removes the Optuna journals, the
-auto-mode result cache and the learned filter priors, keeping your settings) and
-*Reset settings to defaults* (removes `config.json` and reloads the page,
-keeping the caches). Both ask for confirmation, and neither can run while a
-filter generation is in progress. Saved measurements, target presets and
-exported filters are never removed.
+Maintenance actions are now available under **About DecayCore**. Automatic-mode
+caches and settings can be reset separately without removing saved measurements,
+target presets or exported filters.
 
+### Linux audio
+
+Linux packages now use the system audio libraries instead of bundling the Ubuntu
+audio stack. Build and CI checks prevent incompatible audio libraries from being
+included in release artifacts.
+
+Opening the device list no longer opens or probes every ALSA device. PipeWire,
+PulseAudio and the system default are prioritized over direct hardware devices.
+Audio devices are stored using a stable host API and name identifier, resolved
+again before opening a stream, and missing devices now produce a clear error.
+Audio backend and device details are also included in the logs for diagnostics.
 
 ### Run
 
-Starting a run without measurements is now blocked with a clear message instead
-of appearing to hang. Missing or unreadable L/R measurements are treated as a
-blocking error in every mode, and the error toast now includes the instruction
-for fixing it. If a measurement file cannot be read, the status line reports the
-failure instead of remaining on "Reading...".
+Starting a run without readable left and right measurements is now blocked with
+a clear message in every mode. Measurement loading failures are shown in the
+status line instead of leaving the run at "Reading...".
 
 ## [1.2.4] - 14-8-2026
 

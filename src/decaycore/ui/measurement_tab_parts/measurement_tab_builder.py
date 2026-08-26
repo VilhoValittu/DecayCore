@@ -46,6 +46,8 @@ from ...measurement.devices import (
     list_measurement_output_devices,
     list_wasapi_input_devices,
     list_wasapi_output_devices,
+    measurement_device_stable_id,
+    resolve_measurement_device_index,
 )
 from ...measurement.io import save_measurement_bundle
 from ...measurement.models import (
@@ -295,7 +297,7 @@ class _MeasurementTabContext:
         return message is None
 
     # --- device options ----------------------------------------------------
-    def input_device_options(self, *, use_wasapi: bool | None = None) -> dict[int, str]:
+    def input_device_options(self, *, use_wasapi: bool | None = None) -> dict[str, str]:
         if not self.refresh_backend_message():
             return {}
         enabled = self.default_use_wasapi if use_wasapi is None else _measurement_use_wasapi_value(use_wasapi)
@@ -304,11 +306,13 @@ class _MeasurementTabContext:
         else:
             input_devices = list_measurement_input_devices(self.measurement_samplerate, channels=1)
         return {
-            int(device.index): _device_option_label(device, samplerate_hz=self.measurement_samplerate)
+            measurement_device_stable_id(device): _device_option_label(
+                device, samplerate_hz=self.measurement_samplerate
+            )
             for device in input_devices
         }
 
-    def output_device_options_for_role(self, role_value: str, *, use_wasapi: bool | None = None) -> dict[int, str]:
+    def output_device_options_for_role(self, role_value: str, *, use_wasapi: bool | None = None) -> dict[str, str]:
         if not self.refresh_backend_message():
             return {}
         enabled = self.default_use_wasapi if use_wasapi is None else _measurement_use_wasapi_value(use_wasapi)
@@ -324,7 +328,9 @@ class _MeasurementTabContext:
         else:
             output_devices = list_measurement_output_devices(self.measurement_samplerate, channels=required_channels)
         return {
-            int(device.index): _device_option_label(device, samplerate_hz=self.measurement_samplerate)
+            measurement_device_stable_id(device): _device_option_label(
+                device, samplerate_hz=self.measurement_samplerate
+            )
             for device in output_devices
         }
 
@@ -403,9 +409,15 @@ class _MeasurementTabContext:
             ),
         )
         session_channel_key = requested_role if requested_role in ("sub1", "sub2") else role
+        input_device_id = str(ctrl.value("measurement_input_device", "") or "").strip()
+        output_device_id = str(ctrl.value("measurement_output_device", "") or "").strip()
+        input_device_index = resolve_measurement_device_index(input_device_id)
+        output_device_index = resolve_measurement_device_index(output_device_id)
         return MeasurementRequest(
-            input_device_index=_int("measurement_input_device", -1),
-            output_device_index=_int("measurement_output_device", -1),
+            input_device_index=int(input_device_index) if input_device_index is not None else -1,
+            output_device_index=int(output_device_index) if output_device_index is not None else -1,
+            input_device_id=input_device_id or None,
+            output_device_id=output_device_id or None,
             samplerate=samplerate,
             sweep_start_hz=_float_config("measurement_sweep_start_hz", DEFAULT_SWEEP_START_HZ),
             sweep_end_hz=_float_config(

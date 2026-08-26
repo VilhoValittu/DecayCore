@@ -58,6 +58,14 @@ def _register_single_client_guard() -> None:
 
 
 def main():
+    if "--audio-diagnostics" in sys.argv[1:]:
+        try:
+            from decaycore.measurement.devices import measurement_audio_diagnostics_text
+        except ImportError as exc:
+            print(f"Measurement audio diagnostics are unavailable: {exc}", file=sys.stderr, flush=True)
+            return 1
+        print(measurement_audio_diagnostics_text(), flush=True)
+        return 0
     os.environ.setdefault("DECAYCORE_AUTO_PROFILE", os.environ.get("CAMILLAFIR_AUTO_PROFILE", "0"))
     configure_main_app()
     _register_single_client_guard()
@@ -78,10 +86,11 @@ def main():
         reload=False,
         title=PROGRAM_NAME,
     )
+    return 0
 
 
 if __name__ == "__main__":
     import multiprocessing
 
     multiprocessing.freeze_support()
-    main()
+    raise SystemExit(main())

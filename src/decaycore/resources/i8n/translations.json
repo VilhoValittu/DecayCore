@@ -6,7 +6,7 @@
     "notice": "# This file is part of the public source-available DecayCore repository. Non-commercial use is permitted under the terms of the LICENSE file. Commercial use requires separate written permission."
   },
   "en": {
-    "about_body": "**DecayCore** is a room correction FIR generator for DSP systems that support FIR filters.\n\n- **Author:** Vilho Valittu\n- **Contact:** 📧 [vilho.valittu@gmail.com](mailto:vilho.valittu@gmail.com)\n- **Community testing & feedback:** Patu\n- **Special Thanks:** OCA <a href='https://www.youtube.com/@ocaudiophile' target='_blank'>youtube.com/@ocaudiophile</a>\n\n☕ **Support development:** <a href='https://ko-fi.com/vilhovalittu' target='_blank'>ko-fi.com/vilhovalittu</a>",
+    "about_body": "**DecayCore** is a room correction FIR generator for DSP systems that support FIR filters.\n\n- **Author:** Vilho Valittu\n- **Contact:** 📧 [vilho.valittu@gmail.com](mailto:vilho.valittu@gmail.com)\n- **Community testing & feedback:** Patu (WIN), Vl_Po (Linux)\n- **Special Thanks:** OCA <a href='https://www.youtube.com/@ocaudiophile' target='_blank'>youtube.com/@ocaudiophile</a>\n\n☕ **Support development:** <a href='https://ko-fi.com/vilhovalittu' target='_blank'>ko-fi.com/vilhovalittu</a>",
     "about_title": "ℹ️ About DecayCore",
     "manual_close_btn": "Close",
     "open_manual_btn": "📖 User Manual",
