@@ -37,7 +37,7 @@ For a first run in a packaged release:
 - Mode: **DecayCore automatic mode (recommended)**
 - Filter type: **Asymmetric**
 - AUTO goal: **balanced**
-- Target strategy: **Auto: search best built-in**
+- Target strategy: **Adaptive: derive target from room acoustics**
 - Max boost: leave the default conservative limit
 
 Automatic mode searches and ranks several guarded presets. Avoid trying to fill deep dips with extra boost; moving the speakers, changing the crossover, or treating the room is usually more effective.

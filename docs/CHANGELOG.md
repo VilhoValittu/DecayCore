@@ -10,6 +10,46 @@ This page contains the current development notes and three latest stable release
 
 ## DecayCore
 
+## [1.2.6] - 30-8-2026
+
+### Phase correction
+
+A new phase-correction algorithm now applies full correction up to 140 Hz and
+tapers it smoothly above that point. Listening tests indicate slightly tighter
+bass.
+
+The phase plot now shows the FIR filter phase, and the group-delay plot shows
+the FIR filter group delay.
+
+### Automatic mode
+
+The adaptive curve is now the default target in Automatic mode.
+
+### Repeat measurements
+
+Bass-phase consistency between repeat measurements is now checked from
+20–300 Hz. Impulse responses from unstable repeats are no longer averaged in
+the complex domain. A deterministic medoid measurement is selected as the phase
+anchor while the averaged magnitude response is preserved.
+
+The spatially averaged magnitude response is stored in the `__analysis.npz`
+sidecar and restored when the WAV file is loaded again without altering its
+phase.
+
+Results and summary views now report the following diagnostics from 20–200 Hz:
+
+- L/R phase-difference p90
+- coherent-summation loss before FIR correction
+- coherent-summation loss after FIR correction
+- phase-reference confidence
+
+An unreliable phase reference is no longer used to derive automatic L/R phase
+correction.
+
+### Measurement
+
+WASAPI measurement reliability has been improved.
+
 ## [1.2.5] - 26-8-2026
 
 ### UI
@@ -35,51 +75,3 @@ Audio backend and device details are also included in the logs for diagnostics.
 Starting a run without readable left and right measurements is now blocked with
 a clear message in every mode. Measurement loading failures are shown in the
 status line instead of leaving the run at "Reading...".
-
-## [1.2.4] - 14-8-2026
-
-### Measurement
-
-Measurement warning texts have been clarified.
-
-### Adaptive curve
-
-The adaptive curve is now saved to the filter_mode_priors file. This enables more accurate results in automatic mode.
-
-### UI
-
-Texts have been simplified.
-The info box now moves along with the UI.
-
-### Export
-
-Multi-rate taps now scale by sample-rate family:
-44.1/48 kHz → 65536
-88.2/96 kHz → 131072
-176.4/192 kHz → 262144
-When “Generate all common filter sample rates” is active:
-target pre-fetch always uses 44.1 kHz / 65536 taps
-
-## [1.2.3] - 11-8-2026
-
-### Lower memory use after demanding runs
-
-DecayCore now limits its largest DSP caches by both entry count and retained array size. Oversized results are not kept in memory, and runtime caches are cleared when a run ends — including interrupted or failed runs. This prevents high-sample-rate processing and repeated smoothing from leaving hundreds of megabytes reserved while the application is idle, without giving up useful caching during the run itself.
-
-Statistics can now stay in array form inside the DSP pipeline and are converted only when needed for output. This avoids unnecessary intermediate copies during memory-intensive processing.
-
-### More accurate and transparent dual-sub integration
-
-When AUTO Bass Integration is enabled, the two subwoofer measurement inputs are now available directly on the Basic page. Bass Integration v5 combines separately measured subwoofers as their phase-preserving measured pressure sum, matching the shared mono sub branch used in the exported CamillaDSP configuration without inventing a virtual per-sub delay.
-
-Candidate validation now also checks the mono-centre listening scenario alongside the left and right channels and bases safety decisions on the worst result. The results view and export summary show the combined bass response, the measured timing difference between the subwoofers, the combine method, routing and scaling assumptions, and clarify that both subwoofers use one shared mono FIR filter.
-
-## [1.2.2] - 7-8-2026
-
-### Automatic mode
-
-Automatic mode is exclusive to packaged releases; source builds continue to offer the complete Basic and Advanced manual workflows.
-
-### Take your filters anywhere with one click
-
-The **Download filters (.zip)** button returns at the very bottom of the results page, letting you download all filters and configuration files directly from there — especially useful when DecayCore is running on another computer or device.

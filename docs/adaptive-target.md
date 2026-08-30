@@ -15,8 +15,8 @@ Adaptive Target makes small low-frequency changes to a stable Harman6 baseline w
 
 In AUTO mode, DecayCore can determine the target curve in three ways:
 
-- **Auto: search best built-in** — evaluates multiple built-in target curves in parallel and picks the best-ranked match. This is the default.
-- **Adaptive: derive target from room acoustics** — synthesizes a conservative Harman6-based target from broad, stereo-consistent bass evidence. Does not search built-in curves.
+- **Adaptive: derive target from room acoustics** (default) — synthesizes a conservative Harman6-based target from broad, stereo-consistent bass evidence. Does not search built-in curves.
+- **Auto: search best built-in** — evaluates multiple built-in target curves in parallel and picks the best-ranked match.
 - **Use selected target curve from Target page** — uses the target curve manually selected in the Target tab and disables automatic target search.
 
 The adaptive strategy derives its target directly from the measurements. It does not iterate across multiple candidate curves, which makes it significantly faster than the default search-based approach.
@@ -50,7 +50,7 @@ RT60 data is captured automatically when you use DecayCore's built-in measuremen
 
 When using external measurements (REW text exports, WAV impulse files from REW, or other sources), RT60 data is typically not present. The target remains valid and can still reduce an overly strong broad bass shelf, but it will not add bass lift without reliable decay evidence.
 
-**If you are using external measurements and RT60 data is not available, the default `Auto: search best built-in` strategy is generally the safer choice.** The built-in curve search evaluates how well different targets match the measured room and picks the best-ranked result regardless of RT60 data.
+**If you are using external measurements and RT60 data is not available, switching to the `Auto: search best built-in` strategy is generally the safer choice.** The built-in curve search evaluates how well different targets match the measured room and picks the best-ranked result regardless of RT60 data.
 
 ## Related pages
 

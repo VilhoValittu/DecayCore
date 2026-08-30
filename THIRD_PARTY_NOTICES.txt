@@ -70,7 +70,8 @@ Source: https://github.com/google/fonts/tree/main/ofl/silkscreen
 
 DecayCore Linux packages include a PortAudio library built from pinned upstream
 source with ALSA and PulseAudio host APIs enabled. PortAudio is distributed
-under the MIT-style PortAudio license.
+under the MIT-style PortAudio license. The build applies the duplex channel-count
+correction stored at packaging/linux/portaudio-pulseaudio-duplex-channels.patch.
 
 The complete license is included in Linux packages at:
 

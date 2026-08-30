@@ -23,7 +23,7 @@ DecayCore accepts impulse-response WAV files and text exports containing frequen
 
 1. Measure Left and Right or load compatible files on **Files**.
 2. Select **DecayCore automatic mode (recommended)** and **Asymmetric**.
-3. Keep the **balanced** goal and **Auto: search best built-in** target strategy.
+3. Keep the **balanced** goal and **Adaptive: derive target from room acoustics** target strategy.
 4. Press **START** on **START / Results**.
 5. Review warnings and the winning solution.
 6. Export the ZIP, load the filters into your convolver, and measure again.
@@ -97,8 +97,8 @@ Selecting a mode does not rewrite every visible value. Use **Apply mode defaults
 
 ### Target strategies in Automatic mode
 
-- **Auto: search best built-in** evaluates several built-in curves and selects the best-ranked result. Use this for most first runs and external measurements.
-- **Adaptive: derive target from room acoustics** starts from Harman6 and makes small, bounded low-frequency changes from stereo measurement evidence. Reliable RT60 data can permit additional bass lift, but never creates it by itself.
+- **Adaptive: derive target from room acoustics** (default) starts from Harman6 and makes small, bounded low-frequency changes from stereo measurement evidence. Reliable RT60 data can permit additional bass lift, but never creates it by itself.
+- **Auto: search best built-in** evaluates several built-in curves and selects the best-ranked result. A good alternative when measurement metadata is limited or the sources are external.
 - **Use selected target curve from Target page** uses the curve you chose or imported and skips automatic target selection.
 
 In Basic and Advanced modes, select the target directly on **Target**. A mild house curve is usually a safer starting point than a perfectly flat in-room target.

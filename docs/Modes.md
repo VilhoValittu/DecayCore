@@ -45,8 +45,8 @@ Goal: let DecayCore search for a good preset automatically.
 
 In AUTO mode, three target strategies are available from the Basic tab:
 
-- **Auto: search best built-in** (default) — evaluates multiple built-in target curves in parallel and picks the best-ranked match. Most robust choice when measurement source is unknown or external.
-- **Adaptive: derive target from room acoustics** — synthesizes a safety-bounded Harman6-based target from broad, stereo-consistent bass evidence. It reduces adaptation when channels disagree, preserves the reference above 500 Hz by default, and permits additional bass lift only with reliable stereo RT60 evidence. Skips the multi-curve search phase.
+- **Adaptive: derive target from room acoustics** (default) — synthesizes a safety-bounded Harman6-based target from broad, stereo-consistent bass evidence. It reduces adaptation when channels disagree, preserves the reference above 500 Hz by default, and permits additional bass lift only with reliable stereo RT60 evidence. Skips the multi-curve search phase.
+- **Auto: search best built-in** — evaluates multiple built-in target curves in parallel and picks the best-ranked match. Robust choice when the measurement source is unknown or external.
 - **Use selected target curve from Target page** — uses the target curve manually selected in the Target tab. Disables automatic target search.
 
 When `auto_goal` is set to "Prefer Bass", the mode is locked to `selected`.
@@ -55,6 +55,7 @@ When `auto_goal` is set to "Prefer Bass", the mode is locked to `selected`.
 
 ### AUTO defaults when applying mode defaults
 
+- Target strategy: `adaptive` (Adaptive: derive target from room acoustics)
 - Filter type: `Mixed Phase`
 - Correction band: `18-230 Hz`
 - Max boost / cut: `+5 dB / -24 dB`
