@@ -11,7 +11,7 @@
 import os
 import re
 
-DEFAULT_VERSION = "1.2.5"
+DEFAULT_VERSION = "1.2.5 USE PACKAGED VERSION IF YOU WAN'T ALL THE LATEST FEATURES"
 
 
 def normalize_version(value: str | None, *, default: str = DEFAULT_VERSION) -> str:
