@@ -8,7 +8,11 @@ hide_page_heading: true
 
 This page contains the current development notes and three latest stable releases. [Older releases and Finnish translations are preserved in the archive]({{ '/changelog/archive/' | relative_url }}).
 
-## DecayCore
+## [1.2.7] - 31-8-2026
+
+### Bass Integration
+
+Bug fix for LFE +10db level.
 
 ## [1.2.6] - 30-8-2026
 
@@ -75,3 +79,23 @@ Audio backend and device details are also included in the logs for diagnostics.
 Starting a run without readable left and right measurements is now blocked with
 a clear message in every mode. Measurement loading failures are shown in the
 status line instead of leaving the run at "Reading...".
+
+## [1.2.4] - 14-8-2026
+
+### Measurement
+
+Measurement warning texts have been clarified.
+
+### Adaptive curve
+
+The adaptive curve is now saved to the filter-mode priors file, making Automatic
+mode target selection more reproducible.
+
+### UI
+
+Texts have been simplified and the information box now moves with the UI.
+
+### Export
+
+Multi-rate taps now scale by sample-rate family: 44.1/48 kHz uses 65536 taps,
+88.2/96 kHz uses 131072 taps, and 176.4/192 kHz uses 262144 taps.

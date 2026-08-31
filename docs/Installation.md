@@ -7,19 +7,24 @@ permalink: /installation/
 
 ## Recommended installation
 
-Download the latest packaged release, extract it, and run the launcher for your platform. Packaged releases include guided measurement and the native Automatic mode engine.
+Download the latest packaged release, extract it, and run the launcher for a
+currently released platform. Packaged releases include guided measurement and
+the native Automatic mode engine.
 
 [Download the latest release](https://github.com/VilhoValittu/DecayCore/releases/latest)
 
 | Platform | Package and launcher | First-launch notes |
 |---|---|---|
-| Windows | Extract `DecayCore_<version>_windows.7z`, then run `DecayCore.exe`. | If SmartScreen appears, select **More info → Run anyway**. Allow private firewall access if asked. |
-| Ubuntu / Debian | Extract `DecayCore_<version>_linux.7z`, run `./install.sh`, then start with `./run.sh`. | The installer adds the required host ALSA/Pulse client libraries. Use `./install.sh --check` for a read-only dependency check. |
-| Arch Linux | Extract `DecayCore_<version>_linux.7z`, run `./install.sh`, then start with `./run.sh`. | On an existing PipeWire audio system, the installer adds the matching ALSA/Pulse integration packages. |
+| Windows x64 | Extract `DecayCore_<version>_windows.7z`, then run `DecayCore_<version>.exe`. | If SmartScreen appears, select **More info → Run anyway**. Allow private firewall access if asked. |
+| Ubuntu / Debian (x86_64) | Extract `DecayCore_<version>_linux.7z`, run `./install.sh`, then start with `./run.sh`. | The installer adds the required host ALSA/Pulse client libraries. |
+| Arch Linux (x86_64) | Extract `DecayCore_<version>_linux.7z`, run `./install.sh`, then start with `./run.sh`. | On an existing PipeWire audio system, the installer adds the matching ALSA/Pulse integration packages. |
 | Raspberry Pi / Linux ARM64 | Extract `DecayCore_<version>_linux_arm64.7z`, run `./install.sh`, then start with `./run.sh`. | Intended for Raspberry Pi 4/5 and other 64-bit ARM Linux systems. It does not support 32-bit Raspberry Pi OS. |
 | macOS Apple Silicon | Extract `DecayCore_<version>_macos_arm64.7z`, then open `Start_Decay.command`. | If blocked, use **System Settings → Privacy & Security → Open Anyway**. Allow microphone access if requested. |
 
-For measurement audio, DecayCore packages a pinned PortAudio build with ALSA and PulseAudio host APIs. `install.sh` supplies only its host audio libraries: `libasound2 libpulse0` on Debian/Ubuntu, or `alsa-lib libpulse pipewire-alsa pipewire-pulse wireplumber` on an Arch PipeWire audio system.
+For measurement audio on Linux releases, DecayCore packages a pinned PortAudio build with
+ALSA and PulseAudio host APIs. `install.sh` supplies only its host audio
+libraries: `libasound2 libpulse0` on Debian/Ubuntu, or `alsa-lib libpulse pipewire-alsa pipewire-pulse wireplumber`
+on an Arch PipeWire audio system.
 
 To print the packaged process's PortAudio host APIs and raw device list without opening an audio stream, run `./run.sh --audio-diagnostics`.
 

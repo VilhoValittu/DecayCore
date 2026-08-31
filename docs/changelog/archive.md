@@ -6,30 +6,6 @@ permalink: /changelog/archive/
 
 This archive preserves earlier release notes and Finnish translations removed from the shorter main changelog. Return to the [current changelog]({{ '/CHANGELOG.html' | relative_url }}).
 
-## [1.2.4] - 14-8-2026
-
-### Measurement
-
-Measurement warning texts have been clarified.
-
-### Adaptive curve
-
-The adaptive curve is now saved to the filter_mode_priors file. This enables more accurate results in automatic mode.
-
-### UI
-
-Texts have been simplified.
-The info box now moves along with the UI.
-
-### Export
-
-Multi-rate taps now scale by sample-rate family:
-44.1/48 kHz → 65536
-88.2/96 kHz → 131072
-176.4/192 kHz → 262144
-When “Generate all common filter sample rates” is active:
-target pre-fetch always uses 44.1 kHz / 65536 taps
-
 ## [1.2.3] - 11-8-2026
 
 ### Lower memory use after demanding runs
