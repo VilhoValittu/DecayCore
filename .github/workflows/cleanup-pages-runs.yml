@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Delete Pages runs older than 24 hours
+      - name: Delete Pages and cleanup runs older than 24 hours
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -25,13 +25,16 @@ jobs:
             "repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100" \
             --jq ".workflow_runs[]
               | select(
-                  .path == \"dynamic/pages/pages-build-deployment\"
+                  (
+                    .path == \"dynamic/pages/pages-build-deployment\"
+                    or .path == \".github/workflows/cleanup-pages-runs.yml\"
+                  )
                   and .status == \"completed\"
                   and .created_at < \"${cutoff}\"
                 )
               | .id" |
           while read -r run_id; do
-            echo "Deleting Pages workflow run ${run_id}"
+            echo "Deleting workflow run ${run_id}"
             gh api \
               --method DELETE \
               "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}"
