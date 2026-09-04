@@ -8,6 +8,22 @@ hide_page_heading: true
 
 This page contains the current development notes and three latest stable releases. [Older releases and Finnish translations are preserved in the archive]({{ '/changelog/archive/' | relative_url }}).
 
+## [1.2.8] - 4-9-2026
+
+### Export
+
+A user-defined **Filter name** field is now available in the export settings on
+the Files tab. The name is included in ZIP, CamillaDSP, main, sub, config,
+summary and IIR filenames, and is normalized for safe use in filenames.
+
+Target-curve names and timestamps are now also included in sub and CamillaDSP
+filenames.
+
+### UI
+
+The **Measurement preview** section is now hidden when no measurement result is
+available and appears automatically after a successful measurement.
+
 ## [1.2.7] - 31-8-2026
 
 ### Bass Integration
