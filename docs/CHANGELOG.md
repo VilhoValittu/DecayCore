@@ -8,6 +8,36 @@ hide_page_heading: true
 
 This page contains the current development notes and three latest stable releases. [Older releases and Finnish translations are preserved in the archive]({{ '/changelog/archive/' | relative_url }}).
 
+## [1.2.9] - 8-9-2026
+
+### Plots and preview
+
+All plots now use DecayCore's own **Rust-powered plotting engine**. Plotly is no
+longer included in the application packages.
+
+**Target Preview** now keeps the main response plot focused on the target and
+measurement curves. H2–H5 harmonics remain available in the dedicated harmonics
+plot below.
+
+### Bass Integration
+
+The **−10 dB LFE compensation** setting is now optional, giving you control over
+level compensation for your setup. It remains enabled by default, and both the
+preview and cached results respect your selection.
+
+Enabling Bass Integration now preserves your **Hybrid IIR** selection instead of
+turning it on automatically.
+
+### Automatic mode
+
+A new **Run Cache refinement automatically** option lets you choose whether cache
+refinement runs automatically. It is disabled by default.
+
+### UI
+
+**FIR Compare** and its download link are now available under **About DecayCore**
+for easy access to the filter comparison tool.
+
 ## [1.2.8] - 4-9-2026
 
 ### Export
