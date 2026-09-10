@@ -8,6 +8,35 @@ hide_page_heading: true
 
 This page contains the current development notes and three latest stable releases. [Older releases and Finnish translations are preserved in the archive]({{ '/changelog/archive/' | relative_url }}).
 
+## [1.3.0] - 10-9-2026
+
+### Updates
+
+DecayCore now checks for a newer stable version in the background when the UI
+opens. When an update is available, a notification provides a link to the
+release page. Updates can also be checked manually with the new **Check for
+updates** button.
+
+### Run and performance
+
+The previous successful result and its download packages now remain available
+until the new results view is ready.
+
+Preprocessing cache hits are now 29–85% faster.
+
+### UI
+
+The palette button in the top bar now lets you choose between **Retro** and
+**Modern** styles. The selection is saved in the settings and the page reloads
+automatically. Both styles support dark and light modes.
+
+The Modern style uses the system font, a restrained blue-gray color palette,
+soft shadows, rounded surfaces and glass-like navigation. Retro remains the
+default, and existing settings files continue to work without changes.
+
+A new **Correction Confidence Map** under Graphs shows where DecayCore applies
+correction and where it deliberately leaves the response unchanged.
+
 ## [1.2.9] - 8-9-2026
 
 ### Plots and preview
