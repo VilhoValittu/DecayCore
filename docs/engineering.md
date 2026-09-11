@@ -62,9 +62,8 @@ DecayCore separates practical explanation, mathematical detail, safety policy, a
   </section>
 </div>
 
-## Evidence and terminology
+## Terminology
 
-- [Measured performance case study]({{ '/performance/' | relative_url }}) — one inspectable REW project with stated limitations
 - [Glossary]({{ '/glossary/' | relative_url }}) — short definitions for the terms used across these pages
 
 For application steps rather than engineering detail, use the [User Manual]({{ '/User_Manual.html' | relative_url }}).

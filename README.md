@@ -57,7 +57,6 @@ REW-style measurement data may also be used in compatible workflows, but DecayCo
 - [Measurement workflow](https://vilhovalittu.github.io/DecayCore/measurement-workflow/)
 - [User manual](https://vilhovalittu.github.io/DecayCore/User_Manual.html)
 - [Engineering documentation](https://vilhovalittu.github.io/DecayCore/engineering/)
-- [Performance report](https://vilhovalittu.github.io/DecayCore/performance/)
 - [Glossary](https://vilhovalittu.github.io/DecayCore/glossary/)
 - [FAQ](https://vilhovalittu.github.io/DecayCore/faq/)
 

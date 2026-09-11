@@ -16,7 +16,6 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
     <div class="action-row">
       <a class="button button--primary" href="https://github.com/VilhoValittu/DecayCore/releases/latest">Download DecayCore</a>
       <a class="button" href="{{ '/getting-started/' | relative_url }}">Create your first filter</a>
-      <a class="action-link" href="{{ '/performance/' | relative_url }}">See a measured example <span aria-hidden="true">→</span></a>
     </div>
   </div>
   <div class="hero__visual">
@@ -51,22 +50,6 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
     <p>Result graphs and the exported summary explain the selected filter, warnings, limits, and effective settings.</p>
   </section>
 </div>
-
-## Measured evidence
-
-<section class="home-evidence" aria-labelledby="measured-evidence-title">
-  <div class="home-evidence__copy">
-    <h3 id="measured-evidence-title">One inspectable room, not a universal promise</h3>
-    <p>The published case study compares one uncorrected measurement with four FIR results generated from the same REW project. It includes response, phase, group-delay, step, distortion, and waterfall views.</p>
-    <p><a class="text-link" href="{{ '/performance/' | relative_url }}">Read the method, limitations, and full report <span aria-hidden="true">→</span></a></p>
-  </div>
-  <figure class="evidence-figure">
-    <a href="{{ '/performance/' | relative_url }}">
-      <img src="{{ '/performance/source/SPL_15-250.jpg' | relative_url }}" alt="Response from 15 to 250 Hz before correction and with four DecayCore FIR modes" width="1597" height="783" loading="lazy">
-    </a>
-    <figcaption>Published 15–250 Hz comparison from the included REW project.</figcaption>
-  </figure>
-</section>
 
 ## Interface
 

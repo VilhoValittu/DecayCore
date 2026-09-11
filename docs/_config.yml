@@ -17,7 +17,6 @@ header_pages:
   - measurement-workflow.md
   - User_Manual.md
   - engineering.md
-  - performance/index.md
 
 defaults:
   - scope:

@@ -5,23 +5,23 @@ layout: null
 :root {
   --font-sans: "Avenir Next", "Segoe UI Variable", "Segoe UI", "Helvetica Neue", "Nimbus Sans", sans-serif;
   --font-display: "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  --bg: #17133f;
-  --bg-deep: #0d0a2b;
-  --surface: #211a56;
-  --surface-soft: #292064;
-  --surface-accent: rgba(101, 215, 222, 0.12);
-  --text: #f4f1ff;
-  --text-strong: #ffffff;
-  --muted: #c9c1e7;
-  --faint: #9189b3;
-  --line: rgba(174, 163, 235, 0.28);
-  --line-strong: rgba(174, 163, 235, 0.52);
-  --accent: #65d7de;
-  --accent-strong: #8be8ec;
-  --accent-warm: #cbb8ff;
-  --accent-ink: #17133f;
-  --shadow: 6px 6px 0 rgba(6, 4, 25, 0.44);
-  --shadow-hero: 10px 10px 0 rgba(6, 4, 25, 0.5);
+  --bg: #f3f7f8;
+  --bg-deep: #10232d;
+  --surface: #ffffff;
+  --surface-soft: #e7f0f1;
+  --surface-accent: rgba(22, 145, 151, 0.1);
+  --text: #30434b;
+  --text-strong: #10232d;
+  --muted: #5e7077;
+  --faint: #819097;
+  --line: #d2e0e2;
+  --line-strong: #9ebcc0;
+  --accent: #14949a;
+  --accent-strong: #08777f;
+  --accent-warm: #bc6b35;
+  --accent-ink: #ffffff;
+  --shadow: 0 12px 30px rgba(16, 35, 45, 0.08);
+  --shadow-hero: 0 20px 50px rgba(16, 35, 45, 0.14);
 }
 
 * {
@@ -43,9 +43,9 @@ html {
 body {
   margin: 0;
   background:
-    radial-gradient(circle at 8% 0%, rgba(101, 215, 222, 0.14), transparent 26rem),
-    radial-gradient(circle at 92% 8%, rgba(203, 184, 255, 0.14), transparent 24rem),
-    linear-gradient(180deg, #21195a 0, var(--bg) 36rem, #120f35 100%);
+    radial-gradient(circle at 8% 0%, rgba(20, 148, 154, 0.12), transparent 28rem),
+    radial-gradient(circle at 92% 8%, rgba(188, 107, 53, 0.09), transparent 24rem),
+    linear-gradient(180deg, #ffffff 0, var(--bg) 34rem);
   min-height: 100vh;
 }
 
@@ -84,7 +84,7 @@ a:hover {
   top: 0;
   z-index: 10;
   border-bottom: 1px solid var(--line);
-  background: rgba(13, 10, 43, 0.88);
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(16px);
 }
 
@@ -149,7 +149,7 @@ a:hover {
 }
 
 .site-nav a {
-  border-radius: 4px;
+  border-radius: 999px;
   color: var(--muted);
   font-size: 0.94rem;
   font-weight: 650;
@@ -266,7 +266,7 @@ a:hover {
 
 .content code {
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 999px;
   background: var(--surface-soft);
   color: var(--accent-strong);
   font-size: 0.92em;
@@ -318,7 +318,7 @@ a:hover {
   align-items: center;
   min-height: 520px;
   border: 2px solid var(--line-strong);
-  border-radius: 12px;
+  border-radius: 24px;
   background:
     repeating-linear-gradient(
       0deg,
@@ -328,7 +328,7 @@ a:hover {
       transparent 5px
     ),
     radial-gradient(circle at 83% 48%, rgba(101, 215, 222, 0.2), transparent 23rem),
-    linear-gradient(145deg, rgba(62, 49, 132, 0.92), rgba(30, 24, 79, 0.94));
+    linear-gradient(145deg, #ffffff, #e5f1f2);
   box-shadow: var(--shadow-hero);
   overflow: hidden;
   padding: clamp(34px, 6vw, 72px);
@@ -368,9 +368,9 @@ a:hover {
   width: min(320px, 70vw);
   aspect-ratio: 1;
   border: 2px solid var(--line-strong);
-  border-radius: 10px;
+  border-radius: 20px;
   background: var(--bg-deep);
-  box-shadow: 8px 8px 0 rgba(6, 4, 25, 0.5);
+  box-shadow: 0 16px 32px rgba(16, 35, 45, 0.18);
   overflow: hidden;
 }
 
@@ -453,7 +453,7 @@ a:hover {
   justify-content: center;
   min-height: 44px;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 999px;
   background: var(--surface-soft);
   box-shadow: 3px 3px 0 rgba(6, 4, 25, 0.38);
   color: var(--text);
@@ -491,7 +491,7 @@ a:hover {
 .feature-card,
 .doc-card {
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 16px;
   background: linear-gradient(180deg, rgba(198, 190, 255, 0.1), rgba(198, 190, 255, 0.05));
   box-shadow: var(--shadow);
   padding: 20px;
@@ -596,30 +596,6 @@ a:hover {
   font-size: 0.88rem;
   line-height: 1.45;
   padding: 10px 4px 0;
-}
-
-.performance-report {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin: 28px 0 0;
-}
-
-.performance-report__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin: 8px 0 32px;
-}
-
-.performance-report__frame {
-  display: block;
-  width: 100%;
-  height: min(82vh, 1100px);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #ffffff;
-  box-shadow: var(--shadow);
 }
 
 .site-footer {
