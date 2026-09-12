@@ -91,13 +91,13 @@ a:hover {
 .site-header__inner,
 .page-shell,
 .site-footer__inner {
-  width: min(1120px, calc(100% - 32px));
+  width: min(1440px, calc(100% - 48px));
   margin: 0 auto;
 }
 
 .site-header__inner {
   display: flex;
-  min-height: 82px;
+  min-height: 68px;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
@@ -172,7 +172,7 @@ a:hover {
 }
 
 .page-shell {
-  padding: 54px 0 80px;
+  padding: 28px 0 48px;
 }
 
 .page-heading {
@@ -193,7 +193,7 @@ a:hover {
   margin: 0;
   color: var(--text-strong);
   font-family: var(--font-display);
-  font-size: clamp(2.75rem, 6vw, 5.25rem);
+  font-size: clamp(2.75rem, 4vw, 4rem);
   line-height: 1.02;
   letter-spacing: -0.065em;
   text-wrap: balance;
@@ -214,11 +214,11 @@ a:hover {
 }
 
 .is-home .content {
-  max-width: 1120px;
+  max-width: none;
 }
 
 .has-wide-content .content {
-  max-width: 1120px;
+  max-width: none;
 }
 
 .content h2,
@@ -230,7 +230,7 @@ a:hover {
 }
 
 .content h2 {
-  margin-top: 2.2rem;
+  margin-top: 1.6rem;
   font-size: 1.72rem;
 }
 
@@ -314,11 +314,11 @@ a:hover {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(240px, 340px);
-  gap: clamp(42px, 7vw, 88px);
+  gap: 40px;
   align-items: center;
-  min-height: 520px;
+  min-height: 380px;
   border: 2px solid var(--line-strong);
-  border-radius: 24px;
+  border-radius: 6px;
   background:
     repeating-linear-gradient(
       0deg,
@@ -331,7 +331,7 @@ a:hover {
     linear-gradient(145deg, #ffffff, #e5f1f2);
   box-shadow: var(--shadow-hero);
   overflow: hidden;
-  padding: clamp(34px, 6vw, 72px);
+  padding: 32px 40px;
 }
 
 .hero::before,
@@ -485,13 +485,13 @@ a:hover {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
-  margin: 28px 0;
+  margin: 20px 0;
 }
 
 .feature-card,
 .doc-card {
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 6px;
   background: linear-gradient(180deg, rgba(198, 190, 255, 0.1), rgba(198, 190, 255, 0.05));
   box-shadow: var(--shadow);
   padding: 20px;
@@ -554,8 +554,21 @@ a:hover {
     radial-gradient(circle at top right, rgba(101, 215, 222, 0.12), transparent 40%),
     linear-gradient(180deg, rgba(198, 190, 255, 0.1), rgba(198, 190, 255, 0.05));
   box-shadow: var(--shadow);
-  margin: 0 0 52px;
+  margin: 0 0 28px;
   padding: 28px;
+}
+
+/* Text-only evidence must not reserve an empty illustration column. */
+.home-evidence--copy {
+  display: block;
+}
+
+.home-evidence--copy .home-evidence__copy {
+  max-width: 1050px;
+}
+
+.home-evidence--copy .section-link {
+  margin-bottom: 0;
 }
 
 .home-evidence h2 {
@@ -644,6 +657,21 @@ a:hover {
   overflow: hidden;
   background: var(--surface);
   box-shadow: var(--shadow);
+}
+
+.screenshot-gallery--single {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 1100px;
+}
+
+.screenshot-item {
+  margin: 0;
+}
+
+@media (min-width: 1100px) {
+  .is-home .feature-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .screenshot-gallery--featured {
