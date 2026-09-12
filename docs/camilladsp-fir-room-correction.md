@@ -10,6 +10,6 @@ DecayCore designs the correction; CamillaDSP applies it during playback. A norma
 
 If Hybrid IIR is active, use both the exported peaking filters and the FIR convolution stage. Loading only the WAV omits correction transferred to IIR. Bass Integration exports a shared Sub FIR and the crossover, delay, gain, and polarity settings needed by the sub branch.
 
-Always start at reduced volume and listen carefully after deployment. DecayCore does not automatically include the exported filters in its measurement path. A verification measurement requires routing the sweep through the convolver and can catch routing, rate, crossover, polarity, and gain differences that an offline prediction cannot see. The listening test is the most important final check.
+Start at a low volume and listen to familiar music. Compare with bypass at the same volume. The graphs can help find problems, but your ears make the final decision.
 
-Use [Getting Started]({{ '/getting-started/' | relative_url }}) for filter creation and the [User Manual]({{ '/User_Manual.html' | relative_url }}) for deployment details.
+Use [Getting Started]({{ '/getting-started/' | relative_url }}) for filter creation, the [User Manual]({{ '/User_Manual.html' | relative_url }}) for deployment, and [Results]({{ '/results/' | relative_url }}) for optional measurement through CamillaDSP.

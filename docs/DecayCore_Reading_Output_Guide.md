@@ -8,7 +8,7 @@ hide_page_heading: true
 
 ## In brief
 
-Start with System Health and the summary, then inspect magnitude, filter demand, phase, group delay, and the final impulse. A generated graph is a prediction; confirm the result with a new measurement.
+Use the graphs to catch obvious problems, not to choose what sounds best. Start with System Health and the summary, then check magnitude, filter demand, phase, group delay, and the final impulse. After that, load the filter and listen.
 
 ## 1. What you get after a run
 
@@ -145,4 +145,6 @@ Use these first:
   - Check `AUTO-ALIGN` delay and gain difference
   - Re-verify measurement consistency
 
-Use re-measurement with filter enabled as the final validation.
+The graphs are for diagnosis. They are not the final vote. Compare the filter with bypass at the same volume and trust what you hear.
+
+If you want to measure with correction active, the sweep must be routed through your convolver. See [Results]({{ '/results/' | relative_url }}) for details.

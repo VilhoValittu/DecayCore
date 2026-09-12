@@ -10,6 +10,6 @@ Choose **Mixed Phase** when measurements show useful excess-phase behavior that 
 
 Mixed Phase needs more judgment than Minimum Phase. Correction strength, full-correction frequency, fade frequency, group-delay limits, and pre-energy guards all affect the result. More phase correction is not automatically better, especially where reflections make measurements position-sensitive.
 
-Start with mode defaults, inspect the final impulse and group delay, and verify the deployed filter with a new measurement. Use **Asymmetric** instead when you want the recommended general-purpose balance without deliberately tuning mixed-phase controls.
+Start with the mode defaults and check the final impulse and group delay for obvious problems. Then listen. Use **Asymmetric** when you want the normal starting point without tuning mixed-phase controls yourself.
 
 Read the [Technical Reference]({{ '/Official_Manual.html' | relative_url }}) for the phase pipeline or [Getting Started]({{ '/getting-started/' | relative_url }}) for the normal workflow.

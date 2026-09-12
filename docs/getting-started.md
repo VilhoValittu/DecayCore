@@ -1,11 +1,11 @@
 ---
 title: Getting Started with DecayCore
 nav_title: Start here
-description: Download DecayCore, measure or import your speakers, create your first FIR filters, and verify the result.
+description: Download DecayCore, create your first FIR filters, and try them with familiar music.
 permalink: /getting-started/
 ---
 
-This is the shortest path from downloading DecayCore to using a verified pair of correction filters.
+This is the quickest way to make and try your first pair of DecayCore filters.
 
 ## Your first DecayCore filter
 
@@ -14,9 +14,9 @@ This is the shortest path from downloading DecayCore to using a verified pair of
 3. Measure Left and Right, or import compatible measurements.
 4. Select **Automatic**, **Asymmetric**, and the **balanced** goal.
 5. Press **START**.
-6. Inspect the warnings and selected result.
+6. Check the warnings and selected result.
 7. Export and load the filters into your convolver.
-8. Listen carefully. DecayCore does not automatically include the exported filters in its measurement path. Measuring with correction active requires routing the sweep through the convolver, so the listening test is the most important final check.
+8. Listen to familiar music. Keep the comparison level-matched. Do not keep a filter just because its graph looks better.
 
 > **Need more detail?** Use the [Measurement guide]({{ '/measurement-workflow/' | relative_url }}), [Installation guide]({{ '/installation/' | relative_url }}), or the complete [User Manual]({{ '/User_Manual.html' | relative_url }}).
 
@@ -76,14 +76,13 @@ Download the result ZIP or open the output folder shown on the results page. It 
 
 ### 6. Listen and optionally verify
 
-Listen carefully at a reduced level. DecayCore does not automatically include the exported filters in its measurement path. If you make a verification measurement, route the sweep through the convolver and confirm that:
+Start at a low volume and use recordings you know well. Listen for tonal balance, bass integration, clarity, imaging, and anything that sounds unnatural.
 
-- the broad response moved in the intended direction
-- bass did not become weak or excessively boosted
-- the playback chain does not clip
-- left and right channel assignment is correct
+Compare with bypass at the same volume. A louder result will often seem better.
 
-Do not judge success from the generated graph alone. The verification measurement includes the real playback chain and room.
+The plots can help explain what you hear, but they are not the goal. If the filter sounds worse, go back and change it.
+
+DecayCore does not include exported filters in its own measurement path. Measuring with correction active is possible only if you route the sweep through your convolver. If you are not sure how to do that, skip the verification measurement and trust the listening test.
 
 ## Next steps
 

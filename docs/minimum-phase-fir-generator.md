@@ -10,6 +10,6 @@ Choose **Minimum Phase** when causal behavior and lower latency matter more than
 
 Minimum Phase is useful for latency-sensitive playback, compatibility-focused convolution chains, and a conservative comparison against more phase-active modes. It does not make the correction unrestricted: magnitude, boost, cut, slope, bass, and numerical guards remain active.
 
-Compare the deployed result with **Asymmetric**, the recommended general-purpose starting point, using the same measurements, target, limits, and gain. Re-measure each result instead of comparing generated curves alone.
+Compare the deployed result with **Asymmetric** using the same measurements, target, limits, and playback level. Choose by listening, not by whichever generated curve looks cleaner.
 
 See [Getting Started]({{ '/getting-started/' | relative_url }}) for the first-run workflow and [FIR Room Correction]({{ '/fir-room-correction/' | relative_url }}) for the mode overview.

@@ -45,6 +45,5 @@ Use mono files with consistent sample rate, gain, and timing. For REW exports, u
 - Avoid clipping and background noise.
 - Keep speakers, crossovers, routing, and volume unchanged during a measurement set.
 - Save the uncorrected measurements for comparison.
-- Load the filters and listen carefully. DecayCore does not automatically include the exported filters in its measurement path. Measuring with correction active requires routing the sweep through the convolver, so the listening test is the most important final check.
 
-Continue with [Getting Started]({{ '/getting-started/' | relative_url }}) or read the complete [User Manual]({{ '/User_Manual.html' | relative_url }}).
+Continue with [Getting Started]({{ '/getting-started/' | relative_url }}). The [Results guide]({{ '/results/' | relative_url }}) explains listening tests and optional measurements through a convolver.

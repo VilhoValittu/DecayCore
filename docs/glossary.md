@@ -69,4 +69,4 @@ The propagation delay from loudspeaker to microphone. DecayCore removes this lin
 
 ## Verification measurement
 
-A new measurement made with the exported filters active. It checks the real playback chain, routing, gain, crossover, loudspeakers, and room rather than only the offline prediction.
+A measurement made with the exported filters active. DecayCore does not create this route automatically; the sweep must pass through your convolver. It is useful for checking the setup, but it does not replace listening.

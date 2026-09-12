@@ -30,7 +30,7 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
 
 1. **Measure or import.** Measure left and right speakers in DecayCore, or load compatible REW text or impulse-response files.
 2. **Generate.** Start with Automatic mode and the Asymmetric filter type. DecayCore searches for a conservative result and reports the settings it used.
-3. **Export and verify.** Load the WAV filters into your convolver and listen carefully. DecayCore does not automatically include the exported filters in its measurement path. Measuring with correction active requires routing the sweep through the convolver, so the listening test is the most important final check.
+3. **Load and listen.** Play music you know well and compare with bypass at the same volume. The graphs explain the filter; they do not decide whether it sounds good.
 
 <p class="section-link"><a href="{{ '/getting-started/' | relative_url }}">Follow the complete first-filter workflow <span aria-hidden="true">→</span></a></p>
 
@@ -46,18 +46,18 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
     <p>Correction strength, bass boost, timing changes, and filter gain stay inside explicit safety limits.</p>
   </section>
   <section class="feature-card">
-    <h3>Show its work</h3>
-    <p>Result graphs and the exported summary explain the selected filter, warnings, limits, and effective settings.</p>
+    <h3>Explain what it changed</h3>
+    <p>The graphs and summary show the correction, its limits, and any warnings.</p>
   </section>
   <section class="feature-card">
     <h3>Control decay and timing</h3>
-    <p>Measured time-domain evidence can constrain phase correction and support bounded low-frequency decay control.</p>
+    <p>TDC and bounded phase correction address bass decay and timing where the measurement supports it.</p>
   </section>
 </div>
 
 ## One workflow, from input to result
 
-<p>Work through the numbered pages from measurement and files to settings, target, correction, and results. Automatic mode handles the search; every effective choice remains visible in the result.</p>
+<p>The numbered pages follow the job from measurement to export. Automatic mode handles the search and shows the settings it chose.</p>
 
 <div class="screenshot-gallery screenshot-gallery--single">
   <figure class="screenshot-item">
@@ -68,14 +68,16 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
   </figure>
 </div>
 
-## Result and verification
+## The graph is not the result
 
 <div class="home-evidence home-evidence--copy">
   <div class="home-evidence__copy">
-    <p class="section-kicker">Trust the complete signal chain</p>
-    <h2>A generated graph is a prediction, not the final proof</h2>
-    <p>Inspect the result and exported summary, load the filters, and listen carefully. DecayCore does not automatically include the exported filters in its measurement path. Measuring with correction active requires routing the sweep through the convolver, so the listening test is the most important final check. A verification measurement can still catch routing, gain, crossover, polarity, and sample-rate mistakes that an offline prediction cannot see.</p>
-    <p class="section-link"><a href="{{ '/results/' | relative_url }}">Learn how to read and verify a result <span aria-hidden="true">→</span></a></p>
+    <p class="section-kicker">Listen first</p>
+    <h2>The result is what you hear</h2>
+    <p>The graphs show what DecayCore changed. They do not tell you whether it sounds good.</p>
+    <p>Load the filters, lower the volume, and listen to music you know well. Compare with bypass at the same volume. If it sounds worse, it is worse—even if the graph looks better.</p>
+    <p>A corrected-system measurement can be useful, but DecayCore does not route its sweep through the exported filters automatically. That requires a separate loop through your convolver.</p>
+    <p class="section-link"><a href="{{ '/results/' | relative_url }}">How to read and test a result <span aria-hidden="true">→</span></a></p>
   </div>
 </div>
 

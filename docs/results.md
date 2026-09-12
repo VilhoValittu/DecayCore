@@ -1,22 +1,22 @@
 ---
-title: Results and verification
+title: Read the result, then listen
 nav_title: Results
-description: Read DecayCore's generated result, deploy the filters safely, and verify the complete playback chain with a new measurement.
+description: Use DecayCore's graphs to spot problems, then judge the filter by listening.
 permalink: /results/
 ---
 
-A DecayCore run produces a technical prediction and export package. The result becomes trustworthy only after the filters have been loaded into the real playback chain and measured again.
+The result view shows what DecayCore calculated. Use it to catch warnings, clipping risk, excessive boost, or strange timing before you load the filter. It cannot tell you whether the filter sounds good.
 
-## A result has two parts
+## What the graphs are for
 
 <div class="doc-grid doc-grid--two">
   <section class="doc-card">
-    <h3>Generated analysis</h3>
-    <p>Response, phase, group delay, impulse, headroom, warnings, and the effective settings selected by the workflow.</p>
+    <h3>Safety check</h3>
+    <p>Check warnings, headroom, boost, channel routing, and the final impulse before playback.</p>
   </section>
   <section class="doc-card">
-    <h3>Verification measurement</h3>
-    <p>Load the filters and listen carefully first. DecayCore does not automatically include the exported filters in its measurement path. A measurement with correction active requires routing the sweep through the convolver; when performed, it can confirm routing, gain, polarity, crossover behavior, sample rate, and the acoustic result. The listening test remains the most important final check.</p>
+    <h3>Troubleshooting</h3>
+    <p>If something sounds wrong, the magnitude, phase, group-delay, and filter plots can help show why.</p>
   </section>
 </div>
 
@@ -29,7 +29,7 @@ A DecayCore run produces a technical prediction and export package. The result b
   <figcaption>START / Results is the entry point for generation, progress, warnings, and the selected solution.</figcaption>
 </figure>
 
-Check the result in this order:
+Check these before playback:
 
 | Check | What you are looking for |
 |---|---|
@@ -42,18 +42,24 @@ Check the result in this order:
 
 [Open the complete Reading DecayCore Output guide]({{ '/DecayCore_Reading_Output_Guide.html' | relative_url }}).
 
-## Verify the real playback chain
+## Listen first
 
 1. Load the correct Left and Right filters and any required subwoofer or Hybrid IIR stages.
-2. Confirm the convolver sample rate and channel routing.
-3. Start playback at reduced level.
-4. Listen carefully. If you make a verification measurement, route the sweep through the convolver and measure from the same reference position with the same routing.
-5. Compare the corrected measurement with the uncorrected baseline.
+2. Check the sample rate, channel routing, and headroom.
+3. Start at a low volume.
+4. Use recordings you know well.
+5. Compare with bypass at the same volume.
 
-The verification measurement should show that the broad response moved in the intended direction without new crossover cancellation, channel mismatch, clipping, or excessive bass loss. Listening remains the final check.
+Listen for tonal balance, bass integration, clarity, imaging, and anything that sounds unnatural. If the filter sounds worse, do not use it just because the curves look cleaner.
+
+## Optional measurement through the convolver
+
+DecayCore does not apply exported filters to its own measurement sweep. To measure with correction active, you must route the sweep through the convolver yourself.
+
+This can catch routing, gain, crossover, polarity, and sample-rate mistakes. Do it only if you understand the routing. The measurement is an extra check, not a replacement for listening.
 
 ## Keep comparisons honest
 
-One room example cannot prove universal performance. When publishing or comparing results, keep the microphone method, smoothing, level reference, frequency range, target, and playback chain visible. Share the measurement data when possible so others can inspect more than a screenshot.
+One room does not prove how a filter will work in another. When sharing comparisons, include the microphone method, smoothing, level, frequency range, target, and playback chain. Share the measurement files when possible.
 
 For deployment details, use the [User Manual]({{ '/User_Manual.html#8-export-and-deploy' | relative_url }}). For the correction rationale, see [How DecayCore works]({{ '/how-it-works/' | relative_url }}).

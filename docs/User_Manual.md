@@ -14,7 +14,7 @@ You need:
 - a calibrated measurement microphone
 - separate Left and Right measurements
 - a playback system that accepts FIR convolution filters
-- enough control of playback volume to begin verification quietly
+- a way to start playback at a low volume
 
 DecayCore accepts impulse-response WAV files and text exports containing frequency, magnitude, and phase. Packaged releases also include guided measurement and **DecayCore automatic mode (recommended)**.
 
@@ -26,8 +26,8 @@ DecayCore accepts impulse-response WAV files and text exports containing frequen
 2. Select **DecayCore automatic mode (recommended)** and **Asymmetric**.
 3. Keep the **balanced** goal and **Adaptive: derive target from room acoustics** target strategy.
 4. Press **START** on **START / Results**.
-5. Review warnings and the winning solution.
-6. Export the ZIP, load the filters into your convolver, and listen carefully.
+5. Check the warnings and selected solution.
+6. Export the ZIP, load the filters, and listen to familiar music.
 
 When running from source, use **Basic** instead of Automatic mode.
 
@@ -186,7 +186,7 @@ Review these items before export:
 - **Impulse:** inspect energy around the main peak, especially with linear or mixed-phase filters.
 - **Summary:** confirm mode, target, effective limits, warnings, and Automatic winner details.
 
-Automatic ranking is a decision aid, not an absolute sound-quality score.
+Automatic ranking compares filters made from the same measurements. It is not a sound-quality score.
 
 ## 8. Export and deploy
 
@@ -212,15 +212,17 @@ Load the compatible ZIP or WAV set in **DSP Engine → Convolution**. Ensure the
 
 Load each WAV through Convolution, verify channel assignment, and add enough preamp reduction to prevent clipping.
 
-## 9. Verify safely
+## 9. Listen
 
 1. Start playback at reduced level.
 2. Confirm Left, Right, and any Sub output are routed correctly.
-3. Listen for missing bass, excess brightness, unstable imaging, or obvious timing problems.
-4. If you make a verification measurement, route the sweep through the convolver; DecayCore does not automatically include the exported filters in its measurement path.
-5. Compare the verification measurement and exported summary with the uncorrected baseline.
+3. Use recordings you know well.
+4. Compare with bypass at the same volume.
+5. Listen for missing bass, excess brightness, unstable imaging, or anything that sounds unnatural.
 
-Change one major setting at a time so the result remains explainable.
+If it sounds worse, do not keep the filter because the graph looks better. Change one major setting at a time and listen again.
+
+DecayCore does not apply exported filters to its own measurement sweep. A corrected-system measurement requires you to route the sweep through the convolver. It can help find setup errors, but it is optional and does not replace listening.
 
 ## 10. Troubleshooting
 
@@ -259,4 +261,4 @@ Check clipping, noise, cables, device selection, sweep level, and microphone mov
 - **RT60:** an estimate of how long sound energy takes to decay by 60 dB.
 - **Taps:** the number of samples in the FIR; more taps increase time span and processing cost.
 
-The best result is usually a conservative, repeatable filter that survives a verification measurement—not the flattest generated graph.
+A filter is successful only if it sounds better. A flatter graph on its own proves nothing.
