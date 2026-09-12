@@ -8,6 +8,19 @@ hide_page_heading: true
 
 This page contains the current development notes and three latest stable releases. [Older releases and Finnish translations are preserved in the archive]({{ '/changelog/archive/' | relative_url }}).
 
+## [1.3.1] - 12-9-2026
+
+### Filter optimization
+
+Get more from long FIR filters with **ATC (Automate tap count)**. The new feature
+automatically trims filter length at high tap counts while preserving correction
+quality. Linear-phase filters benefit the most.
+
+### Export
+
+Filter filenames now include seconds in their timestamps, making consecutive
+exports easier to tell apart.
+
 ## [1.3.0] - 10-9-2026
 
 ### Updates

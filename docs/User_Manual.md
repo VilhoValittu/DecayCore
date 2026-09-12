@@ -121,6 +121,22 @@ For a first run, leave mode defaults in place. These controls matter most when d
 
 Match the sample rate to the playback pipeline. More taps give better low-frequency and time resolution but increase processing cost and latency. Multi-rate export scales the tap count for each sample-rate family.
 
+### Automate tap count
+
+In packaged builds, **Automate tap count** on the Run tab generates filters with
+the current settings and then shortens their exported support within a strict
+response-error bound. It works with Asymmetric, Minimum, Mixed and Linear Phase.
+The taps setting still controls the design resolution; it is not replaced by
+the final export length. Each sample rate is checked separately.
+
+All output channels share the same crop and removed delay, preserving their
+relative timing. Odd final lengths receive one trailing zero. If no shorter
+support passes, the existing support is retained, with even-length padding when
+needed. The results show design/output taps and the actual common delay removed.
+Response and scoring diagnostics describe the design before this final step;
+impulse metrics describe the exported filters. Shorter support does not always
+mean lower delay, particularly with minimum-phase filters.
+
 ### Correction range
 
 Use the lower and upper correction limits to keep correction inside the measured, trustworthy band. Broad full-range correction requires better measurement quality than bass-focused correction.
@@ -262,3 +278,10 @@ Check clipping, noise, cables, device selection, sweep level, and microphone mov
 - **Taps:** the number of samples in the FIR; more taps increase time span and processing cost.
 
 A filter is successful only if it sounds better. A flatter graph on its own proves nothing.
+
+When the usual tap-count check cannot find a shorter filter, an enabled
+high-pass filter permits a small additional absolute response error below its
+cutoff (0.002% of each channel's response peak). Limits at and above the cutoff
+remain unchanged. Results and the export summary identify when this allowance
+was used. Runs without a high-pass filter, and runs with a separate sub output,
+retain the original error limits.
