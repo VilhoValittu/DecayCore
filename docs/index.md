@@ -30,7 +30,7 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
 
 1. **Measure or import.** Measure left and right speakers in DecayCore, or load compatible REW text or impulse-response files.
 2. **Generate.** Start with Automatic mode and the Asymmetric filter type. DecayCore searches for a conservative result and reports the settings it used.
-3. **Export and verify.** Load the WAV filters into your convolver, then measure again with correction active.
+3. **Export and verify.** Load the WAV filters into your convolver and listen carefully. DecayCore does not automatically include the exported filters in its measurement path. Measuring with correction active requires routing the sweep through the convolver, so the listening test is the most important final check.
 
 <p class="section-link"><a href="{{ '/getting-started/' | relative_url }}">Follow the complete first-filter workflow <span aria-hidden="true">→</span></a></p>
 
@@ -74,7 +74,7 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
   <div class="home-evidence__copy">
     <p class="section-kicker">Trust the complete signal chain</p>
     <h2>A generated graph is a prediction, not the final proof</h2>
-    <p>Inspect the result and exported summary, deploy the filter at reduced level, and measure again with correction active. The verification measurement catches routing, gain, crossover, polarity, and sample-rate mistakes that an offline prediction cannot see.</p>
+    <p>Inspect the result and exported summary, load the filters, and listen carefully. DecayCore does not automatically include the exported filters in its measurement path. Measuring with correction active requires routing the sweep through the convolver, so the listening test is the most important final check. A verification measurement can still catch routing, gain, crossover, polarity, and sample-rate mistakes that an offline prediction cannot see.</p>
     <p class="section-link"><a href="{{ '/results/' | relative_url }}">Learn how to read and verify a result <span aria-hidden="true">→</span></a></p>
   </div>
 </div>

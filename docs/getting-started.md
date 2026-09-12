@@ -16,7 +16,7 @@ This is the shortest path from downloading DecayCore to using a verified pair of
 5. Press **START**.
 6. Inspect the warnings and selected result.
 7. Export and load the filters into your convolver.
-8. Measure again with correction active.
+8. Listen carefully. DecayCore does not automatically include the exported filters in its measurement path. Measuring with correction active requires routing the sweep through the convolver, so the listening test is the most important final check.
 
 > **Need more detail?** Use the [Measurement guide]({{ '/measurement-workflow/' | relative_url }}), [Installation guide]({{ '/installation/' | relative_url }}), or the complete [User Manual]({{ '/User_Manual.html' | relative_url }}).
 
@@ -74,9 +74,9 @@ Download the result ZIP or open the output folder shown on the results page. It 
 - **Roon:** load the ZIP or compatible WAV set in Convolution.
 - **Equalizer APO:** use the Convolution filter and leave enough preamp headroom.
 
-### 6. Measure again
+### 6. Listen and optionally verify
 
-Activate the filters at a reduced listening level and repeat the measurement. Confirm that:
+Listen carefully at a reduced level. DecayCore does not automatically include the exported filters in its measurement path. If you make a verification measurement, route the sweep through the convolver and confirm that:
 
 - the broad response moved in the intended direction
 - bass did not become weak or excessively boosted

@@ -16,7 +16,7 @@ A DecayCore run produces a technical prediction and export package. The result b
   </section>
   <section class="doc-card">
     <h3>Verification measurement</h3>
-    <p>A new measurement with correction active confirms routing, gain, polarity, crossover behavior, sample rate, and the acoustic result.</p>
+    <p>Load the filters and listen carefully first. DecayCore does not automatically include the exported filters in its measurement path. A measurement with correction active requires routing the sweep through the convolver; when performed, it can confirm routing, gain, polarity, crossover behavior, sample rate, and the acoustic result. The listening test remains the most important final check.</p>
   </section>
 </div>
 
@@ -47,7 +47,7 @@ Check the result in this order:
 1. Load the correct Left and Right filters and any required subwoofer or Hybrid IIR stages.
 2. Confirm the convolver sample rate and channel routing.
 3. Start playback at reduced level.
-4. Measure again from the same reference position and with the same routing.
+4. Listen carefully. If you make a verification measurement, route the sweep through the convolver and measure from the same reference position with the same routing.
 5. Compare the corrected measurement with the uncorrected baseline.
 
 The verification measurement should show that the broad response moved in the intended direction without new crossover cancellation, channel mismatch, clipping, or excessive bass loss. Listening remains the final check.

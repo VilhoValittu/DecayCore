@@ -27,7 +27,7 @@ DecayCore accepts impulse-response WAV files and text exports containing frequen
 3. Keep the **balanced** goal and **Adaptive: derive target from room acoustics** target strategy.
 4. Press **START** on **START / Results**.
 5. Review warnings and the winning solution.
-6. Export the ZIP, load the filters into your convolver, and measure again.
+6. Export the ZIP, load the filters into your convolver, and listen carefully.
 
 When running from source, use **Basic** instead of Automatic mode.
 
@@ -217,7 +217,7 @@ Load each WAV through Convolution, verify channel assignment, and add enough pre
 1. Start playback at reduced level.
 2. Confirm Left, Right, and any Sub output are routed correctly.
 3. Listen for missing bass, excess brightness, unstable imaging, or obvious timing problems.
-4. Measure again with correction active.
+4. If you make a verification measurement, route the sweep through the convolver; DecayCore does not automatically include the exported filters in its measurement path.
 5. Compare the verification measurement and exported summary with the uncorrected baseline.
 
 Change one major setting at a time so the result remains explainable.
