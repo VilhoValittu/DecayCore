@@ -23,11 +23,13 @@ No. Most of the work comes from controlled cuts and modest shaping. Boost is del
 
 ## Does DecayCore include measurement?
 
-Yes. Packaged releases include guided measurement. See [Measurement]({{ '/measurement-workflow/' | relative_url }}) for current platform support and routing requirements.
+Yes, and it is the recommended starting point. Packaged releases include guided measurement of the speaker response, RT60 decay, and harmonic distortion. See [Measurement]({{ '/measurement-workflow/' | relative_url }}) for current platform support and routing requirements.
 
 ## Should I measure with DecayCore or REW?
 
-Use DecayCore's guided workflow if it suits your setup. If you already have good REW measurements, bring them along; there is no prize for measuring the same room twice before dinner. Text exports or impulse-response files work when phase, timing, gain, and channel references are consistent.
+**Choose DecayCore's guided measurement when your setup supports it.** It records the sweep and saves RT60 decay data and harmonic distortion curves alongside the speaker response. The correction gets measured information about lingering bass and where extra boost may be unwise. Hi-fi has enough educated guesswork around the equipment rack already.
+
+REW imports are still supported. A suitable impulse-response WAV can provide RT60, but a standard frequency-response text export does not contain the recorded decay, and normal linear IR exports do not bring the separate harmonic curves with them. The advantage is the complete measurement session available to DecayCore. If you import files, keep phase, timing, gain, and channel references consistent.
 
 ## Where can I download DecayCore?
 

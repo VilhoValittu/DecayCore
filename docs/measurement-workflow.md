@@ -1,11 +1,15 @@
 ---
 title: DecayCore Measurement Workflow
 nav_title: Measurement
-description: Measure loudspeakers with DecayCore or import compatible REW text and impulse-response files.
+description: Use DecayCore's guided measurement to capture speaker response, RT60 decay, and harmonic distortion for better-informed correction.
 permalink: /measurement-workflow/
 ---
 
-The microphone helps explain why the bass changes when you lean forward in your favourite chair. Give it a quiet room and a repeatable setup, and you have a useful starting point for correction. Packaged DecayCore releases can guide you through the measurement, or you can bring compatible files from elsewhere.
+The microphone helps explain why the bass changes when you lean forward in your favourite chair. Give it a quiet room and a repeatable setup, and you have a useful starting point for correction. **I recommend DecayCore's own guided measurement** in the packaged release whenever your platform and routing support it.
+
+The same session captures the speaker response, **RT60 decay data**, and **harmonic distortion curves**. RT60 helps DecayCore assess how long sound energy lingers in the room. Harmonic data helps identify frequencies where adding boost may ask too much of the system. That is useful information before telling a small woofer to audition as a subwoofer.
+
+These values come from the recorded sweep: DecayCore analyses the measured impulse response for RT60 and separates harmonic responses from the sweep recording. The correction can use those saved results directly. There is no need to reconstruct decay from a frequency-response curve when the session already contains usable decay data.
 
 ## Platform support
 
@@ -25,11 +29,15 @@ The measurement engine is included in packaged releases, not in the public sourc
 4. Set measurement volume at the end of the signal chain, such as the amplifier or an analog volume control. Avoid reducing level digitally before the amplifier because that also reduces measurement signal-to-noise ratio.
 5. Run the guided session and follow the prompts when moving the microphone.
 6. Review rejected takes. If many are rejected, check levels, connections, noise, and microphone placement before increasing rejection strictness.
-7. Save the session. Keep all files from the session at the same gain and timing reference.
+7. Save the session. Keep all files from the session at the same gain and timing reference, and keep the accompanying metadata and harmonic files beside the WAVs when moving or reusing them.
 
 For subwoofer measurement on Windows, configure the output device for 5.1 or 7.1 in Windows Sound settings before starting. DecayCore sends the subwoofer sweep to the LFE channel.
 
 ## Importing existing measurements
+
+Compatible imports remain useful when built-in measurement is unavailable or you want to work with an existing measurement set. A suitable imported impulse response can also supply RT60 through decay analysis. Ordinary frequency-response text exports do not include the recorded decay, and a normal linear impulse-response WAV does not include the separate harmonic curves saved by DecayCore's own session.
+
+Without usable measured decay, any decay estimate reconstructed from magnitude is diagnostic only; it does not stand in for measured RT60 when driving decay correction. Missing harmonic data also means the extra harmonic-based boost-risk guidance is unavailable. Normal filter generation still works, but DecayCore's own measurement gives it a more complete starting point.
 
 ### REW text export
 
@@ -41,7 +49,7 @@ Use mono files with consistent sample rate, gain, and timing. For REW exports, u
 
 ## Measurement checklist
 
-Resist moving a speaker “just a little” halfway through. We all know how that evening ends. Finish a consistent set first, then measure the new position as a separate comparison.
+Resist moving a speaker “just a little” halfway through. I know all too well how that evening ends. Finish a consistent set first, then measure the new position as a separate comparison.
 
 - Use the same microphone position and procedure for corresponding channels.
 - Avoid clipping and background noise.

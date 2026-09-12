@@ -19,6 +19,6 @@ DecayCore focuses on peaks the measurements support correcting, broad tonal erro
 
 ## What you need
 
-You need Left and Right measurements and a playback system that accepts convolution filters. The packaged application can guide the measurement and Automatic-mode search; compatible REW text or impulse-response files can also be imported.
+You need Left and Right measurements and a playback system that accepts convolution filters. Use the packaged application's guided measurement where supported: its RT60 decay data and harmonic curves give the correction measured information about lingering bass and boost risk, alongside the speaker response. Automatic mode can then handle the search. Compatible REW text or impulse-response imports remain an option when needed.
 
 Follow [Getting Started]({{ '/getting-started/' | relative_url }}) to create a first filter, or read [Why DecayCore Works]({{ '/Why_DecayCore_Works.html' | relative_url }}) for the design rationale.

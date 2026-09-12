@@ -9,7 +9,7 @@ Choosing a target curve can easily become the whole evening. Adaptive Target giv
 
 ## In brief
 
-Adaptive Target makes small low-frequency changes to a stable Harman6 baseline when both channels provide consistent evidence. Use the built-in target search when measurement metadata is limited.
+Adaptive Target makes small low-frequency changes to a stable Harman6 baseline when both channels provide consistent evidence. Start with DecayCore's own measurement so the target has the session's RT60 decay data available. Use the built-in target search when measurement metadata is limited.
 
 ## What it is
 
@@ -46,9 +46,9 @@ Adaptive target is useful when:
 
 **RT60 data is useful but not required.**
 
-RT60 data is captured automatically when you use DecayCore's built-in measurement tool. Adaptive target uses reliable stereo RT60 data as a bass-lift authority and decay guard, not as a broadband target generator.
+DecayCore's built-in measurement is the recommended source: it analyses the recorded decay and saves RT60 automatically. The session also includes harmonic curves for boost-risk guidance elsewhere in the correction workflow. Adaptive Target itself uses reliable stereo RT60 data to decide whether additional bass lift is permissible and to restrain it in a slow-decay room. RT60 alone does not determine the target's tonal shape.
 
-When using external measurements (REW text exports, WAV impulse files from REW, or other sources), RT60 data is typically not present. The target remains valid and can still reduce an overly strong broad bass shelf, but it will not add bass lift without reliable decay evidence.
+Ordinary REW frequency-response text exports do not carry recorded decay. A suitable imported impulse-response WAV can supply RT60 through analysis of its decay, though it does not include the separate harmonic curves from a DecayCore session. If reliable RT60 remains unavailable, the target can still reduce an overly strong broad bass shelf, but it will not add bass lift.
 
 **If you are using external measurements and RT60 data is not available, switching to the `Auto: search best built-in` strategy is generally the safer choice.** The built-in curve search evaluates how well different targets match the measured room and picks the best-ranked result regardless of RT60 data.
 

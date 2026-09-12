@@ -20,6 +20,8 @@ TDC uses decay evidence to form a low-frequency reduction separate from target m
 
 ## When to use it
 
+Start with DecayCore's guided measurement where supported. It saves RT60 from the recorded decay, giving TDC measured evidence to work with. A suitable imported impulse response can also provide that evidence; a decay estimate reconstructed from magnitude alone is diagnostic and cannot authorise decay correction.
+
 Use TDC when repeatable measurements show excessive low-frequency decay. Leave it conservative when decay evidence is missing, noisy, or changes strongly with microphone position. Speaker placement, listening position, crossover work, and acoustic treatment remain better solutions for problems that correction cannot address reliably.
 
 ## Related pages

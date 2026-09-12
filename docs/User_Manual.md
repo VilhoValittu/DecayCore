@@ -22,7 +22,7 @@ DecayCore accepts impulse-response WAV files and text exports containing frequen
 
 ### A safe first run
 
-1. Measure Left and Right or load compatible files on **Files**.
+1. Use **Measure** for guided Left and Right measurements with RT60 and harmonic data, then load the session results on **Files**. Import compatible measurements if guided measurement is unavailable.
 2. Select **DecayCore automatic mode (recommended)** and **Asymmetric**.
 3. Keep the **balanced** goal and **Adaptive: derive target from room acoustics** target strategy.
 4. Press **START** on **START / Results**.
@@ -34,6 +34,8 @@ When running from source, use **Basic** instead of Automatic mode.
 ## 2. Measure or import
 
 ### Guided measurement
+
+This is the recommended source for correction when your platform and routing support it. DecayCore analyses the recorded sweep for RT60 decay and harmonic distortion as well as the speaker response. RT60 provides measured decay information; the harmonic curves support boost-risk guidance. Keep the saved session files together so these results remain available when reloading the WAVs.
 
 Open **Measure** and configure the input device, output device, microphone calibration, selected channels, positions, and repeats. The guided session measures each selected channel, pauses when the microphone must move, rejects unusable takes, and saves one impulse-response WAV per channel.
 
@@ -56,6 +58,8 @@ Normal REW headers and comments are accepted. Phase is required for phase-aware 
 ### Impulse-response WAV files
 
 Use mono WAV files with consistent sample rate, gain, and timing. When exporting from REW, use the same options for every channel; `float32`, normalization, and consistent `t=0` placement are suitable defaults.
+
+A suitable imported IR can provide RT60 from its recorded decay. Standard frequency-response text exports lack that decay information, and ordinary linear IR WAVs do not include the separate harmonic curves saved by DecayCore. Imports remain supported, but use DecayCore's own measurement when possible to supply the fuller set of measurement data.
 
 ### Input checklist
 

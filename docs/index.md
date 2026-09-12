@@ -12,7 +12,7 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
     <p class="hero__eyebrow">Room measurement and FIR correction</p>
     <h1>Measure the room.<br><span>Reveal the music.</span></h1>
     <p class="hero__copy hero__copy--lead">You know that bass note that seems to turn up on every record? Your room may have a favourite. DecayCore measures your speakers in your listening room and creates FIR correction filters to help bring things back into balance.</p>
-    <p class="hero__copy">Measure with the guided workflow or bring your existing measurements. Export WAV filters for CamillaDSP, Roon, Equalizer APO, MiniDSP, and other FIR-capable systems, then put on a record you know by heart.</p>
+    <p class="hero__copy">Start with DecayCore's guided measurement: it captures room decay (RT60) and harmonic distortion alongside the speaker response, giving the correction more measured information to work with. Export WAV filters for CamillaDSP, Roon, Equalizer APO, MiniDSP, and other FIR-capable systems, then put on a record you know by heart.</p>
     <div class="action-row">
       <a class="button button--primary" href="https://github.com/VilhoValittu/DecayCore/releases/latest">Download DecayCore</a>
       <a class="button" href="{{ '/getting-started/' | relative_url }}">Create your first filter</a>
@@ -28,7 +28,7 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
 
 ## How it works
 
-1. **Measure or import.** Put the microphone where you listen and measure each speaker in DecayCore, or load compatible REW text or impulse-response files.
+1. **Measure in DecayCore.** Put the microphone where you listen and use the guided workflow. The session includes RT60 and harmonic data to help assess lingering bass and the risk of adding boost. Compatible REW text and impulse-response imports remain available when you need them.
 2. **Generate.** Start with Automatic mode and the Asymmetric filter type. DecayCore tries conservative settings and shows you which ones it chose. There is plenty of time to become very particular about them later.
 3. **Load and listen.** Play something familiar. Yes, *Hotel California* counts. Compare with bypass at the same volume and give the music a chance before opening another graph.
 
@@ -74,7 +74,7 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
   <div class="home-evidence__copy">
     <p class="section-kicker">Listen first</p>
     <h2>The result is what you hear</h2>
-    <p>A tidy response plot is satisfying. So is hearing the bass line clearly enough to follow what the player is doing. The second one is why we bother.</p>
+    <p>A tidy response plot is satisfying. So is hearing the bass line clearly enough to follow what the player is doing. The second one is why I bother.</p>
     <p>Load the filters, start quietly, and play a few records you know well. Compare with bypass at the same volume. Listen to the weight of a kick drum, the body of a voice, and whether the bass lets the next note through. If it sounds worse, it is worse. Your ears do not owe the graph a positive review.</p>
     <p>A corrected-system measurement can be useful, but DecayCore does not route its sweep through the exported filters automatically. That requires a separate loop through your convolver.</p>
     <p class="section-link"><a href="{{ '/results/' | relative_url }}">How to read and test a result <span aria-hidden="true">→</span></a></p>

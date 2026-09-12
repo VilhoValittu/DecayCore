@@ -12,6 +12,8 @@ This page contains the current development notes and three latest stable release
 
 Lisätty ZIPin bypass-kansioon CamillaDSP-YML, joka käyttää $samplerate$-muuttujaa. Mukana mono-, stereo- ja subwoofer-tuki.
 
+Hiottu muistin käyttöä automaattimoodissa. Hivenen nopeampi lopputulos testikoneella.
+
 ## [1.3.1] - 12-9-2026
 
 ### Filter optimization

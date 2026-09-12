@@ -11,7 +11,7 @@ Let's get your first pair of filters playing. Pick a few recordings you know wel
 
 1. Download and extract DecayCore.
 2. Open DecayCore.
-3. Measure Left and Right, or import compatible measurements.
+3. Measure Left and Right with DecayCore's guided workflow to include RT60 and harmonic data.
 4. Select **Automatic**, **Asymmetric**, and the **balanced** goal.
 5. Press **START**.
 6. Check the warnings and selected result.
@@ -36,14 +36,14 @@ See the [Installation guide]({{ '/installation/' | relative_url }}) for platform
 
 ### 2. Measure your speakers
 
-The recommended method is the guided workflow on the **Measure** page:
+Use the guided workflow on the **Measure** page whenever your platform and audio routing support it. It captures RT60 decay data and harmonic distortion along with the speaker response. That gives DecayCore measured evidence about how long the bass hangs around and where extra boost deserves caution. The woofer gets a say before anyone orders another few decibels.
 
 1. Connect your calibrated microphone.
 2. Load its calibration file.
 3. Measure Left and Right separately.
-4. Save the session and load the resulting impulse-response WAV files on the **Files** page.
+4. Save the session and load the resulting impulse-response WAV files on the **Files** page. Keep the accompanying session files beside the WAVs so the saved RT60 and harmonic data remain available.
 
-You can instead import compatible REW text exports containing frequency, magnitude, and phase, or mono impulse-response WAV files. See [Measurement]({{ '/measurement-workflow/' | relative_url }}) for platform support, subwoofer routing, and export requirements.
+If built-in measurement is unavailable, or you need to use existing files, import compatible REW text exports containing frequency, magnitude, and phase, or mono impulse-response WAV files. A suitable imported IR can provide RT60, but ordinary response exports do not carry DecayCore's full session data, including the separate harmonic curves. See [Measurement]({{ '/measurement-workflow/' | relative_url }}) for platform support, subwoofer routing, and export requirements.
 
 ### 3. Start with Automatic mode
 
