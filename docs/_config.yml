@@ -14,9 +14,9 @@ plugins:
 
 header_pages:
   - getting-started.md
-  - measurement-workflow.md
   - User_Manual.md
   - engineering.md
+  - results.md
 
 defaults:
   - scope:

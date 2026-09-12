@@ -2,6 +2,7 @@
 title: DecayCore User Manual
 nav_title: Manual
 description: Practical instructions for measuring, creating, exporting, deploying, and troubleshooting DecayCore FIR filters.
+toc: manual
 ---
 
 This manual follows the work you do in DecayCore: prepare measurements, choose a workflow, generate filters, inspect the result, and deploy it safely.
