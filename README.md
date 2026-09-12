@@ -1,37 +1,34 @@
-# DecayCore - FIR Room Correction and Acoustic Measurement Tool
+# DecayCore — FIR Room Correction and Acoustic Measurement
 
-DecayCore is a free FIR room correction, acoustic measurement, and filter generation tool. It exports convolution-ready WAV FIR filters compatible with any FIR-capable DSP engine — including CamillaDSP, Roon convolution, Equalizer APO, MiniDSP and similar platforms. The filter-generation source is available for non-commercial use. The packaged release builds include the integrated measurement workflow.
+Your speakers play the music. Your room leaves its mark. Bass builds up. Some notes linger. Others disappear at the listening seat.
 
-DecayCore includes its own measurement workflow in release builds. The preferred workflow is to measure directly with DecayCore, generate correction filters from those measurements, and export convolution-ready WAV FIR filters.
+DecayCore helps you measure what is happening and build FIR correction filters for your system. Measure your room, choose a target, and export filters ready to load into your DSP. The packaged app brings measurement and filter generation together in one workflow, free for non-commercial use.
 
-DecayCore runs through a browser-based user interface. The application starts a local UI that you use in your web browser; it is not a cloud service.
+**[Download DecayCore](https://github.com/VilhoValittu/DecayCore/releases)** · [Getting started](https://vilhovalittu.github.io/DecayCore/getting-started/) · [Documentation](https://vilhovalittu.github.io/DecayCore/)
 
-It focuses on physically sane, band-limited room correction instead of simply forcing a flat frequency response. DecayCore prioritizes controlled cuts, containment, and acoustically plausible shaping. Boost is not the primary goal, and remains a bounded, guarded exception only where the measurement supports it. DecayCore supports Linear Phase, Minimum Phase, Mixed Phase and Asymmetric FIR filters, automatic target optimization, phase-aware correction, and Temporal Decay Control for low-frequency room behavior.
+## Correction with restraint
 
->DecayCore was formerly known as CamillaFIR. The project was renamed to avoid confusion with CamillaDSP while keeping full CamillaDSP compatibility.
+A deep dip in a measurement can tempt you to turn up the gain. Room acoustics rarely makes it that simple.
 
-## Links
+DecayCore puts controlled cuts first. It keeps correction within defined frequency bands and allows limited boost only where the measurement supports it. Deep nulls and uncertain regions are guarded against excessive correction.
 
-- Documentation: https://vilhovalittu.github.io/DecayCore/
-- Releases: [DecayCore releases](https://github.com/VilhoValittu/DecayCore/releases)
-- Source code: [DecayCore repository](https://github.com/VilhoValittu/DecayCore)
+You can use automatic target optimization in the packaged app or take control with Basic and Advanced manual filtering. Linear Phase, Minimum Phase, Mixed Phase and Asymmetric FIR filters let you choose an approach for your system. Phase-aware correction and Temporal Decay Control add tools for addressing timing and low-frequency decay.
 
-> Important note about the measurement function :
-> The integrated measurement function is available only in the packaged versions published under the GitHub Releases section. It is not included in the public source tree. The source repository contains the filter-generation side, while the measurement/acquisition workflow remains available through the released builds.
+## From measurement to playback
 
-REW-style measurement data may also be used in compatible workflows, but DecayCore's own measurement workflow is the preferred path.
+1. **Measure your room.** Use the built-in measurement workflow in the packaged release. Compatible REW-style measurement data can also be used.
+2. **Build your correction.** Choose your target and filter settings, then generate FIR filters from your measurements.
+3. **Load the filters and listen.** Export convolution-ready WAV files for CamillaDSP, Roon convolution, Equalizer APO, MiniDSP, or another FIR-capable DSP engine.
 
-## What DecayCore does
+The app runs locally on your computer, with controls in your web browser. No cloud service is involved.
 
-- Measures loudspeakers and rooms with the built-in measurement workflow in release builds
-- Provides a local browser-based user interface
-- Generates FIR room correction filters from measurement data
-- Exports convolution-ready WAV FIR filters
-- Supports CamillaDSP, Roon convolution, Equalizer APO, and other FIR-capable DSP engines
-- Supports Linear Phase, Minimum Phase, Mixed Phase and Asymmetric FIR filters
-- Prioritizes cuts and bounded shaping over boost-heavy "flatten at any cost" correction
-- Uses conservative correction limits to avoid unsafe boosts, deep-null chasing, and unrealistic room correction
-- Includes automatic target optimization and Temporal Decay Control
+## Choose your version
+
+**The packaged release** includes integrated measurement and the automatic-mode decision engine. Download it from [GitHub Releases](https://github.com/VilhoValittu/DecayCore/releases) for the complete workflow.
+
+**The public source** provides filter generation with Basic and Advanced manual controls for non-commercial use. The measurement engine, automatic-mode decision engine, and related packaged workflows are proprietary and are not included in the public source tree. See the [source repository](https://github.com/VilhoValittu/DecayCore) and the license terms below.
+
+> DecayCore was formerly called CamillaFIR. The name changed to avoid confusion with CamillaDSP; full CamillaDSP compatibility remains.
 
 ## Screenshots
 
@@ -62,13 +59,13 @@ REW-style measurement data may also be used in compatible workflows, but DecayCo
 
 ## Download
 
-Download DecayCore from the official GitHub releases page:
+Ready to hear what correction can do in your room?
 
-[DecayCore releases](https://github.com/VilhoValittu/DecayCore/releases)
+[Download the packaged app](https://github.com/VilhoValittu/DecayCore/releases) and follow the [getting started guide](https://vilhovalittu.github.io/DecayCore/getting-started/).
 
 ## Contact
 
-Feedback: vilho.valittu@gmail.com
+Questions, feedback, or something that could work better? Write to vilho.valittu@gmail.com.
 
 ## Python and dependency baseline
 
