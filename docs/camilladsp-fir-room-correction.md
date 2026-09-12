@@ -6,7 +6,7 @@ permalink: /camilladsp-fir-room-correction/
 
 ## How does DecayCore work with CamillaDSP?
 
-DecayCore designs the correction; CamillaDSP applies it during playback. A normal export includes Left and Right FIR WAV files plus CamillaDSP configuration material. Load each filter into the matching channel, preserve the exported sample-rate and gain assumptions, and leave enough headroom to avoid clipping.
+DecayCore makes the filters, and CamillaDSP runs them while you listen. A normal export includes Left and Right FIR WAV files plus CamillaDSP configuration material. Load each filter into the matching channel, keep the exported sample-rate and gain settings, and leave enough headroom to avoid clipping. Getting Left and Right the right way round is still one of hi-fi's more cost-effective adjustments.
 
 If Hybrid IIR is active, use both the exported peaking filters and the FIR convolution stage. Loading only the WAV omits correction transferred to IIR. Bass Integration exports a shared Sub FIR and the crossover, delay, gain, and polarity settings needed by the sub branch.
 

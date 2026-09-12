@@ -7,19 +7,19 @@ permalink: /faq/
 
 ## What is DecayCore?
 
-DecayCore is a FIR room correction, acoustic measurement, and filter generation tool for CamillaDSP, convolution WAV filters, and other FIR-capable DSP engines.
+DecayCore measures how your speakers and room behave together, then makes FIR correction filters for your playback system. It is for the familiar situation where you like your speakers, love your records, and suspect the room is getting rather too involved in the bass line.
 
 ## Was DecayCore formerly called CamillaFIR?
 
-Yes. DecayCore was formerly known as CamillaFIR. The project was renamed to avoid confusion with CamillaDSP while keeping full CamillaDSP compatibility.
+Yes. The name changed from CamillaFIR to DecayCore to avoid confusion with CamillaDSP. They still work together. There are already enough similar names to remember in a hi-fi rack.
 
 ## Does DecayCore work only with CamillaDSP?
 
-No. DecayCore is compatible with CamillaDSP, but the generated FIR filters can also be used with other convolution-capable DSP engines that support compatible WAV impulse response filters.
+No. CamillaDSP is one option. You can also load the generated filters into other convolution engines that accept compatible WAV impulse responses. Check the required format, sample rate, and channel routing for your player before loading them.
 
 ## Is DecayCore mainly a boost tool?
 
-No. DecayCore is built around physically plausible room correction where controlled cuts and bounded shaping do most of the work. Boost is intentionally limited and should not be used to chase deep nulls, uncertain bass behavior, or a perfectly flat-looking graph.
+No. Most of the work comes from controlled cuts and modest shaping. Boost is deliberately limited. If the room cancels a note at your seat, asking the woofer to try harder can use up headroom without solving much. That is a good moment to look at placement, rather than reach for another 6 dB.
 
 ## Does DecayCore include measurement?
 
@@ -27,7 +27,7 @@ Yes. Packaged releases include guided measurement. See [Measurement]({{ '/measur
 
 ## Should I measure with DecayCore or REW?
 
-Use DecayCore's guided workflow when it is available and suits your routing. Existing REW text or impulse-response files are also valid when phase, timing, gain, and channel references are consistent.
+Use DecayCore's guided workflow if it suits your setup. If you already have good REW measurements, bring them along; there is no prize for measuring the same room twice before dinner. Text exports or impulse-response files work when phase, timing, gain, and channel references are consistent.
 
 ## Where can I download DecayCore?
 

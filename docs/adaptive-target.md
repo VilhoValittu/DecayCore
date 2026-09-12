@@ -5,7 +5,7 @@ description: How DecayCore derives a room-aware target curve from measurement da
 permalink: /adaptive-target/
 ---
 
-Adaptive Target is one of three target strategies available in DecayCore's AUTO mode. Instead of searching through the library of built-in target curves, it synthesizes a custom target from the room's measured characteristics.
+Choosing a target curve can easily become the whole evening. Adaptive Target gives you a starting point based on your room's measurements, with small adjustments to an established bass balance. It is one of three target strategies in AUTO mode and creates its target directly, without searching the built-in curve library.
 
 ## In brief
 
@@ -19,7 +19,7 @@ In AUTO mode, DecayCore can determine the target curve in three ways:
 - **Auto: search best built-in** — evaluates multiple built-in target curves in parallel and picks the best-ranked match.
 - **Use selected target curve from Target page** — uses the target curve manually selected in the Target tab and disables automatic target search.
 
-The adaptive strategy derives its target directly from the measurements. It does not iterate across multiple candidate curves, which makes it significantly faster than the default search-based approach.
+Because Adaptive Target derives the curve directly from the measurements, it skips the time spent comparing several built-in targets. You can get to the listening part sooner.
 
 ## How it works
 

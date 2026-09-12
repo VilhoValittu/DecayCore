@@ -5,7 +5,7 @@ description: Use DecayCore's graphs to spot problems, then judge the filter by l
 permalink: /results/
 ---
 
-The result view shows what DecayCore calculated. Use it to catch warnings, clipping risk, excessive boost, or strange timing before you load the filter. It cannot tell you whether the filter sounds good.
+The filters are ready. Before reaching for the volume knob, check the result view for warnings, clipping risk, excessive boost, or odd timing. Then comes the interesting part: finding out what happened to the music.
 
 ## What the graphs are for
 
@@ -50,7 +50,9 @@ Check these before playback:
 4. Use recordings you know well.
 5. Compare with bypass at the same volume.
 
-Listen for tonal balance, bass integration, clarity, imaging, and anything that sounds unnatural. If the filter sounds worse, do not use it just because the curves look cleaner.
+Try a bass line with a few different notes. Are some still much louder than the others? Listen to a familiar voice and the space around it, then something busy enough to test whether the bass keeps its shape. Pay attention to tonal balance, bass integration, clarity, and imaging. A leaner sound can seem clearer at first while losing some of the body you enjoyed, so give it a few tracks.
+
+If the filter sounds worse, do not keep it just because the curves look cleaner. You have to live with the sound; the graph gets to sit in a folder.
 
 At some point, you are allowed to finish the album instead of restarting the same thirty seconds.
 
@@ -62,6 +64,6 @@ This can catch routing, gain, crossover, polarity, and sample-rate mistakes. Do 
 
 ## Keep comparisons honest
 
-One room does not prove how a filter will work in another. When sharing comparisons, include the microphone method, smoothing, level, frequency range, target, and playback chain. Share the measurement files when possible.
+One room does not prove how a filter will work in another. When sharing comparisons, include the microphone method, smoothing, level, frequency range, target, and playback chain. Share the measurement files when possible. It gives the next curious listener something more useful than “the bass is tighter”, a phrase that has already done several lifetimes of service on hi-fi forums.
 
 For deployment details, use the [User Manual]({{ '/User_Manual.html#8-export-and-deploy' | relative_url }}). For the correction rationale, see [How DecayCore works]({{ '/how-it-works/' | relative_url }}).

@@ -6,9 +6,9 @@ permalink: /fir-room-correction/
 
 ## What does FIR room correction change?
 
-A finite impulse response (FIR) filter can change magnitude and phase while giving precise control over its time-domain behavior. DecayCore designs FIR filters from measured loudspeaker and room responses, then exports WAV impulses for a convolution engine.
+Perhaps a few bass notes dominate everything, or a familiar voice sounds heavier at your listening seat than it should. Measuring the speakers in the room gives you a way to investigate. DecayCore uses those measurements to design finite impulse response (FIR) filters, which can adjust magnitude and phase with precise control over their timing. You load the exported WAV impulses into your convolution engine for playback.
 
-The goal is not to make every point in the response flat. Deep dips are often caused by cancellations that move with listening position and cannot be repaired safely with boost. DecayCore instead emphasizes supported peaks, broad tonal errors, low-frequency decay, and bounded phase correction.
+DecayCore focuses on peaks the measurements support correcting, broad tonal errors, low-frequency decay, and bounded phase correction. Deep dips often come from cancellations that move with listening position and cannot be repaired safely with boost. A ruler-flat plot is a tempting hobby in its own right, but the amplifier should not have to fund it.
 
 ## Available filter strategies
 

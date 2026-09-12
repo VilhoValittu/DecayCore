@@ -1,30 +1,30 @@
 ---
 title: How DecayCore works
 nav_title: How it works
-description: Understand DecayCore's correction principles, focused features, mathematical model, DSP guards, and operating policies.
+description: Find out how DecayCore handles bass, phase, decay, and headroom, with the maths available when you want to go further.
 permalink: /how-it-works/
 ---
 
-Start with the correction concepts, then go deeper only when you need the mathematical model or implementation-level reference.
+If you have ever moved a speaker a few centimetres and then listened to the same track six times, you already know why the details matter. These pages explain what DecayCore measures, what it tries to correct, and where it leaves well alone. Start with the concepts; the equations are here for the evening that was supposed to involve just one album.
 
 ## Concepts
 
 <div class="doc-grid doc-grid--two">
   <section class="doc-card">
     <h3><a href="{{ '/Why_DecayCore_Works.html' | relative_url }}">Why DecayCore Works</a></h3>
-    <p>A plain-language explanation of measurement confidence, cuts-first correction, phase safety, decay control, and headroom.</p>
+    <p>Why some peaks are worth cutting, some dips are best left alone, and your amplifier deserves a little breathing room.</p>
   </section>
   <section class="doc-card">
     <h3><a href="{{ '/Comparison_vs_EQ.html' | relative_url }}">DecayCore vs conventional EQ</a></h3>
-    <p>How a bounded magnitude-and-time workflow differs from magnitude-focused equalization.</p>
+    <p>What looking at timing and decay adds to the familiar job of adjusting frequency response.</p>
   </section>
   <section class="doc-card">
     <h3><a href="{{ '/temporal-decay-control/' | relative_url }}">Temporal Decay Control</a></h3>
-    <p>Why low-frequency decay is treated separately from ordinary magnitude matching.</p>
+    <p>What to do when a bass note hangs around after the player has moved on.</p>
   </section>
   <section class="doc-card">
     <h3><a href="{{ '/adaptive-target/' | relative_url }}">Adaptive Target</a></h3>
-    <p>How bounded target changes are derived from broad, stereo-consistent room evidence.</p>
+    <p>How the measurements from both speakers guide small changes to the bass target.</p>
   </section>
   <section class="doc-card">
     <h3><a href="{{ '/User_Manual.html#4-choose-the-target-and-filter-type' | relative_url }}">Filter types</a></h3>
@@ -37,11 +37,11 @@ Start with the correction concepts, then go deeper only when you need the mathem
 <div class="doc-grid">
   <section class="doc-card">
     <h3><a href="{{ '/Modes.html' | relative_url }}">AUTO, BASIC, and ADVANCED</a></h3>
-    <p>Search behavior, manual control, defaults, and policy clamps.</p>
+    <p>Let Automatic find a starting point, use Basic for manual adjustment, or get into the details with Advanced.</p>
   </section>
   <section class="doc-card">
     <h3><a href="{{ '/hybrid-iir-fir/' | relative_url }}">Hybrid IIR + FIR</a></h3>
-    <p>Division of narrow modal cuts and broadband correction between two filter stages.</p>
+    <p>How IIR handles narrow bass resonances while FIR takes care of broader correction.</p>
   </section>
 </div>
 
@@ -58,7 +58,7 @@ Start with the correction concepts, then go deeper only when you need the mathem
   </section>
   <section class="doc-card">
     <h3><a href="{{ '/DecayCore_dsp_guards.html' | relative_url }}">DSP guards</a></h3>
-    <p>The complete taxonomy of acoustic-policy and numerical-safety guards.</p>
+    <p>The limits that keep correction strength, timing, and the underlying calculations under control.</p>
   </section>
   <section class="doc-card">
     <h3><a href="{{ '/Stability_and_Reproducibility.html' | relative_url }}">Stability and reproducibility</a></h3>

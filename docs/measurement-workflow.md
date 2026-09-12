@@ -5,7 +5,7 @@ description: Measure loudspeakers with DecayCore or import compatible REW text a
 permalink: /measurement-workflow/
 ---
 
-Good correction starts with a clean, repeatable measurement. DecayCore can capture measurements in packaged releases or read compatible files created elsewhere.
+The microphone helps explain why the bass changes when you lean forward in your favourite chair. Give it a quiet room and a repeatable setup, and you have a useful starting point for correction. Packaged DecayCore releases can guide you through the measurement, or you can bring compatible files from elsewhere.
 
 ## Platform support
 
@@ -40,6 +40,8 @@ Export each channel separately and include frequency, magnitude, and phase. Deca
 Use mono files with consistent sample rate, gain, and timing. For REW exports, use `float32`, normalization, and the same `t=0` placement for every channel. Do not normalize files from a shared DecayCore measurement session individually.
 
 ## Measurement checklist
+
+Resist moving a speaker “just a little” halfway through. We all know how that evening ends. Finish a consistent set first, then measure the new position as a separate comparison.
 
 - Use the same microphone position and procedure for corresponding channels.
 - Avoid clipping and background noise.

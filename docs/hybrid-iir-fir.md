@@ -5,7 +5,7 @@ description: How DecayCore combines narrow IIR biquad cuts with FIR correction f
 permalink: /hybrid-iir-fir/
 ---
 
-The Hybrid IIR + FIR workflow is an optional extension to DecayCore's standard FIR correction pipeline. It adds a small set of narrow IIR peaking EQ cuts targeting stubborn room modes in the bass region before the FIR filter is synthesized.
+Sometimes one or two bass resonances keep drawing attention to themselves, whatever record you put on. Hybrid IIR + FIR adds a small set of narrow IIR peaking EQ cuts to DecayCore's normal FIR workflow for those stubborn room modes. It is optional; a well-behaved bass response does not need extra filters just because there is a checkbox available.
 
 ## In brief
 

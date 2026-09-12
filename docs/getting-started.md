@@ -5,7 +5,7 @@ description: Download DecayCore, create your first FIR filters, and try them wit
 permalink: /getting-started/
 ---
 
-This is the quickest way to make and try your first pair of DecayCore filters.
+Let's get your first pair of filters playing. Pick a few recordings you know well: a voice you recognise immediately, a bass line you can hum, perhaps that live album where you know exactly when someone coughs. Those will be useful once the measuring is done.
 
 ## Your first DecayCore filter
 
@@ -24,7 +24,7 @@ This is the quickest way to make and try your first pair of DecayCore filters.
 
 ### Before you start
 
-You need a calibrated measurement microphone, a way to play the measurement sweep, and a playback system that accepts FIR convolution filters. For most users, the packaged release is the right choice because it includes guided measurement and Automatic mode.
+You need a calibrated measurement microphone, a way to play the measurement sweep, and a playback system that accepts FIR convolution filters. Download the packaged release for guided measurement and Automatic mode. Give yourself a quiet stretch of time; the microphone will happily include the dishwasher in its assessment of your system.
 
 ### 1. Download and open DecayCore
 
@@ -55,7 +55,7 @@ For a first run in a packaged release:
 - Target strategy: **Adaptive: derive target from room acoustics**
 - Max boost: leave the default conservative limit
 
-Automatic mode searches and ranks several guarded presets. Avoid trying to fill deep dips with extra boost; moving the speakers, changing the crossover, or treating the room is usually more effective.
+Automatic mode tries several presets within safety limits and ranks the results. Leave the boost limit alone for now. A deep dip can tempt you into adding another few decibels, but a cancellation is remarkably unimpressed by amplifier effort. Speaker placement, crossover changes, or room treatment are usually more useful there.
 
 Source checkouts do not include the packaged Automatic mode engine. Use **Basic** for a conservative manual starting point when running from source.
 
@@ -76,11 +76,11 @@ Download the result ZIP or open the output folder shown on the results page. It 
 
 ### 6. Listen and optionally verify
 
-Start at a low volume and use recordings you know well. Listen for tonal balance, bass integration, clarity, imaging, and anything that sounds unnatural.
+Start at a low volume with those familiar recordings. Can you follow the bass line through the busy passages? Does a voice still have its body? Is the centre image where you expect it? Listen for tonal balance, bass integration, clarity, and anything that now sounds unnatural.
 
 Compare with bypass at the same volume. A louder result will often seem better. The volume knob has won enough unfair comparisons already.
 
-The plots can help explain what you hear, but they are not the goal. If the filter sounds worse, go back and change it.
+Use a few different records before making up your mind. One beautifully recorded acoustic guitar cannot speak for your entire collection. If the filter sounds worse, go back and change it; the plots can help you work out why.
 
 DecayCore does not include exported filters in its own measurement path. Measuring with correction active is possible only if you route the sweep through your convolver. If you are not sure how to do that, skip the verification measurement and trust the listening test.
 

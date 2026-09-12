@@ -4,7 +4,7 @@ description: Temporal Decay Control is a DecayCore feature for controlling low-f
 permalink: /temporal-decay-control/
 ---
 
-Temporal Decay Control is one of DecayCore's core ideas.
+You know the bass note that is still hanging around when the next one arrives? That lingering energy is why DecayCore pays attention to decay as well as level. The room does not always share the drummer's sense of when to stop.
 
 ## In brief
 
@@ -12,7 +12,7 @@ Temporal Decay Control (TDC) reduces supported low-frequency energy that lasts t
 
 ## Why frequency response is not enough
 
-A flat-looking response does not guarantee controlled bass. Low-frequency room modes can store energy and decay slowly, producing bass that sounds heavy or detached even after ordinary equalization.
+A frequency-response plot tells you about level across frequencies. It does not tell the whole story of how long the bass hangs around. Low-frequency room modes can store energy and decay slowly, leaving notes heavy or detached even after ordinary equalization. You may have the level about right and still struggle to follow a quick bass line.
 
 ## What Temporal Decay Control does
 
