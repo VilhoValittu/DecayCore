@@ -78,7 +78,7 @@ Download the result ZIP or open the output folder shown on the results page. It 
 
 Start at a low volume and use recordings you know well. Listen for tonal balance, bass integration, clarity, imaging, and anything that sounds unnatural.
 
-Compare with bypass at the same volume. A louder result will often seem better.
+Compare with bypass at the same volume. A louder result will often seem better. The volume knob has won enough unfair comparisons already.
 
 The plots can help explain what you hear, but they are not the goal. If the filter sounds worse, go back and change it.
 

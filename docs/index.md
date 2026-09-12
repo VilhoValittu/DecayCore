@@ -75,7 +75,7 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
     <p class="section-kicker">Listen first</p>
     <h2>The result is what you hear</h2>
     <p>The graphs show what DecayCore changed. They do not tell you whether it sounds good.</p>
-    <p>Load the filters, lower the volume, and listen to music you know well. Compare with bypass at the same volume. If it sounds worse, it is worse—even if the graph looks better.</p>
+    <p>Load the filters, lower the volume, and listen to music you know well. Compare with bypass at the same volume. If it sounds worse, it is worse—even if the graph looks better. Your ears do not owe the graph a positive review.</p>
     <p>A corrected-system measurement can be useful, but DecayCore does not route its sweep through the exported filters automatically. That requires a separate loop through your convolver.</p>
     <p class="section-link"><a href="{{ '/results/' | relative_url }}">How to read and test a result <span aria-hidden="true">→</span></a></p>
   </div>

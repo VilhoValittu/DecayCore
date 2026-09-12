@@ -52,6 +52,8 @@ Check these before playback:
 
 Listen for tonal balance, bass integration, clarity, imaging, and anything that sounds unnatural. If the filter sounds worse, do not use it just because the curves look cleaner.
 
+At some point, you are allowed to finish the album instead of restarting the same thirty seconds.
+
 ## Optional measurement through the convolver
 
 DecayCore does not apply exported filters to its own measurement sweep. To measure with correction active, you must route the sweep through the convolver yourself.
