@@ -30,7 +30,7 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
 
 1. **Measure or import.** Measure left and right speakers in DecayCore, or load compatible REW text or impulse-response files.
 2. **Generate.** Start with Automatic mode and the Asymmetric filter type. DecayCore searches for a conservative result and reports the settings it used.
-3. **Load and listen.** Play music you know well and compare with bypass at the same volume. The graphs explain the filter; they do not decide whether it sounds good.
+3. **Load and listen.** Play music you know well (yes, *Hotel California* counts—we won't tell the other audiophiles) and compare with bypass at the same volume. The graphs explain the filter; they do not decide whether it sounds good.
 
 <p class="section-link"><a href="{{ '/getting-started/' | relative_url }}">Follow the complete first-filter workflow <span aria-hidden="true">→</span></a></p>
 
