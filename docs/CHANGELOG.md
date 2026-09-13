@@ -8,11 +8,24 @@ hide_page_heading: true
 
 This page contains the current development notes and three latest stable releases. [Older releases and Finnish translations are preserved in the archive]({{ '/changelog/archive/' | relative_url }}).
 
-## [Unreleased]
+## [1.3.2] - 13-9-2026
 
-Lisätty ZIPin bypass-kansioon CamillaDSP-YML, joka käyttää $samplerate$-muuttujaa. Mukana mono-, stereo- ja subwoofer-tuki.
+### Export
 
-Hiottu muistin käyttöä automaattimoodissa. Hivenen nopeampi lopputulos testikoneella.
+Set up bypass playback more easily with a **CamillaDSP bypass configuration**
+included in the ZIP's bypass folder. It uses the `$samplerate$` variable and
+supports mono, stereo and subwoofer setups.
+
+### Automatic mode
+
+Automatic mode now uses memory more efficiently, with a modest speed improvement
+observed on the test machine.
+
+### UI
+
+The **FIR Compare** download link now points to the correct
+[releases page](https://github.com/VilhoValittu/FIR-Compare/releases), making the
+filter comparison tool easier to find.
 
 ## [1.3.1] - 12-9-2026
 
