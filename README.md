@@ -34,7 +34,7 @@ The app runs locally on your computer, with controls in your web browser. No clo
 
 ## Screenshots
 
-![Files tab — load measurement files, inspect metadata, and set output format](docs/pics/ui_1.png)
+![Basic tab with the speaker measurements sidebar open](docs/pics/ui_1.png)
 
 ![Measure tab — configure capture devices and run guided room measurements](docs/pics/ui_2.png)
 
@@ -48,7 +48,7 @@ The app runs locally on your computer, with controls in your web browser. No clo
 
 ![XO tab — define crossover filters between bands](docs/pics/ui_7.png)
 
-![Start / Results tab — launch correction and follow its progress](docs/pics/ui_8.png)
+![Start / Results tab before speaker measurements are loaded](docs/pics/ui_8.png)
 
 ## Documentation
 

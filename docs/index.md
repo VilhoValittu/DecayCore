@@ -57,14 +57,14 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
 
 ## One workflow, from input to result
 
-<p>Work through the numbered pages from measurement to export. Automatic mode handles the search and shows its chosen settings, so you have a starting point for listening without spending the evening trying every combination.</p>
+<p>Work through the pages from measurement to export. Automatic mode handles the search and shows its chosen settings, so you have a starting point for listening without spending the evening trying every combination.</p>
 
 <div class="screenshot-gallery screenshot-gallery--single">
   <figure class="screenshot-item">
     <a href="{{ '/pics/ui_8.png' | relative_url }}">
-      <img src="{{ '/pics/ui_8.png' | relative_url }}" alt="DecayCore START and Results page ready to generate FIR correction filters" width="1536" height="960" loading="lazy">
+      <img src="{{ '/pics/ui_8.png' | relative_url }}" alt="DecayCore START and Results page before speaker measurements are loaded" width="1536" height="960" loading="lazy">
     </a>
-    <figcaption class="screenshot-item__caption">START / Results — generate filters, follow progress, and inspect the selected solution</figcaption>
+    <figcaption class="screenshot-item__caption">START / Results — load measurements to enable filter generation, then follow progress and inspect the result</figcaption>
   </figure>
 </div>
 

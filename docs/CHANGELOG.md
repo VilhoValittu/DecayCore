@@ -8,6 +8,23 @@ hide_page_heading: true
 
 This page contains the current development notes and three latest stable releases. [Older releases and Finnish translations are preserved in the archive]({{ '/changelog/archive/' | relative_url }}).
 
+## [1.3.3] - 18-9-2026
+
+### UI
+
+The **Modern** style has a new layout. The packaged application now uses
+DecayCore's native browser UI engine and no longer includes NiceGUI.
+
+The new **Apply saved auto settings** button in Basic and Advanced modes lets
+you apply saved Automatic mode settings for the selected filter type, with the
+newest settings listed first. The current target curve and mode safety limits
+are preserved.
+
+### Automatic mode
+
+After running Automatic mode with an adaptive target, you can download that
+target and use it in Basic and Advanced modes.
+
 ## [1.3.2] - 13-9-2026
 
 ### Export
