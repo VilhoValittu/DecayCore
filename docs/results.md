@@ -42,6 +42,12 @@ Check these before playback:
 
 [Open the complete Reading DecayCore Output guide]({{ '/DecayCore_Reading_Output_Guide.html' | relative_url }}).
 
+## Compare phase strategies interactively
+
+The [interactive FIR comparison]({{ '/fir-comparison-demo/' | relative_url }}) puts DecayCore's Mixed, Minimum, Linear, and Asymmetric phase filters beside the same reference filter. Change the reference, inspect signed differences, and compare magnitude, timing, phase, and impulse behavior without reducing the result to a single winner.
+
+<p class="action-row"><a class="button button--primary" href="{{ '/fir-comparison-demo/' | relative_url }}">Open the FIR comparison</a></p>
+
 ## Listen first
 
 1. Load the correct Left and Right filters and any required subwoofer or Hybrid IIR stages.

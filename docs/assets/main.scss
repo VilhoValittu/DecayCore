@@ -611,6 +611,14 @@ a:hover {
   padding: 10px 4px 0;
 }
 
+.demo-preview {
+  max-width: 1180px;
+}
+
+.demo-preview img {
+  box-shadow: var(--shadow-hero);
+}
+
 .site-footer {
   border-top: 1px solid var(--line);
   background: var(--bg-deep);
