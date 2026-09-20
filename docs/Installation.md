@@ -23,7 +23,7 @@ the native Automatic mode engine.
 
 For measurement audio on Linux releases, DecayCore packages a pinned PortAudio build with
 ALSA and PulseAudio host APIs. `install.sh` supplies only its host audio
-libraries: `libasound2 libpulse0` on Debian/Ubuntu, or `alsa-lib libpulse pipewire-alsa pipewire-pulse wireplumber`
+libraries: `libasound2t64 libpulse0` on current Debian/Ubuntu releases (`libasound2` on older releases), or `alsa-lib libpulse pipewire-alsa pipewire-pulse wireplumber`
 on an Arch PipeWire audio system.
 
 To print the packaged process's PortAudio host APIs and raw device list without opening an audio stream, run `./run.sh --audio-diagnostics`.
@@ -34,8 +34,9 @@ To use the interface from another computer on the same trusted network, start
 DecayCore with `--lan` (for example, `./run.sh --lan` on Linux). Open one of the
 complete `DecayCore LAN:` addresses printed in the console. The address includes
 a private session token and must be copied in full. LAN mode uses unencrypted
-HTTP, so do not enable it on an untrusted or publicly exposed network. The host
-firewall may also need permission for TCP port 8080 on the private network.
+HTTP and does not automatically open a local browser, so do not enable it on an
+untrusted or publicly exposed network. The host firewall may also need permission
+for TCP port 8080 on the private network.
 
 See [Measurement]({{ '/measurement-workflow/' | relative_url }}) for current platform support and routing requirements.
 

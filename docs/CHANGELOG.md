@@ -8,6 +8,27 @@ hide_page_heading: true
 
 This page contains the current development notes and three latest stable releases. [Older releases and Finnish translations are preserved in the archive]({{ '/changelog/archive/' | relative_url }}).
 
+## [1.3.7] - 20-9-2026
+
+### Local network access
+
+Fixed a blank page when opening DecayCore from another device in `--lan` mode.
+Browsers do not provide `crypto.randomUUID()` over an unencrypted, non-local
+HTTP connection, which previously stopped the frontend during initialization.
+
+The frontend now falls back to cryptographically secure UUID generation using
+`crypto.getRandomValues()`, allowing the interface and authenticated requests
+to initialize normally over a trusted local network.
+
+### Installation script on Linux systems
+
+For measurement audio on Linux releases, DecayCore packages a pinned PortAudio build with
+ALSA and PulseAudio host APIs. `install.sh` supplies only its host audio
+libraries: `libasound2t64 libpulse0` on current Debian/Ubuntu releases (`libasound2` on older releases), or `alsa-lib libpulse pipewire-alsa pipewire-pulse wireplumber`
+on an Arch PipeWire audio system.
+
+Thanks to **mkusan** from asr-forum for finding these!
+
 ## [1.3.6] - 20-9-2026
 
 ### Shutdown
