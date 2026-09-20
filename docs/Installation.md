@@ -30,6 +30,13 @@ To print the packaged process's PortAudio host APIs and raw device list without 
 
 DecayCore normally opens its local browser interface automatically. If it does not, open `http://127.0.0.1:8080`. The interface runs on your computer; it is not a cloud service.
 
+To use the interface from another computer on the same trusted network, start
+DecayCore with `--lan` (for example, `./run.sh --lan` on Linux). Open one of the
+complete `DecayCore LAN:` addresses printed in the console. The address includes
+a private session token and must be copied in full. LAN mode uses unencrypted
+HTTP, so do not enable it on an untrusted or publicly exposed network. The host
+firewall may also need permission for TCP port 8080 on the private network.
+
 See [Measurement]({{ '/measurement-workflow/' | relative_url }}) for current platform support and routing requirements.
 
 ## Run from source

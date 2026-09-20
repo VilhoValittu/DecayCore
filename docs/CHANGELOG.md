@@ -8,7 +8,24 @@ hide_page_heading: true
 
 This page contains the current development notes and three latest stable releases. [Older releases and Finnish translations are preserved in the archive]({{ '/changelog/archive/' | relative_url }}).
 
-## [Unreleased]
+## [1.3.6] - 20-9-2026
+
+### Shutdown
+
+The shutdown button now displays a single persistent notification: “DecayCore
+is shutting down. You can close this browser tab.” Genuine HTTP and loading
+errors continue to be reported normally.
+
+### Local network access
+
+Local network access must now be enabled explicitly with the `--lan` option,
+for example `./run.sh --lan`. DecayCore prints complete LAN addresses, including
+the session token, to the console. Copy the entire address when opening
+DecayCore on another device.
+
+LAN mode uses an unencrypted HTTP connection and should only be enabled on a
+trusted local network. TCP port 8080 may also need to be allowed through the
+firewall for private networks.
 
 ## [1.3.5] - 19-9-2026
 
