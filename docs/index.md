@@ -17,6 +17,7 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
       <a class="button button--primary" href="https://github.com/VilhoValittu/DecayCore/releases/latest">Download DecayCore</a>
       <a class="button" href="{{ '/getting-started/' | relative_url }}">Create your first filter</a>
     </div>
+    <p class="hero__availability">The packaged download includes guided measurement and Automatic mode. The public source checkout provides Basic and Advanced manual filtering.</p>
   </div>
   <div class="hero__visual">
     <div class="hero__logo-frame">
@@ -61,10 +62,10 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
 
 <div class="screenshot-gallery screenshot-gallery--single">
   <figure class="screenshot-item">
-    <a href="{{ '/pics/ui_8.png' | relative_url }}">
-      <img src="{{ '/pics/ui_8.png' | relative_url }}" alt="DecayCore START and Results page before speaker measurements are loaded" width="1536" height="960" loading="lazy">
+    <a href="{{ '/pics/result-response-example.png' | relative_url }}">
+      <img src="{{ '/pics/result-response-example.png' | relative_url }}" alt="DecayCore result showing target-tracking figures and a left-channel response graph" width="1610" height="900" loading="lazy">
     </a>
-    <figcaption class="screenshot-item__caption">START / Results — load measurements to enable filter generation, then follow progress and inspect the result</figcaption>
+    <figcaption class="screenshot-item__caption">Completed result with target-tracking figures and a response graph. The exported-filter curve is a prediction, not a follow-up room measurement.</figcaption>
   </figure>
 </div>
 

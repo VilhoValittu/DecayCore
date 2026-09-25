@@ -6,7 +6,7 @@ hide_page_heading: true
 
 # Changelog
 
-This page contains the current development notes and three latest stable releases. [Older releases and Finnish translations are preserved in the archive]({{ '/changelog/archive/' | relative_url }}).
+This page contains the current development notes and five latest stable releases. [Older releases and Finnish translations are preserved in the archive]({{ '/changelog/archive/' | relative_url }}).
 
 ## [Unreleased]
 

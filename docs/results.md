@@ -23,10 +23,10 @@ The filters are ready. Before reaching for the volume knob, check the result vie
 ## Read the generated result
 
 <figure class="report-figure">
-  <a href="{{ '/pics/ui_8.png' | relative_url }}">
-    <img src="{{ '/pics/ui_8.png' | relative_url }}" alt="DecayCore START and Results page" width="1536" height="960" loading="lazy">
+  <a href="{{ '/pics/result-response-example.png' | relative_url }}">
+    <img src="{{ '/pics/result-response-example.png' | relative_url }}" alt="DecayCore result showing target-tracking figures and a left-channel response graph" width="1610" height="900" loading="lazy">
   </a>
-  <figcaption>START / Results is the entry point for generation, progress, warnings, and the selected solution.</figcaption>
+  <figcaption>Completed result with target-tracking figures and a response graph. DecayCore predicts the exported filter's effect here; measuring the corrected playback requires a separate sweep through your convolver.</figcaption>
 </figure>
 
 Check these before playback:

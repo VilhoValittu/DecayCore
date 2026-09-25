@@ -57,7 +57,7 @@ body {
   border: 2px solid var(--accent);
   border-radius: 4px;
   background: var(--bg-deep);
-  color: var(--text-strong);
+  color: #ffffff;
   font-weight: 750;
   padding: 10px 14px;
   text-decoration: none;
@@ -65,7 +65,7 @@ body {
 }
 
 .skip-link:focus {
-  color: var(--text-strong);
+  color: #ffffff;
   transform: translateY(0);
 }
 
@@ -213,6 +213,10 @@ a:hover {
   max-width: 880px;
 }
 
+.content [id] {
+  scroll-margin-top: 6rem;
+}
+
 .is-home .content {
   max-width: none;
 }
@@ -278,7 +282,7 @@ a:hover {
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--bg-deep);
-  color: var(--text);
+  color: var(--surface-soft);
   padding: 18px;
 }
 
@@ -398,6 +402,13 @@ a:hover {
 .hero__copy--lead {
   color: var(--text);
   font-size: clamp(1.08rem, 1.6vw, 1.25rem);
+}
+
+.hero__availability {
+  max-width: 740px;
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 0.94rem;
 }
 
 .hero__signal {
@@ -636,7 +647,7 @@ a:hover {
 }
 
 .site-footer__brand {
-  color: var(--accent-warm);
+  color: #e4ad86;
   font-family: var(--font-display);
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -644,12 +655,12 @@ a:hover {
 
 .site-footer a {
   margin-left: 14px;
-  color: var(--muted);
+  color: var(--surface-soft);
   text-decoration: none;
 }
 
 .site-footer a:hover {
-  color: var(--accent-strong);
+  color: #ffffff;
 }
 
 .screenshot-gallery {
