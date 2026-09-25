@@ -8,6 +8,25 @@ hide_page_heading: true
 
 This page contains the current development notes and three latest stable releases. [Older releases and Finnish translations are preserved in the archive]({{ '/changelog/archive/' | relative_url }}).
 
+## [Unreleased]
+
+### Reliability and security
+
+Automatic-mode process workers now use a thread-safe process start method and
+fall back to threads when a worker payload cannot be serialized. Browser
+Markdown and ordinary HTML content are sanitized before rendering.
+
+The continuous-integration workflow now runs the complete Python test suite and
+Ruff checks. Release builds also pin PyInstaller and Maturin, including the
+isolated native-extension build environments.
+
+Lisäsin ohjatun mittauksen virhenäkymään syykohtaiset tarkistusohjeet. Virhe kertoo nyt myös, mitkä otot hylättiin ja miksi. Ohjeet neuvovat tarkistamaan esimerkiksi leikkautumisen, äänitystason, ajoitusreferenssin ja kanavareitityksen.
+
+Advanced-välilehdelle lisättiin huoneen pituuden, leveyden ja korkeuden kentät sekä yksikkövalinta senttimetreille tai jaloille.
+Mitoista laskettu tilavuus vaikuttaa Schroeder-arvioon ja automaattitilan taajuusrajaan.
+
+Lisätty erillinen start-nappi joka tekee putkeen jokaisen filtterityypin ajot.
+
 ## [1.3.7] - 20-9-2026
 
 ### Local network access

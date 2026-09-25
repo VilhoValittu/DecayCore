@@ -1,6 +1,6 @@
 ---
 title: DecayCore vs Conventional EQ-Based Room Correction
-description: Compare DecayCore's bounded, phase-aware, time-domain FIR workflow with conventional magnitude-focused IIR and minimum-phase equalization.
+description: Compare DecayCore's bounded FIR workflow with magnitude-only parametric EQ.
 hide_page_heading: true
 ---
 
@@ -8,47 +8,28 @@ hide_page_heading: true
 
 ## In brief
 
-Conventional equalization usually concentrates on magnitude. DecayCore also controls correction confidence, phase strategy, timing, and low-frequency decay while keeping every stage bounded.
+This comparison uses a magnitude-only parametric EQ workflow as its reference: measure the frequency response, fit PEQ filters, and set the output level. Other EQ tools may offer some of the controls listed here.
 
-## Conventional approach (typical IIR / minimum-phase EQ)
-Many room-correction workflows:
-- treat response errors mainly as magnitude EQ problems
-- focus on PEQ/IIR fitting with limited phase-domain control
-- do not directly control decay behavior
-- can overfit reflection-driven dips and combing
+## Magnitude-only PEQ workflow
 
-### Common consequences
-- bass can get flatter but still ring
-- narrow treble corrections can sound harsh
-- results may change noticeably with small mic-position differences
+PEQ filters change level at selected frequencies. A magnitude plot alone does not show how long bass energy decays or whether a narrow dip moves with microphone position. Those questions need additional measurement and listening checks before adding another filter.
 
----
+## What DecayCore adds
 
-## DecayCore approach (current)
-
-| Aspect | Conventional EQ | DecayCore |
+| Aspect | Magnitude-only PEQ workflow | DecayCore |
 |---|---|---|
-| Input sources | usually frequency-response only | REW TXT + WAV/IR inputs |
-| Propagation delay (TOF) | often implicit | explicitly removed before phase analysis |
-| Phase strategy | mostly minimum-phase behavior | Linear / Minimum / Mixed / Asymmetric + optional 2058-safe mode |
-| Excess-phase safety | limited | Mixed-phase fade + excess-delay and pre-ringing guards |
-| Room modes / ringing | mainly amplitude shaping | **Temporal Decay Control (TDC)** with strength + max reduction + slope limit |
-| Reflection handling | may invert combing dips | confidence-weighted correction + smoothing + A-FDW |
-| Correction bounds | tool-dependent | explicit limits for boost/cut/slope/phase band and low-bass safety |
-| Headroom handling | manual gain staging | auto-headroom gain model with configurable margin |
-| Stereo consistency | often per-channel behavior | stereo-link options with a shared leveling anchor, shared or hybrid windowing, and channel-specific final auto-gain |
-| Reproducible A/B | harder across fs/taps | optional **comparison mode** with fixed analysis grid |
-| Multi-rate output | uncommon | native multi-rate FIR export |
-| Runtime diagnostics | often limited | Summary version stamp, timing breakdown, and System Health checks |
+| Propagation delay (TOF) | No separate phase-analysis step | Removed before excess-phase analysis |
+| Phase strategy | Phase follows the selected PEQ filters | Linear / Minimum / Mixed / Asymmetric + optional 2058-safe mode |
+| Excess-phase safety | No separate excess-phase correction | Mixed-phase fade + excess-delay and pre-ringing guards |
+| Room modes / ringing | PEQ cuts change amplitude | **Temporal Decay Control (TDC)** with strength + max reduction + slope limit |
+| Reflection handling | Depends on which peaks and dips are selected | Confidence-weighted correction + smoothing + A-FDW |
+| Correction bounds | Set through the chosen PEQ filters | Explicit limits for boost/cut/slope/phase band and low-bass safety |
+| Headroom handling | Set by the operator | Auto-headroom gain model with configurable margin |
+| Stereo consistency | Left and Right settings chosen separately | Stereo-link options with a shared leveling anchor, shared or hybrid windowing, and channel-specific final auto-gain |
+| Reproducible A/B | Requires a consistent comparison method | Optional **comparison mode** with fixed analysis grid |
 
----
+## Listen to the result
 
-## Audible result (typical)
-- tighter bass decay (less overhang)
-- fewer "false-detail" treble corrections
-- cleaner transients with safer phase behavior
-- more repeatable tuning between runs
-
-DecayCore intentionally avoids aggressive inversion and prioritizes corrections that remain stable and physically plausible.
+Compare at matched playback level. Check whether bass notes decay more evenly and whether voices and transients still sound natural. A flatter magnitude plot alone cannot establish which filter sounds better.
 
 For operating guidance, see [Getting Started]({{ '/getting-started/' | relative_url }}). For the engineering rationale, see [Why DecayCore Works]({{ '/Why_DecayCore_Works.html' | relative_url }}).

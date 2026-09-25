@@ -45,7 +45,7 @@ Goal: let DecayCore search for a good preset automatically.
 
 In AUTO mode, three target strategies are available from the Basic tab:
 
-- **Adaptive: derive target from room acoustics** (default) — synthesizes a safety-bounded Harman6-based target from broad, stereo-consistent bass evidence. It reduces adaptation when channels disagree, preserves the reference above 500 Hz by default, and permits additional bass lift only with reliable stereo RT60 evidence. Skips the multi-curve search phase.
+- **Adaptive: derive target from room acoustics** (default) — scores built-in curves to select a base, then adjusts it by at most ±1 dB using broad, stereo-consistent bass evidence. It reduces adaptation when channels disagree, preserves the selected curve above 500 Hz by default, and permits additional bass lift only with reliable stereo RT60 evidence. It skips the full multi-curve candidate search.
 - **Auto: search best built-in** — evaluates multiple built-in target curves in parallel and picks the best-ranked match. Robust choice when the measurement source is unknown or external.
 - **Use selected target curve from Target page** — uses the target curve manually selected in the Target tab. Disables automatic target search.
 
@@ -166,7 +166,7 @@ Goal: manual expert workflow with fewer policy constraints.
 ## Additional runtime notes
 
 - Auto-align is always forced ON by pipeline policy.
-- Max boost is globally safety-capped to `MAX_SAFE_BOOST` (currently `8.0 dB`) in all modes.
+- The DSP runtime caps max boost at `12.0 dB` in all modes. Automatic search also uses an `8.0 dB` candidate-evaluation cap and may choose a lower effective limit.
 - In the UI, IR windowing choices are limited to `auto` and `rew_asym`; `rew_asym` is available only when allowed by filter type and mode rules.
 
 ## Implementation reference

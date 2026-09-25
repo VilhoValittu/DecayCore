@@ -60,7 +60,7 @@ Packaged measurement sessions can provide repeat quality, timing, harmonic curve
 Manual modes use the selected built-in or custom target. Automatic mode supports three strategies:
 
 - **Auto: search best built-in** compares supported built-in curves using the same measurement context.
-- **Adaptive: derive target from room acoustics** makes small, bounded low-frequency changes to a Harman6 baseline from broad stereo evidence.
+- **Adaptive: derive target from room acoustics** scores built-in curves to select a base, then makes bounded low-frequency changes from broad stereo evidence.
 - **Use selected target curve from Target page** locks the manually selected target.
 
 Target leveling and correction are separate operations. Leveling establishes the reference offset; magnitude correction then shapes the measured response toward the target within the permitted band and limits.

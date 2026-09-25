@@ -10,11 +10,7 @@ hide_page_heading: true
 
 Repeatable results require identical measurements, settings, application behavior, and comparison context. DecayCore combines deterministic processing, bounded correction, versioned compatibility, and exported diagnostics to make differences inspectable.
 
-DecayCore is designed to avoid the classic failure mode:
-
-**small measurement or setting changes -> large unstable filter changes**
-
-The system stays predictable because it is deterministic, bounded, and observable.
+The limits reduce the chance that a small measurement or setting change produces a large filter change.
 
 ## 1) Deterministic pipeline and versioned behavior
 
@@ -121,5 +117,3 @@ If two runs differ, diagnostics help explain why.
 6. Keep headroom margin and stereo-link policy fixed.
 7. Verify System Health is clean before exporting.
 8. Compare Summary outputs and timing data when validating repeated runs.
-
-**Bottom line:** DecayCore is reproducible because correction strength is bounded, phase is safety-limited, and the full run is observable end-to-end.

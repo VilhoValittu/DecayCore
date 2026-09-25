@@ -102,7 +102,7 @@ Selecting a mode does not rewrite every visible value. Use **Apply mode defaults
 
 ### Target strategies in Automatic mode
 
-- **Adaptive: derive target from room acoustics** (default) starts from Harman6 and makes small, bounded low-frequency changes from stereo measurement evidence. Reliable RT60 data can permit additional bass lift, but never creates it by itself.
+- **Adaptive: derive target from room acoustics** (default) scores built-in curves to select a base, then makes low-frequency changes of at most ±1 dB from stereo measurement evidence. Reliable RT60 data can permit additional bass lift, but never creates it by itself.
 - **Auto: search best built-in** evaluates several built-in curves and selects the best-ranked result. A good alternative when measurement metadata is limited or the sources are external.
 - **Use selected target curve from Target page** uses the curve you chose or imported and skips automatic target selection.
 
@@ -140,6 +140,13 @@ needed. The results show design/output taps and the actual common delay removed.
 Response and scoring diagnostics describe the design before this final step;
 impulse metrics describe the exported filters. Shorter support does not always
 mean lower delay, particularly with minimum-phase filters.
+
+When the usual tap-count check cannot find a shorter filter, an enabled
+high-pass filter permits a small additional absolute response error below its
+cutoff (0.002% of each channel's response peak). Limits at and above the cutoff
+remain unchanged. Results and the export summary identify when this allowance
+was used. Runs without a high-pass filter, and runs with a separate sub output,
+retain the original error limits.
 
 ### Correction range
 
@@ -282,10 +289,3 @@ Check clipping, noise, cables, device selection, sweep level, and microphone mov
 - **Taps:** the number of samples in the FIR; more taps increase time span and processing cost.
 
 A filter is successful only if it sounds better. A flatter graph on its own proves nothing.
-
-When the usual tap-count check cannot find a shorter filter, an enabled
-high-pass filter permits a small additional absolute response error below its
-cutoff (0.002% of each channel's response peak). Limits at and above the cutoff
-remain unchanged. Results and the export summary identify when this allowance
-was used. Runs without a high-pass filter, and runs with a separate sub output,
-retain the original error limits.

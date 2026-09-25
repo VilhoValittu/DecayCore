@@ -24,9 +24,7 @@ The app runs locally on your computer, with controls in your web browser. No clo
 
 ## Choose your version
 
-**The packaged release** includes integrated measurement and the automatic-mode decision engine. Download it from [GitHub Releases](https://github.com/VilhoValittu/DecayCore/releases) for the complete workflow.
-
-> For sound quality, the packaged release is in a different league. Its proprietary Rust engine is the reason to choose it over the public Python version.
+**The packaged release** includes integrated measurement and the native Rust Automatic mode decision engine. Download it from [GitHub Releases](https://github.com/VilhoValittu/DecayCore/releases) for the complete workflow.
 
 **The public source** provides filter generation with Basic and Advanced manual controls for non-commercial use. The measurement engine, automatic-mode decision engine, and related packaged workflows are proprietary and are not included in the public source tree. See the [source repository](https://github.com/VilhoValittu/DecayCore) and the license terms below.
 

@@ -8,17 +8,11 @@ hide_page_heading: true
 
 ## In brief
 
-DSP correction decides the response of the filter. Export windowing decides how that response is placed and limited in time. Changing the export window does not rerun target matching.
-
-In DecayCore, **IR export windowing** and **DSP correction** are intentionally treated as two separate stages.
-This separation is fundamental for clarity, reproducibility, and meaningful A/B comparisons.
-
----
+DSP correction designs the filter before export windowing places and tapers its impulse in time. Changing the window does not rerun target matching, but it can change the response of the exported FIR.
 
 ## DSP Correction (what is corrected)
 
-The actual correction logic operates during analysis and optimization, before any FIR is written to disk.
-This stage defines **what is corrected and by how much**, including:
+Analysis and optimization define the intended correction before the FIR is written to disk. This stage includes:
 
 - target curve fitting
 - magnitude correction
@@ -27,19 +21,11 @@ This stage defines **what is corrected and by how much**, including:
 - Temporal Decay Control (TDC)
 - auto-leveling and safety limits
 
-These processes determine the final frequency- and phase-domain behavior of the correction.
-They are **not affected** by IR export windowing.
-
----
+Changing the export window leaves these design decisions unchanged.
 
 ## IR Export Windowing (how the FIR is written)
 
-IR export windowing affects **only the time-domain representation of the exported FIR impulse**.
-
-REW-style windowing:
-- reshapes the impulse response in the time domain
-- affects onset delay, symmetry, and tail behavior
-- does **not** change the underlying frequency or phase response of the FIR
+IR export windowing changes the impulse's onset, symmetry, or tail. Tapering or trimming nonzero samples can also change the exported filter's frequency and phase response. The target and correction settings remain the same.
 
 Supported modes (UI):
 
@@ -49,32 +35,15 @@ Supported modes (UI):
 Legacy config values (`off`, `rew_sym`) are still accepted when set directly in config files,
 but are no longer exposed in the UI.
 
----
-
 ## Why this distinction matters
 
-The same DSP correction can legitimately produce **multiple FIR files** that share:
-- identical frequency response
-- identical phase response
-
-but differ in:
-- time alignment
-- impulse symmetry
-- practical latency characteristics
+The same DSP design can produce FIR files with different time alignment, impulse symmetry, and practical latency. Their realized responses may also differ if the window changes nonzero samples.
 
 This is useful for:
+
 - matching different convolver requirements
 - minimizing audible latency
 - comparing results directly with REW
 - controlled listening tests and A/B evaluation
 
-For this reason, DecayCore:
-- keeps DSP correction deterministic and invariant
-- allows IR export windowing as a separate, explicit choice
-- includes the windowing type in exported filenames for traceability
-
----
-
-In short:
-**DSP correction defines the filter behavior.
-IR export windowing defines how that behavior is packaged in time.**
+DecayCore records the windowing type in exported filenames so you can tell which FIR you loaded. Compare the exported filters when evaluating different window settings.

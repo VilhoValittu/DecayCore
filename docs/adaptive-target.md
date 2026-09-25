@@ -1,36 +1,36 @@
 ---
 title: Adaptive Target
 nav_title: Adaptive Target
-description: How DecayCore derives a room-aware target curve from measurement data instead of searching through built-in curves.
+description: How DecayCore selects a built-in base curve and adjusts it using room measurements.
 permalink: /adaptive-target/
 ---
 
-Choosing a target curve can easily become the whole evening. Adaptive Target gives you a starting point based on your room's measurements, with small adjustments to an established bass balance. It is one of three target strategies in AUTO mode and creates its target directly, without searching the built-in curve library.
+Choosing a target curve can easily become the whole evening. Adaptive Target scores the built-in curves to choose a base, then makes small changes using your room's measurements. It is one of three target strategies in AUTO mode.
 
 ## In brief
 
-Adaptive Target makes small low-frequency changes to a stable Harman6 baseline when both channels provide consistent evidence. Start with DecayCore's own measurement so the target has the session's RT60 decay data available. Use the built-in target search when measurement metadata is limited.
+Adaptive Target makes small low-frequency changes to the selected built-in curve when both channels provide consistent evidence. Start with DecayCore's own measurement so the target has the session's RT60 decay data available. Use the built-in target search when measurement metadata is limited.
 
 ## What it is
 
 In AUTO mode, DecayCore can determine the target curve in three ways:
 
-- **Adaptive: derive target from room acoustics** (default) — synthesizes a conservative Harman6-based target from broad, stereo-consistent bass evidence. Does not search built-in curves.
+- **Adaptive: derive target from room acoustics** (default) — scores built-in curves to choose a base, then adjusts it using broad, stereo-consistent bass evidence.
 - **Auto: search best built-in** — evaluates multiple built-in target curves in parallel and picks the best-ranked match.
 - **Use selected target curve from Target page** — uses the target curve manually selected in the Target tab and disables automatic target search.
 
-Because Adaptive Target derives the curve directly from the measurements, it skips the time spent comparing several built-in targets. You can get to the listening part sooner.
+Adaptive Target uses the built-in curves for base selection but skips the full candidate search across those targets.
 
 ## How it works
 
 When adaptive target is selected, DecayCore:
 
-1. Starts with a Harman6-style reference target as a base shape.
+1. Scores the built-in curves against the measurements and selects a base target.
 2. Aligns each channel to the reference before measuring broad bass residuals, so the reference curve's own bass shelf is not mistaken for room buildup.
 3. Smooths and evaluates the channels separately, then reduces adaptation when they disagree.
-4. Bounds target changes to −2.0/+0.75 dB and fades adaptation out by 500 Hz.
+4. Bounds target changes to ±1.0 dB relative to that base and fades adaptation out by 500 Hz.
 5. Allows additional bass lift only when reliable stereo RT60 bands are available, and suppresses that lift in a slow-decay room.
-6. Preserves the Harman6 shape above 500 Hz by default and proceeds directly to filter generation.
+6. Preserves the selected base curve above 500 Hz by default and passes the target to Automatic mode's filter search.
 
 RT60 never creates a tonal adjustment on its own. Optional high-frequency adaptation is disabled in AUTO and requires explicit high-SNR, stereo-consistent evidence at DSP-helper level.
 
@@ -38,7 +38,7 @@ RT60 never creates a tonal adjustment on its own. Optional high-frequency adapta
 
 Adaptive target is useful when:
 
-- you want faster AUTO runs without the multi-curve search overhead
+- you want to skip the full multi-curve candidate search
 - the room has unusual bass characteristics that may not match any single built-in target well
 - you are using DecayCore's built-in measurement tool, which captures RT60 data automatically
 

@@ -47,4 +47,4 @@ If the app does not start, use the platform cleanup script in `config_delete/`. 
 
 ## Is DecayCore open source?
 
-DecayCore source availability depends on the repository contents. Some components, such as measurement internals, may be excluded from the public source repository.
+The public source repository includes Basic and Advanced manual filter generation. Guided measurement and the Automatic mode decision engine are proprietary and available in packaged releases. See the [source repository](https://github.com/VilhoValittu/DecayCore) for the available code and license terms.
