@@ -6,26 +6,100 @@ hide_page_heading: true
 
 # Changelog
 
-This page contains the current development notes and five latest stable releases. [Older releases and Finnish translations are preserved in the archive]({{ '/changelog/archive/' | relative_url }}).
+This page contains the five latest stable releases. [Older releases and Finnish translations are preserved in the archive]({{ '/changelog/archive/' | relative_url }}).
 
-## [Unreleased]
+## [1.3.8] - 1-10-2026
+
+### Faster Automatic mode
+
+Automatic mode is much faster. On test machine, a full Automatic mode run
+takes **116 seconds in version 1.3.7 and 49 seconds in version 1.3.8**. The
+filters and safety checks are the same as before.
+
+### New features
+
+Compare every filter type in one go with **START with all four filter types**.
+DecayCore runs the complete pipeline once per filter type with the current
+settings and saves four export bundles. In Automatic mode, each type gets its
+own search.
+
+Tell DecayCore about your room: the Advanced tab now has **Room dimensions**
+fields for length, width and height in centimetres or feet. For irregular or
+open-plan spaces, you can enter an effective volume directly. The room volume
+feeds the Schroeder estimate and Automatic mode's frequency limit.
+
+The Output settings header now shows the custom filter name and the enabled
+sample-rate exports, including the optional 352.8 / 384 kHz rates, and updates
+as you change settings.
+
+### Plots
+
+Plots are easier to read. Axes use round numbers (1, 2, 5 and their multiples),
+the number of ticks fits the panel size, and labels stay distinct when you zoom
+in far. Wide frequency axes show whole decades.
+
+Panning and zooming are about 10 times faster on large curves.
+
+### Measurement
+
+Audio dropouts can no longer slip into your measurement. If the stream drops or
+inserts samples during the sweep, DecayCore rejects the take and asks you to
+measure again, instead of analysing it as valid.
+
+When guided measurement fails, the error view lists which takes were rejected
+and why. It adds checks for clipping, recording level, timing reference and
+channel routing, so you know what to fix.
+
+The Measurement tab is locked while a run is in progress. Every button and field
+is greyed out, so a stray click can't start a measurement or replace your
+measurement files mid-run. A note at the top of the tab says why, and the tab
+unlocks when the run ends. The reverse also holds: the START buttons stay off
+while a measurement is in progress, with a note explaining the wait.
+
+### Uploads
+
+Each speaker channel now has exactly one measurement source: the file shown
+under **Speaker measurements**. Uploading a file clears any earlier path, and
+entering a path clears the upload, so the run, the RT60 and harmonics data and
+the target preview always use the file you see. You can also use a WAV file for
+one channel and a TXT file for the other.
+
+Automatic mode now caches runs made from uploaded or in-app measurements, so
+reruns no longer start cold.
+
+File pickers show a **Choose file** button and name the loaded file below the
+field. Long file names wrap.
+
+>> Thanks to **PO3c** from asr-forum for reporting this bug.
+
+### DSP safety
+
+Bass boost now stops at the speaker's measured −1 dB low-frequency limit in
+every mode, including Unsafe Raw. Cuts remain available. A final check on the
+finished filter lowers the level when needed, without changing phase or timing.
+Export diagnostics report each channel's limit and safety gain. The
+low-frequency rolloff detector also now smooths the response as intended.
 
 ### Reliability and security
 
-Automatic-mode process workers now use a thread-safe process start method and
-fall back to threads when a worker payload cannot be serialized. Browser
-Markdown and ordinary HTML content are sanitized before rendering.
+DecayCore now keeps working when conditions get rough. Automatic mode starts
+reliably, even on systems where its faster worker setup is unavailable. If
+another DecayCore version changes your search history mid-run, the search stops
+and tells you, so you never get a result quietly built on default settings.
 
-The continuous-integration workflow now runs the complete Python test suite and
-Ruff checks. Release builds also pin PyInstaller and Maturin, including the
-isolated native-extension build environments.
+The browser interface holds up when you leave several tabs open or upload large
+files. A full queue now turns an upload away right away, so you don't wait for a
+big file to transfer before it fails. A broken request no longer blocks later
+connections. Pages shown inside the app are cleaned before they appear, and
+every release is built the same way, so you get the same tested software each
+time.
 
-Lisäsin ohjatun mittauksen virhenäkymään syykohtaiset tarkistusohjeet. Virhe kertoo nyt myös, mitkä otot hylättiin ja miksi. Ohjeet neuvovat tarkistamaan esimerkiksi leikkautumisen, äänitystason, ajoitusreferenssin ja kanavareitityksen.
+### Updating from an older version
 
-Advanced-välilehdelle lisättiin huoneen pituuden, leveyden ja korkeuden kentät sekä yksikkövalinta senttimetreille tai jaloille.
-Mitoista laskettu tilavuus vaikuttaa Schroeder-arvioon ja automaattitilan taajuusrajaan.
-
-Lisätty erillinen start-nappi joka tekee putkeen jokaisen filtterityypin ajot.
+Settings, caches and search histories saved by older versions are no longer
+carried over. Settings that cannot be read fall back to defaults, and the first
+Automatic mode run after updating starts from scratch. Select your measurement
+device again.
 
 ## [1.3.7] - 20-9-2026
 
@@ -115,20 +189,3 @@ required GLIBCXX or CXXABI versions are unavailable.
 This also ensures that the browser receives the current tokenized DecayCore URL
 instead of leaving the user with an old or unauthenticated page that reports
 HTTP 403 errors.
-
-## [1.3.3] - 18-9-2026
-
-### UI
-
-The **Modern** style has a new layout. The packaged application now uses
-DecayCore's native browser UI engine and no longer includes NiceGUI.
-
-The new **Apply saved auto settings** button in Basic and Advanced modes lets
-you apply saved Automatic mode settings for the selected filter type, with the
-newest settings listed first. The current target curve and mode safety limits
-are preserved.
-
-### Automatic mode
-
-After running Automatic mode with an adaptive target, you can download that
-target and use it in Basic and Advanced modes.

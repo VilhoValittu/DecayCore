@@ -73,10 +73,12 @@ All DecayCore versions released and documented in this repository are based on P
 
 The main source environment currently documented by `requirements.txt` uses these pinned package versions:
 
-- `numpy==2.4.6`
-- `scipy==1.17.1`
 - `nicegui==3.13.0`
 - `plotly==6.8.0`
+
+Arrays use the owned `decaycore-numeric` Rust extension. NumPy `2.4.6` and
+SciPy `1.17.1` are test-only numerical references in `requirements-reference.txt`;
+packaged releases contain neither.
 
 > `numba` was removed in v1.1.6. Public source builds may optionally compile the
 > `decaycore-dsp` Rust extension for faster manual filtering. Automatic mode uses

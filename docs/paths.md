@@ -66,12 +66,6 @@ $XDG_DATA_HOME/DecayCore/
 
 **Example:** `C:\Users\username\AppData\Roaming\DecayCore\`
 
-### Legacy Fallback (Linux/macOS/Windows)
-If the primary data directory cannot be created, DecayCore falls back to the legacy directory:
-```
-~/.camillafir/
-```
-
 ---
 
 ## Optuna Optimization Database
@@ -125,11 +119,6 @@ decaycore_optuna_target_[FILTER_TYPE]_[MEASUREMENT_ID]_[VERSION].log
 %APPDATA%\DecayCore\decaycore_optuna_target_asymmetric_headphone.log
 ```
 
-#### Legacy Fallback (if primary directory unavailable)
-```
-~/.camillafir/decaycore_optuna_mixed_nomeasurement.log
-```
-
 ---
 
 ## Resetting Caches and Configuration (Troubleshooting)
@@ -147,7 +136,8 @@ What to remove:
 - **Filter priors:** `auto_mode_filter_priors.json`
 - **Main config:** `config.json`
 
-from the data directory (and the legacy `~/.camillafir/` fallback), as listed in
+from the data directory (and any leftover `~/.camillafir/` directory from an old
+version), as listed in
 the tables above. Your saved measurements, target presets and exported filters
 under `Documents/DecayCore/` are **not** affected.
 
@@ -164,7 +154,7 @@ can clear the caches without losing your settings:
 
 Both ask for confirmation and list what will be removed. Neither is available
 while a filter generation is running. The in-app reset covers the current data
-directory only — the legacy `~/.camillafir/` fallback is handled by the helper
+directory only — a leftover `~/.camillafir/` directory is removed by the helper
 scripts below.
 
 ### Helper scripts
@@ -185,14 +175,12 @@ shell scripts also accept `--dry-run` to preview without deleting, and
 
 ---
 
-## Migration from Legacy Paths
+## Data from older versions
 
-If you have DecayCore installed from a legacy version, configuration and Optuna databases are automatically migrated to the new platform-specific paths on first use:
-
-- **Old Optuna path** (`~/.camillafir/`) → New platform-specific data directory
-- **Old config path** → New platform-specific config directory (no auto-migration; starts fresh)
-
-The legacy `~/.camillafir/` directory is not deleted; you may remove it manually after confirming the migration was successful.
+Settings, caches and search histories written by older versions are not migrated.
+Settings that cannot be read fall back to defaults, and caches and search
+histories are rebuilt on demand. The old `~/.camillafir/` directory is no longer
+read; delete it manually, or with the helper scripts, once you no longer need it.
 
 ---
 
@@ -202,7 +190,7 @@ The legacy `~/.camillafir/` directory is not deleted; you may remove it manually
 |-----------|-------|-------|---------|
 | **Config** | `~/.config/DecayCore/config.json` | `~/Library/Application Support/DecayCore/config.json` | `%APPDATA%\DecayCore\config.json` |
 | **Data/Optuna** | `~/.local/share/DecayCore/` | `~/Library/Application Support/DecayCore/` | `%APPDATA%\DecayCore\` |
-| **Legacy** | `~/.camillafir/` | `~/.camillafir/` | `~/.camillafir/` |
+| **Old, unused** | `~/.camillafir/` | `~/.camillafir/` | `~/.camillafir/` |
 | **Measurements** | `~/Documents/DecayCore/measurement/` | `~/Documents/DecayCore/measurement/` | `%USERPROFILE%\Documents\DecayCore\measurement\` |
 | **Filters** | `~/Documents/DecayCore/filters/` | `~/Documents/DecayCore/filters/` | `%USERPROFILE%\Documents\DecayCore\filters\` |
 

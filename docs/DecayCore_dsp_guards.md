@@ -65,7 +65,7 @@ Limits excessive energy before the main impulse peak to preserve transient reali
 ---
 
 ## 3. Max Boost / Max Cut Limits
-**Location:** dsp/correction_mag.py, dsp/limits.py
+**Location:** dsp/correction_mag_parts/, dsp/limits.py
 **Stage:** Magnitude correction
 
 **Config (typical):**
@@ -84,7 +84,7 @@ Prevents unrealistic amplification demands on the system.
 ---
 
 ## 4. Peak Priority Shaping
-**Location:** dsp/correction_mag.py
+**Location:** dsp/correction_mag_parts/
 **Stage:** Error shaping
 
 **Config (typical):**
@@ -101,7 +101,7 @@ Reduces boost into narrow dips/nulls where correction is physically ineffective.
 ---
 
 ## 5. Regularization
-**Location:** dsp/correction_mag.py
+**Location:** dsp/correction_mag_parts/
 **Stage:** Target shaping
 
 **Config (typical):**
@@ -117,7 +117,7 @@ Globally pulls correction toward 0 dB to improve robustness.
 ---
 
 ## 6. Smoothing (Magnitude Domain)
-**Location:** dsp/correction_mag.py
+**Location:** dsp/correction_mag_parts/
 **Stage:** Target conditioning
 
 **Why:**
@@ -130,7 +130,7 @@ Smooths the correction curve to improve spatial robustness and perceptual stabil
 ---
 
 ## 7. Confidence-Based Weighting / Target Pull
-**Location:** dsp/correction_mag.py, dsp/decaycore_dsp.py
+**Location:** dsp/correction_mag_parts/, dsp/decaycore_dsp.py
 **Stage:** Target blending
 
 **Config (typical):**

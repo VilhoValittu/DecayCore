@@ -171,7 +171,7 @@ Goal: manual expert workflow with fewer policy constraints.
 
 ## Implementation reference
 
-- `src/decaycore/ui/decaycore_modes.py`
-- `src/decaycore/config/decaycore_pipeline.py`
-- `src/decaycore/ui/system_health.py`
+- `src/decaycore/config/mode_policy.py`
+- `src/decaycore/config/pipeline_parts/`
+- `src/decaycore/application/health_service.py`
 - `src/decaycore/decaycore.py`
