@@ -26,7 +26,7 @@ The app runs locally on your computer, with controls in your web browser. No clo
 
 **The packaged release** includes integrated measurement and the native Rust Automatic mode decision engine. Download it from [GitHub Releases](https://github.com/VilhoValittu/DecayCore/releases) for the complete workflow.
 
-**The public source** provides filter generation with Basic and Advanced manual controls for non-commercial use. The measurement engine, automatic-mode decision engine, and related packaged workflows are proprietary and are not included in the public source tree. See the [source repository](https://github.com/VilhoValittu/DecayCore) and the license terms below.
+**The public source** is frozen at version 1.2.5. It provides filter generation with Basic and Advanced manual controls for non-commercial use. The measurement engine, automatic-mode decision engine, and related packaged workflows are proprietary and are not included in the public source tree. See the [source repository](https://github.com/VilhoValittu/DecayCore) and the license terms below.
 
 > DecayCore was formerly called CamillaFIR. The name changed to avoid confusion with CamillaDSP; full CamillaDSP compatibility remains.
 
@@ -73,12 +73,10 @@ All DecayCore versions released and documented in this repository are based on P
 
 The main source environment currently documented by `requirements.txt` uses these pinned package versions:
 
+- `numpy==2.4.6`
+- `scipy==1.17.1`
 - `nicegui==3.13.0`
 - `plotly==6.8.0`
-
-Arrays use the owned `decaycore-numeric` Rust extension. NumPy `2.4.6` and
-SciPy `1.17.1` are test-only numerical references in `requirements-reference.txt`;
-packaged releases contain neither.
 
 > `numba` was removed in v1.1.6. Public source builds may optionally compile the
 > `decaycore-dsp` Rust extension for faster manual filtering. Automatic mode uses
