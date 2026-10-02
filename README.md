@@ -26,7 +26,7 @@ The app runs locally on your computer, with controls in your web browser. No clo
 
 **The packaged release** includes integrated measurement and the native Rust Automatic mode decision engine. Download it from [GitHub Releases](https://github.com/VilhoValittu/DecayCore/releases) for the complete workflow.
 
-**The public source** is frozen at version 1.2.5. It provides filter generation with Basic and Advanced manual controls for non-commercial use. The measurement engine, automatic-mode decision engine, and related packaged workflows are proprietary and are not included in the public source tree. See the [source repository](https://github.com/VilhoValittu/DecayCore) and the license terms below.
+**The public source** is frozen at version 1.2.5. It is source-available for non-commercial use and provides filter generation with Basic and Advanced manual controls. Releases after 1.2.5 are built from a private repository. Their source code is not published, and they are proprietary software that is free for non-commercial use under the license included in each download. The measurement engine, automatic-mode decision engine, and related packaged workflows are not included in the public source tree. See the [source repository](https://github.com/VilhoValittu/DecayCore) and the license terms below.
 
 > DecayCore was formerly called CamillaFIR. The name changed to avoid confusion with CamillaDSP; full CamillaDSP compatibility remains.
 
@@ -86,8 +86,13 @@ The main source environment currently documented by `requirements.txt` uses thes
 
 ## License
 
-DecayCore is source-available for personal, educational, research, and other
-non-commercial use under the terms of the LICENSE file.
+The source code in this repository, frozen at version 1.2.5, is source-available
+for personal, educational, research, and other non-commercial use under the terms
+of the LICENSE file.
+
+Releases after 1.2.5 are built from a private repository. They are proprietary
+software, free for non-commercial use under the license included in each
+download.
 
 The measurement engine, automatic-mode decision engine, and related packaged
 workflows are not included in this repository and remain proprietary.

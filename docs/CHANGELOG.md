@@ -27,6 +27,12 @@ Automatic mode now uses about 30% less memory at its peak. On the test
 measurement, peak memory fell from about 890 MB to about 615 MB. Filters,
 scores and exported files are the same as before.
 
+### License terms in every download
+
+Every download now includes the license and a list of third-party notices.
+DecayCore is free for non-commercial use. Commercial use needs written
+permission.
+
 ## [1.3.8] - 1-10-2026
 
 ### Faster Automatic mode
