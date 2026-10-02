@@ -18,7 +18,7 @@ filters and safety checks are the same as before.
 
 ### New features
 
-Compare every filter type in one go with **START with all four filter types**.
+Make every filter type in one go with **START with all four filter types**.
 DecayCore runs the complete pipeline once per filter type with the current
 settings and saves four export bundles. In Automatic mode, each type gets its
 own search.
