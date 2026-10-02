@@ -8,6 +8,25 @@ hide_page_heading: true
 
 This page contains the five latest stable releases. [Older releases and Finnish translations are preserved in the archive]({{ '/changelog/archive/' | relative_url }}).
 
+## [Unreleased]
+
+### More reliable measurements
+
+Measurements are much less likely to stop with an "audio output underflow"
+error, especially on slower computers. Playing the sweep and recording the
+microphone now run in their own engine, which doesn't wait on anything else
+DecayCore is doing. On Linux, measurements also use a deeper audio buffer and
+ask the system to schedule audio ahead of other work, so the sweep is less
+likely to break up. If audio is still interrupted, for example by another heavy
+program, DecayCore stops the measurement and tells you instead of using a
+damaged recording.
+
+### Lower memory use
+
+Automatic mode now uses about 30% less memory at its peak. On the test
+measurement, peak memory fell from about 890 MB to about 615 MB. Filters,
+scores and exported files are the same as before.
+
 ## [1.3.8] - 1-10-2026
 
 ### Faster Automatic mode

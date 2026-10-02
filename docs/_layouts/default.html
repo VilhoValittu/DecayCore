@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     {% seo %}
     <meta name="google-site-verification" content="-lDppG75tnSsL-qtF1eBLBQWsv3IctR9_RKh65WTiuY">
-    <meta name="theme-color" content="#17133f">
+    <meta name="theme-color" content="#0d0a2b">
+    <meta name="color-scheme" content="light dark">
     <link rel="icon" type="image/svg+xml" href="{{ '/pics/DecayCore_logo.svg' | relative_url }}">
     <link rel="stylesheet" href="{{ '/assets/main.css' | relative_url }}">
   </head>
@@ -13,13 +14,10 @@
     <a class="skip-link" href="#main-content">Skip to main content</a>
 
     <header class="site-header">
-      <div class="site-header__inner">
+      <div class="wrap site-header__inner">
         <a class="brand" href="{{ '/' | relative_url }}" aria-label="{{ site.title }} home">
-          <img class="brand__mark" src="{{ '/pics/DecayCore_logo.svg' | relative_url }}" alt="" width="52" height="52">
-          <span class="brand__copy">
-            <span class="brand__name">{{ site.title }}</span>
-            <span class="brand__tagline">Measure the room. Reveal the music.</span>
-          </span>
+          <img class="brand__mark" src="{{ '/pics/DecayCore_logo.svg' | relative_url }}" alt="" width="40" height="40">
+          <span class="brand__name">{{ site.title }}</span>
         </a>
 
         <nav class="site-nav site-nav--desktop" aria-label="Primary navigation">
@@ -47,25 +45,82 @@
         {% endif %}
       {% endunless %}
 
-      <article class="content">
-        {{ content }}
-      </article>
+      <div class="page-body">
+        <article class="content">
+          {{ content }}
+        </article>
+      </div>
     </main>
 
     <footer class="site-footer">
-      <div class="site-footer__inner">
-        <span class="site-footer__brand">Measure the room. Reveal the music.</span>
-        <span>
-          <a href="{{ '/' | relative_url }}">Home</a>
-          <a href="{{ '/getting-started/' | relative_url }}">Getting Started</a>
+      <div class="wrap site-footer__inner">
+        <div class="site-footer__about">
+          <a class="brand" href="{{ '/' | relative_url }}">
+            <img class="brand__mark" src="{{ '/pics/DecayCore_logo.svg' | relative_url }}" alt="" width="40" height="40">
+            <span class="brand__name">{{ site.title }}</span>
+          </a>
+          <p>Measure the room. Reveal the music.</p>
+        </div>
+        <nav class="site-footer__col" aria-label="Get started">
+          <h2>Get started</h2>
+          <a href="{{ '/getting-started/' | relative_url }}">Getting started</a>
           <a href="{{ '/installation/' | relative_url }}">Installation</a>
+          <a href="{{ '/measurement-workflow/' | relative_url }}">Measurement</a>
+          <a href="https://github.com/VilhoValittu/DecayCore/releases/latest">Download</a>
+        </nav>
+        <nav class="site-footer__col" aria-label="Learn">
+          <h2>Learn</h2>
+          <a href="{{ '/User_Manual.html' | relative_url }}">Manual</a>
+          <a href="{{ '/how-it-works/' | relative_url }}">How it works</a>
+          <a href="{{ '/results/' | relative_url }}">Results</a>
           <a href="{{ '/faq/' | relative_url }}">FAQ</a>
           <a href="{{ '/glossary/' | relative_url }}">Glossary</a>
+        </nav>
+        <nav class="site-footer__col" aria-label="Project">
+          <h2>Project</h2>
           <a href="{{ '/CHANGELOG.html' | relative_url }}">Changelog</a>
-          <a href="{{ '/User_Manual.html' | relative_url }}">Manual</a>
+          <a href="{{ '/fir-comparison-demo/' | relative_url }}">FIR comparison</a>
           <a href="https://github.com/VilhoValittu/DecayCore">GitHub</a>
-        </span>
+        </nav>
       </div>
+      <p class="wrap site-footer__legal">Copyright © 2026 Vilho Valittu. Source-available, non-commercial license.</p>
     </footer>
+
+    <script>
+      /* "On this page" rail for long documents. Pages work the same without it. */
+      (function () {
+        var body = document.querySelector('.page-body');
+        var content = document.querySelector('.content');
+        if (!body || !content || document.body.classList.contains('is-home') || document.body.classList.contains('has-wide-content') || !window.IntersectionObserver) return;
+        var heads = Array.prototype.slice.call(content.querySelectorAll('h2[id]'));
+        if (heads.length < 3) return;
+        var nav = document.createElement('nav');
+        nav.className = 'toc';
+        nav.setAttribute('aria-label', 'On this page');
+        var title = document.createElement('p');
+        title.textContent = 'On this page';
+        nav.appendChild(title);
+        var links = {};
+        heads.forEach(function (h) {
+          var a = document.createElement('a');
+          a.href = '#' + h.id;
+          a.textContent = h.textContent;
+          nav.appendChild(a);
+          links[h.id] = a;
+        });
+        body.appendChild(nav);
+        body.classList.add('has-toc');
+        var current = null;
+        var io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) {
+            if (!e.isIntersecting) return;
+            if (current) current.removeAttribute('aria-current');
+            current = links[e.target.id];
+            current.setAttribute('aria-current', 'true');
+          });
+        }, { rootMargin: '-80px 0px -70% 0px' });
+        heads.forEach(function (h) { io.observe(h); });
+      })();
+    </script>
   </body>
 </html>
