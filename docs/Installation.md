@@ -21,8 +21,13 @@ the native Automatic mode engine.
 | Raspberry Pi / Linux ARM64 | Extract `DecayCore_<version>_linux_arm64.7z`, run `./install.sh`, then start with `./run.sh`. | Intended for Raspberry Pi 4/5 and other 64-bit ARM Linux systems. It does not support 32-bit Raspberry Pi OS. |
 | macOS Apple Silicon | Extract `DecayCore_<version>_macos_arm64.7z`, then open `Start_Decay.command`. | If blocked, use **System Settings → Privacy & Security → Open Anyway**. Allow microphone access if requested. |
 
+The Linux installer also adds `xdg-utils`, which opens the local interface in
+your default browser. Run `./install.sh --check` to check the host audio libraries
+and browser launcher. A desktop session and an installed browser are needed for
+automatic browser opening; with `--lan`, you can use a browser on another computer.
+
 For measurement audio on Linux releases, DecayCore packages a pinned PortAudio build with
-ALSA and PulseAudio host APIs. `install.sh` supplies only its host audio
+ALSA and PulseAudio host APIs. `install.sh` supplies the host audio
 libraries: `libasound2t64 libpulse0` on current Debian/Ubuntu releases (`libasound2` on older releases), or `alsa-lib libpulse pipewire-alsa pipewire-pulse wireplumber`
 on an Arch PipeWire audio system.
 
@@ -32,9 +37,11 @@ DecayCore normally opens its local browser interface automatically. If it does n
 
 To use the interface from another computer on the same trusted network, start
 DecayCore with `--lan` (for example, `./run.sh --lan` on Linux). Open one of the
-complete `DecayCore LAN:` addresses printed in the console. The address includes
-a private session token and must be copied in full. LAN mode uses unencrypted
-HTTP and does not automatically open a local browser, so do not enable it on an
+`DecayCore LAN:` addresses printed in the console, such as
+`http://192.168.1.20:8080/`. You can bookmark this address; no session code is
+needed. Anyone who can reach the server on the network can open the interface.
+LAN mode uses unencrypted HTTP and does not automatically open a local browser,
+so do not enable it on an
 untrusted or publicly exposed network. The host firewall may also need permission
 for TCP port 8080 on the private network.
 

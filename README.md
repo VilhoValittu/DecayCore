@@ -32,7 +32,7 @@ The app runs locally on your computer, with controls in your web browser. No clo
 
 ## Screenshots
 
-![Basic tab with the speaker measurements sidebar open](docs/pics/ui_1.png)
+![Basic tab with the current setup and Choose files button in the sidebar](docs/pics/ui_1.png)
 
 ![Measure tab — configure capture devices and run guided room measurements](docs/pics/ui_2.png)
 

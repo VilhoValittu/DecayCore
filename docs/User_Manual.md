@@ -22,7 +22,7 @@ DecayCore accepts impulse-response WAV files and text exports containing frequen
 
 ### A safe first run
 
-1. Use **Measure** for guided Left and Right measurements with RT60 and harmonic data, then load the session results on **Files**. Import compatible measurements if guided measurement is unavailable.
+1. Use **Measure** for guided Left and Right measurements with RT60 and harmonic data, then press **Use final measurements**. To import existing measurements, open **Choose files…** in the sidebar.
 2. Select **DecayCore automatic mode (recommended)** and **Asymmetric**.
 3. Keep the **balanced** goal and **Adaptive: derive target from room acoustics** target strategy.
 4. Press **START** on **START / Results**.
@@ -32,6 +32,20 @@ DecayCore accepts impulse-response WAV files and text exports containing frequen
 When running from source, use **Basic** instead of Automatic mode.
 
 ## 2. Measure or import
+
+### Select measurement files
+
+Open **Choose files…** in the sidebar's current setup summary. The window shows
+the measurement folder and the Left and Right channels side by side. Select
+each channel's file from the folder, or expand **Load file or enter path manually**
+to upload a file or enter its path. **Suggest files** uses file names to suggest
+channel assignments; check the assignments before running correction.
+
+The sidebar shows the selected file for each channel. Once all required channels
+are loaded, the button changes to **Change files…**. With bass integration enabled,
+the same window shows the main and subwoofer channels.
+
+![Measurement file selection window with the folder and Left and Right channels](pics/measurement-file-selection.png)
 
 ### Guided measurement
 
@@ -95,6 +109,15 @@ Basic provides manual control with conservative defaults and hard safety clamps.
 ### Advanced
 
 Advanced exposes more correction, phase, timing, and protection controls. It is intended for measured experiments where you understand the effect of each change. Safety-critical numerical guards remain active.
+
+At the top of Advanced, choose **Strict**, **Balanced** or **Loose**, review the
+preview, then press **Apply**. Strict uses tighter correction limits; Balanced is
+the recommended starting point; Loose allows more freedom for fine-tuning. Each
+preset sets the correction slope limit, maximum cut, transition width and
+regularization. Your boost limits, correction range, phase settings and bass
+protection retain their current values. Changing a preset value manually shows
+**Custom**. Automatic mode locks the preset controls because it manages these
+settings itself.
 
 Selecting a mode does not rewrite every visible value. Use **Apply mode defaults** when you want to reset the controls to that mode's baseline.
 

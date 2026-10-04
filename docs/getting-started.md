@@ -41,9 +41,17 @@ Use the guided workflow on the **Measure** page whenever your platform and audio
 1. Connect your calibrated microphone.
 2. Load its calibration file.
 3. Measure Left and Right separately.
-4. Save the session and load the resulting impulse-response WAV files on the **Files** page. Keep the accompanying session files beside the WAVs so the saved RT60 and harmonic data remain available.
+4. Save the session and press **Use final measurements** to apply the results. Keep the accompanying session files beside the WAVs so the saved RT60 and harmonic data remain available when you reload them.
 
 If built-in measurement is unavailable, or you need to use existing files, import compatible REW text exports containing frequency, magnitude, and phase, or mono impulse-response WAV files. A suitable imported IR can provide RT60, but ordinary response exports do not carry DecayCore's full session data, including the separate harmonic curves. See [Measurement]({{ '/measurement-workflow/' | relative_url }}) for platform support, subwoofer routing, and export requirements.
+
+Open **Choose files…** in the sidebar and select the Left and Right files in the
+window. You can choose from the measurement folder, use **Suggest files**, or
+expand **Load file or enter path manually** to upload files or enter their paths.
+Check the channel assignments and the file names shown in the sidebar before
+starting. To replace loaded measurements, use **Change files…**.
+
+![Choose Left and Right measurement files in one window]({{ '/pics/measurement-file-selection.png' | relative_url }})
 
 ### 3. Start with Automatic mode
 

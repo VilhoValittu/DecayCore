@@ -8,26 +8,62 @@ hide_page_heading: true
 
 This page contains the five latest stable releases. [Older releases and Finnish translations are preserved in the archive]({{ '/changelog/archive/' | relative_url }}).
 
-## [Unreleased]
+## [1.3.9] - 4-10-2026
+
+### Easier from the start
+
+Choose your measurement files in one window, with Left and Right side by side.
+The sidebar keeps your current setup in view. Updated guides and screenshots
+help you through the first run.
+
+### Clearer results
+
+See what changed and why. Correction explanations are easier to read, with more
+room for the graphs and extra detail when you want it. Safety notices stay
+visible, and the exported report includes the same explanations.
+
+Graph downloads are easier to tell apart, even when you save several versions.
+
+### More from the first run
+
+Automatic mode now fine-tunes its best result more consistently on the first
+run. It also makes better use of measured distortion and room decay when
+choosing how much correction to apply.
+
+### Less waiting. Less memory.
+
+Filter calculations are faster, especially with long filters and repeated runs.
+Automatic mode also uses less memory. Acoustic safety checks remain in place.
 
 ### More reliable measurements
 
-Measurements are much less likely to stop with an "audio output underflow"
-error, especially on slower computers. Playing the sweep and recording the
-microphone now run in their own engine, which doesn't wait on anything else
-DecayCore is doing. On Linux, measurements also use a deeper audio buffer and
-ask the system to schedule audio ahead of other work, so the sweep is less
-likely to break up. If audio is still interrupted, for example by another heavy
-program, DecayCore stops the measurement and tells you instead of using a
-damaged recording.
+Measurements run more smoothly, especially on slower computers. Timing
+references are recognised more reliably in noisy recordings. If audio is
+interrupted, DecayCore stops the take and tells you to try again.
 
-### Lower memory use
+### More precise bass correction
 
-Automatic mode now uses about 30% less memory at its peak. On the test
-measurement, peak memory fell from about 890 MB to about 615 MB. Filters,
-scores and exported files are the same as before.
+Temporal Decay Control responds more precisely to the bass decay in your room.
+Two-subwoofer timing is also more reliable.
 
-### License terms in every download
+### Advanced, made simpler
+
+Choose Strict, Balanced or Loose, preview the settings, and press Apply.
+The new presets bring related correction controls together while keeping your
+chosen bass protection and phase settings.
+
+You can now enter effective room volume in cubic feet as well as cubic metres.
+
+### Easier to open
+
+Bookmark DecayCore's browser address and come back to it after a restart.
+With LAN access enabled, open it from another computer on your trusted network.
+Anyone who can reach the host can use the interface while LAN access is enabled.
+
+Linux installation now includes the launcher needed to open your browser
+automatically and checks that it is available.
+
+### License terms included
 
 Every download now includes the license and a list of third-party notices.
 DecayCore is free for non-commercial use. Commercial use needs written
