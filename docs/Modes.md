@@ -43,7 +43,7 @@ Goal: let DecayCore search for a good preset automatically.
 
 ### Target selection strategy (auto_target_mode)
 
-In AUTO mode, three target strategies are available from the Basic tab:
+In AUTO mode, three target strategies are available from the Setup tab:
 
 - **Adaptive: derive target from room acoustics** (default) — scores built-in curves to select a base, then adjusts it by at most ±1 dB using broad, stereo-consistent bass evidence. It reduces adaptation when channels disagree, preserves the selected curve above 500 Hz by default, and permits additional bass lift only with reliable stereo RT60 evidence. It skips the full multi-curve candidate search.
 - **Auto: search best built-in** — evaluates multiple built-in target curves in parallel and picks the best-ranked match. Robust choice when the measurement source is unknown or external.

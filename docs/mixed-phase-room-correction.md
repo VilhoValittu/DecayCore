@@ -8,6 +8,11 @@ permalink: /mixed-phase-room-correction/
 
 Choose **Mixed Phase** when measurements show useful excess-phase behavior that you want to correct inside a limited frequency band. DecayCore blends that correction with a safer phase baseline and fades it out above the configured range.
 
+DecayCore calculates extra phase correction from the predicted response after
+frequency-response correction. This avoids correcting the same bass resonance's
+timing twice. The remaining phase correction stays within the selected frequency
+range and passes through the delay and pre-ringing guards.
+
 Mixed Phase asks for more judgment than Minimum Phase. Correction strength, full-correction frequency, fade frequency, group-delay limits, and pre-energy guards all affect the result. Take it one change at a time. A setting that looks wonderful at one microphone position may be less convincing when you lean over to pick up your drink, especially where reflections dominate the measurement.
 
 Start with the mode defaults and check the final impulse and group delay for obvious problems. Then listen. Use **Asymmetric** when you want the normal starting point without tuning mixed-phase controls yourself.

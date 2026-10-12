@@ -8,6 +8,55 @@ hide_page_heading: true
 
 This page contains the five latest stable releases. [Older releases and Finnish translations are preserved in the archive]({{ '/changelog/archive/' | relative_url }}).
 
+## [Unreleased]
+
+## [1.4.0] - 12-10-2026
+
+### Decay before and after correction
+
+New Decay / RT60 and Bass decay views compare measured and predicted decay
+for each channel. The Timing view adds an impulse envelope in dB, and reports
+include playback headroom recommendations. Decay estimates describe ringing,
+not overall sound quality.
+
+### Safer correction
+
+Correction fades smoothly at measurement boundaries, and decay correction
+respects its frequency limit. Phase correction avoids correcting the same
+bass resonance twice. Pre-ringing protection now works, with a default limit
+of -25 dB instead of -35 dB.
+
+For left/right correction without Bass Integration, filters that lengthen bass
+decay trigger a check of lighter phase correction. Reports explain any remaining
+problems or why the original correction was kept when all checks failed.
+
+### Separate filters for two subwoofers
+
+Bass Integration supports individual delay, level and polarity for two subs,
+with separate results views and a four-output CamillaDSP export. Both sub
+measurements must share a timing reference. Bypass playback preserves
+crossovers, subwoofer protection and bass alignment.
+
+### More reliable Automatic mode
+
+Adaptive targets stay within 1 dB of their base curve. Measured room decay and
+distortion discourage extra boost, and measurement gaps no longer influence
+adaptation. Search starts consistently on Windows and Linux. Earlier results
+are rebuilt and may differ slightly.
+
+### Less waiting
+
+Minimum-phase calculation is faster on Windows and Linux; other filter types
+are faster on Windows. Bass decay checks skip unnecessary recalculations.
+Progress now tracks all four filters through export and shows accurate search
+trial counts.
+
+### Clearer setup
+
+Basic is now Setup. Settings managed by Automatic mode sit in expandable
+sections, zero values are preserved, and unreadable measurements prevent runs.
+Room dimensions stay correct when switching units.
+
 ## [1.3.9] - 4-10-2026
 
 ### Easier from the start

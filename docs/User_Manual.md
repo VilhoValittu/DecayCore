@@ -84,6 +84,8 @@ A suitable imported IR can provide RT60 from its recorded decay. Standard freque
 
 ## 3. Choose the operating mode
 
+Select the operating mode on **Setup**. Opening **Advanced** or **IR Window & Decay Control** keeps the selected mode.
+
 All modes use the same DSP engine. The mode changes who chooses the settings and how tightly the interface constrains them.
 
 ### Automatic mode
@@ -100,7 +102,7 @@ Choose an AUTO goal:
 
 The scores compare candidates from the same measurement set. Do not use them to compare unrelated speakers or rooms.
 
-Automatic mode manages many Advanced settings. Fields that remain enabled are deliberate expert overrides. The final summary reports the effective values used, including any winner refinement.
+Automatic mode manages many Advanced settings. These settings are collapsed under **Show detailed settings** on Advanced and IR Window & Decay Control. Room dimensions remain visible. Fields that remain enabled are deliberate expert overrides. The final summary reports the effective values used, including any winner refinement.
 
 ### Basic
 
@@ -110,7 +112,7 @@ Basic provides manual control with conservative defaults and hard safety clamps.
 
 Advanced exposes more correction, phase, timing, and protection controls. It is intended for measured experiments where you understand the effect of each change. Safety-critical numerical guards remain active.
 
-At the top of Advanced, choose **Strict**, **Balanced** or **Loose**, review the
+In the Correction preset section on Advanced, choose **Strict**, **Balanced** or **Loose**, review the
 preview, then press **Apply**. Strict uses tighter correction limits; Balanced is
 the recommended starting point; Loose allows more freedom for fine-tuning. Each
 preset sets the correction slope limit, maximum cut, transition width and
@@ -150,7 +152,8 @@ Match the sample rate to the playback pipeline. More taps give better low-freque
 
 ### Automate tap count
 
-In packaged builds, **Automate tap count** on the Run tab generates filters with
+In packaged builds, open **Additional run options** on **START / Results** and
+choose **Run with automatic tap count**. This generates filters with
 the current settings and then shortens their exported support within a strict
 response-error bound. It works with Asymmetric, Minimum, Mixed and Linear Phase.
 The taps setting still controls the design resolution; it is not replaced by
@@ -225,7 +228,7 @@ The crossover phase model describes expected crossover rotation so phase correct
 
 ## 7. Generate and read the result
 
-Open **START / Results** and press **START**. During an Automatic run, DecayCore may evaluate targets, search preset candidates, refine finalists, and validate the winner. Repeated runs with the same measurements and relevant settings may reuse compatible cache data.
+Open **START / Results** and press **START**. For separate results for all four filter types, open **Additional run options** and choose **Run all four filter types**. This runs the full calculation for each type and takes longer than a single run. During an Automatic run, DecayCore may evaluate targets, search preset candidates, refine finalists, and validate the winner. Repeated runs with the same measurements and relevant settings may reuse compatible cache data.
 
 Review these items before export:
 
