@@ -192,6 +192,8 @@ Maximum cut controls the strongest permitted attenuation. Leave enough headroom 
 
 A high-pass filter (HPF) protects the system below its useful range. In Automatic mode, enabling HPF lets the search choose its frequency and slope. Low-bass boost lock and Excursion Protection can block risky boost while still allowing cuts.
 
+Asymmetric, Mixed Phase and Minimum Phase filters keep the HPF's natural minimum-phase response, so it adds no pre-ringing. Linear Phase makes it linear-phase, which rings equally before and after the peak. Below 65,536 taps the HPF runs as a separate IIR filter and the FIR leaves it alone. **HPF in the final FIR** in the Results tab compares the exported filter with the HPF you set. Very steep settings reach a floor near -60 dB because the filter is finite.
+
 ### Level matching and Stereo Link
 
 Level matching establishes the reference between measurement and target. Stereo Link keeps left and right decisions coherent without forcing identical correction where the channels differ.
@@ -225,6 +227,17 @@ Impulse-response export windowing controls how the final FIR is placed and shape
 ### XO Phase Model
 
 The crossover phase model describes expected crossover rotation so phase correction does not mistake it for an unrelated loudspeaker error. Use it only when the crossover topology and slopes are known.
+
+Each of the five XO slots takes a corner frequency, a slope and a type. **Butterworth** is the default. **Linkwitz-Riley** applies to 12, 24, 36 and 48 dB/oct; 6 and 18 dB/oct are always Butterworth. The type sets the modelled phase turn around the corner, not the frequency response. At 80 Hz the two differ by 1 to 3.5 ms of group delay, depending on the slope. At 2 kHz the difference is under 0.15 ms.
+
+The filter inverts the phase of every crossover you enter, so an entry the speaker does not have adds phase error instead of removing it. After a run, **XO model fit** in the Results tab compares each crossover with the measured phase:
+
+- **good** or **partial**: the measurement contains the crossover; the percentage is the share of the leftover group-delay spread it removes.
+- **weak**: the crossover explains little of the measurement.
+- **mismatch - check XO**: the measurement shows less group-delay spread without this crossover than with it. Recheck the frequency, slope and type. The log carries the same warning.
+- **not verifiable**: the crossover's own group-delay swing is under 1 ms, room reflections hide it, or it lies outside the measured range. At 24 dB/oct the first case starts at about 250 Hz.
+
+The check only reports; it never changes the filter. With a low crossover, an Asymmetric filter also limits room phase correction so the filter adds no pre-ringing beyond the crossover's own.
 
 ## 7. Generate and read the result
 

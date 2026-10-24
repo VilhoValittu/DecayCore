@@ -158,7 +158,7 @@ Optional TDC slope limiting constrains \(D(f)\) in dB/oct to avoid narrow stacke
 ## 7. Phase modeling and guards
 
 ### 7.1 Theoretical phase baseline
-Theoretical phase \(\phi_{theo}(f)\) is built from configured XO + HPF analog Butterworth models.
+Theoretical phase \(\phi_{theo}(f)\) is built from the configured XO analog models (Butterworth or Linkwitz-Riley) and the HPF. The FIR baseline inverts the crossovers. It inverts the HPF only in Linear Phase. In the other filter types the HPF stays minimum-phase: its minimum phase, computed from the applied magnitude, is expected in the measurement-plus-correction sum so it is not mistaken for excess phase, and an HPF run as an external IIR is left out of the model.
 
 ### 7.2 Excess phase correction
 \[

@@ -10,6 +10,130 @@ This page contains the five latest stable releases. [Older releases and Finnish 
 
 ## [Unreleased]
 
+## [1.4.2] - 24-10-2026
+
+### Deep bass nulls now show clearly in the target curve
+
+The target curve dips where the room has a deep null, so the filter no longer tries to fill it. In a test, a 16 dB dip half an octave wide, typical of a boundary cancellation, left the target unchanged. It now lowers the target by about 8 dB. Broad dips and ordinary ripple are left to the correction. A file exported in SPL now gives the same filter as one in dBFS. Earlier Automatic results are rebuilt.
+
+### CamillaDSP files no longer cut the level by a fixed 6 dB
+
+Without a subwoofer, the file plays 6 dB louder at the same volume, so lower your volume before the first listen. With a subwoofer, it cuts 6.02 dB for the summed channels, plus any gain from the sub trim. Raise Auto Headroom Margin for more clipping headroom.
+
+### Linkwitz-Riley or Butterworth for each crossover
+
+Pick Butterworth or Linkwitz-Riley for each crossover on the XO tab, to match your speakers. Butterworth stays the default.
+
+### Results check your crossovers against the measurement
+
+Results shows how well each crossover matches the measured phase, for example "80Hz: 91% good", and warns when the measurement doesn't contain one. Crossovers too subtle to see in a room read "not verifiable". The check never changes the filter.
+
+### Finer bass resolution in the analysis
+
+Third-octave smoothing no longer flattens narrow room modes. A 9 dB mode with a Q of 30 now reads 8 dB instead of 3 dB. Filters for smooth measurements are unchanged. Earlier Automatic results are rebuilt.
+
+### Implausible room-decay readings no longer shape Bass-first AI or Hybrid IIR
+
+With Bass-first AI on, a measured RT60 that DecayCore already rejects, such as 0.04 s or 8 s, no longer sets the modal limit or narrows the Hybrid IIR band. Earlier Automatic results are rebuilt.
+
+### High-pass filters attenuate as designed in Asymmetric and Mixed Phase
+
+A 20 Hz, 24 dB/oct high-pass gave 12 dB at 10 Hz instead of 23 dB. Results now checks the exported high-pass against the one you set. Earlier Automatic results are rebuilt.
+
+### Automatic mode keeps high-pass and low-pass filters at full depth
+
+A late refinement step no longer limits their stopband to Max Cut. A 40 Hz, 24 dB/oct high-pass with 131,072 taps now attenuates 10 Hz by 42 dB instead of 17 dB. Earlier Automatic results that used this step are rebuilt.
+
+### Low crossovers keep an Asymmetric filter's response
+
+With a crossover at 100 Hz or lower, an Asymmetric filter could bend the bass by 4 dB or more. It now keeps its designed response, as Linear Phase already does. Earlier Automatic results that used a crossover are rebuilt.
+
+## [1.4.1] - 23-10-2026
+
+### Group-delay gradient readout covers the audio band
+
+The Results tab and the text report now measure the excess-phase group-delay gradient from 20 Hz up, so its peak is no longer reported at a few hertz. The filters and Automatic mode ranking are unchanged.
+
+### Faster bass decay check
+
+When a left/right filter lengthens bass decay, DecayCore tries lighter phase correction. Those attempts now reuse the correction already calculated, so a 65,536-tap Asymmetric run at 44.1 kHz finishes about a third sooner. The filters are identical to before.
+
+### Faster, clearer measurement timeout errors
+
+When the audio stream never starts, a measurement now gives up after two seconds instead of waiting out the whole sweep, so a failing device no longer holds the start of the sweep back by about 30 seconds. The error says whether the input device delivered any audio. On macOS, if it delivered none, it points to System Settings > Privacy & Security > Microphone. The log lists the devices that were opened and how many frames were played and recorded.
+
+### macOS launcher asks for microphone access as DecayCore
+
+`Start_Decay.command` now opens the app bundle instead of running it inside Terminal. The microphone prompt and the entry in Privacy & Security name DecayCore, not Terminal.
+
+### Crossovers no longer distort the filter
+
+With a crossover set on the XO tab, Asymmetric and Linear Phase filters could cut the midrange by about 20 dB if dB/oct was over 12. The filter now keeps the frequency response it was designed with, and Automatic mode ranks these runs like any others. Earlier Automatic results that used a crossover are rebuilt. Thanks **Nomid from ASR-forum** to finding this!
+
+### Sample-rate ranking matches Automatic mode
+
+When you export several sample rates, the summary ranks them using the same DSP quality penalty as Automatic mode. Scores can differ from earlier versions.
+
+### Text measurements with a byte-order mark
+
+Text measurement files saved with a byte-order mark now keep their first data
+row, and UTF-16 files are read instead of rejected.
+
+### Runs with an empty correction band
+
+If the correction band ends up empty, for example when its maximum is below its
+minimum, the run now finishes without magnitude correction instead of failing.
+
+### Corrupt WAV measurements are rejected
+
+A float WAV that contains invalid samples is now reported as unreadable. It
+used to load as an empty curve and fail later in the run.
+
+### Zero values stay zero
+
+A left IR window of 0 ms and a maximum boost of 0 dB are kept when you reopen
+the app. Both used to snap back to their defaults.
+
+### Headroom across the full filter
+
+Final filters keep the requested headroom across the full frequency range,
+including output tilt and normalization. Reports show any extra attenuation.
+
+### More reliable timing with limited measurements
+
+Timing estimates use phase within the measured frequency range. Reports explain
+when there is too little phase coverage to estimate timing.
+
+### Faster Bass Integration calculations
+
+Bass Integration calculates timing faster. Band analysis uses the correct
+response for odd filter orders.
+
+### More dependable correction
+
+Final filter checks catch bass and voice-band peaks in either channel. Bass
+analysis recognises nearby resonances across sample rates and filter lengths.
+Correction uses measured room decay; magnitude-derived RT60 estimates remain
+diagnostic.
+
+### Consistent repeated calculations
+
+Changing measurement data no longer alters earlier cached inputs. RT60 estimates
+stay consistent across filter lengths and calculation order. Earlier Automatic
+mode results are rebuilt.
+
+### Faster Mixed Phase calculation
+
+Mixed Phase filters calculate faster, with pre-ringing protection and alignment
+checks in place.
+
+### Bass Integration for up to four subwoofers
+
+Measure and integrate up to four subs, with previews and results for each one.
+Separate filters include individual delay, level and polarity, with a six-output
+CamillaDSP export for four subs and two main speakers. Combined level estimates
+account for measured level differences and phase cancellation.
+
 ## [1.4.0] - 12-10-2026
 
 ### Decay before and after correction
