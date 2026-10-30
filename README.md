@@ -32,11 +32,11 @@ The app runs locally on your computer, with controls in your web browser. No clo
 
 ## Screenshots
 
-![Basic tab with the current setup and Choose files button in the sidebar](docs/pics/ui_1.png)
+![Setup tab with the current setup and Choose files button in the sidebar](docs/pics/ui_1.png)
 
 ![Measure tab — configure capture devices and run guided room measurements](docs/pics/ui_2.png)
 
-![Basic tab — choose operating mode, FIR engine, and sample rate](docs/pics/ui_3.png)
+![Setup tab — choose operating mode, FIR engine, and sample rate](docs/pics/ui_3.png)
 
 ![Target tab — shape the target curve, leveling, and gain behavior](docs/pics/ui_4.png)
 

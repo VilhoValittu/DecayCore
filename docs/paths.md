@@ -193,6 +193,9 @@ read; delete it manually, or with the helper scripts, once you no longer need it
 | **Old, unused** | `~/.camillafir/` | `~/.camillafir/` | `~/.camillafir/` |
 | **Measurements** | `~/Documents/DecayCore/measurement/` | `~/Documents/DecayCore/measurement/` | `%USERPROFILE%\Documents\DecayCore\measurement\` |
 | **Filters** | `~/Documents/DecayCore/filters/` | `~/Documents/DecayCore/filters/` | `%USERPROFILE%\Documents\DecayCore\filters\` |
+| **Log files** | `~/Documents/DecayCore/logs/` | `~/Documents/DecayCore/logs/` | `%USERPROFILE%\Documents\DecayCore\logs\` |
+
+Log files exist only after you tick **Save a log file** in **About DecayCore**. If the Documents folder cannot be written, DecayCore saves them in a `logs` folder inside the data directory instead.
 
 ---
 

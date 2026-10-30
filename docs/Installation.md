@@ -31,12 +31,13 @@ ALSA and PulseAudio host APIs. `install.sh` supplies the host audio
 libraries: `libasound2t64 libpulse0` on current Debian/Ubuntu releases (`libasound2` on older releases), or `alsa-lib libpulse pipewire-alsa pipewire-pulse wireplumber`
 on an Arch PipeWire audio system.
 
-To print the packaged process's PortAudio host APIs and raw device list without opening an audio stream, run `./run.sh --audio-diagnostics`.
+To print the packaged process's PortAudio host APIs and raw device list without opening an audio stream, run `./run.sh --audio-diagnostics` (`./Start_Decay.command --audio-diagnostics` on macOS).
 
 DecayCore normally opens its local browser interface automatically. If it does not, open `http://127.0.0.1:8080`. The interface runs on your computer; it is not a cloud service.
 
 To use the interface from another computer on the same trusted network, start
-DecayCore with `--lan` (for example, `./run.sh --lan` on Linux). Open one of the
+DecayCore with `--lan` (for example, `./run.sh --lan` on Linux or
+`./Start_Decay.command --lan` on macOS). Open one of the
 `DecayCore LAN:` addresses printed in the console, such as
 `http://192.168.1.20:8080/`. You can bookmark this address; no session code is
 needed. Anyone who can reach the server on the network can open the interface.
@@ -44,6 +45,10 @@ LAN mode uses unencrypted HTTP and does not automatically open a local browser,
 so do not enable it on an
 untrusted or publicly exposed network. The host firewall may also need permission
 for TCP port 8080 on the private network.
+
+On macOS, `--lan` runs DecayCore inside the terminal window so that the addresses
+are shown there. macOS then asks for microphone access for Terminal instead of
+DecayCore, and closing the terminal window stops DecayCore.
 
 See [Measurement]({{ '/measurement-workflow/' | relative_url }}) for current platform support and routing requirements.
 

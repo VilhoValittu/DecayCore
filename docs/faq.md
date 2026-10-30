@@ -43,6 +43,8 @@ The packaged release also includes guided measurement and Automatic mode.
 
 Open **About DecayCore → Maintenance**. Use **Clear automatic-mode caches** for unexpected Automatic results or **Reset settings to defaults** for a damaged configuration. Neither action removes measurements, target presets, or exported filters.
 
+To report a problem, tick **Save a log file** in **About DecayCore**, repeat the steps, and click **Email the log**. Your email app opens a draft to the developer with the end of the log. An email link cannot attach files, so attach the file named in the message, the newest one in `Documents/DecayCore/logs`. On macOS this is also the way to get the log, because `Start_Decay.command` hides the terminal output.
+
 If the app does not start, use the platform cleanup script in `config_delete/`. [Configuration and Data Paths]({{ '/paths.html#resetting-caches-and-configuration-troubleshooting' | relative_url }}) lists the affected files.
 
 ## Is DecayCore open source?

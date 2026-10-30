@@ -10,6 +10,68 @@ This page contains the five latest stable releases. [Older releases and Finnish 
 
 ## [Unreleased]
 
+## [1.4.3] - 30-10-2026
+
+### Send a log file with bug reports
+
+Tick Save a log file in About DecayCore, repeat the problem, and click Email the log. Your email app opens a draft to the developer. Attach the newest file from Documents/DecayCore/logs, since an email link cannot attach it.
+
+### Audio diagnostics and LAN access on macOS
+
+Run `./Start_Decay.command --audio-diagnostics` to list your audio devices, or `--lan` to open DecayCore from another computer. With `--lan` the addresses print in the terminal, macOS asks for microphone access for Terminal, and closing the terminal stops DecayCore.
+
+### Placement hints for deep bass nulls
+
+Results lists up to three deep, narrow nulls that no filter can fill, each with the distance to a reflecting surface that can cause it. Moving the speaker, subwoofer or seat does more than any filter.
+
+### Settings files for Equalizer APO and PipeWire
+
+Tick Equalizer APO and PipeWire files in Output settings to add a ready-made config for each player to the export, next to the CamillaDSP files.
+
+### Profiles for your settings
+
+Save your settings under a name on the Setup page and load them again, for music and movies for example. A profile holds settings only, not measurement files. Undo restores what a load replaced.
+
+### Results lead with graphs
+
+Results opens with the graphs. The details sit in three groups, and the ZIP download is a small link beside the saved folder.
+
+### Crossover models no longer fail the safety check
+
+Asymmetric and Linear Phase filters for a speaker with crossovers set under XO pass the safety check. Undoing a crossover's phase puts part of the pulse just ahead of its peak, and the check counted that as pre-ringing. It now allows for it. Earlier Automatic results are rebuilt.
+
+### Automatic tap count shortens many more filters
+
+Most Minimum and Mixed Phase filters now shorten by about 60%, Linear Phase filters by about a third, and more Asymmetric filters shorten too. An exported filter stays within 1% (about 0.09 dB) of the design response. The search takes a few seconds longer.
+
+### DecayCore asks before quitting mid-run
+
+The Quit button asks first while a run or measurement is in progress, and the browser warns before you close the tab. A long Automatic search is no longer lost by accident.
+
+### Undo for Apply mode defaults
+
+Undo puts back the values that Apply mode defaults replaced. The message tells you how many values changed.
+
+### Measure says why capture is unavailable
+
+The Measure page shows the reason above the buttons, such as no microphone or output device, and points to loading measurements you already have.
+
+### Edit manually from Automatic mode
+
+Pages that Automatic mode manages have an Edit manually in Advanced mode button. In the Modern and North styles their tabs are labelled Auto. The Target preview says when its curve is for reference only.
+
+### Navigation follows the working order
+
+In the Modern and North styles, tabs are grouped as Prepare, Fine-tune and Run, and each page before START ends with a Next button. The group names show in windows tall enough to fit them.
+
+### Run all four filter types keeps every result
+
+Each filter type's result and download stay on the page, one section per type, with the latest open. Before, only the last result remained.
+
+### A tidier XO page and labels
+
+The XO page shows the crossovers you use plus one empty slot, and its heading no longer repeats the step number. Labels no longer use emoji, so they look the same on every system.
+
 ## [1.4.2] - 24-10-2026
 
 ### Deep bass nulls now show clearly in the target curve

@@ -155,7 +155,10 @@ Match the sample rate to the playback pipeline. More taps give better low-freque
 In packaged builds, open **Additional run options** on **START / Results** and
 choose **Run with automatic tap count**. This generates filters with
 the current settings and then shortens their exported support within a strict
-response-error bound. It works with Asymmetric, Minimum, Mixed and Linear Phase.
+response-error bound: at every frequency the exported filter stays within 1%
+(about 0.09 dB) of the design response, measured against the local response with
+a floor of 0.1% of the response peak. It works with Asymmetric, Minimum, Mixed
+and Linear Phase.
 The taps setting still controls the design resolution; it is not replaced by
 the final export length. Each sample rate is checked separately.
 

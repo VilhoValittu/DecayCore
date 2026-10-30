@@ -105,8 +105,8 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
     <p class="band__intro">Work through the pages from measurement to export. Automatic mode handles the search and shows its chosen settings, so you have a starting point for listening without spending the evening trying every combination.</p>
     <div class="shots">
       <figure class="shot">
-        <a href="{{ '/pics/ui_1.png' | relative_url }}"><img src="{{ '/pics/ui_1.png' | relative_url }}" alt="Basic tab with the mode selector, automatic goal, and target strategy" width="1536" height="960" loading="lazy"></a>
-        <figcaption>Basic: choose the mode, goal, and target strategy.</figcaption>
+        <a href="{{ '/pics/ui_1.png' | relative_url }}"><img src="{{ '/pics/ui_1.png' | relative_url }}" alt="Setup tab with the mode selector, automatic goal, and target strategy" width="1536" height="960" loading="lazy"></a>
+        <figcaption>Setup: choose the mode, goal, and target strategy.</figcaption>
       </figure>
       <figure class="shot">
         <a href="{{ '/pics/ui_4.png' | relative_url }}"><img src="{{ '/pics/ui_4.png' | relative_url }}" alt="Target tab with a target curve preview and correction limits" width="1536" height="960" loading="lazy"></a>
