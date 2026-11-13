@@ -10,11 +10,11 @@ This page contains the five latest stable releases. [Older releases and Finnish 
 
 ## [Unreleased]
 
+## [1.4.4] - 13-11-2026
+
 ### Intel Macs get their own package
 
 Releases now include a macOS package for Intel Macs next to the Apple silicon one. Download the one that matches your Mac.
-
-## [1.4.4] - 13-11-2026
 
 ### Phase correction works better
 

@@ -145,6 +145,3 @@ Documents/DecayCore/filters/<version>/
 
 If the directory is not writable, DecayCore chooses a writable application-data location and shows it on **START / Results**.
 
-## Browser notes
-
-Use a current Chrome, Edge, Firefox, or Safari release. If Vivaldi on Windows causes a NumPy `MemoryError` during a demanding run, close other tabs or repeat the run in another supported browser.
