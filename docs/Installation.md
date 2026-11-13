@@ -19,7 +19,13 @@ the native Automatic mode engine.
 | Ubuntu / Debian (x86_64) | Extract `DecayCore_<version>_linux.7z`, run `./install.sh`, then start with `./run.sh`. | The installer adds the required host ALSA/Pulse client libraries. |
 | Arch Linux (x86_64) | Extract `DecayCore_<version>_linux.7z`, run `./install.sh`, then start with `./run.sh`. | On an existing PipeWire audio system, the installer adds the matching ALSA/Pulse integration packages. |
 | Raspberry Pi / Linux ARM64 | Extract `DecayCore_<version>_linux_arm64.7z`, run `./install.sh`, then start with `./run.sh`. | Intended for Raspberry Pi 4/5 and other 64-bit ARM Linux systems. It does not support 32-bit Raspberry Pi OS. |
-| macOS Apple Silicon | Extract `DecayCore_<version>_macos_arm64.7z`, then open `Start_Decay.command`. | If blocked, use **System Settings → Privacy & Security → Open Anyway**. Allow microphone access if requested. |
+| macOS Apple silicon (M1 and later) | Extract `DecayCore_<version>_macos_arm64.7z`, then open `Start_Decay.command`. | If blocked, use **System Settings → Privacy & Security → Open Anyway**. Allow microphone access if requested. |
+| macOS Intel | Extract `DecayCore_<version>_macos_x86_64.7z`, then open `Start_Decay.command`. | Same first-launch steps as Apple silicon. |
+
+Not sure which Mac you have? Open **Apple menu → About This Mac**. A **Chip**
+line (Apple M1, M2, …) means Apple silicon; a **Processor** line naming Intel
+means an Intel Mac. The two macOS packages are separate builds, so download the
+one that matches.
 
 The Linux installer also adds `xdg-utils`, which opens the local interface in
 your default browser. Run `./install.sh --check` to check the host audio libraries
