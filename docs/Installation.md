@@ -15,7 +15,7 @@ the native Automatic mode engine.
 
 | Platform | Package and launcher | First-launch notes |
 |---|---|---|
-| Windows x64 | Extract `DecayCore_<version>_windows.7z`, then run `DecayCore_<version>.exe`. | If SmartScreen appears, select **More info → Run anyway**. Allow private firewall access if asked. |
+| Windows x64 | Extract `DecayCore_<version>_windows.7z`, then run `DecayCore_<version>.exe` from the extracted folder (keep its `_internal` folder beside it). | If SmartScreen appears, select **More info → Run anyway**. Allow private firewall access if asked. |
 | Ubuntu / Debian (x86_64) | Extract `DecayCore_<version>_linux.7z`, run `./install.sh`, then start with `./run.sh`. | The installer adds the required host ALSA/Pulse client libraries. |
 | Arch Linux (x86_64) | Extract `DecayCore_<version>_linux.7z`, run `./install.sh`, then start with `./run.sh`. | On an existing PipeWire audio system, the installer adds the matching ALSA/Pulse integration packages. |
 | Raspberry Pi / Linux ARM64 | Extract `DecayCore_<version>_linux_arm64.7z`, run `./install.sh`, then start with `./run.sh`. | Intended for Raspberry Pi 4/5 and other 64-bit ARM Linux systems. It does not support 32-bit Raspberry Pi OS. |
@@ -32,6 +32,8 @@ libraries: `libasound2t64 libpulse0` on current Debian/Ubuntu releases (`libasou
 on an Arch PipeWire audio system.
 
 To print the packaged process's PortAudio host APIs and raw device list without opening an audio stream, run `./run.sh --audio-diagnostics` (`./Start_Decay.command --audio-diagnostics` on macOS).
+
+If measurement stops recording, run `./run.sh --audio-record-test` (`./Start_Decay.command --audio-record-test` on macOS). It records three seconds from the default input through two audio paths, prints the callback counts, and says which path stops. Add `--audio-input-device N`, with a device number from the diagnostics list, to test another input.
 
 DecayCore normally opens its local browser interface automatically. If it does not, open `http://127.0.0.1:8080`. The interface runs on your computer; it is not a cloud service.
 

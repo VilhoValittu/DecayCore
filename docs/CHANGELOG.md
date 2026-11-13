@@ -10,6 +10,36 @@ This page contains the five latest stable releases. [Older releases and Finnish 
 
 ## [Unreleased]
 
+## [1.4.4] - 13-11-2026
+
+### Phase correction works better
+
+Automatic mode keeps the phase correction unless dropping it clearly helps, and the group-delay limiter now covers the bass too, so room modes near 30 Hz no longer slip through. If the limiter's result is still too strong, the correction is scaled down until it fits.
+
+### Resonances are cut deeper
+
+Automatic mode now judges tone at matched level, so room-mode peaks come down 0.5 to 1.6 dB further on a reference measurement. A resonance that is cut until its decay can no longer be measured counts as fixed.
+
+### Left and right stay balanced
+
+With stereo link on, both channels keeps balance better compared to each other.
+
+### Measurement starts with your default devices
+
+The Measure page now selects your system's default microphone and output when you have no saved choice.
+
+### Faster Automatic mode on Windows
+
+Automatic mode runs about 15% faster on Windows.
+
+### Record test for audio problems
+
+If measurement stops recording, start DC with : `--audio-record-test` extension in a terminal. It records three seconds through two audio paths and prints which one works. Send the output with your log file. Command works at every OS.
+
+### Quicker error when the input stops
+
+If the microphone stops delivering audio during a measurement, DecayCore now gives up after a few seconds of silence instead of waiting for each retry to time out. The log file also records why a measurement failed.
+
 ## [1.4.3] - 30-10-2026
 
 ### Send a log file with bug reports
