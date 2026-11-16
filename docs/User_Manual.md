@@ -102,6 +102,8 @@ Choose an AUTO goal:
 
 The scores compare candidates from the same measurement set. Do not use them to compare unrelated speakers or rooms.
 
+To see how the goals differ on one real measurement, open the [Automatic goal comparison](https://vilhovalittu.github.io/DecayCore/auto-mode-goals-demo/).
+
 Automatic mode manages many Advanced settings. These settings are collapsed under **Show detailed settings** on Advanced and IR Window & Decay Control. Room dimensions remain visible. Fields that remain enabled are deliberate expert overrides. The final summary reports the effective values used, including any winner refinement.
 
 ### Basic
@@ -257,6 +259,12 @@ Review these items before export:
 
 Automatic ranking compares filters made from the same measurements. It is not a sound-quality score.
 
+### Compare filters
+
+**Compare filters** on the results page opens **Compare FIRs** with the run selected; after **Run all four filter types**, every result of the batch is selected. The page lists saved runs from the filters folder, newest first, and accepts other FIR WAV files. Choose a channel and press **Create comparison**. The built-in FIR Compare saves an HTML report in `Documents/DecayCore/Analyze` and opens it in your browser.
+
+With **Include predicted response and target tracking**, each filter is applied to the current WAV measurement and compared with the target saved with the newest selected run. FIR Compare analyzes the full impulse response without DecayCore's IR window, so its numbers can differ from the results page. Its differences are descriptive, not a ranking.
+
 ## 8. Export and deploy
 
 The result ZIP normally includes:
@@ -264,6 +272,7 @@ The result ZIP normally includes:
 - Left and Right FIR WAV files in the selected output format
 - bypass FIR files for level- and timing-matched comparison
 - `Summary_...txt`
+- `Target_L_...txt` and `Target_R_...txt`: the target each channel was designed for, as REW-compatible text. An all-rates ZIP holds them once, at the selected sample rate
 - CamillaDSP configuration files
 - Sub FIR and crossover settings when Bass Integration is used
 
@@ -275,7 +284,15 @@ Use the generated YAML when possible, or add each WAV to the correct convolution
 
 ### Roon
 
-Load the compatible ZIP or WAV set in **DSP Engine → Convolution**. Ensure the package contains the rate used by playback.
+Tick **Roon convolution ZIP** in Output settings before the run. Load the `Roon_Convolution_...zip` from inside the export into **DSP Engine → Convolution**. Don't load the export ZIP itself: it also holds the bypass filters, and Roon may pick those. Roon picks the filter for the playback rate. The Roon ZIP is left out when the filters include subwoofer outputs.
+
+### JRiver Media Center
+
+Tick **JRiver convolution folder** in Output settings. Copy the `JRiver` folder from the export and choose a `.cfg` in **Tools → Options → Audio → DSP Studio & Output Format → Convolution**. The files are named, for example, `DecayCore2.0_441.cfg`, so JRiver switches to the matching file when the playback rate changes. JRiver keeps a loaded filter until it restarts, so restart it after you replace the files.
+
+### HQPlayer
+
+HQPlayer takes one filter per channel and scales it to the playback rate. Export with the Mono layout at the highest rate you play, then load the left and right WAV files in HQPlayer's convolution settings.
 
 ### Equalizer APO
 

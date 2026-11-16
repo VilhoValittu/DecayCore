@@ -10,6 +10,32 @@ This page contains the five latest stable releases. [Older releases and Finnish 
 
 ## [Unreleased]
 
+### Filters ready for Roon and JRiver
+
+Tick Roon convolution ZIP or JRiver convolution folder in Output settings. Each holds your filters for every exported rate, so the player switches to the one that matches playback. Roon takes the ZIP as it is. Filters with subwoofer outputs still need CamillaDSP.
+
+### One target per filter ZIP
+
+A ZIP with all common sample rates now holds one target per channel, at the selected rate, instead of one for every rate. Compare FIRs lists the run once.
+
+### Faster Linear Phase calculation
+
+Linear Phase filters calculate about 25% faster. The filters are unchanged.
+
+### Automatic mode goals now pick different filters
+
+Room-safe now favors less boost and gentler correction, Low-ripple the smoothest bass, and Subwoofers the closest match to the target from 20 to 200 Hz. Before, all three picked the same filter 90% of time as Balanced, which is unchanged. Earlier Automatic results are rebuilt.
+
+## [1.4.5_beta1] - 14-11-2026
+
+### Compare filters inside DecayCore
+
+The new Compare FIRs page puts saved filters side by side in the built-in FIR Compare, with each predicted response against the target the run used. Compare filters on the Results page opens it with the run, or the whole batch, selected.
+
+### Targets saved with your filters
+
+Each filter ZIP now holds the target each channel was designed for, as a REW-compatible text file. Compare FIRs lists runs saved from this version on. Add older filters as WAV files.
+
 ## [1.4.4] - 13-11-2026
 
 ### Intel Macs get their own package

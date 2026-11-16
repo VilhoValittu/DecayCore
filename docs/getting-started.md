@@ -79,7 +79,8 @@ Source checkouts do not include the packaged Automatic mode engine. Use **Basic*
 Download the result ZIP or open the output folder shown on the results page. It contains convolution-ready WAV filters and supporting configuration files.
 
 - **CamillaDSP:** use the generated YAML or load the left and right WAV files into convolution filters.
-- **Roon:** load the ZIP or compatible WAV set in Convolution.
+- **Roon:** tick Roon convolution ZIP in Output settings and load the `Roon_Convolution_...zip` from the export in Convolution.
+- **JRiver:** tick JRiver convolution folder and load the `.cfg` for your rate from the `JRiver` folder.
 - **Equalizer APO:** use the Convolution filter and leave enough preamp headroom.
 
 ### 6. Listen and optionally verify

@@ -48,6 +48,12 @@ The [interactive FIR comparison]({{ '/fir-comparison-demo/' | relative_url }}) p
 
 <p class="action-row"><a class="button button--primary" href="{{ '/fir-comparison-demo/' | relative_url }}">Open the FIR comparison</a></p>
 
+## Compare Automatic goals
+
+The [Automatic goal comparison]({{ '/auto-mode-goals-demo/' | relative_url }}) shows the filters Automatic mode picks with the Balanced, Room-safe, and Low-ripple goals on the same measurement. See how much boost each goal allows and what that costs in target error.
+
+<p class="action-row"><a class="button button--primary" href="{{ '/auto-mode-goals-demo/' | relative_url }}">Open the goal comparison</a></p>
+
 ## Listen first
 
 1. Load the correct Left and Right filters and any required subwoofer or Hybrid IIR stages.
