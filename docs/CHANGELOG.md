@@ -10,13 +10,23 @@ This page contains the five latest stable releases. [Older releases and Finnish 
 
 ## [Unreleased]
 
+## [1.4.5_beta2] - 16-11-2026
+
+### Clearer START page
+
+Pick Standard or All four filter types, tick Automatic tap count for either, then press the one START button. Output settings fold into a one-line summary, and short notes show what each player file changes.
+
 ### Filters ready for Roon and JRiver
 
-Tick Roon convolution ZIP or JRiver convolution folder in Output settings. Each holds your filters for every exported rate, so the player switches to the one that matches playback. Roon takes the ZIP as it is. Filters with subwoofer outputs still need CamillaDSP.
+Tick Roon convolution ZIP or JRiver convolution folder in Output settings. Each holds your filters for every exported rate, so the player switches to the one that matches playback. Roon takes the ZIP as it is. The export then skips the CamillaDSP files, so each filter is saved once. Filters with subwoofer outputs still need CamillaDSP.
 
-### One target per filter ZIP
+### Hybrid IIR only with CamillaDSP alone
 
-A ZIP with all common sample rates now holds one target per channel, at the selected rate, instead of one for every rate. Compare FIRs lists the run once.
+Hybrid IIR can't be ticked while Output settings adds Equalizer APO, PipeWire, HLC, Roon or JRiver files. Those play the FIR alone and would miss the IIR cuts. The setup panel shows when Hybrid IIR is on.
+
+### Equalizer APO, PipeWire and HLC files ticked separately
+
+Output settings now has one box each for the Equalizer APO, PipeWire and HLC convolver files. If you had ticked the shared Equalizer APO and PipeWire box, both stay on. HLC files are no longer added unless you tick them.
 
 ### Faster Linear Phase calculation
 
@@ -25,8 +35,6 @@ Linear Phase filters calculate about 25% faster. The filters are unchanged.
 ### Automatic mode goals now pick different filters
 
 Room-safe now favors less boost and gentler correction, Low-ripple the smoothest bass, and Subwoofers the closest match to the target from 20 to 200 Hz. Before, all three picked the same filter 90% of time as Balanced, which is unchanged. Earlier Automatic results are rebuilt.
-
-## [1.4.5_beta1] - 14-11-2026
 
 ### Compare filters inside DecayCore
 

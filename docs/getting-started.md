@@ -81,7 +81,7 @@ Download the result ZIP or open the output folder shown on the results page. It 
 - **CamillaDSP:** use the generated YAML or load the left and right WAV files into convolution filters.
 - **Roon:** tick Roon convolution ZIP in Output settings and load the `Roon_Convolution_...zip` from the export in Convolution.
 - **JRiver:** tick JRiver convolution folder and load the `.cfg` for your rate from the `JRiver` folder.
-- **Equalizer APO:** use the Convolution filter and leave enough preamp headroom.
+- **Equalizer APO:** tick Equalizer APO file for a ready-made config, use the Convolution filter and leave enough preamp headroom.
 
 ### 6. Listen and optionally verify
 

@@ -18,7 +18,7 @@ You can use automatic target optimization in the packaged app or take control wi
 
 1. **Measure your room.** Use the built-in measurement workflow in the packaged release. Compatible REW-style measurement data can also be used.
 2. **Build your correction.** Choose your target and filter settings, then generate FIR filters from your measurements.
-3. **Load the filters and listen.** Export convolution-ready WAV files for CamillaDSP, Roon convolution, Equalizer APO, MiniDSP, or another FIR-capable DSP engine.
+3. **Load the filters and listen.** Export convolution-ready WAV files for CamillaDSP, Roon convolution, Equalizer APO, or another FIR engine that loads WAV impulse responses. MiniDSP devices need raw `.bin` coefficient files, which DecayCore does not export yet.
 
 The app runs locally on your computer, with controls in your web browser. No cloud service is involved.
 

@@ -154,8 +154,9 @@ Match the sample rate to the playback pipeline. More taps give better low-freque
 
 ### Automate tap count
 
-In packaged builds, open **Additional run options** on **START / Results** and
-choose **Run with automatic tap count**. This generates filters with
+In packaged builds, tick **Automatic tap count** under **Run** on
+**START / Results** and press **START**. It works with **Standard** and with
+**All four filter types**, where each type gets its own tap count. This generates filters with
 the current settings and then shortens their exported support within a strict
 response-error bound: at every frequency the exported filter stays within 1%
 (about 0.09 dB) of the design response, measured against the local response with
@@ -219,7 +220,7 @@ Excess-phase strength controls how much supported phase error is corrected. **Fu
 
 ### Hybrid IIR + FIR
 
-Hybrid IIR can move supported narrow bass cuts into CamillaDSP peaking filters and let FIR handle the remaining broadband magnitude and phase correction. The exported CamillaDSP configuration must include both IIR and FIR stages; loading only the WAV omits the transferred cuts.
+Hybrid IIR can move supported narrow bass cuts into CamillaDSP peaking filters and let FIR handle the remaining broadband magnitude and phase correction. The exported CamillaDSP configuration must include both IIR and FIR stages; loading only the WAV omits the transferred cuts. Hybrid IIR can't be ticked while Output settings adds Equalizer APO, PipeWire, HLC, Roon or JRiver files, because those play the WAV alone. Ticking one of them unticks Hybrid IIR. While Hybrid IIR is on, the setup panel shows a **Hybrid IIR** chip.
 
 ### Bass Integration
 
@@ -246,7 +247,7 @@ The check only reports; it never changes the filter. With a low crossover, an As
 
 ## 7. Generate and read the result
 
-Open **START / Results** and press **START**. For separate results for all four filter types, open **Additional run options** and choose **Run all four filter types**. This runs the full calculation for each type and takes longer than a single run. During an Automatic run, DecayCore may evaluate targets, search preset candidates, refine finalists, and validate the winner. Repeated runs with the same measurements and relevant settings may reuse compatible cache data.
+Open **START / Results** and press **START**. For separate results for all four filter types, choose **All four filter types** under **Run** first. This runs the full calculation for each type and takes longer than a single run. The choice isn't saved, so DecayCore starts with **Standard** next time. During an Automatic run, DecayCore may evaluate targets, search preset candidates, refine finalists, and validate the winner. Repeated runs with the same measurements and relevant settings may reuse compatible cache data.
 
 Review these items before export:
 
@@ -261,7 +262,7 @@ Automatic ranking compares filters made from the same measurements. It is not a 
 
 ### Compare filters
 
-**Compare filters** on the results page opens **Compare FIRs** with the run selected; after **Run all four filter types**, every result of the batch is selected. The page lists saved runs from the filters folder, newest first, and accepts other FIR WAV files. Choose a channel and press **Create comparison**. The built-in FIR Compare saves an HTML report in `Documents/DecayCore/Analyze` and opens it in your browser.
+**Compare filters** on the results page opens **Compare FIRs** with the run selected; after a run of **All four filter types**, every result of the batch is selected. The page lists saved runs from the filters folder, newest first, and accepts other FIR WAV files. Choose a channel and press **Create comparison**. The built-in FIR Compare saves an HTML report in `Documents/DecayCore/Analyze` and opens it in your browser.
 
 With **Include predicted response and target tracking**, each filter is applied to the current WAV measurement and compared with the target saved with the newest selected run. FIR Compare analyzes the full impulse response without DecayCore's IR window, so its numbers can differ from the results page. Its differences are descriptive, not a ranking.
 
@@ -275,6 +276,9 @@ The result ZIP normally includes:
 - `Target_L_...txt` and `Target_R_...txt`: the target each channel was designed for, as REW-compatible text. An all-rates ZIP holds them once, at the selected sample rate
 - CamillaDSP configuration files
 - Sub FIR and crossover settings when Bass Integration is used
+- `Config_...cfg` and `bypass/Bypass_Config_...cfg` for the HLC convolver, when you tick **HLC convolver file** in Output settings
+
+When you tick the Roon ZIP or the JRiver folder and no Equalizer APO, PipeWire or HLC file, the export leaves out the main FIR WAV files and the CamillaDSP files that load them. The Roon ZIP or the JRiver folder then holds the only copy of the filters.
 
 The default output location is `Documents/DecayCore/filters/<version>/`. If it is not writable, the results page reports the fallback location.
 
@@ -296,7 +300,7 @@ HQPlayer takes one filter per channel and scales it to the playback rate. Export
 
 ### Equalizer APO
 
-Load each WAV through Convolution, verify channel assignment, and add enough preamp reduction to prevent clipping.
+Tick **Equalizer APO file** in Output settings for a ready-made config. Load each WAV through Convolution, verify channel assignment, and add enough preamp reduction to prevent clipping.
 
 ## 9. Listen
 
