@@ -10,15 +10,45 @@ This page contains the five latest stable releases. [Older releases and Finnish 
 
 ## [Unreleased]
 
-## [1.4.5_beta2] - 16-11-2026
+## [1.4.5] - 18-11-2026
+
+### Filters for miniDSP
+
+Tick miniDSP files in Output settings. The FIR then corrects phase only, and PEQ filters carry the EQ, including boosts and room-mode cuts. Set how many per output below the box; the default is 10.
+
+The high-pass goes to the plugin's crossover block instead of the FIR. The README gives its type and frequency, and the export adds it as biquad files. Export at the plugin's sample rate. Hybrid IIR and the Equalizer APO, PipeWire, HLC, Roon and JRiver files are unavailable while miniDSP is ticked.
 
 ### Clearer START page
 
-Pick Standard or All four filter types, tick Automatic tap count for either, then press the one START button. Output settings fold into a one-line summary, and short notes show what each player file changes.
+Pick Standard or All four filter types, tick Automatic tap count for either, then press the one START button. Output settings has its own page in the sidebar, just above START. START shows your output choices in one line, and Change… opens the page.
 
 ### Filters ready for Roon and JRiver
 
 Tick Roon convolution ZIP or JRiver convolution folder in Output settings. Each holds your filters for every exported rate, so the player switches to the one that matches playback. Roon takes the ZIP as it is. The export then skips the CamillaDSP files, so each filter is saved once. Filters with subwoofer outputs still need CamillaDSP.
+
+### Compare filters inside DecayCore
+
+The new Compare FIRs page puts saved filters side by side in the built-in FIR Compare, with each predicted response against the target the run used. Compare filters on the Results page opens it with the run, or the whole batch, selected.
+
+### Targets saved with your filters
+
+Each filter ZIP now holds the target each channel was designed for, as a REW-compatible text file. Compare FIRs lists runs saved from this version on. Add older filters as WAV files.
+
+### Automatic mode goals now pick different filters
+
+Room-safe now favors less boost and gentler correction, Low-ripple the smoothest bass, and Subwoofers the closest match to the target from 20 to 200 Hz. Before, all three picked the same filter as Balanced 90% of the time. Balanced is unchanged. Earlier Automatic results are rebuilt.
+
+### Measurements on macOS record to the end
+
+On macOS the microphone could stop a moment into the sweep while playback went on, and the measurement timed out. DecayCore no longer checks audio devices during a measurement, which is what stopped the recording. Thanks to **PaulZH** from ASR-forum for helping solve this.
+
+### Bass phase correction no longer fades run by run
+
+Automatic mode no longer weakens bass phase correction a little more on every run. It could fade to zero, leaving the FIR with no bass phase correction. Earlier Automatic results are rebuilt.
+
+### Full bass from short filters
+
+Short filters no longer roll off the bass. At 2048 taps and 96 kHz they lost about 4 dB at 20 Hz and 25 dB at 5 Hz. Earlier Automatic results are rebuilt.
 
 ### Hybrid IIR only with CamillaDSP alone
 
@@ -31,18 +61,6 @@ Output settings now has one box each for the Equalizer APO, PipeWire and HLC con
 ### Faster Linear Phase calculation
 
 Linear Phase filters calculate about 25% faster. The filters are unchanged.
-
-### Automatic mode goals now pick different filters
-
-Room-safe now favors less boost and gentler correction, Low-ripple the smoothest bass, and Subwoofers the closest match to the target from 20 to 200 Hz. Before, all three picked the same filter 90% of time as Balanced, which is unchanged. Earlier Automatic results are rebuilt.
-
-### Compare filters inside DecayCore
-
-The new Compare FIRs page puts saved filters side by side in the built-in FIR Compare, with each predicted response against the target the run used. Compare filters on the Results page opens it with the run, or the whole batch, selected.
-
-### Targets saved with your filters
-
-Each filter ZIP now holds the target each channel was designed for, as a REW-compatible text file. Compare FIRs lists runs saved from this version on. Add older filters as WAV files.
 
 ## [1.4.4] - 13-11-2026
 

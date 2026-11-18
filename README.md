@@ -1,52 +1,72 @@
+<p align="center">
+  <img src="docs/pics/DecayCore_logo.svg" alt="DecayCore logo" width="96" height="96">
+</p>
+
 # DecayCore — FIR Room Correction and Acoustic Measurement
+
+<p align="center">
+  <a href="https://github.com/VilhoValittu/DecayCore/releases"><strong>Download</strong></a> ·
+  <a href="https://vilhovalittu.github.io/DecayCore/getting-started/">Getting started</a> ·
+  <a href="https://vilhovalittu.github.io/DecayCore/">Documentation</a>
+</p>
+
+![DecayCore result: left-channel target error falls from 2.57 to 1.47 dB RMS](docs/pics/result-response-example.png)
 
 Your speakers play the music. Your room leaves its mark. Bass builds up. Some notes linger. Others disappear at the listening seat.
 
-DecayCore helps you measure what is happening and build FIR correction filters for your system. Measure your room, choose a target, and export filters ready to load into your DSP. The packaged app brings measurement and filter generation together in one workflow, free for non-commercial use.
+DecayCore helps you measure what is happening and build FIR correction filters for your system. Measure your room, choose a target, and export filters ready to load into your DSP. The app runs locally on your computer, with controls in your web browser. No cloud service is involved.
 
-**[Download DecayCore](https://github.com/VilhoValittu/DecayCore/releases)** · [Getting started](https://vilhovalittu.github.io/DecayCore/getting-started/) · [Documentation](https://vilhovalittu.github.io/DecayCore/)
+> DecayCore was formerly called CamillaFIR. The name changed to avoid confusion with CamillaDSP; full CamillaDSP compatibility remains.
+
+## At a glance
+
+| | |
+| --- | --- |
+| **Measure** | Guided sweeps with RT60 and harmonic distortion in the packaged release, or REW text exports and impulse-response WAV files |
+| **Correct** | Linear, Minimum, Mixed and Asymmetric phase FIR. Automatic, Basic and Advanced modes |
+| **Protect** | Cuts first, limited boost only where the measurement supports it, guarded deep nulls, Temporal Decay Control for lingering bass |
+| **Export** | WAV impulse responses for CamillaDSP, Roon, Equalizer APO and other convolvers. miniDSP: phase FIR plus PEQ biquads |
 
 ## Correction with restraint
 
 A deep dip in a measurement can tempt you to turn up the gain. Room acoustics rarely makes it that simple.
 
-DecayCore puts controlled cuts first. It keeps correction within defined frequency bands and allows limited boost only where the measurement supports it. Deep nulls and uncertain regions are guarded against excessive correction.
-
-You can use automatic target optimization in the packaged app or take control with Basic and Advanced manual filtering. Linear Phase, Minimum Phase, Mixed Phase and Asymmetric FIR filters let you choose an approach for your system. Phase-aware correction and Temporal Decay Control add tools for addressing timing and low-frequency decay.
+DecayCore puts controlled cuts first. It keeps correction within defined frequency bands and allows limited boost only where the measurement supports it. Deep nulls and uncertain regions are guarded against excessive correction. Phase-aware correction and Temporal Decay Control add tools for addressing timing and low-frequency decay.
 
 ## From measurement to playback
 
 1. **Measure your room.** Use the built-in measurement workflow in the packaged release. Compatible REW-style measurement data can also be used.
 2. **Build your correction.** Choose your target and filter settings, then generate FIR filters from your measurements.
-3. **Load the filters and listen.** Export convolution-ready WAV files for CamillaDSP, Roon convolution, Equalizer APO, or another FIR engine that loads WAV impulse responses. MiniDSP devices need raw `.bin` coefficient files, which DecayCore does not export yet.
+3. **Load the filters and listen.** Export convolution-ready WAV files for CamillaDSP, Roon convolution, Equalizer APO, or another FIR engine that loads WAV impulse responses. For MiniDSP, tick the miniDSP files in Output settings: the FIR then corrects phase only, and PEQ biquad text carries the EQ.
 
-The app runs locally on your computer, with controls in your web browser. No cloud service is involved.
+You need a calibrated measurement microphone, a way to play the measurement sweep, and a playback system that accepts FIR convolution filters.
 
-## Choose your version
+## Supported platforms
 
-**The packaged release** includes integrated measurement and the native Rust Automatic mode decision engine. Download it from [GitHub Releases](https://github.com/VilhoValittu/DecayCore/releases) for the complete workflow.
+| Platform | Release package |
+| --- | --- |
+| Windows x64 | `DecayCore_<version>_windows.7z` |
+| Ubuntu / Debian, Arch Linux (x86_64) | `DecayCore_<version>_linux.7z` |
+| Raspberry Pi 4/5, 64-bit ARM Linux | `DecayCore_<version>_linux_arm64.7z` |
+| macOS Apple silicon / Intel | `DecayCore_<version>_macos_arm64.7z` / `_macos_x86_64.7z` |
 
-**The public source** is frozen at version 1.2.5. It is source-available for non-commercial use and provides filter generation with Basic and Advanced manual controls. Releases after 1.2.5 are built from a private repository. Their source code is not published, and they are proprietary software that is free for non-commercial use under the license included in each download. The measurement engine, automatic-mode decision engine, and related packaged workflows are not included in the public source tree. See the [source repository](https://github.com/VilhoValittu/DecayCore) and the license terms below.
-
-> DecayCore was formerly called CamillaFIR. The name changed to avoid confusion with CamillaDSP; full CamillaDSP compatibility remains.
+See the [Installation guide](https://vilhovalittu.github.io/DecayCore/installation/) for first-launch steps.
 
 ## Screenshots
 
-![Setup tab with the current setup and Choose files button in the sidebar](docs/pics/ui_1.png)
+| | |
+| --- | --- |
+| ![Measure tab: configure capture devices and run guided room measurements](docs/pics/ui_2.png)<br>**Measure** | ![Target tab: shape the target curve, leveling and gain behavior](docs/pics/ui_4.png)<br>**Target** |
+| ![Advanced tab: refine correction shaping, bass protection and confidence controls](docs/pics/ui_5.png)<br>**Advanced** | ![IR Window & Decay Control tab: control export windowing and temporal processing](docs/pics/ui_6.png)<br>**IR Window & Decay Control** |
 
-![Measure tab — configure capture devices and run guided room measurements](docs/pics/ui_2.png)
+<details>
+<summary>More screenshots: Setup and XO</summary>
 
-![Setup tab — choose operating mode, FIR engine, and sample rate](docs/pics/ui_3.png)
+![Setup tab: choose operating mode, FIR engine and sample rate](docs/pics/ui_3.png)
 
-![Target tab — shape the target curve, leveling, and gain behavior](docs/pics/ui_4.png)
+![XO tab: define crossover filters between bands](docs/pics/ui_7.png)
 
-![Advanced tab — refine correction shaping, bass protection, and confidence controls](docs/pics/ui_5.png)
-
-![IR Window & Decay Control tab — control export windowing and temporal processing](docs/pics/ui_6.png)
-
-![XO tab — define crossover filters between bands](docs/pics/ui_7.png)
-
-![Start / Results tab before speaker measurements are loaded](docs/pics/ui_8.png)
+</details>
 
 ## Documentation
 
@@ -57,11 +77,7 @@ The app runs locally on your computer, with controls in your web browser. No clo
 - [Glossary](https://vilhovalittu.github.io/DecayCore/glossary/)
 - [FAQ](https://vilhovalittu.github.io/DecayCore/faq/)
 
-## Download
-
-Ready to hear what correction can do in your room?
-
-[Download the packaged app](https://github.com/VilhoValittu/DecayCore/releases) and follow the [getting started guide](https://vilhovalittu.github.io/DecayCore/getting-started/).
+To compare exported filters side by side, use the separate [FIR Compare](https://github.com/VilhoValittu/FIR-Compare/releases) tool.
 
 ## Contact
 

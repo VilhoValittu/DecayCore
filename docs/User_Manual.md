@@ -220,7 +220,7 @@ Excess-phase strength controls how much supported phase error is corrected. **Fu
 
 ### Hybrid IIR + FIR
 
-Hybrid IIR can move supported narrow bass cuts into CamillaDSP peaking filters and let FIR handle the remaining broadband magnitude and phase correction. The exported CamillaDSP configuration must include both IIR and FIR stages; loading only the WAV omits the transferred cuts. Hybrid IIR can't be ticked while Output settings adds Equalizer APO, PipeWire, HLC, Roon or JRiver files, because those play the WAV alone. Ticking one of them unticks Hybrid IIR. While Hybrid IIR is on, the setup panel shows a **Hybrid IIR** chip.
+Hybrid IIR can move supported narrow bass cuts into CamillaDSP peaking filters and let FIR handle the remaining broadband magnitude and phase correction. The exported CamillaDSP configuration must include both IIR and FIR stages; loading only the WAV omits the transferred cuts. Hybrid IIR can't be ticked while Output settings adds Equalizer APO, PipeWire, HLC, Roon or JRiver files, because those play the FIR alone. The miniDSP files carry the cuts in their PEQ filters. Ticking one of them unticks Hybrid IIR. While Hybrid IIR is on, the setup panel shows a **Hybrid IIR** chip.
 
 ### Bass Integration
 
@@ -277,6 +277,7 @@ The result ZIP normally includes:
 - CamillaDSP configuration files
 - Sub FIR and crossover settings when Bass Integration is used
 - `Config_...cfg` and `bypass/Bypass_Config_...cfg` for the HLC convolver, when you tick **HLC convolver file** in Output settings
+- `MiniDSP/` with one `.bin` FIR file per output, the PEQ filters as `_PEQ.txt` biquad files and a short loading note, when you tick **miniDSP files (FIR .bin, PEQ .txt)** in Output settings
 
 When you tick the Roon ZIP or the JRiver folder and no Equalizer APO, PipeWire or HLC file, the export leaves out the main FIR WAV files and the CamillaDSP files that load them. The Roon ZIP or the JRiver folder then holds the only copy of the filters.
 
@@ -301,6 +302,20 @@ HQPlayer takes one filter per channel and scales it to the playback rate. Export
 ### Equalizer APO
 
 Tick **Equalizer APO file** in Output settings for a ready-made config. Load each WAV through Convolution, verify channel assignment, and add enough preamp reduction to prevent clipping.
+
+### miniDSP
+
+miniDSP plugins don't load WAV files and run short FIR blocks next to a PEQ bank. Tick **miniDSP files (FIR .bin, PEQ .txt)** in Output settings before the run. The run then changes how the filter is built:
+
+- The main-channel FIR corrects phase and group delay only, so all of its taps go to timing.
+- The magnitude correction moves to peaking filters, cuts and boosts, fitted to the same safe correction curve the FIR would have used. Every boost limit still applies. Hybrid IIR cuts, when on, count toward the same filter budget.
+- **miniDSP PEQ filters / output** in Advanced → Hybrid IIR tuning sets the budget, 10 by default to match the 2x4 HD.
+- Below 65,536 taps the PEQ is fitted on a 65,536-tap design grid, so a short FIR doesn't limit the EQ resolution.
+- The FIR carries the attenuation the largest boost needs, so the FIR and PEQ together don't clip.
+- Equalizer APO, PipeWire, HLC, Roon and JRiver files are unavailable, because they would play the FIR without any EQ. The CamillaDSP file carries the same PEQ.
+- Subwoofer outputs keep their EQ in the FIR.
+
+Set the sample rate to the fixed rate your plugin runs at, for example 96 kHz on the 2x4 HD, and choose no more taps than its FIR block allows for each output. Load each `.bin` from the `MiniDSP` folder into the FIR block of the matching output, and each `_PEQ.txt` into the PEQ bank of the same output with the plugin's advanced biquad import. Without the PEQ files the correction has no EQ at all. With subwoofers, set the crossover, delay, gain and polarity in the plugin's own blocks, using the values in the CamillaDSP file. Choose Mixed Phase, Asymmetric or Linear Phase: Minimum Phase has no phase correction left for the FIR to do.
 
 ## 9. Listen
 

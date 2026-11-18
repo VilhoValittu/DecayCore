@@ -17,7 +17,7 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
       <p class="eyebrow">Room measurement and FIR correction</p>
       <h1>Measure the room.<br><span>Reveal the music.</span></h1>
       <p class="hero__lead">You know that bass note that seems to turn up on every record? Your room may have a favourite. DecayCore measures your speakers in your listening room and creates FIR correction filters to help bring things back into balance.</p>
-      <p class="hero__copy">Export WAV filters for CamillaDSP, Roon, Equalizer APO, and other convolvers that load WAV impulse responses.</p>
+      <p class="hero__copy">Export WAV filters for CamillaDSP, Roon, Equalizer APO, and other WAV convolvers, or FIR and PEQ files for MiniDSP.</p>
       <div class="action-row">
         <a class="button button--primary" href="https://github.com/VilhoValittu/DecayCore/releases/latest">Download DecayCore</a>
         <a class="button" href="{{ '/getting-started/' | relative_url }}">Create your first filter</a>
@@ -41,6 +41,7 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
       <li>CamillaDSP</li>
       <li>Roon</li>
       <li>Equalizer APO</li>
+      <li>MiniDSP</li>
       <li>Other FIR convolvers</li>
     </ul>
   </div>
