@@ -2,6 +2,7 @@
 title: DecayCore Stability and Reproducibility
 description: Explain DecayCore's deterministic pipeline, bounded correction, input robustness, comparable evaluation, phase safeguards, and audit trail.
 hide_page_heading: true
+permalink: /how-it-works/stability/
 ---
 
 # Stability and Reproducibility

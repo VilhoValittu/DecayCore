@@ -2,6 +2,7 @@
 title: DecayCore Modes - AUTO vs BASIC vs ADVANCED
 description: Reference for DecayCore AUTO, BASIC, and ADVANCED operating policies, defaults, controls, target selection, and safety clamps.
 hide_page_heading: true
+permalink: /manual/modes/
 ---
 
 # DecayCore Modes: AUTO vs BASIC vs ADVANCED

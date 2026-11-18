@@ -2,6 +2,7 @@
 title: DecayCore DSP Guards Reference
 description: Reference for DecayCore's acoustic correction limits, phase and pre-ringing guards, numerical safeguards, dependency clusters, and operational triggers.
 hide_page_heading: true
+permalink: /how-it-works/guards/
 ---
 
 # DecayCore DSP Guards Reference

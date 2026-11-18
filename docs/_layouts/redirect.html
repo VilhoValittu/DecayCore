@@ -4,13 +4,15 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ page.title }} | {{ site.title }}</title>
+    <meta name="robots" content="noindex">
     <link rel="canonical" href="{{ page.redirect_to | absolute_url }}">
+    <script>location.replace({{ page.redirect_to | relative_url | jsonify }} + location.hash);</script>
     <meta http-equiv="refresh" content="0; url={{ page.redirect_to | relative_url }}">
   </head>
   <body>
     <main>
       <h1>{{ page.title }}</h1>
-      <p>This guide has moved to <a href="{{ page.redirect_to | relative_url }}">Getting Started</a>.</p>
+      <p>This page has moved to <a href="{{ page.redirect_to | relative_url }}">{{ page.redirect_to | absolute_url }}</a>.</p>
     </main>
   </body>
 </html>

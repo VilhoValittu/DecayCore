@@ -15,6 +15,7 @@ plugins:
 header_pages:
   - getting-started.md
   - User_Manual.md
+  - playback.md
   - engineering.md
   - results.md
 

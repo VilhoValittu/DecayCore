@@ -55,6 +55,6 @@ Ordinary REW frequency-response text exports do not carry recorded decay. A suit
 ## Related pages
 
 - [Getting Started]({{ '/getting-started/' | relative_url }})
-- [Modes: AUTO, BASIC, ADVANCED]({{ '/Modes.html' | relative_url }})
+- [Modes: AUTO, BASIC, ADVANCED]({{ '/manual/modes/' | relative_url }})
 - [Built-in Measurement]({{ '/measurement-workflow/' | relative_url }})
-- [Technical Reference — Target formation]({{ '/Official_Manual.html' | relative_url }})
+- [Technical Reference — Target formation]({{ '/how-it-works/pipeline/' | relative_url }})

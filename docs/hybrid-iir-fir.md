@@ -75,6 +75,6 @@ These parameters are available in the Advanced tab under the hybrid IIR tuning s
 ## Related pages
 
 - [FIR Room Correction]({{ '/fir-room-correction/' | relative_url }})
-- [CamillaDSP FIR Room Correction]({{ '/camilladsp-fir-room-correction/' | relative_url }})
-- [Technical Reference — Hybrid IIR + FIR]({{ '/Official_Manual.html' | relative_url }})
+- [CamillaDSP FIR Room Correction]({{ '/playback/camilladsp/' | relative_url }})
+- [Technical Reference — Hybrid IIR + FIR]({{ '/how-it-works/pipeline/' | relative_url }})
 - [Temporal Decay Control]({{ '/temporal-decay-control/' | relative_url }})

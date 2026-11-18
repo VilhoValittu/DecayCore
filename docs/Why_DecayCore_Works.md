@@ -2,6 +2,7 @@
 title: Why DecayCore Works
 description: Practical explanation of DecayCore's time-domain-first alignment, confidence weighting, DSP guardrails, phase safety, and temporal decay control.
 hide_page_heading: true
+permalink: /how-it-works/why/
 ---
 
 # Why DecayCore Works

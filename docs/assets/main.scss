@@ -1453,3 +1453,27 @@ a:hover {
     transition: none !important;
   }
 }
+
+/* ---------- Playback ---------- */
+
+.doc-card__tag {
+  display: inline-block;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--kicker);
+  color: var(--surface);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 1px 9px;
+  vertical-align: middle;
+}
+
+.chips a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.chips a:hover {
+  text-decoration: underline;
+}

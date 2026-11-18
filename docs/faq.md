@@ -15,7 +15,7 @@ Yes. The name changed from CamillaFIR to DecayCore to avoid confusion with Camil
 
 ## Does DecayCore work only with CamillaDSP?
 
-No. CamillaDSP is one option. You can also load the generated filters into other convolution engines that accept compatible WAV impulse responses. Check the required format, sample rate, and channel routing for your player before loading them.
+No. CamillaDSP is one option. DecayCore also writes ready-made files for Roon, JRiver Media Center, Equalizer APO, PipeWire and the HLC convolver, and FIR and PEQ files for miniDSP plugins such as the 2x4 HD. HQPlayer and other convolvers take the WAV filters directly. [Playback]({{ '/playback/' | relative_url }}) has a loading guide for each.
 
 ## Is DecayCore mainly a boost tool?
 
@@ -45,7 +45,7 @@ Open **About DecayCore → Maintenance**. Use **Clear automatic-mode caches** fo
 
 To report a problem, tick **Save a log file** in **About DecayCore**, repeat the steps, and click **Email the log**. Your email app opens a draft to the developer with the end of the log. An email link cannot attach files, so attach the file named in the message, the newest one in `Documents/DecayCore/logs`. On macOS this is also the way to get the log, because `Start_Decay.command` hides the terminal output.
 
-If the app does not start, use the platform cleanup script in `config_delete/`. [Configuration and Data Paths]({{ '/paths.html#resetting-caches-and-configuration-troubleshooting' | relative_url }}) lists the affected files.
+If the app does not start, use the platform cleanup script in `config_delete/`. [Configuration and Data Paths]({{ '/manual/paths/#resetting-caches-and-configuration-troubleshooting' | relative_url }}) lists the affected files.
 
 ## Is DecayCore open source?
 

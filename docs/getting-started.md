@@ -18,7 +18,7 @@ Let's get your first pair of filters playing. Pick a few recordings you know wel
 7. Export and load the filters into your convolver.
 8. Listen to familiar music. Keep the comparison level-matched. Do not keep a filter just because its graph looks better.
 
-> **Need more detail?** Use the [Measurement guide]({{ '/measurement-workflow/' | relative_url }}), [Installation guide]({{ '/installation/' | relative_url }}), or the complete [User Manual]({{ '/User_Manual.html' | relative_url }}).
+> **Need more detail?** Use the [Measurement guide]({{ '/measurement-workflow/' | relative_url }}), [Installation guide]({{ '/installation/' | relative_url }}), or the complete [User Manual]({{ '/manual/' | relative_url }}).
 
 ## Detailed steps
 
@@ -82,6 +82,10 @@ Download the result ZIP or open the output folder shown on the results page. It 
 - **Roon:** tick Roon convolution ZIP in Output settings and load the `Roon_Convolution_...zip` from the export in Convolution.
 - **JRiver:** tick JRiver convolution folder and load the `.cfg` for your rate from the `JRiver` folder.
 - **Equalizer APO:** tick Equalizer APO file for a ready-made config, use the Convolution filter and leave enough preamp headroom.
+- **HQPlayer:** export with the Mono layout at the highest rate you play and load the left and right WAV files.
+- **miniDSP:** tick miniDSP files, load each `.bin` into the FIR block and each `_PEQ.txt` into the PEQ bank of the same output.
+
+[Playback]({{ '/playback/' | relative_url }}) has step-by-step guides for every player.
 
 ### 6. Listen and optionally verify
 
@@ -95,6 +99,6 @@ DecayCore does not include exported filters in its own measurement path. Measuri
 
 ## Next steps
 
-- [User Manual]({{ '/User_Manual.html' | relative_url }}) — settings, outputs, deployment, and troubleshooting
-- [Reading DecayCore Output]({{ '/DecayCore_Reading_Output_Guide.html' | relative_url }}) — result graphs and summary fields
+- [User Manual]({{ '/manual/' | relative_url }}) — settings, outputs, deployment, and troubleshooting
+- [Reading DecayCore Output]({{ '/manual/reading-output/' | relative_url }}) — result graphs and summary fields
 - [How DecayCore works]({{ '/how-it-works/' | relative_url }}) — correction principles and technical references

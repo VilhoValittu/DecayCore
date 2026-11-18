@@ -40,4 +40,4 @@ Balanced tracks the target most closely and uses the most boost. Room-safe and L
 
 These plots describe one measured example. Lower target error or less boost does not by itself establish better audible performance. Check headroom and safety first, then compare filters at matched playback level with familiar recordings.
 
-To choose a goal for your own system, see [Choose the operating mode]({{ '/User_Manual.html' | relative_url }}#3-choose-the-operating-mode) in the manual.
+To choose a goal for your own system, see [Choose the operating mode]({{ '/manual/' | relative_url }}#3-choose-the-operating-mode) in the manual.

@@ -2,6 +2,7 @@
 title: Reading DecayCore Output
 description: Interpret DecayCore result files, plots, metrics, confidence indicators, target selection, and automatic-mode decision summaries.
 hide_page_heading: true
+permalink: /manual/reading-output/
 ---
 
 # Reading DecayCore Output

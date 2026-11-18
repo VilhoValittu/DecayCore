@@ -2,6 +2,7 @@
 title: DecayCore Configuration and Data Paths
 description: Locate DecayCore configuration, automatic-mode caches, optimization journals, measurement files, logs, and exports on each supported platform.
 hide_page_heading: true
+permalink: /manual/paths/
 ---
 
 # DecayCore Configuration and Data Paths

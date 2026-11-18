@@ -29,4 +29,4 @@ Use TDC when repeatable measurements show excessive low-frequency decay. Leave i
 - [Measurement workflow]({{ '/measurement-workflow/' | relative_url }})
 - [FIR room correction]({{ '/fir-room-correction/' | relative_url }})
 - [Mixed Phase Room Correction]({{ '/mixed-phase-room-correction/' | relative_url }})
-- [CamillaDSP FIR room correction]({{ '/camilladsp-fir-room-correction/' | relative_url }})
+- [CamillaDSP FIR room correction]({{ '/playback/camilladsp/' | relative_url }})

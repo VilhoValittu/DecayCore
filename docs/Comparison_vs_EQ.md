@@ -2,6 +2,7 @@
 title: DecayCore vs Conventional EQ-Based Room Correction
 description: Compare DecayCore's bounded FIR workflow with magnitude-only parametric EQ.
 hide_page_heading: true
+permalink: /how-it-works/vs-eq/
 ---
 
 # DecayCore vs Conventional EQ-Based Room Correction
@@ -32,4 +33,4 @@ PEQ filters change level at selected frequencies. A magnitude plot alone does no
 
 Compare at matched playback level. Check whether bass notes decay more evenly and whether voices and transients still sound natural. A flatter magnitude plot alone cannot establish which filter sounds better.
 
-For operating guidance, see [Getting Started]({{ '/getting-started/' | relative_url }}). For the engineering rationale, see [Why DecayCore Works]({{ '/Why_DecayCore_Works.html' | relative_url }}).
+For operating guidance, see [Getting Started]({{ '/getting-started/' | relative_url }}). For the engineering rationale, see [Why DecayCore Works]({{ '/how-it-works/why/' | relative_url }}).

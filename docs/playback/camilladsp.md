@@ -1,7 +1,7 @@
 ---
 title: CamillaDSP FIR Room Correction with DecayCore
 description: Generate and deploy DecayCore FIR filters and optional Hybrid IIR stages in CamillaDSP.
-permalink: /camilladsp-fir-room-correction/
+permalink: /playback/camilladsp/
 ---
 
 ## How does DecayCore work with CamillaDSP?
@@ -12,4 +12,4 @@ If Hybrid IIR is active, use both the exported peaking filters and the FIR convo
 
 Start at a low volume and listen to familiar music. Compare with bypass at the same volume. The graphs can help find problems, but your ears make the final decision.
 
-Use [Getting Started]({{ '/getting-started/' | relative_url }}) for filter creation, the [User Manual]({{ '/User_Manual.html' | relative_url }}) for deployment, and [Results]({{ '/results/' | relative_url }}) for optional measurement through CamillaDSP.
+For other players, see [all players]({{ '/playback/' | relative_url }}). Use [Getting Started]({{ '/getting-started/' | relative_url }}) for filter creation, the [User Manual]({{ '/manual/' | relative_url }}) for deployment, and [Results]({{ '/results/' | relative_url }}) for optional measurement through CamillaDSP.

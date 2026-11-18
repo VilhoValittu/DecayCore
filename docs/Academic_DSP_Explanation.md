@@ -2,6 +2,7 @@
 title: DecayCore Time-Domain-First FIR Room Correction
 description: Mathematical and implementation rationale for DecayCore measurement alignment, confidence weighting, correction shaping, phase control, and FIR synthesis.
 hide_page_heading: true
+permalink: /how-it-works/math/
 ---
 
 # DecayCore: Time-Domain-First FIR Room Correction
@@ -214,5 +215,5 @@ DecayCore stability is based on layered constraints:
 ## Implementation Details
 The stability of DecayCore is based on layered constraints and confidence-aware smoothing.
 
-- [DecayCore vs conventional EQ]({{ '/Comparison_vs_EQ.html' | relative_url }}) — how these principles change the correction workflow
-- [Technical Reference]({{ '/Official_Manual.html' | relative_url }}) — pipeline stages, controls, and exports
+- [DecayCore vs conventional EQ]({{ '/how-it-works/vs-eq/' | relative_url }}) — how these principles change the correction workflow
+- [Technical Reference]({{ '/how-it-works/pipeline/' | relative_url }}) — pipeline stages, controls, and exports

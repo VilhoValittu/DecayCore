@@ -11,11 +11,11 @@ If you have ever moved a speaker a few centimetres and then listened to the same
 
 <div class="doc-grid doc-grid--two">
   <section class="doc-card">
-    <h3><a href="{{ '/Why_DecayCore_Works.html' | relative_url }}">Why DecayCore Works</a></h3>
+    <h3><a href="{{ '/how-it-works/why/' | relative_url }}">Why DecayCore Works</a></h3>
     <p>Why some peaks are worth cutting, some dips are best left alone, and your amplifier deserves a little breathing room.</p>
   </section>
   <section class="doc-card">
-    <h3><a href="{{ '/Comparison_vs_EQ.html' | relative_url }}">DecayCore vs conventional EQ</a></h3>
+    <h3><a href="{{ '/how-it-works/vs-eq/' | relative_url }}">DecayCore vs conventional EQ</a></h3>
     <p>What looking at timing and decay adds to the familiar job of adjusting frequency response.</p>
   </section>
   <section class="doc-card">
@@ -27,8 +27,25 @@ If you have ever moved a speaker a few centimetres and then listened to the same
     <p>How the measurements from both speakers guide small changes to the bass target.</p>
   </section>
   <section class="doc-card">
-    <h3><a href="{{ '/User_Manual.html#4-choose-the-target-and-filter-type' | relative_url }}">Filter types</a></h3>
+    <h3><a href="{{ '/manual/#4-choose-the-target-and-filter-type' | relative_url }}">Filter types</a></h3>
     <p>When to use Asymmetric, Minimum Phase, Mixed Phase, or Linear Phase correction.</p>
+  </section>
+</div>
+
+## Filter strategies
+
+<div class="doc-grid">
+  <section class="doc-card">
+    <h3><a href="{{ '/fir-room-correction/' | relative_url }}">FIR room correction</a></h3>
+    <p>When FIR correction helps, and how measurements become convolution filters.</p>
+  </section>
+  <section class="doc-card">
+    <h3><a href="{{ '/mixed-phase-room-correction/' | relative_url }}">Mixed Phase</a></h3>
+    <p>Bounded excess-phase correction, and when it is worth the extra care.</p>
+  </section>
+  <section class="doc-card">
+    <h3><a href="{{ '/minimum-phase-fir-generator/' | relative_url }}">Minimum Phase</a></h3>
+    <p>The low-latency choice, and what it leaves uncorrected.</p>
   </section>
 </div>
 
@@ -36,7 +53,7 @@ If you have ever moved a speaker a few centimetres and then listened to the same
 
 <div class="doc-grid">
   <section class="doc-card">
-    <h3><a href="{{ '/Modes.html' | relative_url }}">AUTO, BASIC, and ADVANCED</a></h3>
+    <h3><a href="{{ '/manual/modes/' | relative_url }}">AUTO, BASIC, and ADVANCED</a></h3>
     <p>Let Automatic find a starting point, use Basic for manual adjustment, or get into the details with Advanced.</p>
   </section>
   <section class="doc-card">
@@ -49,19 +66,19 @@ If you have ever moved a speaker a few centimetres and then listened to the same
 
 <div class="doc-grid">
   <section class="doc-card">
-    <h3><a href="{{ '/Official_Manual.html' | relative_url }}">DSP pipeline</a></h3>
+    <h3><a href="{{ '/how-it-works/pipeline/' | relative_url }}">DSP pipeline</a></h3>
     <p>The processing stages, control roles, phase strategies, synthesis, export, and cache contract.</p>
   </section>
   <section class="doc-card">
-    <h3><a href="{{ '/Academic_DSP_Explanation.html' | relative_url }}">Mathematical model</a></h3>
+    <h3><a href="{{ '/how-it-works/math/' | relative_url }}">Mathematical model</a></h3>
     <p>Equations for alignment, confidence, magnitude shaping, phase construction, TDC, and FIR synthesis.</p>
   </section>
   <section class="doc-card">
-    <h3><a href="{{ '/DecayCore_dsp_guards.html' | relative_url }}">DSP guards</a></h3>
+    <h3><a href="{{ '/how-it-works/guards/' | relative_url }}">DSP guards</a></h3>
     <p>The limits that keep correction strength, timing, and the underlying calculations under control.</p>
   </section>
   <section class="doc-card">
-    <h3><a href="{{ '/Stability_and_Reproducibility.html' | relative_url }}">Stability and reproducibility</a></h3>
+    <h3><a href="{{ '/how-it-works/stability/' | relative_url }}">Stability and reproducibility</a></h3>
     <p>Requirements for comparable runs and the diagnostics used to explain differences.</p>
   </section>
 </div>
@@ -70,4 +87,4 @@ If you have ever moved a speaker a few centimetres and then listened to the same
 
 - [Glossary]({{ '/glossary/' | relative_url }}) — short definitions for the terms used across these pages
 
-For application steps rather than engineering detail, use the [User Manual]({{ '/User_Manual.html' | relative_url }}).
+For application steps rather than engineering detail, use the [User Manual]({{ '/manual/' | relative_url }}).

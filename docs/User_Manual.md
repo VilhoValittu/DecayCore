@@ -3,6 +3,7 @@ title: DecayCore User Manual
 nav_title: Manual
 description: Practical instructions for measuring, creating, exporting, deploying, and troubleshooting DecayCore FIR filters.
 toc: manual
+permalink: /manual/
 ---
 
 This manual follows the work you do in DecayCore: prepare measurements, choose a workflow, generate filters, inspect the result, and deploy it safely.
@@ -144,6 +145,8 @@ In Basic and Advanced modes, select the target directly on **Target**. A mild ho
 | **Mixed Phase** | You want bounded excess-phase correction in a selected band. | Needs careful phase limits and verification. |
 | **Linear Phase** | Linear-phase behavior matters more than latency. | Long filters can add latency and energy before the main impulse. |
 
+[Mixed Phase](https://vilhovalittu.github.io/DecayCore/mixed-phase-room-correction/) and [Minimum Phase](https://vilhovalittu.github.io/DecayCore/minimum-phase-fir-generator/) have their own pages on the website.
+
 ## 5. Set practical limits
 
 For a first run, leave mode defaults in place. These controls matter most when diagnosing or comparing results.
@@ -283,6 +286,8 @@ When you tick the Roon ZIP or the JRiver folder and no Equalizer APO, PipeWire o
 
 The default output location is `Documents/DecayCore/filters/<version>/`. If it is not writable, the results page reports the fallback location.
 
+Step-by-step guides for each player are on the website under [Playback](https://vilhovalittu.github.io/DecayCore/playback/).
+
 ### CamillaDSP
 
 Use the generated YAML when possible, or add each WAV to the correct convolution channel. Hybrid IIR requires the exported peaking filters as well as the FIR stage. Confirm sample rate, channel routing, and gain.
@@ -308,14 +313,14 @@ Tick **Equalizer APO file** in Output settings for a ready-made config. Load eac
 miniDSP plugins don't load WAV files and run short FIR blocks next to a PEQ bank. Tick **miniDSP files (FIR .bin, PEQ .txt)** in Output settings before the run. The run then changes how the filter is built:
 
 - The main-channel FIR corrects phase and group delay only, so all of its taps go to timing.
-- The magnitude correction moves to peaking filters, cuts and boosts, fitted to the same safe correction curve the FIR would have used. Every boost limit still applies. Hybrid IIR cuts, when on, count toward the same filter budget.
+- The magnitude correction moves to peaking filters, cuts and boosts, fitted to the same safe correction curve the FIR would have used. Every boost limit still applies, and narrow room-mode cuts are part of the same filters.
 - **miniDSP PEQ filters / output** in Advanced → Hybrid IIR tuning sets the budget, 10 by default to match the 2x4 HD.
 - Below 65,536 taps the PEQ is fitted on a 65,536-tap design grid, so a short FIR doesn't limit the EQ resolution.
 - The FIR carries the attenuation the largest boost needs, so the FIR and PEQ together don't clip.
 - Equalizer APO, PipeWire, HLC, Roon and JRiver files are unavailable, because they would play the FIR without any EQ. The CamillaDSP file carries the same PEQ.
 - Subwoofer outputs keep their EQ in the FIR.
 
-Set the sample rate to the fixed rate your plugin runs at, for example 96 kHz on the 2x4 HD, and choose no more taps than its FIR block allows for each output. Load each `.bin` from the `MiniDSP` folder into the FIR block of the matching output, and each `_PEQ.txt` into the PEQ bank of the same output with the plugin's advanced biquad import. Without the PEQ files the correction has no EQ at all. With subwoofers, set the crossover, delay, gain and polarity in the plugin's own blocks, using the values in the CamillaDSP file. Choose Mixed Phase, Asymmetric or Linear Phase: Minimum Phase has no phase correction left for the FIR to do.
+Set the sample rate to the fixed rate your plugin runs at, for example 96 kHz on the 2x4 HD. The four outputs of a 2x4 HD or Flex share 4,096 FIR taps, so DecayCore shortens a longer tap setting for the run: 2,042 taps per output for left and right, 1,362 with one subwoofer, 1,024 with two. Your saved tap setting stays as it is. Output settings, Setup and START show the limit. Load each `.bin` from the `MiniDSP` folder into the FIR block of the matching output, and each `_PEQ.txt` into the PEQ bank of the same output with the plugin's advanced biquad import. Without the PEQ files the correction has no EQ at all. With subwoofers, set the crossover, delay, gain and polarity in the plugin's own blocks, using the values in the CamillaDSP file. Choose Mixed Phase, Asymmetric or Linear Phase: Minimum Phase has no phase correction left for the FIR to do.
 
 ## 9. Listen
 

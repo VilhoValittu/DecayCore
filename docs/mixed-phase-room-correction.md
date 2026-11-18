@@ -17,4 +17,4 @@ Mixed Phase asks for more judgment than Minimum Phase. Correction strength, full
 
 Start with the mode defaults and check the final impulse and group delay for obvious problems. Then listen. Use **Asymmetric** when you want the normal starting point without tuning mixed-phase controls yourself.
 
-Read the [Technical Reference]({{ '/Official_Manual.html' | relative_url }}) for the phase pipeline or [Getting Started]({{ '/getting-started/' | relative_url }}) for the normal workflow.
+Read the [Technical Reference]({{ '/how-it-works/pipeline/' | relative_url }}) for the phase pipeline or [Getting Started]({{ '/getting-started/' | relative_url }}) for the normal workflow.

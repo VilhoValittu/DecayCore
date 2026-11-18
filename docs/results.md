@@ -40,7 +40,7 @@ Check these before playback:
 | **Impulse** | Controlled energy around the main peak, especially for linear- and mixed-phase filters. |
 | **Summary** | The intended mode, target, filter type, limits, and Automatic winner details. |
 
-[Open the complete Reading DecayCore Output guide]({{ '/DecayCore_Reading_Output_Guide.html' | relative_url }}).
+[Open the complete Reading DecayCore Output guide]({{ '/manual/reading-output/' | relative_url }}).
 
 ## Compare phase strategies interactively
 
@@ -78,4 +78,4 @@ This can catch routing, gain, crossover, polarity, and sample-rate mistakes. Do 
 
 One room does not prove how a filter will work in another. When sharing comparisons, include the microphone method, smoothing, level, frequency range, target, and playback chain. Share the measurement files when possible. It gives the next curious listener something more useful than “the bass is tighter”, a phrase that has already done several lifetimes of service on hi-fi forums.
 
-For deployment details, use the [User Manual]({{ '/User_Manual.html#8-export-and-deploy' | relative_url }}). For the correction rationale, see [How DecayCore works]({{ '/how-it-works/' | relative_url }}).
+For deployment details, use the [User Manual]({{ '/manual/#8-export-and-deploy' | relative_url }}). For the correction rationale, see [How DecayCore works]({{ '/how-it-works/' | relative_url }}).

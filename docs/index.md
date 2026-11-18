@@ -17,7 +17,7 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
       <p class="eyebrow">Room measurement and FIR correction</p>
       <h1>Measure the room.<br><span>Reveal the music.</span></h1>
       <p class="hero__lead">You know that bass note that seems to turn up on every record? Your room may have a favourite. DecayCore measures your speakers in your listening room and creates FIR correction filters to help bring things back into balance.</p>
-      <p class="hero__copy">Export WAV filters for CamillaDSP, Roon, Equalizer APO, and other WAV convolvers, or FIR and PEQ files for MiniDSP.</p>
+      <p class="hero__copy">Export WAV filters for CamillaDSP, Roon, Equalizer APO, and other WAV convolvers, or FIR and PEQ files for miniDSP.</p>
       <div class="action-row">
         <a class="button button--primary" href="https://github.com/VilhoValittu/DecayCore/releases/latest">Download DecayCore</a>
         <a class="button" href="{{ '/getting-started/' | relative_url }}">Create your first filter</a>
@@ -38,11 +38,13 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
   <div class="wrap strip__inner">
     <p class="strip__label">Exports filters for</p>
     <ul class="chips">
-      <li>CamillaDSP</li>
-      <li>Roon</li>
-      <li>Equalizer APO</li>
-      <li>MiniDSP</li>
-      <li>Other FIR convolvers</li>
+      <li><a href="{{ '/playback/camilladsp/' | relative_url }}">CamillaDSP</a></li>
+      <li><a href="{{ '/playback/roon/' | relative_url }}">Roon</a></li>
+      <li><a href="{{ '/playback/jriver/' | relative_url }}">JRiver</a></li>
+      <li><a href="{{ '/playback/hqplayer/' | relative_url }}">HQPlayer</a></li>
+      <li><a href="{{ '/playback/equalizer-apo/' | relative_url }}">Equalizer APO</a></li>
+      <li><a href="{{ '/playback/minidsp/' | relative_url }}">miniDSP</a></li>
+      <li><a href="{{ '/playback/' | relative_url }}">Other FIR convolvers</a></li>
     </ul>
   </div>
 </section>
@@ -145,7 +147,7 @@ image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
         <p>Install a packaged release on Windows, Linux, or macOS, or run the manual workflow from source.</p>
       </section>
       <section class="doc-card">
-        <h3><a href="{{ '/User_Manual.html' | relative_url }}">User manual</a></h3>
+        <h3><a href="{{ '/manual/' | relative_url }}">User manual</a></h3>
         <p>What the controls do, how to load your filters, and where to look when something sounds odd.</p>
       </section>
       <section class="doc-card">

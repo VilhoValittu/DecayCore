@@ -2,13 +2,14 @@
 title: DecayCore Technical Reference
 description: Technical reference for the DecayCore DSP pipeline, correction controls, phase strategies, safety policies, and exported filters.
 hide_page_heading: true
+permalink: /how-it-works/pipeline/
 ---
 
 # DecayCore Technical Reference
 
 ## In brief
 
-DecayCore separates measurement alignment, target matching, phase construction, decay control, safety limiting, FIR synthesis, and export. This page describes that pipeline and the controls that affect it. For operating instructions, use the [User Manual]({{ '/User_Manual.html' | relative_url }}).
+DecayCore separates measurement alignment, target matching, phase construction, decay control, safety limiting, FIR synthesis, and export. This page describes that pipeline and the controls that affect it. For operating instructions, use the [User Manual]({{ '/manual/' | relative_url }}).
 
 ## 1. Processing model
 
@@ -143,7 +144,7 @@ Export windowing is a later realization step:
 - **rew_asym** applies REW-style asymmetric windowing
 - legacy configuration values remain accepted for compatibility when supported
 
-Windowing can change onset, symmetry, tail length, and practical latency. It does not redefine the target or rerun the correction policy. See [IR Export Windowing]({{ '/IR_Export_Windowing.html' | relative_url }}) for the focused explanation.
+Windowing can change onset, symmetry, tail length, and practical latency. It does not redefine the target or rerun the correction policy. See [IR Export Windowing]({{ '/how-it-works/ir-export-windowing/' | relative_url }}) for the focused explanation.
 
 ## 12. Output contract
 
@@ -166,8 +167,8 @@ Cache entries are reusable only when their signatures cover every input that cha
 
 ## 14. Related references
 
-- [Why DecayCore Works]({{ '/Why_DecayCore_Works.html' | relative_url }}) — practical design rationale
-- [Academic DSP Explanation]({{ '/Academic_DSP_Explanation.html' | relative_url }}) — mathematical model
-- [DSP Guards Reference]({{ '/DecayCore_dsp_guards.html' | relative_url }}) — guard taxonomy and triggers
-- [Stability and Reproducibility]({{ '/Stability_and_Reproducibility.html' | relative_url }}) — repeatable-run requirements
-- [Modes]({{ '/Modes.html' | relative_url }}) — AUTO, Basic, and Advanced policy
+- [Why DecayCore Works]({{ '/how-it-works/why/' | relative_url }}) — practical design rationale
+- [Academic DSP Explanation]({{ '/how-it-works/math/' | relative_url }}) — mathematical model
+- [DSP Guards Reference]({{ '/how-it-works/guards/' | relative_url }}) — guard taxonomy and triggers
+- [Stability and Reproducibility]({{ '/how-it-works/stability/' | relative_url }}) — repeatable-run requirements
+- [Modes]({{ '/manual/modes/' | relative_url }}) — AUTO, Basic, and Advanced policy
