@@ -314,7 +314,7 @@ miniDSP plugins don't load WAV files and run short FIR blocks next to a PEQ bank
 
 - The main-channel FIR corrects phase and group delay only, so all of its taps go to timing.
 - The magnitude correction moves to peaking filters, cuts and boosts, fitted to the same safe correction curve the FIR would have used. Every boost limit still applies, and narrow room-mode cuts are part of the same filters.
-- **miniDSP PEQ filters / output** in Advanced → Hybrid IIR tuning sets the budget, 10 by default to match the 2x4 HD.
+- **miniDSP PEQ filters / output** sets the budget, 10 by default to match the 2x4 HD. It sits under the miniDSP choice in Output settings and shows while that box is ticked.
 - Below 65,536 taps the PEQ is fitted on a 65,536-tap design grid, so a short FIR doesn't limit the EQ resolution.
 - The FIR carries the attenuation the largest boost needs, so the FIR and PEQ together don't clip.
 - Equalizer APO, PipeWire, HLC, Roon and JRiver files are unavailable, because they would play the FIR without any EQ. The CamillaDSP file carries the same PEQ.

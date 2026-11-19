@@ -11,6 +11,8 @@ This page contains the five latest stable releases. [Older releases and Finnish 
 
 ## [Unreleased]
 
+## [1.4.6] - 18-11-2026
+
 ### miniDSP filters that fit the FIR block
 
 With miniDSP ticked, the filters fit the 4096-tap pool of a 2x4 HD or Flex: 2042 taps for two outputs, 1362 with a subwoofer, 1024 with two. Output settings, Setup and START show the limit, and your tap setting stays saved.

@@ -31,7 +31,7 @@ Your saved tap setting stays as it is. Output settings, Setup and START show the
 1. Tick **miniDSP files (FIR .bin, PEQ .txt)** in Output settings before the run.
 2. Set the sample rate to the fixed rate your plugin runs at, for example 96 kHz on the 2x4 HD.
 3. Choose Mixed Phase, Asymmetric or Linear Phase. Minimum Phase leaves the FIR no phase correction to do.
-4. Set **miniDSP PEQ filters / output** in Advanced → Hybrid IIR tuning if your plugin has more or fewer PEQ slots. The default is 10, to match the 2x4 HD.
+4. If your plugin has more or fewer PEQ slots, set **miniDSP PEQ filters / output**. It sits under the miniDSP choice in Output settings and shows while that box is ticked. The default is 10, to match the 2x4 HD.
 
 While miniDSP is ticked, Hybrid IIR and the Equalizer APO, PipeWire, HLC, Roon and JRiver files are unavailable: they would play the FIR without its EQ. The CamillaDSP file carries the same PEQ.
 
