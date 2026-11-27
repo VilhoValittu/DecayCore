@@ -106,11 +106,11 @@ Uses a symmetric linear-phase realization. It preserves linear phase at the cost
 
 ### Mixed Phase
 
-Blends minimum-phase behavior with bounded excess-phase correction, primarily in the configured low-frequency band. Correction strength fades between the full-correction and end frequencies.
+Blends minimum-phase behavior with bounded excess-phase correction, primarily in the configured low-frequency band. Correction strength fades between the full-correction and end frequencies. It is the default filter type.
 
 ### Asymmetric
 
-Uses an asymmetric impulse layout to balance useful phase correction, latency, and pre-ringing containment. It is the general-purpose default in packaged releases.
+Uses an asymmetric impulse layout to balance useful phase correction, latency, and pre-ringing containment.
 
 ### Phase guards
 

@@ -26,7 +26,7 @@ PEQ filters change level at selected frequencies. A magnitude plot alone does no
 | Reflection handling | Depends on which peaks and dips are selected | Confidence-weighted correction + smoothing + A-FDW |
 | Correction bounds | Set through the chosen PEQ filters | Explicit limits for boost/cut/slope/phase band and low-bass safety |
 | Headroom handling | Set by the operator | Auto-headroom gain model with configurable margin |
-| Stereo consistency | Left and Right settings chosen separately | Stereo-link options with a shared leveling anchor, shared or hybrid windowing, and channel-specific final auto-gain |
+| Stereo consistency | Left and Right settings chosen separately | Stereo link with a shared leveling anchor, window and broadband gain |
 | Reproducible A/B | Requires a consistent comparison method | Optional **comparison mode** with fixed analysis grid |
 
 ## Listen to the result

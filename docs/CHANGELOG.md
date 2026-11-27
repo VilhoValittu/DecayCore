@@ -11,6 +11,28 @@ This page contains the five latest stable releases. [Older releases and Finnish 
 
 ## [Unreleased]
 
+## [1.4.7] - 27-11-2026
+
+### Less memory at high sample rates
+
+Filters at 192 kHz and above take about half as much memory on Linux and a fifth less on Windows, also when you export every sample rate. The filters stay the same.
+
+### Closer miniDSP and Hybrid IIR filters
+
+The same number of PEQ filters follows the correction about twice as closely. The Filter graph shows the FIR and PEQ filters together, as your player runs them. Hybrid IIR now runs only when you turn it on. Earlier Automatic results are rebuilt.
+
+### More accurate measurements
+
+DecayCore's own measurements read distortion and signal-to-noise at their true level, keep each speaker's and subwoofer's arrival time, and warn when background noise affects the bass. Re-measure older sessions to use this.
+
+### Safer Bass Integration
+
+Bass Integration tunes sub delay and polarity against the finished filters, and asks you to re-measure files that have lost the main/sub timing. Sub gain stops at +6 dB, and the mains keep their level when the sub gets a boost.
+
+### Also new
+
+An HQPlayer convolution folder, bass and treble shelves for the target, a Harman 6 dB · Horn speakers target, and steadier Automatic results.
+
 ## [1.4.6] - 18-11-2026
 
 ### miniDSP filters that fit the FIR block

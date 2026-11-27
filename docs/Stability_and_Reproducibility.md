@@ -82,7 +82,7 @@ These controls prevent unstable phase behavior and reduce ringing risk.
 
 Level handling is deterministic and tied to realized correction:
 - auto-headroom model computes attenuation from realized max boost + margin
-- stereo-linked runs share the leveling anchor and, in shared mode, the window; hybrid mode can retain channel-specific windows, while final auto-gain remains channel-specific
+- stereo-linked runs share the leveling anchor and window, and both channels get the lower of the two broadband gains
 - plot-only compensation keeps analysis visuals readable while preserving output safety
 
 This keeps output gain decisions consistent across repeated runs.

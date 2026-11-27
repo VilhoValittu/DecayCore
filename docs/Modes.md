@@ -73,7 +73,7 @@ When `auto_goal` is set to "Prefer Bass", the mode is locked to `selected`.
 - Low-bass cut: ON, `40 Hz`
 
 Notes:
-- Fresh config files currently start with `Asymmetric` as the default filter type before any mode-defaults button is applied.
+- Fresh config files currently start with `Mixed` as the default filter type before any mode-defaults button is applied.
 - In AUTO, the final winner may differ from the visible seed values because the search is allowed to move around that baseline.
 
 ---

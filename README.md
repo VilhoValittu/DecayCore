@@ -64,7 +64,7 @@ See the [Installation guide](https://vilhovalittu.github.io/DecayCore/installati
 
 ![Setup tab: choose operating mode, FIR engine and sample rate](docs/pics/ui_3.png)
 
-![XO tab: define crossover filters between bands](docs/pics/ui_7.png)
+![Crossover (XO) tab: define crossover filters between bands](docs/pics/ui_7.png)
 
 </details>
 

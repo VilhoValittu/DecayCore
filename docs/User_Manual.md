@@ -155,9 +155,9 @@ For a first run, leave mode defaults in place. These controls matter most when d
 
 Match the sample rate to the playback pipeline. More taps give better low-frequency and time resolution but increase processing cost and latency. Multi-rate export scales the tap count for each sample-rate family.
 
-### Automate tap count
+### Shorten FIRs automatically
 
-In packaged builds, tick **Automatic tap count** under **Run** on
+In packaged builds, tick **Shorten FIRs automatically** under **Run** on
 **START / Results** and press **START**. It works with **Standard** and with
 **All four filter types**, where each type gets its own tap count. This generates filters with
 the current settings and then shortens their exported support within a strict
