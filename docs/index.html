@@ -1,0 +1,307 @@
+---
+layout: home
+title: "DecayCore: FIR room correction for home listening rooms"
+description: Measure your speakers where you sit, then export FIR filters for CamillaDSP, Roon, JRiver, HQPlayer, Equalizer APO and miniDSP. Free for non-commercial use.
+permalink: /
+image: https://vilhovalittu.github.io/DecayCore/pics/DecayCore_logo_light.png
+---
+<main id="top">
+  <section class="hero hero--triptych" data-enter aria-labelledby="hero-h">
+    <div class="wrap"><div class="hero-text grid hero__grid">
+      <div class="span-3">
+        <h1 id="hero-h">FIR room correction software</h1>
+        <p class="hero__lead">Measure in your listening chair. DecayCore builds the filter. Runs on Windows, Linux and macOS.</p>
+        <div class="hero__cta dc-hero-cta">
+          <a class="btn btn--secondary" href="{{ '/getting-started/' | relative_url }}">Read the setup guide</a>
+        </div>
+      </div>
+      <div class="ly-collage span-9 start-4" role="img" aria-label="DecayCore's target view, its decay control settings and a result showing the target error falling on both channels">
+        <div class="ly-collage__set is-on">
+          <div class="ly-piece crop crop--target" style="left: 4%; top: 0%; width: 62%; height: 50%"></div>
+          <div class="ly-piece pc pc--limits" style="left: 70%; top: 4%; width: 26%">
+            <span class="lbl">Correction limits</span>
+            <div class="ln"><span>Max boost</span><b>5 dB</b></div>
+            <div class="ln"><span>Range</span><b>18–230 Hz</b></div>
+          </div>
+          <div class="ly-piece pc" style="left: 4%; top: 62%; width: 50%">
+            <span class="lbl">Target error, RMS</span>
+            <div class="ln"><span>Left</span><b>2.57 → <span class="good">1.47 dB</span></b></div>
+            <div class="ln"><span>Right</span><b>3.77 → <span class="good">2.40 dB</span></b></div>
+          </div>
+          <div class="ly-piece pc pc--exports" style="left: 58%; top: 62%; width: 38%; height: 34%">
+            <span class="lbl">Exports for</span>
+            <div class="chips"><span>CamillaDSP</span><span>Roon</span><span>JRiver</span><span class="hide-sm">HQPlayer</span><span class="hide-sm">Equalizer APO</span><span class="hide-sm">miniDSP</span></div>
+          </div>
+        </div>
+        <div class="ly-collage__set" aria-hidden="true">
+          <div class="ly-piece crop crop--tdc" style="left: 4%; top: 0%; width: 70%; height: 30%"></div>
+          <div class="ly-piece pc" style="left: 4%; top: 42%; width: 56%">
+            <span class="lbl">A 42 Hz note, before and after TDC</span>
+            <svg viewBox="0 0 400 150" class="dc-mini" aria-hidden="true"><path class="before" d="M0.0,0.0 L3.3,0.0 L6.7,0.5 L10.0,1.5 L13.3,3.3 L16.7,5.7 L20.0,8.6 L23.3,11.8 L26.7,14.9 L30.0,17.6 L33.3,19.8 L36.7,21.3 L40.0,22.3 L43.3,22.8 L46.7,23.1 L50.0,23.5 L53.3,24.3 L56.7,25.5 L60.0,27.4 L63.3,29.7 L66.7,32.5 L70.0,35.3 L73.3,38.1 L76.7,40.5 L80.0,42.5 L83.3,44.0 L86.7,45.0 L90.0,45.7 L93.3,46.3 L96.7,47.0 L100.0,48.0 L103.3,49.4 L106.7,51.3 L110.0,53.6 L113.3,56.1 L116.7,58.8 L120.0,61.3 L123.3,63.5 L126.7,65.3 L130.0,66.8 L133.3,67.9 L136.7,68.7 L140.0,69.6 L143.3,70.5 L146.7,71.7 L150.0,73.2 L153.3,75.1 L156.7,77.3 L160.0,79.7 L163.3,82.1 L166.7,84.4 L170.0,86.5 L173.3,88.2 L176.7,89.7 L180.0,90.8 L183.3,91.9 L186.7,92.9 L190.0,94.0 L193.3,95.3 L196.7,96.9 L200.0,98.8 L203.3,101.0 L206.7,103.2 L210.0,105.5 L213.3,107.6 L216.7,109.5 L220.0,111.2 L223.3,112.7 L226.7,113.9 L230.0,115.1 L233.3,116.2 L236.7,117.5 L240.0,118.9 L243.3,120.6 L246.7,122.5 L250.0,124.5 L253.3,126.7 L256.7,128.8 L260.0,130.8 L263.3,132.6 L266.7,134.3 L270.0,135.7 L273.3,137.1 L276.7,138.3 L280.0,139.6 L283.3,140.9 L286.7,142.5 L290.0,144.2 L293.3,146.0 L296.7,148.0 L300.0,150.0 L303.3,150.0 L306.7,150.0 L310.0,150.0 L313.3,150.0 L316.7,150.0 L320.0,150.0 L323.3,149.9 L326.7,149.6 L330.0,149.4 L333.3,149.3 L336.7,149.3 L340.0,149.5 L343.3,149.8 L346.7,150.0 L350.0,150.0 L353.3,150.0 L356.7,150.0 L360.0,150.0 L363.3,150.0 L366.7,150.0 L370.0,149.9 L373.3,149.7 L376.7,149.5 L380.0,149.4 L383.3,149.5 L386.7,149.7 L390.0,149.9 L393.3,150.0 L396.7,150.0 L400.0,150.0"/><path class="after" d="M0.0,0.0 L3.3,1.4 L6.7,3.1 L10.0,5.4 L13.3,8.5 L16.7,12.2 L20.0,16.5 L23.3,21.0 L26.7,25.4 L30.0,29.4 L33.3,32.9 L36.7,35.7 L40.0,38.0 L43.3,39.8 L46.7,41.4 L50.0,43.2 L53.3,45.2 L56.7,47.8 L60.0,50.9 L63.3,54.6 L66.7,58.6 L70.0,62.8 L73.3,66.9 L76.7,70.6 L80.0,73.9 L83.3,76.7 L86.7,79.0 L90.0,81.0 L93.3,83.0 L96.7,85.0 L100.0,87.3 L103.3,90.0 L106.7,93.2 L110.0,96.8 L113.3,100.7 L116.7,104.6 L120.0,108.4 L123.3,111.9 L126.7,115.1 L130.0,117.8 L133.3,120.2 L136.7,122.4 L140.0,124.6 L143.3,126.8 L146.7,129.3 L150.0,132.2 L153.3,135.4 L156.7,138.9 L160.0,142.6 L163.3,146.3 L166.7,149.9 L170.0,150.0 L173.3,150.0 L176.7,150.0 L180.0,150.0 L183.3,150.0 L186.7,149.5 L190.0,149.0 L193.3,148.7 L196.7,148.6 L200.0,148.8 L203.3,149.3 L206.7,149.9 L210.0,150.0 L213.3,150.0 L216.7,150.0 L220.0,150.0 L223.3,150.0 L226.7,150.0 L230.0,150.0 L233.3,149.5 L236.7,149.1 L240.0,148.9 L243.3,148.9 L246.7,149.1 L250.0,149.5 L253.3,150.0 L256.7,150.0 L260.0,150.0 L263.3,150.0 L266.7,150.0 L270.0,150.0 L273.3,150.0 L276.7,150.0 L280.0,149.6 L283.3,149.3 L286.7,149.1 L290.0,149.2 L293.3,149.4 L296.7,149.7 L300.0,150.0 L303.3,150.0 L306.7,150.0 L310.0,150.0 L313.3,150.0 L316.7,150.0 L320.0,150.0 L323.3,149.9 L326.7,149.6 L330.0,149.4 L333.3,149.3 L336.7,149.3 L340.0,149.5 L343.3,149.8 L346.7,150.0 L350.0,150.0 L353.3,150.0 L356.7,150.0 L360.0,150.0 L363.3,150.0 L366.7,150.0 L370.0,149.9 L373.3,149.7 L376.7,149.5 L380.0,149.4 L383.3,149.5 L386.7,149.7 L390.0,149.9 L393.3,150.0 L396.7,150.0 L400.0,150.0"/></svg>
+          </div>
+          <div class="ly-piece pc" style="left: 64%; top: 56%; width: 32%; height: 40%">
+            <span class="lbl">Decay control</span>
+            <div class="ln"><span>Strength</span><b>50%</b></div>
+            <div class="ln"><span>Max cut</span><b>9 dB</b></div>
+            <div class="ln"><span>Slope</span><b>6 dB/oct</b></div>
+          </div>
+        </div>
+        <div class="ly-collage__set" aria-hidden="true">
+          <div class="ly-piece pc" style="left: 4%; top: 0%; width: 58%">
+            <span class="lbl">Output</span>
+            <div class="ln"><span>Left filter</span><b>WAV, 32-bit float</b></div>
+            <div class="ln"><span>Right filter</span><b>WAV, 32-bit float</b></div>
+            <div class="ln"><span>miniDSP</span><b>FIR and PEQ</b></div>
+          </div>
+          <div class="ly-piece pc" style="left: 66%; top: 4%; width: 30%">
+            <span class="lbl">Filter</span>
+            <span class="big">65,536 taps</span>
+            <span>at 44.1 kHz</span>
+          </div>
+          <div class="ly-piece pc" style="left: 28%; top: 54%; width: 68%; height: 42%">
+            <span class="lbl">Runs on</span>
+            <div class="ln"><span>Windows</span><b>x64</b></div>
+            <div class="ln"><span>Linux</span><b>x86_64 and ARM64</b></div>
+            <div class="ln"><span>macOS</span><b>Apple silicon and Intel</b></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- app-frame: Automatic mode's candidate list beside the chosen filter's response -->
+  <section class="section" id="result" aria-labelledby="result-h">
+    <div class="wrap">
+      <div class="grid grid--top">
+        <h2 id="result-h" class="span-5">Automatic mode scores every correction filter</h2>
+        <p class="span-6 start-7">It tries filter types and limits, scores each against the target, and keeps the one that tracks it best inside the boost limit. <a class="link" href="#features">See what the limits hold</a></p>
+      </div>
+      <div class="ui app fill" role="img" aria-label="DecayCore's Automatic mode scoring filter candidates beside the chosen filter's left channel response, with the target error falling from 2.57 to 1.47 dB RMS" data-ui-pause-host>
+        <div class="app__pane app__pane--list" data-ui-loop>
+          <div class="ui ui-panel ui-win" data-ui="window" data-open="Queued" data-work="Scoring" data-done="Scored">
+            <div class="ui-win__bar">
+              <span class="ui-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="ui-win__crumb">DecayCore <i>/</i> <b>Automatic mode</b></span>
+              <span class="ui-spacer"></span>
+            </div>
+            <div class="ui-win__body">
+              <nav class="ui-win__side" aria-hidden="true">
+                <span class="ui-win__nav is-on">Candidates</span>
+                <span class="ui-win__nav">Chosen</span>
+                <span class="ui-win__nav">Over limit</span>
+                <span class="ui-win__label">Channels</span>
+                <span class="ui-win__nav">Left</span>
+                <span class="ui-win__nav">Right</span>
+              </nav>
+              <div class="ui-win__main">
+                <div class="ui-win__cols" aria-hidden="true"><span>Filter</span><span>Settings</span><span>Status</span><span>Error</span></div>
+                <ul class="ui-win__rows">
+                  <li class="ui-win__row" data-row><span class="ui-avatar" data-tone="1">AS</span><span class="ui-win__who">Asymmetric</span><span class="ui-win__sub">TDC normal · adaptive target</span><span class="ui-win__st is-done" data-st>Chosen</span><span class="ui-win__age">1.47</span></li>
+                  <li class="ui-win__row" data-row><span class="ui-avatar" data-tone="2">MX</span><span class="ui-win__who">Mixed phase</span><span class="ui-win__sub">TDC normal · adaptive target</span><span class="ui-win__st is-done" data-st>Scored</span><span class="ui-win__age">1.58</span></li>
+                  <li class="ui-win__row" data-row><span class="ui-avatar" data-tone="3">AS</span><span class="ui-win__who">Asymmetric</span><span class="ui-win__sub">TDC safe · Harman +6 dB</span><span class="ui-win__st" data-st>Queued</span><span class="ui-win__age">–</span></li>
+                  <li class="ui-win__row" data-row><span class="ui-avatar" data-tone="4">MN</span><span class="ui-win__who">Minimum phase</span><span class="ui-win__sub">TDC off · adaptive target</span><span class="ui-win__st" data-st>Queued</span><span class="ui-win__age">–</span></li>
+                  <li class="ui-win__row" data-row><span class="ui-avatar" data-tone="5">LP</span><span class="ui-win__who">Linear phase</span><span class="ui-win__sub">TDC normal · Harman +6 dB</span><span class="ui-win__st" data-st>Queued</span><span class="ui-win__age">–</span></li>
+                  <li class="ui-win__row" data-row><span class="ui-avatar" data-tone="2">MX</span><span class="ui-win__who">Mixed phase</span><span class="ui-win__sub">TDC safe · adaptive target</span><span class="ui-win__st" data-st>Queued</span><span class="ui-win__age">–</span></li>
+                  <li class="ui-win__row" data-row><span class="ui-avatar" data-tone="1">AS</span><span class="ui-win__who">Asymmetric</span><span class="ui-win__sub">TDC aggressive · adaptive</span><span class="ui-win__st is-you" data-st>Over limit</span><span class="ui-win__age">–</span></li>
+                  <li class="ui-win__row" data-row><span class="ui-avatar" data-tone="3">MN</span><span class="ui-win__who">Minimum phase</span><span class="ui-win__sub">TDC normal · Harman +6 dB</span><span class="ui-win__st" data-st>Queued</span><span class="ui-win__age">–</span></li>
+                  <li class="ui-win__row" data-row><span class="ui-avatar" data-tone="4">LP</span><span class="ui-win__who">Linear phase</span><span class="ui-win__sub">TDC safe · adaptive target</span><span class="ui-win__st" data-st>Queued</span><span class="ui-win__age">–</span></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="app__pane app__pane--open">
+          <div class="ui ui-panel dc-resp">
+            <div class="dc-resp__head"><span class="dc-resp__tab is-on">Left channel</span><span class="dc-resp__tab">Right channel</span><span class="ui-spacer"></span><span class="dc-resp__tab">Response</span><span class="dc-resp__tab">Filter</span><span class="dc-resp__tab">Timing</span></div>
+            <div class="dc-resp__sum"><b>Target tracking improves on both channels.</b><span class="num">Left: target error 2.57 → 1.47 dB RMS. Right: 3.77 → 2.40 dB RMS.</span></div>
+            <div class="dc-legend"><span><i style="border-color:#8fb6c4;border-top-style:dashed"></i>Measured</span><span><i style="border-color:#0d7480"></i>Predicted with filter</span><span><i style="border-color:#c06a1d;border-top-style:dashed"></i>Target</span></div>
+            <svg class="dc-graph" viewBox="0 0 700 320" aria-hidden="true">
+              <rect class="band" x="-10.7" y="0" width="258.2" height="300"/>
+              <line class="gl" x1="0.0" x2="0.0" y1="0" y2="300"/><line class="gl" x1="92.9" x2="92.9" y1="0" y2="300"/><line class="gl" x1="163.1" x2="163.1" y1="0" y2="300"/><line class="gl" x1="233.3" x2="233.3" y1="0" y2="300"/><line class="gl" x1="326.2" x2="326.2" y1="0" y2="300"/><line class="gl" x1="396.4" x2="396.4" y1="0" y2="300"/><line class="gl" x1="466.7" x2="466.7" y1="0" y2="300"/><line class="gl" x1="559.5" x2="559.5" y1="0" y2="300"/><line class="gl" x1="629.8" x2="629.8" y1="0" y2="300"/><line class="gl" x1="0" x2="700" y1="120.0" y2="120.0"/>
+              <path class="meas" d="M0.0,96.0 L2.7,93.8 L5.4,91.6 L8.1,89.4 L10.8,87.2 L13.5,85.0 L16.2,82.8 L18.8,80.6 L21.5,78.4 L24.2,76.1 L26.9,73.9 L29.6,71.7 L32.3,69.5 L35.0,67.3 L37.7,65.1 L40.4,62.8 L43.1,60.5 L45.8,58.1 L48.5,55.8 L51.2,53.2 L53.8,49.8 L56.5,45.3 L59.2,39.6 L61.9,32.1 L64.6,22.8 L67.3,11.9 L70.0,5.0 L72.7,5.0 L75.4,5.0 L78.1,5.0 L80.8,5.0 L83.5,15.1 L86.2,26.3 L88.8,35.7 L91.5,43.1 L94.2,48.8 L96.9,53.0 L99.6,56.0 L102.3,57.9 L105.0,58.6 L107.7,58.2 L110.4,56.4 L113.1,52.8 L115.8,47.4 L118.5,40.5 L121.2,34.2 L123.8,32.8 L126.5,39.2 L129.2,51.4 L131.9,65.7 L134.6,80.7 L137.3,97.1 L140.0,117.2 L142.7,143.0 L145.4,170.6 L148.1,182.6 L150.8,167.2 L153.5,140.6 L156.2,117.7 L158.8,100.6 L161.5,87.0 L164.2,75.1 L166.9,63.9 L169.6,53.7 L172.3,46.5 L175.0,44.5 L177.7,48.5 L180.4,56.8 L183.1,66.8 L185.8,76.5 L188.5,85.3 L191.2,93.0 L193.8,100.2 L196.5,107.2 L199.2,114.6 L201.9,122.9 L204.6,132.8 L207.3,144.3 L210.0,156.1 L212.7,164.3 L215.4,164.9 L218.1,158.5 L220.8,149.4 L223.5,141.0 L226.2,134.5 L228.8,129.8 L231.5,126.6 L234.2,124.4 L236.9,123.2 L239.6,122.5 L242.3,122.1 L245.0,122.0 L247.7,122.1 L250.4,122.2 L253.1,122.5 L255.8,122.8 L258.5,123.2 L261.2,123.6 L263.8,124.1 L266.5,124.6 L269.2,125.0 L271.9,125.5 L274.6,127.8 L277.3,126.4 L280.0,125.0 L282.7,124.7 L285.4,126.6 L288.1,130.8 L290.8,136.4 L293.5,142.0 L296.2,146.0 L298.8,147.2 L301.5,145.2 L304.2,140.7 L306.9,135.0 L309.6,129.7 L312.3,126.1 L315.0,125.0 L317.7,126.0 L320.4,128.1 L323.1,130.0 L325.8,130.6 L328.5,129.3 L331.2,126.5 L333.8,123.3 L336.5,121.4 L339.2,121.9 L341.9,125.4 L344.6,131.7 L347.3,139.5 L350.0,147.2 L352.7,153.1 L355.4,156.2 L358.1,156.3 L360.8,154.3 L363.5,151.3 L366.2,149.0 L368.8,148.1 L371.5,148.8 L374.2,150.5 L376.9,151.8 L379.6,151.4 L382.3,148.6 L385.0,143.4 L387.7,136.6 L390.4,129.9 L393.1,125.0 L395.8,123.0 L398.5,124.5 L401.2,129.0 L403.8,135.0 L406.5,141.1 L409.2,145.8 L411.9,148.4 L414.6,149.3 L417.3,149.4 L420.0,150.0 L422.7,152.1 L425.4,156.0 L428.1,161.4 L430.8,167.0 L433.5,171.2 L436.2,172.6 L438.8,170.6 L441.5,165.6 L444.2,158.6 L446.9,151.4 L449.6,145.7 L452.3,142.4 L455.0,141.8 L457.7,143.1 L460.4,145.2 L463.1,146.6 L465.8,146.5 L468.5,144.9 L471.2,142.5 L473.8,140.7 L476.5,140.8 L479.2,143.7 L481.9,149.4 L484.6,157.0 L487.3,164.9 L490.0,171.3 L492.7,175.1 L495.4,175.6 L498.1,173.5 L500.8,169.9 L503.5,166.4 L506.2,164.2 L508.8,163.9 L511.5,165.1 L514.2,166.9 L516.9,167.8 L519.6,166.9 L522.3,163.6 L525.0,158.4 L527.7,152.7 L530.4,148.1 L533.1,145.9 L535.8,146.8 L538.5,150.7 L541.2,156.4 L543.8,162.3 L546.5,167.0 L549.2,169.4 L551.9,169.5 L554.6,168.1 L557.3,166.5 L560.0,166.0 L562.7,167.4 L565.4,170.9 L568.1,175.4 L570.8,179.6 L573.5,182.1 L576.2,181.9 L578.8,178.9 L581.5,173.9 L584.2,168.4 L586.9,163.9 L589.6,161.8 L592.3,162.4 L595.0,165.1 L597.7,168.9 L600.4,172.1 L603.1,173.7 L605.8,173.0 L608.5,170.6 L611.2,167.5 L613.8,165.4 L616.5,165.3 L619.2,167.8 L621.9,172.4 L624.6,178.0 L627.3,182.9 L630.0,185.8 L632.7,186.0 L635.4,183.7 L638.1,179.9 L640.8,176.1 L643.5,173.8 L646.2,173.7 L648.8,176.0 L651.5,179.6 L654.2,183.2 L656.9,185.4 L659.6,185.2 L662.3,182.7 L665.0,178.8 L667.7,174.8 L670.4,172.3 L673.1,172.2 L675.8,174.8 L678.5,179.2 L681.2,184.1 L683.8,187.9 L686.5,189.6 L689.2,188.7 L691.9,185.9 L694.6,182.4 L697.3,179.7 L700.0,179.0"/>
+              <path class="tgt" d="M0.0,62.8 L2.7,63.0 L5.4,63.1 L8.1,63.3 L10.8,63.5 L13.5,63.6 L16.2,63.8 L18.8,64.0 L21.5,64.2 L24.2,64.4 L26.9,64.7 L29.6,64.9 L32.3,65.1 L35.0,65.4 L37.7,65.6 L40.4,65.9 L43.1,66.2 L45.8,66.5 L48.5,66.8 L51.2,67.2 L53.8,67.5 L56.5,67.9 L59.2,68.2 L61.9,68.6 L64.6,69.0 L67.3,69.4 L70.0,69.9 L72.7,70.3 L75.4,70.8 L78.1,71.2 L80.8,71.7 L83.5,72.2 L86.2,72.8 L88.8,73.3 L91.5,73.9 L94.2,74.4 L96.9,75.0 L99.6,75.6 L102.3,76.3 L105.0,76.9 L107.7,77.6 L110.4,78.2 L113.1,78.9 L115.8,79.6 L118.5,80.3 L121.2,81.0 L123.8,81.8 L126.5,82.5 L129.2,83.3 L131.9,84.0 L134.6,84.8 L137.3,85.6 L140.0,86.3 L142.7,87.1 L145.4,87.9 L148.1,88.7 L150.8,89.5 L153.5,90.3 L156.2,91.1 L158.8,91.9 L161.5,92.7 L164.2,93.5 L166.9,94.3 L169.6,95.0 L172.3,95.8 L175.0,96.6 L177.7,97.3 L180.4,98.1 L183.1,98.8 L185.8,99.5 L188.5,100.2 L191.2,100.9 L193.8,101.6 L196.5,102.3 L199.2,103.0 L201.9,103.6 L204.6,104.2 L207.3,104.8 L210.0,105.4 L212.7,106.0 L215.4,106.6 L218.1,107.1 L220.8,107.6 L223.5,108.2 L226.2,108.6 L228.8,109.1 L231.5,109.6 L234.2,110.2 L236.9,110.9 L239.6,111.7 L242.3,112.4 L245.0,113.2 L247.7,113.9 L250.4,114.6 L253.1,115.3 L255.8,116.0 L258.5,116.6 L261.2,117.3 L263.8,117.9 L266.5,118.5 L269.2,119.2 L271.9,119.8 L274.6,120.4 L277.3,120.9 L280.0,121.5 L282.7,122.1 L285.4,122.6 L288.1,123.2 L290.8,123.7 L293.5,124.2 L296.2,124.7 L298.8,125.2 L301.5,125.7 L304.2,126.2 L306.9,126.7 L309.6,127.2 L312.3,127.7 L315.0,128.1 L317.7,128.6 L320.4,129.1 L323.1,129.5 L325.8,129.9 L328.5,130.4 L331.2,130.8 L333.8,131.3 L336.5,131.7 L339.2,132.1 L341.9,132.5 L344.6,132.9 L347.3,133.3 L350.0,133.8 L352.7,134.2 L355.4,134.6 L358.1,135.0 L360.8,135.4 L363.5,135.8 L366.2,136.1 L368.8,136.5 L371.5,136.9 L374.2,137.3 L376.9,137.7 L379.6,138.1 L382.3,138.5 L385.0,138.8 L387.7,139.2 L390.4,139.6 L393.1,140.0 L395.8,140.3 L398.5,140.7 L401.2,141.1 L403.8,141.4 L406.5,141.8 L409.2,142.2 L411.9,142.5 L414.6,142.9 L417.3,143.3 L420.0,143.6 L422.7,144.0 L425.4,144.3 L428.1,144.7 L430.8,145.1 L433.5,145.4 L436.2,145.8 L438.8,146.1 L441.5,146.5 L444.2,146.8 L446.9,147.2 L449.6,147.5 L452.3,147.9 L455.0,148.2 L457.7,148.6 L460.4,149.0 L463.1,149.3 L465.8,149.7 L468.5,150.0 L471.2,150.4 L473.8,150.7 L476.5,151.1 L479.2,151.4 L481.9,151.8 L484.6,152.1 L487.3,152.5 L490.0,152.8 L492.7,153.2 L495.4,153.5 L498.1,153.9 L500.8,154.2 L503.5,154.6 L506.2,154.9 L508.8,155.2 L511.5,155.6 L514.2,155.9 L516.9,156.3 L519.6,156.6 L522.3,157.0 L525.0,157.3 L527.7,157.7 L530.4,158.0 L533.1,158.4 L535.8,158.7 L538.5,159.1 L541.2,159.4 L543.8,159.8 L546.5,160.1 L549.2,160.5 L551.9,160.8 L554.6,161.1 L557.3,161.5 L560.0,161.8 L562.7,162.2 L565.4,162.5 L568.1,162.9 L570.8,163.2 L573.5,163.6 L576.2,163.9 L578.8,164.3 L581.5,164.6 L584.2,164.9 L586.9,165.3 L589.6,165.6 L592.3,166.0 L595.0,166.3 L597.7,166.7 L600.4,167.0 L603.1,167.4 L605.8,167.7 L608.5,168.1 L611.2,168.4 L613.8,168.7 L616.5,169.1 L619.2,169.4 L621.9,169.8 L624.6,170.1 L627.3,170.5 L630.0,170.8 L632.7,171.2 L635.4,171.5 L638.1,171.9 L640.8,172.2 L643.5,172.5 L646.2,172.9 L648.8,173.2 L651.5,173.6 L654.2,173.9 L656.9,174.3 L659.6,174.6 L662.3,175.0 L665.0,175.3 L667.7,175.7 L670.4,176.0 L673.1,176.3 L675.8,176.7 L678.5,177.0 L681.2,177.4 L683.8,177.7 L686.5,178.1 L689.2,178.4 L691.9,178.8 L694.6,179.1 L697.3,179.4 L700.0,179.8"/>
+              <path class="pred" d="M0.0,84.4 L2.7,83.0 L5.4,81.6 L8.1,80.3 L10.8,78.9 L13.5,77.5 L16.2,76.1 L18.8,74.8 L21.5,73.4 L24.2,72.0 L26.9,70.7 L29.6,69.3 L32.3,68.0 L35.0,66.6 L37.7,65.6 L40.4,65.6 L43.1,65.5 L45.8,65.5 L48.5,65.5 L51.2,65.5 L53.8,65.4 L56.5,65.2 L59.2,64.8 L61.9,64.2 L64.6,63.5 L67.3,62.5 L70.0,61.5 L72.7,60.9 L75.4,61.0 L78.1,61.9 L80.8,63.5 L83.5,65.4 L86.2,67.2 L88.8,68.8 L91.5,70.2 L94.2,71.4 L96.9,72.4 L99.6,73.3 L102.3,74.1 L105.0,74.7 L107.7,75.2 L110.4,75.6 L113.1,75.8 L115.8,75.7 L118.5,75.5 L121.2,75.4 L123.8,75.9 L126.5,77.3 L129.2,79.4 L131.9,81.8 L134.6,84.3 L137.3,93.1 L140.0,106.4 L142.7,123.4 L145.4,141.7 L148.1,149.8 L150.8,140.0 L153.5,123.0 L156.2,108.4 L158.8,97.5 L161.5,92.0 L164.2,91.3 L166.9,90.6 L169.6,90.1 L172.3,89.9 L175.0,90.3 L177.7,91.5 L180.4,93.1 L183.1,95.0 L185.8,96.8 L188.5,98.4 L191.2,100.0 L193.8,101.5 L196.5,105.5 L199.2,110.5 L201.9,116.2 L204.6,122.8 L207.3,130.5 L210.0,138.3 L212.7,143.9 L215.4,144.5 L218.1,140.5 L220.8,134.8 L223.5,129.8 L226.2,126.6 L228.8,124.2 L231.5,122.6 L234.2,121.6 L236.9,121.3 L239.6,121.2 L242.3,121.4 L245.0,121.7 L247.7,122.1 L250.4,122.2 L253.1,122.5 L255.8,122.8 L258.5,123.2 L261.2,123.6 L263.8,124.1 L266.5,124.6 L269.2,125.0 L271.9,125.5 L274.6,127.8 L277.3,126.4 L280.0,125.0 L282.7,124.7 L285.4,126.6 L288.1,130.8 L290.8,136.4 L293.5,142.0 L296.2,146.0 L298.8,147.2 L301.5,145.2 L304.2,140.7 L306.9,135.0 L309.6,129.7 L312.3,126.1 L315.0,125.0 L317.7,126.0 L320.4,128.1 L323.1,130.0 L325.8,130.6 L328.5,129.3 L331.2,126.5 L333.8,123.3 L336.5,121.4 L339.2,121.9 L341.9,125.4 L344.6,131.7 L347.3,139.5 L350.0,147.2 L352.7,153.1 L355.4,156.2 L358.1,156.3 L360.8,154.3 L363.5,151.3 L366.2,149.0 L368.8,148.1 L371.5,148.8 L374.2,150.5 L376.9,151.8 L379.6,151.4 L382.3,148.6 L385.0,143.4 L387.7,136.6 L390.4,129.9 L393.1,125.0 L395.8,123.0 L398.5,124.5 L401.2,129.0 L403.8,135.0 L406.5,141.1 L409.2,145.8 L411.9,148.4 L414.6,149.3 L417.3,149.4 L420.0,150.0 L422.7,152.1 L425.4,156.0 L428.1,161.4 L430.8,167.0 L433.5,171.2 L436.2,172.6 L438.8,170.6 L441.5,165.6 L444.2,158.6 L446.9,151.4 L449.6,145.7 L452.3,142.4 L455.0,141.8 L457.7,143.1 L460.4,145.2 L463.1,146.6 L465.8,146.5 L468.5,144.9 L471.2,142.5 L473.8,140.7 L476.5,140.8 L479.2,143.7 L481.9,149.4 L484.6,157.0 L487.3,164.9 L490.0,171.3 L492.7,175.1 L495.4,175.6 L498.1,173.5 L500.8,169.9 L503.5,166.4 L506.2,164.2 L508.8,163.9 L511.5,165.1 L514.2,166.9 L516.9,167.8 L519.6,166.9 L522.3,163.6 L525.0,158.4 L527.7,152.7 L530.4,148.1 L533.1,145.9 L535.8,146.8 L538.5,150.7 L541.2,156.4 L543.8,162.3 L546.5,167.0 L549.2,169.4 L551.9,169.5 L554.6,168.1 L557.3,166.5 L560.0,166.0 L562.7,167.4 L565.4,170.9 L568.1,175.4 L570.8,179.6 L573.5,182.1 L576.2,181.9 L578.8,178.9 L581.5,173.9 L584.2,168.4 L586.9,163.9 L589.6,161.8 L592.3,162.4 L595.0,165.1 L597.7,168.9 L600.4,172.1 L603.1,173.7 L605.8,173.0 L608.5,170.6 L611.2,167.5 L613.8,165.4 L616.5,165.3 L619.2,167.8 L621.9,172.4 L624.6,178.0 L627.3,182.9 L630.0,185.8 L632.7,186.0 L635.4,183.7 L638.1,179.9 L640.8,176.1 L643.5,173.8 L646.2,173.7 L648.8,176.0 L651.5,179.6 L654.2,183.2 L656.9,185.4 L659.6,185.2 L662.3,182.7 L665.0,178.8 L667.7,174.8 L670.4,172.3 L673.1,172.2 L675.8,174.8 L678.5,179.2 L681.2,184.1 L683.8,187.9 L686.5,189.6 L689.2,188.7 L691.9,185.9 L694.6,182.4 L697.3,179.7 L700.0,179.0"/>
+              <text x="3.0" y="316">20</text><text x="95.9" y="316">50</text><text x="166.1" y="316">100</text><text x="236.3" y="316">200</text><text x="329.2" y="316">500</text><text x="399.4" y="316">1k</text><text x="469.7" y="316">2k</text><text x="562.5" y="316">5k</text><text x="632.8" y="316">10k</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- pinned-chapters (moments.md): two screens, three steps, one screen each -->
+  <section class="section" id="how" style="--h: 2; --hm: 2" data-moment="pinned-chapters" aria-labelledby="how-h">
+    <div class="wrap mo-pc__grid">
+      <div class="mo-pc__text">
+        <h2 id="how-h">From microphone to playback in 3 steps</h2>
+        <ol class="mo-pc__steps">
+          <li class="mo-pc__step">
+            <h3>Measure the room from your chair</h3>
+            <p>Put a calibrated microphone where you listen and run the guided sweep. REW text exports and impulse WAVs load too.</p>
+            <figure class="mo-pc__visual"><img src="{{ '/pics/home/step-measure.webp' | relative_url }}" srcset="{{ '/pics/home/step-measure-640.webp' | relative_url }} 640w, {{ '/pics/home/step-measure.webp' | relative_url }} 1280w" sizes="(min-width: 1024px) 45vw, 90vw" alt="DecayCore's measurement dialog with the left and right measurements chosen from the measurement folder" width="1280" height="960" loading="lazy"></figure>
+          </li>
+          <li class="mo-pc__step">
+            <h3>Automatic mode picks the correction</h3>
+            <p>Start with Automatic mode and the Mixed-phase filter. DecayCore shows which settings it chose and why.</p>
+            <figure class="mo-pc__visual"><img src="{{ '/pics/home/step-setup.webp' | relative_url }}" srcset="{{ '/pics/home/step-setup-640.webp' | relative_url }} 640w, {{ '/pics/home/step-setup.webp' | relative_url }} 1280w" sizes="(min-width: 1024px) 45vw, 90vw" alt="DecayCore's Setup tab with Automatic mode selected and the Mixed phase filter type" width="1280" height="960" loading="lazy"></figure>
+          </li>
+          <li class="mo-pc__step">
+            <h3>The correction loaded in your player</h3>
+            <p>Play a record you know and compare with bypass at the same volume. If it sounds worse, it is worse.</p>
+            <figure class="mo-pc__visual"><img src="{{ '/pics/home/step-result.webp' | relative_url }}" srcset="{{ '/pics/home/step-result-640.webp' | relative_url }} 640w, {{ '/pics/home/step-result.webp' | relative_url }} 1248w" sizes="(min-width: 1024px) 45vw, 90vw" alt="DecayCore's result view: the left channel response with measured, predicted and target curves" width="1248" height="936" loading="lazy"></figure>
+          </li>
+        </ol>
+      </div>
+      <div class="mo-pc__visuals frame"></div>
+    </div>
+  </section>
+
+  <!-- features-2x2 on two screens -->
+  <section class="section g2" id="features" aria-labelledby="features-h">
+    <div class="wrap">
+      <div class="group">
+        <div class="section-head">
+          <h2 id="features-h">Correction with limits you can read. <span class="muted">Every cut and boost stays inside them.</span></h2>
+        </div>
+        <div class="grid">
+          <article class="card card--row card--open span-6 m-nolift">
+            <h3>Room peaks cut, deep nulls left alone</h3>
+            <p>A bass peak comes down to the target. A deep cancellation gets no more than 5 dB, because boost there mostly heats the amplifier.</p>
+            <div class="panel">
+              <div class="stage stage--fade-b"><div class="at-rise fit" style="--fit-max:420px;--ax:max(24px, 50% - 210px);--ay:40px;--ay-sm:16px">
+                <div class="ui ui-panel dc-card">
+                  <span class="t-small muted">Left channel, 20 to 300 Hz</span>
+                  <svg viewBox="0 -6 400 132" class="dc-mini dc-peaks" preserveAspectRatio="none" aria-hidden="true"><path class="before" d="M0.0,55.5 L2.5,54.5 L5.0,53.5 L7.5,52.5 L10.0,51.4 L12.5,50.4 L15.0,49.4 L17.5,48.4 L20.0,47.3 L22.5,46.3 L25.0,45.3 L27.5,44.2 L30.0,43.2 L32.5,42.2 L35.0,41.2 L37.5,40.1 L40.0,39.1 L42.5,38.1 L45.0,37.1 L47.5,36.0 L50.0,35.0 L52.5,34.0 L55.0,32.9 L57.5,31.9 L60.0,30.8 L62.5,29.7 L65.0,28.6 L67.5,27.5 L70.0,26.5 L72.5,25.3 L75.0,24.0 L77.5,22.5 L80.0,20.6 L82.5,18.4 L85.0,15.9 L87.5,12.8 L90.0,9.3 L92.5,5.1 L95.0,2.0 L97.5,2.0 L100.0,2.0 L102.5,2.0 L105.0,2.0 L107.5,2.0 L110.0,2.0 L112.5,2.0 L115.0,2.0 L117.5,2.0 L120.0,2.0 L122.5,2.0 L125.0,3.5 L127.5,8.1 L130.0,12.2 L132.5,15.7 L135.0,18.7 L137.5,21.2 L140.0,23.2 L142.5,24.9 L145.0,26.2 L147.5,27.2 L150.0,27.9 L152.5,28.2 L155.0,28.2 L157.5,27.8 L160.0,27.0 L162.5,25.7 L165.0,23.9 L167.5,21.4 L170.0,18.5 L172.5,15.2 L175.0,12.0 L177.5,9.7 L180.0,9.2 L182.5,11.0 L185.0,15.1 L187.5,20.7 L190.0,27.2 L192.5,34.0 L195.0,40.9 L197.5,48.1 L200.0,55.9 L202.5,64.7 L205.0,75.1 L207.5,87.3 L210.0,100.6 L212.5,112.5 L215.0,118.7 L217.5,116.2 L220.0,106.5 L222.5,94.0 L225.0,82.0 L227.5,71.8 L230.0,63.4 L232.5,56.3 L235.0,50.1 L237.5,44.4 L240.0,38.9 L242.5,33.7 L245.0,28.7 L247.5,24.2 L250.0,20.6 L252.5,18.4 L255.0,17.9 L257.5,19.2 L260.0,22.2 L262.5,26.2 L265.0,30.7 L267.5,35.4 L270.0,39.9 L272.5,44.2 L275.0,48.1 L277.5,51.8 L280.0,55.2 L282.5,58.5 L285.0,61.8 L287.5,65.1 L290.0,68.5 L292.5,72.3 L295.0,76.4 L297.5,81.0 L300.0,86.1 L302.5,91.6 L305.0,97.1 L307.5,102.0 L310.0,105.4 L312.5,106.5 L315.0,105.1 L317.5,101.8 L320.0,97.6 L322.5,93.3 L325.0,89.4 L327.5,86.1 L330.0,83.3 L332.5,81.1 L335.0,79.3 L337.5,77.9 L340.0,76.8 L342.5,76.0 L345.0,75.5 L347.5,75.1 L350.0,74.9 L352.5,74.7 L355.0,74.6 L357.5,74.6 L360.0,74.6 L362.5,74.6 L365.0,74.7 L367.5,74.8 L370.0,75.0 L372.5,75.1 L375.0,75.3 L377.5,75.5 L380.0,75.7 L382.5,75.9 L385.0,76.1 L387.5,76.3 L390.0,76.5 L392.5,76.8 L395.0,77.0 L397.5,77.2 L400.0,77.5"/><path class="tgt" d="M0.0,31.3 L2.5,31.4 L5.0,31.4 L7.5,31.5 L10.0,31.6 L12.5,31.7 L15.0,31.7 L17.5,31.8 L20.0,31.9 L22.5,32.0 L25.0,32.1 L27.5,32.2 L30.0,32.3 L32.5,32.4 L35.0,32.5 L37.5,32.6 L40.0,32.7 L42.5,32.8 L45.0,32.9 L47.5,33.0 L50.0,33.1 L52.5,33.2 L55.0,33.4 L57.5,33.5 L60.0,33.6 L62.5,33.8 L65.0,33.9 L67.5,34.0 L70.0,34.2 L72.5,34.3 L75.0,34.5 L77.5,34.7 L80.0,34.8 L82.5,35.0 L85.0,35.2 L87.5,35.3 L90.0,35.5 L92.5,35.7 L95.0,35.9 L97.5,36.1 L100.0,36.3 L102.5,36.5 L105.0,36.7 L107.5,36.9 L110.0,37.1 L112.5,37.3 L115.0,37.6 L117.5,37.8 L120.0,38.0 L122.5,38.3 L125.0,38.5 L127.5,38.8 L130.0,39.0 L132.5,39.3 L135.0,39.5 L137.5,39.8 L140.0,40.1 L142.5,40.4 L145.0,40.6 L147.5,40.9 L150.0,41.2 L152.5,41.5 L155.0,41.8 L157.5,42.1 L160.0,42.4 L162.5,42.8 L165.0,43.1 L167.5,43.4 L170.0,43.7 L172.5,44.0 L175.0,44.4 L177.5,44.7 L180.0,45.1 L182.5,45.4 L185.0,45.8 L187.5,46.1 L190.0,46.5 L192.5,46.8 L195.0,47.2 L197.5,47.5 L200.0,47.9 L202.5,48.3 L205.0,48.6 L207.5,49.0 L210.0,49.4 L212.5,49.7 L215.0,50.1 L217.5,50.5 L220.0,50.8 L222.5,51.2 L225.0,51.6 L227.5,51.9 L230.0,52.3 L232.5,52.7 L235.0,53.1 L237.5,53.4 L240.0,53.8 L242.5,54.2 L245.0,54.5 L247.5,54.9 L250.0,55.2 L252.5,55.6 L255.0,55.9 L257.5,56.3 L260.0,56.6 L262.5,57.0 L265.0,57.3 L267.5,57.7 L270.0,58.0 L272.5,58.3 L275.0,58.7 L277.5,59.0 L280.0,59.3 L282.5,59.6 L285.0,60.0 L287.5,60.3 L290.0,60.6 L292.5,60.9 L295.0,61.2 L297.5,61.5 L300.0,61.7 L302.5,62.0 L305.0,62.3 L307.5,62.6 L310.0,62.8 L312.5,63.1 L315.0,63.4 L317.5,63.6 L320.0,63.9 L322.5,64.1 L325.0,64.4 L327.5,64.6 L330.0,64.8 L332.5,65.0 L335.0,65.3 L337.5,65.5 L340.0,65.7 L342.5,66.0 L345.0,66.4 L347.5,66.8 L350.0,67.1 L352.5,67.5 L355.0,67.8 L357.5,68.1 L360.0,68.5 L362.5,68.8 L365.0,69.1 L367.5,69.5 L370.0,69.8 L372.5,70.1 L375.0,70.4 L377.5,70.7 L380.0,71.0 L382.5,71.3 L385.0,71.6 L387.5,71.9 L390.0,72.2 L392.5,72.5 L395.0,72.8 L397.5,73.0 L400.0,73.3"/><path class="after" d="M0.0,47.0 L2.5,46.4 L5.0,45.8 L7.5,45.1 L10.0,44.5 L12.5,43.8 L15.0,43.2 L17.5,42.6 L20.0,41.9 L22.5,41.3 L25.0,40.7 L27.5,40.0 L30.0,39.4 L32.5,38.7 L35.0,38.1 L37.5,37.5 L40.0,36.9 L42.5,36.2 L45.0,35.6 L47.5,35.0 L50.0,34.3 L52.5,33.7 L55.0,33.3 L57.5,33.3 L60.0,33.3 L62.5,33.3 L65.0,33.3 L67.5,33.3 L70.0,33.3 L72.5,33.3 L75.0,33.2 L77.5,33.2 L80.0,33.1 L82.5,33.0 L85.0,32.8 L87.5,32.6 L90.0,32.4 L92.5,32.0 L95.0,31.6 L97.5,31.2 L100.0,30.7 L102.5,30.3 L105.0,30.0 L107.5,29.8 L110.0,29.9 L112.5,30.3 L115.0,30.9 L117.5,31.7 L120.0,32.6 L122.5,33.5 L125.0,34.3 L127.5,35.1 L130.0,35.8 L132.5,36.4 L135.0,37.0 L137.5,37.6 L140.0,38.1 L142.5,38.5 L145.0,38.9 L147.5,39.3 L150.0,39.6 L152.5,39.9 L155.0,40.2 L157.5,40.4 L160.0,40.6 L162.5,40.7 L165.0,40.8 L167.5,40.8 L170.0,40.7 L172.5,40.6 L175.0,40.5 L177.5,40.5 L180.0,40.8 L182.5,41.3 L185.0,42.1 L187.5,43.1 L190.0,44.1 L192.5,45.3 L195.0,46.4 L197.5,47.9 L200.0,53.1 L202.5,59.0 L205.0,65.8 L207.5,73.9 L210.0,82.7 L212.5,90.5 L215.0,94.7 L217.5,93.2 L220.0,87.0 L222.5,79.0 L225.0,71.4 L227.5,64.9 L230.0,59.5 L232.5,55.0 L235.0,52.7 L237.5,52.3 L240.0,52.0 L242.5,51.7 L245.0,51.4 L247.5,51.2 L250.0,51.1 L252.5,51.1 L255.0,51.4 L257.5,51.9 L260.0,52.5 L262.5,53.3 L265.0,54.1 L267.5,55.0 L270.0,55.8 L272.5,56.7 L275.0,57.4 L277.5,58.1 L280.0,58.8 L282.5,59.5 L285.0,61.1 L287.5,63.4 L290.0,65.8 L292.5,68.3 L295.0,71.1 L297.5,74.1 L300.0,77.6 L302.5,81.2 L305.0,84.9 L307.5,88.2 L310.0,90.5 L312.5,91.3 L315.0,90.5 L317.5,88.4 L320.0,85.8 L322.5,83.1 L325.0,80.7 L327.5,79.1 L330.0,77.7 L332.5,76.6 L335.0,75.7 L337.5,75.0 L340.0,74.4 L342.5,74.2 L345.0,74.0 L347.5,74.0 L350.0,74.0 L352.5,74.0 L355.0,74.2 L357.5,74.3 L360.0,74.5 L362.5,74.6 L365.0,74.7 L367.5,74.8 L370.0,75.0 L372.5,75.1 L375.0,75.3 L377.5,75.5 L380.0,75.7 L382.5,75.9 L385.0,76.1 L387.5,76.3 L390.0,76.5 L392.5,76.8 L395.0,77.0 L397.5,77.2 L400.0,77.5"/></svg>
+                </div>
+              </div></div>
+            </div>
+          </article>
+          <article class="card card--row card--open span-6 m-nolift">
+            <h3>Correction limits on boost and gain</h3>
+            <p>Correction strength, bass boost, timing and filter gain each have a limit, set on the Target tab.</p>
+            <div class="panel">
+              <div class="stage stage--fade-b"><div class="at-right to-edge" style="--ax:32px;--ay:48px">
+                <div class="ui ui-panel ui-toggles" data-ui="toggles">
+                  <div class="ui-head">
+                    <svg class="ui-icon ui-toggles__ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 13 4v3.6c0 3-2.1 5.4-5 6.6-2.9-1.2-5-3.6-5-6.6V4z"/><path d="m5.8 8 1.6 1.6 3-3.2"/></svg>
+                    <div class="ui-title">FIR correction limits</div>
+                    <span class="ui-spacer"></span>
+                    <div class="ui-meta" data-tg-count>3 of 4 on</div>
+                  </div>
+                  <ul class="ui-toggles__list">
+                    <li class="ui-tg"><span class="ui-tg__text"><span class="ui-tg__label">Max boost 5 dB</span><span class="ui-tg__sub">Dips get little, peaks get cut</span></span><button class="ui-switch is-on" type="button" role="switch" aria-checked="true" aria-label="Max boost 5 dB"><i></i></button></li>
+                    <li class="ui-tg"><span class="ui-tg__text"><span class="ui-tg__label">Correct 18 to 230 Hz</span><span class="ui-tg__sub">Where the room does most harm</span></span><button class="ui-switch is-on" type="button" role="switch" aria-checked="true" aria-label="Correct 18 to 230 Hz"><i></i></button></li>
+                    <li class="ui-tg"><span class="ui-tg__text"><span class="ui-tg__label">Auto headroom</span><span class="ui-tg__sub">Level matched 300 to 3000 Hz</span></span><button class="ui-switch is-on" type="button" role="switch" aria-checked="true" aria-label="Auto headroom"><i></i></button></li>
+                    <li class="ui-tg"><span class="ui-tg__text"><span class="ui-tg__label">Channel-specific bass</span><span class="ui-tg__sub">Off unless you ask</span></span><button class="ui-switch" type="button" role="switch" aria-checked="false" aria-label="Channel-specific bass"><i></i></button></li>
+                  </ul>
+                </div>
+              </div></div>
+            </div>
+          </article>
+        </div>
+      </div>
+      <div class="grid">
+        <article class="card card--row card--open span-6 m-nolift">
+          <h3>A correction summary for each channel</h3>
+          <p>The summary lists the gain, the delay removed and the error before and after, per channel.</p>
+          <div class="panel">
+            <div class="stage stage--fade-b"><div class="at-rise fit" style="--fit-max:520px;--ax:max(24px, 50% - 260px);--ay:96px;--ay-sm:16px">
+              <div class="ui ui-panel dc-card">
+                <span class="t-small muted">Result summary</span>
+                <div class="dc-sum">
+                  <div><span>Left target error</span><b>2.57 → 1.47 dB RMS</b></div>
+                  <div><span>Right target error</span><b>3.77 → 2.40 dB RMS</b></div>
+                  <div><span>Auto gain</span><b>−2.81 dB</b></div>
+                  <div><span>Filter delay removed</span><b>84.99 ms</b></div>
+                </div>
+                <svg class="dc-graph dc-tall-g" viewBox="0 0 700 300" preserveAspectRatio="none" aria-hidden="true"><line class="gl" x1="0.0" x2="0.0" y1="0" y2="300"/><line class="gl" x1="92.9" x2="92.9" y1="0" y2="300"/><line class="gl" x1="163.1" x2="163.1" y1="0" y2="300"/><line class="gl" x1="233.3" x2="233.3" y1="0" y2="300"/><line class="gl" x1="326.2" x2="326.2" y1="0" y2="300"/><line class="gl" x1="396.4" x2="396.4" y1="0" y2="300"/><line class="gl" x1="466.7" x2="466.7" y1="0" y2="300"/><line class="gl" x1="559.5" x2="559.5" y1="0" y2="300"/><line class="gl" x1="629.8" x2="629.8" y1="0" y2="300"/><line class="gl" x1="0" x2="700" y1="120.0" y2="120.0"/><path class="meas" d="M0.0,96.0 L2.7,93.8 L5.4,91.6 L8.1,89.4 L10.8,87.2 L13.5,85.0 L16.2,82.8 L18.8,80.6 L21.5,78.4 L24.2,76.1 L26.9,73.9 L29.6,71.7 L32.3,69.5 L35.0,67.3 L37.7,65.1 L40.4,62.8 L43.1,60.5 L45.8,58.1 L48.5,55.8 L51.2,53.2 L53.8,49.8 L56.5,45.3 L59.2,39.6 L61.9,32.1 L64.6,22.8 L67.3,11.9 L70.0,5.0 L72.7,5.0 L75.4,5.0 L78.1,5.0 L80.8,5.0 L83.5,15.1 L86.2,26.3 L88.8,35.7 L91.5,43.1 L94.2,48.8 L96.9,53.0 L99.6,56.0 L102.3,57.9 L105.0,58.6 L107.7,58.2 L110.4,56.4 L113.1,52.8 L115.8,47.4 L118.5,40.5 L121.2,34.2 L123.8,32.8 L126.5,39.2 L129.2,51.4 L131.9,65.7 L134.6,80.7 L137.3,97.1 L140.0,117.2 L142.7,143.0 L145.4,170.6 L148.1,182.6 L150.8,167.2 L153.5,140.6 L156.2,117.7 L158.8,100.6 L161.5,87.0 L164.2,75.1 L166.9,63.9 L169.6,53.7 L172.3,46.5 L175.0,44.5 L177.7,48.5 L180.4,56.8 L183.1,66.8 L185.8,76.5 L188.5,85.3 L191.2,93.0 L193.8,100.2 L196.5,107.2 L199.2,114.6 L201.9,122.9 L204.6,132.8 L207.3,144.3 L210.0,156.1 L212.7,164.3 L215.4,164.9 L218.1,158.5 L220.8,149.4 L223.5,141.0 L226.2,134.5 L228.8,129.8 L231.5,126.6 L234.2,124.4 L236.9,123.2 L239.6,122.5 L242.3,122.1 L245.0,122.0 L247.7,122.1 L250.4,122.2 L253.1,122.5 L255.8,122.8 L258.5,123.2 L261.2,123.6 L263.8,124.1 L266.5,124.6 L269.2,125.0 L271.9,125.5 L274.6,127.8 L277.3,126.4 L280.0,125.0 L282.7,124.7 L285.4,126.6 L288.1,130.8 L290.8,136.4 L293.5,142.0 L296.2,146.0 L298.8,147.2 L301.5,145.2 L304.2,140.7 L306.9,135.0 L309.6,129.7 L312.3,126.1 L315.0,125.0 L317.7,126.0 L320.4,128.1 L323.1,130.0 L325.8,130.6 L328.5,129.3 L331.2,126.5 L333.8,123.3 L336.5,121.4 L339.2,121.9 L341.9,125.4 L344.6,131.7 L347.3,139.5 L350.0,147.2 L352.7,153.1 L355.4,156.2 L358.1,156.3 L360.8,154.3 L363.5,151.3 L366.2,149.0 L368.8,148.1 L371.5,148.8 L374.2,150.5 L376.9,151.8 L379.6,151.4 L382.3,148.6 L385.0,143.4 L387.7,136.6 L390.4,129.9 L393.1,125.0 L395.8,123.0 L398.5,124.5 L401.2,129.0 L403.8,135.0 L406.5,141.1 L409.2,145.8 L411.9,148.4 L414.6,149.3 L417.3,149.4 L420.0,150.0 L422.7,152.1 L425.4,156.0 L428.1,161.4 L430.8,167.0 L433.5,171.2 L436.2,172.6 L438.8,170.6 L441.5,165.6 L444.2,158.6 L446.9,151.4 L449.6,145.7 L452.3,142.4 L455.0,141.8 L457.7,143.1 L460.4,145.2 L463.1,146.6 L465.8,146.5 L468.5,144.9 L471.2,142.5 L473.8,140.7 L476.5,140.8 L479.2,143.7 L481.9,149.4 L484.6,157.0 L487.3,164.9 L490.0,171.3 L492.7,175.1 L495.4,175.6 L498.1,173.5 L500.8,169.9 L503.5,166.4 L506.2,164.2 L508.8,163.9 L511.5,165.1 L514.2,166.9 L516.9,167.8 L519.6,166.9 L522.3,163.6 L525.0,158.4 L527.7,152.7 L530.4,148.1 L533.1,145.9 L535.8,146.8 L538.5,150.7 L541.2,156.4 L543.8,162.3 L546.5,167.0 L549.2,169.4 L551.9,169.5 L554.6,168.1 L557.3,166.5 L560.0,166.0 L562.7,167.4 L565.4,170.9 L568.1,175.4 L570.8,179.6 L573.5,182.1 L576.2,181.9 L578.8,178.9 L581.5,173.9 L584.2,168.4 L586.9,163.9 L589.6,161.8 L592.3,162.4 L595.0,165.1 L597.7,168.9 L600.4,172.1 L603.1,173.7 L605.8,173.0 L608.5,170.6 L611.2,167.5 L613.8,165.4 L616.5,165.3 L619.2,167.8 L621.9,172.4 L624.6,178.0 L627.3,182.9 L630.0,185.8 L632.7,186.0 L635.4,183.7 L638.1,179.9 L640.8,176.1 L643.5,173.8 L646.2,173.7 L648.8,176.0 L651.5,179.6 L654.2,183.2 L656.9,185.4 L659.6,185.2 L662.3,182.7 L665.0,178.8 L667.7,174.8 L670.4,172.3 L673.1,172.2 L675.8,174.8 L678.5,179.2 L681.2,184.1 L683.8,187.9 L686.5,189.6 L689.2,188.7 L691.9,185.9 L694.6,182.4 L697.3,179.7 L700.0,179.0"/><path class="tgt" d="M0.0,62.8 L2.7,63.0 L5.4,63.1 L8.1,63.3 L10.8,63.5 L13.5,63.6 L16.2,63.8 L18.8,64.0 L21.5,64.2 L24.2,64.4 L26.9,64.7 L29.6,64.9 L32.3,65.1 L35.0,65.4 L37.7,65.6 L40.4,65.9 L43.1,66.2 L45.8,66.5 L48.5,66.8 L51.2,67.2 L53.8,67.5 L56.5,67.9 L59.2,68.2 L61.9,68.6 L64.6,69.0 L67.3,69.4 L70.0,69.9 L72.7,70.3 L75.4,70.8 L78.1,71.2 L80.8,71.7 L83.5,72.2 L86.2,72.8 L88.8,73.3 L91.5,73.9 L94.2,74.4 L96.9,75.0 L99.6,75.6 L102.3,76.3 L105.0,76.9 L107.7,77.6 L110.4,78.2 L113.1,78.9 L115.8,79.6 L118.5,80.3 L121.2,81.0 L123.8,81.8 L126.5,82.5 L129.2,83.3 L131.9,84.0 L134.6,84.8 L137.3,85.6 L140.0,86.3 L142.7,87.1 L145.4,87.9 L148.1,88.7 L150.8,89.5 L153.5,90.3 L156.2,91.1 L158.8,91.9 L161.5,92.7 L164.2,93.5 L166.9,94.3 L169.6,95.0 L172.3,95.8 L175.0,96.6 L177.7,97.3 L180.4,98.1 L183.1,98.8 L185.8,99.5 L188.5,100.2 L191.2,100.9 L193.8,101.6 L196.5,102.3 L199.2,103.0 L201.9,103.6 L204.6,104.2 L207.3,104.8 L210.0,105.4 L212.7,106.0 L215.4,106.6 L218.1,107.1 L220.8,107.6 L223.5,108.2 L226.2,108.6 L228.8,109.1 L231.5,109.6 L234.2,110.2 L236.9,110.9 L239.6,111.7 L242.3,112.4 L245.0,113.2 L247.7,113.9 L250.4,114.6 L253.1,115.3 L255.8,116.0 L258.5,116.6 L261.2,117.3 L263.8,117.9 L266.5,118.5 L269.2,119.2 L271.9,119.8 L274.6,120.4 L277.3,120.9 L280.0,121.5 L282.7,122.1 L285.4,122.6 L288.1,123.2 L290.8,123.7 L293.5,124.2 L296.2,124.7 L298.8,125.2 L301.5,125.7 L304.2,126.2 L306.9,126.7 L309.6,127.2 L312.3,127.7 L315.0,128.1 L317.7,128.6 L320.4,129.1 L323.1,129.5 L325.8,129.9 L328.5,130.4 L331.2,130.8 L333.8,131.3 L336.5,131.7 L339.2,132.1 L341.9,132.5 L344.6,132.9 L347.3,133.3 L350.0,133.8 L352.7,134.2 L355.4,134.6 L358.1,135.0 L360.8,135.4 L363.5,135.8 L366.2,136.1 L368.8,136.5 L371.5,136.9 L374.2,137.3 L376.9,137.7 L379.6,138.1 L382.3,138.5 L385.0,138.8 L387.7,139.2 L390.4,139.6 L393.1,140.0 L395.8,140.3 L398.5,140.7 L401.2,141.1 L403.8,141.4 L406.5,141.8 L409.2,142.2 L411.9,142.5 L414.6,142.9 L417.3,143.3 L420.0,143.6 L422.7,144.0 L425.4,144.3 L428.1,144.7 L430.8,145.1 L433.5,145.4 L436.2,145.8 L438.8,146.1 L441.5,146.5 L444.2,146.8 L446.9,147.2 L449.6,147.5 L452.3,147.9 L455.0,148.2 L457.7,148.6 L460.4,149.0 L463.1,149.3 L465.8,149.7 L468.5,150.0 L471.2,150.4 L473.8,150.7 L476.5,151.1 L479.2,151.4 L481.9,151.8 L484.6,152.1 L487.3,152.5 L490.0,152.8 L492.7,153.2 L495.4,153.5 L498.1,153.9 L500.8,154.2 L503.5,154.6 L506.2,154.9 L508.8,155.2 L511.5,155.6 L514.2,155.9 L516.9,156.3 L519.6,156.6 L522.3,157.0 L525.0,157.3 L527.7,157.7 L530.4,158.0 L533.1,158.4 L535.8,158.7 L538.5,159.1 L541.2,159.4 L543.8,159.8 L546.5,160.1 L549.2,160.5 L551.9,160.8 L554.6,161.1 L557.3,161.5 L560.0,161.8 L562.7,162.2 L565.4,162.5 L568.1,162.9 L570.8,163.2 L573.5,163.6 L576.2,163.9 L578.8,164.3 L581.5,164.6 L584.2,164.9 L586.9,165.3 L589.6,165.6 L592.3,166.0 L595.0,166.3 L597.7,166.7 L600.4,167.0 L603.1,167.4 L605.8,167.7 L608.5,168.1 L611.2,168.4 L613.8,168.7 L616.5,169.1 L619.2,169.4 L621.9,169.8 L624.6,170.1 L627.3,170.5 L630.0,170.8 L632.7,171.2 L635.4,171.5 L638.1,171.9 L640.8,172.2 L643.5,172.5 L646.2,172.9 L648.8,173.2 L651.5,173.6 L654.2,173.9 L656.9,174.3 L659.6,174.6 L662.3,175.0 L665.0,175.3 L667.7,175.7 L670.4,176.0 L673.1,176.3 L675.8,176.7 L678.5,177.0 L681.2,177.4 L683.8,177.7 L686.5,178.1 L689.2,178.4 L691.9,178.8 L694.6,179.1 L697.3,179.4 L700.0,179.8"/><path class="pred" d="M0.0,84.4 L2.7,83.0 L5.4,81.6 L8.1,80.3 L10.8,78.9 L13.5,77.5 L16.2,76.1 L18.8,74.8 L21.5,73.4 L24.2,72.0 L26.9,70.7 L29.6,69.3 L32.3,68.0 L35.0,66.6 L37.7,65.6 L40.4,65.6 L43.1,65.5 L45.8,65.5 L48.5,65.5 L51.2,65.5 L53.8,65.4 L56.5,65.2 L59.2,64.8 L61.9,64.2 L64.6,63.5 L67.3,62.5 L70.0,61.5 L72.7,60.9 L75.4,61.0 L78.1,61.9 L80.8,63.5 L83.5,65.4 L86.2,67.2 L88.8,68.8 L91.5,70.2 L94.2,71.4 L96.9,72.4 L99.6,73.3 L102.3,74.1 L105.0,74.7 L107.7,75.2 L110.4,75.6 L113.1,75.8 L115.8,75.7 L118.5,75.5 L121.2,75.4 L123.8,75.9 L126.5,77.3 L129.2,79.4 L131.9,81.8 L134.6,84.3 L137.3,93.1 L140.0,106.4 L142.7,123.4 L145.4,141.7 L148.1,149.8 L150.8,140.0 L153.5,123.0 L156.2,108.4 L158.8,97.5 L161.5,92.0 L164.2,91.3 L166.9,90.6 L169.6,90.1 L172.3,89.9 L175.0,90.3 L177.7,91.5 L180.4,93.1 L183.1,95.0 L185.8,96.8 L188.5,98.4 L191.2,100.0 L193.8,101.5 L196.5,105.5 L199.2,110.5 L201.9,116.2 L204.6,122.8 L207.3,130.5 L210.0,138.3 L212.7,143.9 L215.4,144.5 L218.1,140.5 L220.8,134.8 L223.5,129.8 L226.2,126.6 L228.8,124.2 L231.5,122.6 L234.2,121.6 L236.9,121.3 L239.6,121.2 L242.3,121.4 L245.0,121.7 L247.7,122.1 L250.4,122.2 L253.1,122.5 L255.8,122.8 L258.5,123.2 L261.2,123.6 L263.8,124.1 L266.5,124.6 L269.2,125.0 L271.9,125.5 L274.6,127.8 L277.3,126.4 L280.0,125.0 L282.7,124.7 L285.4,126.6 L288.1,130.8 L290.8,136.4 L293.5,142.0 L296.2,146.0 L298.8,147.2 L301.5,145.2 L304.2,140.7 L306.9,135.0 L309.6,129.7 L312.3,126.1 L315.0,125.0 L317.7,126.0 L320.4,128.1 L323.1,130.0 L325.8,130.6 L328.5,129.3 L331.2,126.5 L333.8,123.3 L336.5,121.4 L339.2,121.9 L341.9,125.4 L344.6,131.7 L347.3,139.5 L350.0,147.2 L352.7,153.1 L355.4,156.2 L358.1,156.3 L360.8,154.3 L363.5,151.3 L366.2,149.0 L368.8,148.1 L371.5,148.8 L374.2,150.5 L376.9,151.8 L379.6,151.4 L382.3,148.6 L385.0,143.4 L387.7,136.6 L390.4,129.9 L393.1,125.0 L395.8,123.0 L398.5,124.5 L401.2,129.0 L403.8,135.0 L406.5,141.1 L409.2,145.8 L411.9,148.4 L414.6,149.3 L417.3,149.4 L420.0,150.0 L422.7,152.1 L425.4,156.0 L428.1,161.4 L430.8,167.0 L433.5,171.2 L436.2,172.6 L438.8,170.6 L441.5,165.6 L444.2,158.6 L446.9,151.4 L449.6,145.7 L452.3,142.4 L455.0,141.8 L457.7,143.1 L460.4,145.2 L463.1,146.6 L465.8,146.5 L468.5,144.9 L471.2,142.5 L473.8,140.7 L476.5,140.8 L479.2,143.7 L481.9,149.4 L484.6,157.0 L487.3,164.9 L490.0,171.3 L492.7,175.1 L495.4,175.6 L498.1,173.5 L500.8,169.9 L503.5,166.4 L506.2,164.2 L508.8,163.9 L511.5,165.1 L514.2,166.9 L516.9,167.8 L519.6,166.9 L522.3,163.6 L525.0,158.4 L527.7,152.7 L530.4,148.1 L533.1,145.9 L535.8,146.8 L538.5,150.7 L541.2,156.4 L543.8,162.3 L546.5,167.0 L549.2,169.4 L551.9,169.5 L554.6,168.1 L557.3,166.5 L560.0,166.0 L562.7,167.4 L565.4,170.9 L568.1,175.4 L570.8,179.6 L573.5,182.1 L576.2,181.9 L578.8,178.9 L581.5,173.9 L584.2,168.4 L586.9,163.9 L589.6,161.8 L592.3,162.4 L595.0,165.1 L597.7,168.9 L600.4,172.1 L603.1,173.7 L605.8,173.0 L608.5,170.6 L611.2,167.5 L613.8,165.4 L616.5,165.3 L619.2,167.8 L621.9,172.4 L624.6,178.0 L627.3,182.9 L630.0,185.8 L632.7,186.0 L635.4,183.7 L638.1,179.9 L640.8,176.1 L643.5,173.8 L646.2,173.7 L648.8,176.0 L651.5,179.6 L654.2,183.2 L656.9,185.4 L659.6,185.2 L662.3,182.7 L665.0,178.8 L667.7,174.8 L670.4,172.3 L673.1,172.2 L675.8,174.8 L678.5,179.2 L681.2,184.1 L683.8,187.9 L686.5,189.6 L689.2,188.7 L691.9,185.9 L694.6,182.4 L697.3,179.7 L700.0,179.0"/></svg>
+              </div>
+            </div></div>
+          </div>
+        </article>
+        <article class="card card--row card--open span-6 m-nolift">
+          <h3>Decay control for ringing room modes</h3>
+          <p>Temporal Decay Control cuts a lingering room mode by up to 9 dB, so the next bass note gets through.</p>
+          <div class="panel">
+            <div class="stage stage--fade-b"><div class="at-rise fit" style="--fit-max:520px;--ax:max(24px, 50% - 260px);--ay:96px;--ay-sm:16px">
+              <div class="ui ui-panel dc-card">
+                <span class="t-small muted">A 42 Hz mode, 0 to 600 ms</span>
+                <svg viewBox="0 0 400 150" class="dc-mini dc-tall" preserveAspectRatio="none" aria-hidden="true"><path class="before" d="M0.0,0.0 L3.3,0.0 L6.7,0.5 L10.0,1.5 L13.3,3.3 L16.7,5.7 L20.0,8.6 L23.3,11.8 L26.7,14.9 L30.0,17.6 L33.3,19.8 L36.7,21.3 L40.0,22.3 L43.3,22.8 L46.7,23.1 L50.0,23.5 L53.3,24.3 L56.7,25.5 L60.0,27.4 L63.3,29.7 L66.7,32.5 L70.0,35.3 L73.3,38.1 L76.7,40.5 L80.0,42.5 L83.3,44.0 L86.7,45.0 L90.0,45.7 L93.3,46.3 L96.7,47.0 L100.0,48.0 L103.3,49.4 L106.7,51.3 L110.0,53.6 L113.3,56.1 L116.7,58.8 L120.0,61.3 L123.3,63.5 L126.7,65.3 L130.0,66.8 L133.3,67.9 L136.7,68.7 L140.0,69.6 L143.3,70.5 L146.7,71.7 L150.0,73.2 L153.3,75.1 L156.7,77.3 L160.0,79.7 L163.3,82.1 L166.7,84.4 L170.0,86.5 L173.3,88.2 L176.7,89.7 L180.0,90.8 L183.3,91.9 L186.7,92.9 L190.0,94.0 L193.3,95.3 L196.7,96.9 L200.0,98.8 L203.3,101.0 L206.7,103.2 L210.0,105.5 L213.3,107.6 L216.7,109.5 L220.0,111.2 L223.3,112.7 L226.7,113.9 L230.0,115.1 L233.3,116.2 L236.7,117.5 L240.0,118.9 L243.3,120.6 L246.7,122.5 L250.0,124.5 L253.3,126.7 L256.7,128.8 L260.0,130.8 L263.3,132.6 L266.7,134.3 L270.0,135.7 L273.3,137.1 L276.7,138.3 L280.0,139.6 L283.3,140.9 L286.7,142.5 L290.0,144.2 L293.3,146.0 L296.7,148.0 L300.0,150.0 L303.3,150.0 L306.7,150.0 L310.0,150.0 L313.3,150.0 L316.7,150.0 L320.0,150.0 L323.3,149.9 L326.7,149.6 L330.0,149.4 L333.3,149.3 L336.7,149.3 L340.0,149.5 L343.3,149.8 L346.7,150.0 L350.0,150.0 L353.3,150.0 L356.7,150.0 L360.0,150.0 L363.3,150.0 L366.7,150.0 L370.0,149.9 L373.3,149.7 L376.7,149.5 L380.0,149.4 L383.3,149.5 L386.7,149.7 L390.0,149.9 L393.3,150.0 L396.7,150.0 L400.0,150.0"/><path class="after" d="M0.0,0.0 L3.3,1.4 L6.7,3.1 L10.0,5.4 L13.3,8.5 L16.7,12.2 L20.0,16.5 L23.3,21.0 L26.7,25.4 L30.0,29.4 L33.3,32.9 L36.7,35.7 L40.0,38.0 L43.3,39.8 L46.7,41.4 L50.0,43.2 L53.3,45.2 L56.7,47.8 L60.0,50.9 L63.3,54.6 L66.7,58.6 L70.0,62.8 L73.3,66.9 L76.7,70.6 L80.0,73.9 L83.3,76.7 L86.7,79.0 L90.0,81.0 L93.3,83.0 L96.7,85.0 L100.0,87.3 L103.3,90.0 L106.7,93.2 L110.0,96.8 L113.3,100.7 L116.7,104.6 L120.0,108.4 L123.3,111.9 L126.7,115.1 L130.0,117.8 L133.3,120.2 L136.7,122.4 L140.0,124.6 L143.3,126.8 L146.7,129.3 L150.0,132.2 L153.3,135.4 L156.7,138.9 L160.0,142.6 L163.3,146.3 L166.7,149.9 L170.0,150.0 L173.3,150.0 L176.7,150.0 L180.0,150.0 L183.3,150.0 L186.7,149.5 L190.0,149.0 L193.3,148.7 L196.7,148.6 L200.0,148.8 L203.3,149.3 L206.7,149.9 L210.0,150.0 L213.3,150.0 L216.7,150.0 L220.0,150.0 L223.3,150.0 L226.7,150.0 L230.0,150.0 L233.3,149.5 L236.7,149.1 L240.0,148.9 L243.3,148.9 L246.7,149.1 L250.0,149.5 L253.3,150.0 L256.7,150.0 L260.0,150.0 L263.3,150.0 L266.7,150.0 L270.0,150.0 L273.3,150.0 L276.7,150.0 L280.0,149.6 L283.3,149.3 L286.7,149.1 L290.0,149.2 L293.3,149.4 L296.7,149.7 L300.0,150.0 L303.3,150.0 L306.7,150.0 L310.0,150.0 L313.3,150.0 L316.7,150.0 L320.0,150.0 L323.3,149.9 L326.7,149.6 L330.0,149.4 L333.3,149.3 L336.7,149.3 L340.0,149.5 L343.3,149.8 L346.7,150.0 L350.0,150.0 L353.3,150.0 L356.7,150.0 L360.0,150.0 L363.3,150.0 L366.7,150.0 L370.0,149.9 L373.3,149.7 L376.7,149.5 L380.0,149.4 L383.3,149.5 L386.7,149.7 L390.0,149.9 L393.3,150.0 L396.7,150.0 L400.0,150.0"/></svg>
+                <div class="dc-legend"><span><i style="border-color:#8fb6c4;border-top-style:dashed"></i>Before</span><span><i style="border-color:#0d7480"></i>With TDC</span></div>
+              </div>
+            </div></div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- split-text-left on the surface band; the page's one effect (grain-gradient) in this [data-visual] frame -->
+  <section class="section ground-surface" id="playback" aria-labelledby="playback-h">
+    <div class="wrap">
+      <div class="grid grid--top">
+        <div class="span-5 stack-5">
+          <h2 id="playback-h">Correction filters for the player you already use</h2>
+          <p class="t-lead">DecayCore writes one filter per channel. Load them in your convolver and keep your library, your player and your routing.</p>
+          <ul class="stack-3">
+            <li>WAV filters for CamillaDSP, Roon, JRiver, HQPlayer and Equalizer APO</li>
+            <li>FIR and PEQ files for miniDSP</li>
+            <li>Any other convolver that loads a WAV impulse</li>
+          </ul>
+          <a class="link" href="{{ '/playback/' | relative_url }}">Read the playback guides</a>
+        </div>
+        <div class="frame frame--split span-6 start-7" data-visual data-fx="grain-gradient" data-fx-seed="7">
+          <div class="stage stage--fade-br"><div class="at-corner to-edge" style="--w: 680px; --ax: 56px; --ay: 56px">
+            <div class="ui ui-panel dc-out">
+              <div class="ui-head"><div class="ui-title">Output settings</div><span class="ui-spacer"></span><div class="ui-meta">Ready to export</div></div>
+              <dl class="dc-out__rows">
+                <dt>Format</dt><dd>Mono WAV, 32-bit float</dd>
+                <dt>CamillaDSP</dt><dd>S32_LE</dd>
+                <dt>Sample rate</dt><dd>44.1 kHz</dd>
+                <dt>Taps</dt><dd>65,536 per channel</dd>
+              </dl>
+              <ul class="dc-out__files">
+                <li><img data-icon="audio" src="{{ '/assets/kit/icons/audio.svg' | relative_url }}" alt="" width="24" height="24" loading="lazy"><span>Left filter.wav</span><span>WAV</span></li>
+                <li><img data-icon="audio" src="{{ '/assets/kit/icons/audio.svg' | relative_url }}" alt="" width="24" height="24" loading="lazy"><span>Right filter.wav</span><span>WAV</span></li>
+                <li><img data-icon="audio" src="{{ '/assets/kit/icons/audio.svg' | relative_url }}" alt="" width="24" height="24" loading="lazy"><span>Bypass, left and right.wav</span><span>WAV</span></li>
+                <li><img data-icon="txt" src="{{ '/assets/kit/icons/txt.svg' | relative_url }}" alt="" width="24" height="24" loading="lazy"><span>camilladsp.yml</span><span>Config</span></li>
+                <li><img data-icon="txt" src="{{ '/assets/kit/icons/txt.svg' | relative_url }}" alt="" width="24" height="24" loading="lazy"><span>Summary.txt</span><span>Report</span></li>
+                <li><img data-icon="txt" src="{{ '/assets/kit/icons/txt.svg' | relative_url }}" alt="" width="24" height="24" loading="lazy"><span>miniDSP FIR.txt</span><span>FIR</span></li>
+                <li><img data-icon="txt" src="{{ '/assets/kit/icons/txt.svg' | relative_url }}" alt="" width="24" height="24" loading="lazy"><span>miniDSP PEQ.txt</span><span>PEQ</span></li>
+              </ul>
+            </div>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="faq" aria-labelledby="faq-h">
+    <div class="wrap">
+      <div class="grid grid--top">
+        <div class="span-6 stack-6">
+          <div class="section-head"><h2 id="faq-h">Questions before you measure</h2></div>
+          <div class="dc-os">
+            <div class="dc-os__icons"><img loading="lazy" data-icon="windows" src="{{ '/assets/kit/icons/windows.svg' | relative_url }}" alt="Windows" width="40" height="40"><img loading="lazy" data-icon="linux-tux" src="{{ '/assets/kit/icons/linux-tux.svg' | relative_url }}" alt="Linux" width="40" height="40"><img loading="lazy" data-icon="apple" src="{{ '/assets/kit/icons/apple.svg' | relative_url }}" alt="macOS" width="40" height="40" class="ic-ink"></div>
+            <div class="ui ui-panel dc-release">
+              <div class="ui-head"><div class="ui-title">Latest release</div><span class="ui-spacer"></span><div class="ui-meta">Version 1.4.7</div></div>
+              <dl class="dc-out__rows">
+                <dt>Windows</dt><dd>x64</dd>
+                <dt>Linux</dt><dd>x86_64 and ARM64</dd>
+                <dt>macOS</dt><dd>Apple silicon and Intel</dd>
+              </dl>
+              <p class="dc-release__links"><a class="link" href="{{ '/changelog/' | relative_url }}">Read the changelog</a></p>
+            </div>
+          </div>
+        </div>
+        <div class="faq span-6 start-7">
+          <div class="faq__item"><h3>What do I need to measure the room?</h3><p>A calibrated measurement microphone, a way to play the sweep, and a player that loads FIR convolution filters.</p></div>
+          <div class="faq__item"><h3>Which correction filter should I start with?</h3><p>Automatic mode with the Mixed phase filter type, the default. It tries conservative settings first and shows which ones it chose.</p></div>
+          <div class="faq__item"><h3>Does the graph show my corrected room?</h3><p>No. The predicted curve is the measurement with the filter applied in software. To measure the corrected room, route a sweep through your convolver.</p></div>
+          <div class="faq__item"><h3>What does DecayCore cost?</h3><p>Nothing for non-commercial use. The packaged release adds guided measurement and Automatic mode to the manual Basic and Advanced modes.</p></div>
+          <div class="faq__item"><h3>Was DecayCore called CamillaFIR?</h3><p>Yes. The name changed to avoid confusion with CamillaDSP, which DecayCore still exports for.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>

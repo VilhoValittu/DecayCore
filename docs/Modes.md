@@ -29,8 +29,6 @@ Across all modes, the correction philosophy stays the same: cuts are the main to
 - BASIC clamps are re-applied at runtime for safety.
 - AUTO and ADVANCED do not use BASIC-style hard mode clamps.
 
----
-
 ## AUTO (default startup mode)
 
 Goal: let DecayCore search for a good preset automatically.
@@ -46,13 +44,11 @@ Goal: let DecayCore search for a good preset automatically.
 
 In AUTO mode, three target strategies are available from the Setup tab:
 
-- **Adaptive: derive target from room acoustics** (default) — scores built-in curves to select a base, then adjusts it by at most ±1 dB using broad, stereo-consistent bass evidence. It reduces adaptation when channels disagree, preserves the selected curve above 500 Hz by default, and permits additional bass lift only with reliable stereo RT60 evidence. It skips the full multi-curve candidate search.
-- **Auto: search best built-in** — evaluates multiple built-in target curves in parallel and picks the best-ranked match. Robust choice when the measurement source is unknown or external.
-- **Use selected target curve from Target page** — uses the target curve manually selected in the Target tab. Disables automatic target search.
+- **Adaptive: derive target from room acoustics** (default): scores built-in curves to select a base, then adjusts it by at most ±1 dB using broad, stereo-consistent bass evidence. It reduces adaptation when channels disagree, preserves the selected curve above 500 Hz by default, and permits additional bass lift only with reliable stereo RT60 evidence. It skips the full multi-curve candidate search.
+- **Auto: search best built-in**: evaluates multiple built-in target curves in parallel and picks the best-ranked match. Use it when the measurement source is unknown or external.
+- **Use selected target curve from Target page**: uses the target curve manually selected in the Target tab. Disables automatic target search.
 
 When `auto_goal` is set to "Prefer Bass", the mode is locked to `selected`.
-
----
 
 ### AUTO defaults when applying mode defaults
 
@@ -75,8 +71,6 @@ When `auto_goal` is set to "Prefer Bass", the mode is locked to `selected`.
 Notes:
 - Fresh config files currently start with `Mixed` as the default filter type before any mode-defaults button is applied.
 - In AUTO, the final winner may differ from the visible seed values because the search is allowed to move around that baseline.
-
----
 
 ## BASIC
 
@@ -129,8 +123,6 @@ Goal: predictable manual results with hard guard rails.
 - Forced booleans: `enable_tdc=True`, `enable_afdw=True`, `low_bass_cut_enable=True`, `stereo_link=True`
 - Forced mode: `ir_export_window_mode='auto'`
 
----
-
 ## ADVANCED
 
 Goal: manual expert workflow with fewer policy constraints.
@@ -161,8 +153,6 @@ Goal: manual expert workflow with fewer policy constraints.
 - Excursion protection: ON
 - Low-bass cut: ON, `40 Hz`
 - IR windowing mode: `auto`
-
----
 
 ## Additional runtime notes
 

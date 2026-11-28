@@ -60,7 +60,7 @@ DecayCore provides multiple safety layers:
 - FDW / A-FDW to reduce reflection-driven phase noise
 - Mixed-phase excess correction fade (LF full correction -> HF no correction)
 - Mixed-only guards: `max_excess_delay_ms` and `max_pre_ringing_db`
-- adaptive excess-phase clamp behavior for robust operation
+- adaptive excess-phase clamping
 - conditional GD spike guarding in bass-focused high-risk cases
 
 ## 5) TDC targets ringing that EQ alone cannot fix

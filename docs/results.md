@@ -24,9 +24,9 @@ The filters are ready. Before reaching for the volume knob, check the result vie
 
 <figure class="report-figure">
   <a href="{{ '/pics/result-response-example.png' | relative_url }}">
-    <img src="{{ '/pics/result-response-example.png' | relative_url }}" alt="DecayCore result showing target-tracking figures and a left-channel response graph" width="1610" height="900" loading="lazy">
+    <img src="{{ '/pics/result-response-example.png' | relative_url }}" alt="DecayCore result: the left channel response with measured, predicted and target curves" width="1232" height="712" loading="lazy">
   </a>
-  <figcaption>Completed result with target-tracking figures and a response graph. DecayCore predicts the exported filter's effect here; measuring the corrected playback requires a separate sweep through your convolver.</figcaption>
+  <figcaption>Completed result: the left channel response with measured, predicted and target curves. DecayCore predicts the exported filter's effect here; measuring the corrected playback requires a separate sweep through your convolver.</figcaption>
 </figure>
 
 Check these before playback:

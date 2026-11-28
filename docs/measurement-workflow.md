@@ -7,7 +7,7 @@ permalink: /measurement-workflow/
 
 The microphone helps explain why the bass changes when you lean forward in your favourite chair. Give it a quiet room and a repeatable setup, and you have a useful starting point for correction. **I recommend DecayCore's own guided measurement** in the packaged release whenever your platform and routing support it.
 
-The same session captures the speaker response, **RT60 decay data**, and **harmonic distortion curves**. RT60 helps DecayCore assess how long sound energy lingers in the room. Harmonic data helps identify frequencies where adding boost may ask too much of the system. That is useful information before telling a small woofer to audition as a subwoofer.
+The same session captures the speaker response, RT60 decay data, and harmonic distortion curves. RT60 helps DecayCore assess how long sound energy lingers in the room. Harmonic data helps identify frequencies where adding boost may ask too much of the system. That is useful information before telling a small woofer to audition as a subwoofer.
 
 These values come from the recorded sweep: DecayCore analyses the measured impulse response for RT60 and separates harmonic responses from the sweep recording. The correction can use those saved results directly. There is no need to reconstruct decay from a frequency-response curve when the session already contains usable decay data.
 

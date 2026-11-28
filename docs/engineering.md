@@ -85,6 +85,6 @@ If you have ever moved a speaker a few centimetres and then listened to the same
 
 ## Terminology
 
-- [Glossary]({{ '/glossary/' | relative_url }}) — short definitions for the terms used across these pages
+- [Glossary]({{ '/glossary/' | relative_url }}): short definitions for the terms used across these pages
 
 For application steps rather than engineering detail, use the [User Manual]({{ '/manual/' | relative_url }}).

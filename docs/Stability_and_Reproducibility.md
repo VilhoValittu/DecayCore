@@ -25,19 +25,15 @@ DecayCore produces repeatable outputs.
 
 The pipeline keeps its behavior deterministic for fixed inputs and settings.
 Automatic mode may use seeded Optuna-backed search, but the seed is derived deterministically from the measurement/signature context so identical runs remain reproducible.
-Current releases keep this deterministic model while retaining smarter cache reuse around automatic-mode target and preset search.
+Cache reuse in automatic-mode target and preset search does not change this.
 
 ## 2) Input robustness: TXT and WAV/IR
 
-Modern workflows mix REW text exports and WAV/IR measurements.
-
-Stability improvements include:
+DecayCore accepts REW text exports and WAV impulse responses. WAV handling includes:
 - deterministic WAV parsing policy aligned to TXT baseline behavior
 - path sanitation and local WAV existence validation
 - higher minimum FFT robustness for WAV IR -> FR conversion
 - alignment guard between delay estimate and impulse-peak alignment
-
-This reduces source-format-dependent surprises.
 
 ## 3) Bounded correction prevents inverse-filter runaway
 
@@ -56,8 +52,6 @@ Decay bounds:
 - TDC strength and max reduction limits
 - optional TDC slope limit
 
-When limits are active, behavior remains controlled instead of extreme.
-
 ## 4) Confidence-guided correction improves repeatability
 
 Room data confidence is frequency-dependent.
@@ -74,9 +68,7 @@ Phase processing is constrained by design:
 - `phase_limit` bounds correction bandwidth
 - Mixed-phase excess correction is faded from LF to HF
 - Mixed-only limits cap excess delay and pre-ringing risk
-- adaptive excess-phase clamping and conditional GD spike guards improve robustness
-
-These controls prevent unstable phase behavior and reduce ringing risk.
+- adaptive excess-phase clamping and conditional GD spike guards
 
 ## 6) Headroom reproducibility and stereo consistency
 
@@ -85,8 +77,6 @@ Level handling is deterministic and tied to realized correction:
 - stereo-linked runs share the leveling anchor and window, and both channels get the lower of the two broadband gains
 - plot-only compensation keeps analysis visuals readable while preserving output safety
 
-This keeps output gain decisions consistent across repeated runs.
-
 ## 7) Comparable evaluation across fs/taps
 
 Changing fs/taps can change analysis grids even when audible behavior is similar.
@@ -94,19 +84,16 @@ DecayCore addresses this with:
 - comparison mode (fixed reference grid for scoring/match)
 - multi-rate export with time-length-aware tap mapping
 
-So you can compare settings more fairly without grid-induced score drift.
+Scores then stay comparable when only the grid changes.
 
 ## 8) Observability and audit trail
 
-Reproducibility needs traceability.
-DecayCore provides:
+DecayCore records:
 - Summary version stamp and key effective parameters
 - run timing breakdown (Read, DSP, ZIP/PNG, Render, Total)
 - expanded System Health warnings for source completeness and risky settings
 
 If two runs differ, diagnostics help explain why.
-
----
 
 ## Reproducible-run checklist
 

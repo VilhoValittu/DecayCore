@@ -7,6 +7,8 @@ permalink: /playback/
 
 DecayCore makes the filters; your player runs them. Tick the files for your player in **Output settings** before you press **START**, then follow its page below. Each page covers what the export holds, how to load it, and what to check before the first record.
 
+## Player guides
+
 <div class="doc-grid">
   <section class="doc-card">
     <h3><a href="{{ '/playback/camilladsp/' | relative_url }}">CamillaDSP</a></h3>

@@ -8,7 +8,14 @@
     <meta name="theme-color" content="#0d0a2b">
     <meta name="color-scheme" content="light dark">
     <link rel="icon" type="image/svg+xml" href="{{ '/pics/favicon.svg' | relative_url }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ '/assets/main.css' | relative_url }}">
+    {% if page.math %}
+    <script>window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] } };</script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js"></script>
+    {% endif %}
   </head>
   <body class="{% if page.hide_title %}is-home {% endif %}{% if page.wide_content %}has-wide-content{% endif %}">
     <a class="skip-link" href="#main-content">Skip to main content</a>

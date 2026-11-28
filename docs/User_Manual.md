@@ -24,7 +24,7 @@ DecayCore accepts impulse-response WAV files and text exports containing frequen
 ### A safe first run
 
 1. Use **Measure** for guided Left and Right measurements with RT60 and harmonic data, then press **Use final measurements**. To import existing measurements, open **Choose files…** in the sidebar.
-2. Select **DecayCore automatic mode (recommended)** and **Asymmetric**.
+2. Select **DecayCore automatic mode (recommended)** and **Mixed Phase** (the default).
 3. Keep the **balanced** goal and **Adaptive: derive target from room acoustics** target strategy.
 4. Press **START** on **START / Results**.
 5. Check the warnings and selected solution.
@@ -46,7 +46,7 @@ The sidebar shows the selected file for each channel. Once all required channels
 are loaded, the button changes to **Change files…**. With bass integration enabled,
 the same window shows the main and subwoofer channels.
 
-![Measurement file selection window with the folder and Left and Right channels](pics/measurement-file-selection.png)
+![Measurement file selection window with the folder and Left and Right channels]({{ '/pics/measurement-file-selection.png' | relative_url }})
 
 ### Guided measurement
 
@@ -95,11 +95,11 @@ Automatic mode evaluates candidate presets, ranks them against the current measu
 
 Choose an AUTO goal:
 
-- **balanced** — general-purpose default
-- **room-safe** — more conservative for difficult measurements
-- **low-ripple** — prioritizes smoother low-frequency response around modes
-- **prefer bass** — gives bass target matching more weight
-- **subwoofers** — focuses analysis and leveling on subwoofer work
+- **balanced**: general-purpose default
+- **room-safe**: more conservative for difficult measurements
+- **low-ripple**: prioritizes smoother low-frequency response around modes
+- **prefer bass**: gives bass target matching more weight
+- **subwoofers**: focuses analysis and leveling on subwoofer work
 
 The scores compare candidates from the same measurement set. Do not use them to compare unrelated speakers or rooms.
 
@@ -140,9 +140,9 @@ In Basic and Advanced modes, select the target directly on **Target**. A mild ho
 
 | Filter type | Use it when | Main tradeoff |
 |---|---|---|
-| **Asymmetric** | You want the recommended general-purpose result. | Balances latency, phase correction, and pre-ringing containment. |
+| **Asymmetric** | You want a general-purpose alternative to the default. | Balances latency, phase correction, and pre-ringing containment. |
 | **Minimum Phase** | Low latency and causal behavior matter most. | Does not provide linear-phase correction. |
-| **Mixed Phase** | You want bounded excess-phase correction in a selected band. | Needs careful phase limits and verification. |
+| **Mixed Phase** | You want the default: bounded excess-phase correction in a selected band. | Needs careful phase limits and verification. |
 | **Linear Phase** | Linear-phase behavior matters more than latency. | Long filters can add latency and energy before the main impulse. |
 
 [Mixed Phase](https://vilhovalittu.github.io/DecayCore/mixed-phase-room-correction/) and [Minimum Phase](https://vilhovalittu.github.io/DecayCore/minimum-phase-fir-generator/) have their own pages on the website.

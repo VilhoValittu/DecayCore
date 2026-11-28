@@ -15,6 +15,6 @@ range and passes through the delay and pre-ringing guards.
 
 Mixed Phase asks for more judgment than Minimum Phase. Correction strength, full-correction frequency, fade frequency, group-delay limits, and pre-energy guards all affect the result. Take it one change at a time. A setting that looks wonderful at one microphone position may be less convincing when you lean over to pick up your drink, especially where reflections dominate the measurement.
 
-Start with the mode defaults and check the final impulse and group delay for obvious problems. Then listen. Use **Asymmetric** when you want the normal starting point without tuning mixed-phase controls yourself.
+Start with the mode defaults and check the final impulse and group delay for obvious problems. Then listen. Mixed Phase is the default filter type, so the mode defaults are the normal starting point. Use **Asymmetric** when you want a starting point without mixed-phase controls to tune.
 
 Read the [Technical Reference]({{ '/how-it-works/pipeline/' | relative_url }}) for the phase pipeline or [Getting Started]({{ '/getting-started/' | relative_url }}) for the normal workflow.

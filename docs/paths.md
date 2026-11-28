@@ -13,11 +13,11 @@ Use **About DecayCore → Maintenance** for normal cache or settings recovery. T
 
 DecayCore stores configuration files, Automatic-mode journals and caches, measurements, and exports in platform-specific user directories.
 
-## Main Configuration File
+## Main configuration file
 
 The main `config.json` contains UI preferences, DSP settings, and user-configurable parameters.
 
-### Linux / Unix-like Systems (XDG-compliant)
+### Linux / Unix-like systems (XDG-compliant)
 ```
 $XDG_CONFIG_HOME/DecayCore/config.json
 ```
@@ -39,13 +39,11 @@ $XDG_CONFIG_HOME/DecayCore/config.json
 
 **Example:** `C:\Users\username\AppData\Roaming\DecayCore\config.json`
 
----
-
-## Data Directory (Measurements, Filters, Optuna Database)
+## Data directory (measurements, filters, Optuna database)
 
 The data directory contains measurement files, exported filters, and Optuna optimization journals.
 
-### Linux / Unix-like Systems (XDG-compliant)
+### Linux / Unix-like systems (XDG-compliant)
 ```
 $XDG_DATA_HOME/DecayCore/
 ```
@@ -67,13 +65,11 @@ $XDG_DATA_HOME/DecayCore/
 
 **Example:** `C:\Users\username\AppData\Roaming\DecayCore\`
 
----
-
-## Optuna Optimization Database
+## Optuna optimization database
 
 When using automatic mode, DecayCore uses Optuna to optimize filter parameters across trials. Optimization data is stored in journal files (SQLite databases) within the data directory.
 
-### File Naming
+### File naming
 
 Optuna journal filenames follow the pattern:
 ```
@@ -86,11 +82,11 @@ decaycore_optuna_[FILTER_TYPE]_[MEASUREMENT_ID]_[VERSION].log
 - `[VERSION]`: Program compatibility version (e.g., `v1_2_0`), omitted if current version
 
 **Examples:**
-- `decaycore_optuna_mixed_nomeasurement.log` — Mixed filter, no measurement context
-- `decaycore_optuna_asymmetric_headphone_micdistance1cm.log` — Asymmetric filter, specific measurement
-- `decaycore_optuna_linear_nomeasurement_v1_0_0.log` — Historical version-tagged database
+- `decaycore_optuna_mixed_nomeasurement.log`: Mixed filter, no measurement context
+- `decaycore_optuna_asymmetric_headphone_micdistance1cm.log`: Asymmetric filter, specific measurement
+- `decaycore_optuna_linear_nomeasurement_v1_0_0.log`: Historical version-tagged database
 
-### Target Curve Optimization
+### Target curve optimization
 
 When running automatic mode with a specific target curve selected:
 ```
@@ -98,9 +94,9 @@ decaycore_optuna_target_[FILTER_TYPE]_[MEASUREMENT_ID]_[VERSION].log
 ```
 
 **Example:**
-- `decaycore_optuna_target_asymmetric_headphone.log` — Target curve optimization for asymmetric filters
+- `decaycore_optuna_target_asymmetric_headphone.log`: Target curve optimization for asymmetric filters
 
-### Path Examples
+### Path examples
 
 #### Linux
 ```
@@ -120,15 +116,13 @@ decaycore_optuna_target_[FILTER_TYPE]_[MEASUREMENT_ID]_[VERSION].log
 %APPDATA%\DecayCore\decaycore_optuna_target_asymmetric_headphone.log
 ```
 
----
+## Resetting caches and configuration (troubleshooting)
 
-## Resetting Caches and Configuration (Troubleshooting)
-
-If DecayCore behaves strangely — for example automatic mode returns unexpected
+If DecayCore behaves strangely, for example automatic mode returns unexpected
 results, reuses stale optimization data, or the app fails to start cleanly after
-a settings change — **deleting the automatic-mode disk caches and `config.json`
-is a recommended first step.** These files are regenerated automatically on the
-next run, so removing them is safe and only forces a fresh recomputation.
+a settings change, start by deleting the automatic-mode disk caches and
+`config.json`. DecayCore regenerates these files on the next run, so removing
+them only forces a fresh recomputation.
 
 What to remove:
 
@@ -140,7 +134,7 @@ What to remove:
 from the data directory (and any leftover `~/.camillafir/` directory from an old
 version), as listed in
 the tables above. Your saved measurements, target presets and exported filters
-under `Documents/DecayCore/` are **not** affected.
+under `Documents/DecayCore/` are not affected.
 
 ### In-app reset
 
@@ -155,8 +149,8 @@ can clear the caches without losing your settings:
 
 Both ask for confirmation and list what will be removed. Neither is available
 while a filter generation is running. The in-app reset covers the current data
-directory only — a leftover `~/.camillafir/` directory is removed by the helper
-scripts below.
+directory only. The helper scripts below also remove a leftover `~/.camillafir/`
+directory.
 
 ### Helper scripts
 
@@ -174,8 +168,6 @@ Each script lists the files it will delete and asks for confirmation first. The
 shell scripts also accept `--dry-run` to preview without deleting, and
 `-y`/`--yes` to skip the prompt.
 
----
-
 ## Data from older versions
 
 Settings, caches and search histories written by older versions are not migrated.
@@ -183,9 +175,7 @@ Settings that cannot be read fall back to defaults, and caches and search
 histories are rebuilt on demand. The old `~/.camillafir/` directory is no longer
 read; delete it manually, or with the helper scripts, once you no longer need it.
 
----
-
-## Summary Table
+## Summary table
 
 | Component | Linux | macOS | Windows |
 |-----------|-------|-------|---------|
@@ -198,9 +188,7 @@ read; delete it manually, or with the helper scripts, once you no longer need it
 
 Log files exist only after you tick **Save a log file** in **About DecayCore**. If the Documents folder cannot be written, DecayCore saves them in a `logs` folder inside the data directory instead.
 
----
-
-## Opening Paths from DecayCore
+## Opening paths from DecayCore
 
 To locate these directories on your system:
 

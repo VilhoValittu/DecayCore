@@ -12,7 +12,7 @@ Let's get your first pair of filters playing. Pick a few recordings you know wel
 1. Download and extract DecayCore.
 2. Open DecayCore.
 3. Measure Left and Right with DecayCore's guided workflow to include RT60 and harmonic data.
-4. Select **Automatic**, **Asymmetric**, and the **balanced** goal.
+4. Select **Automatic**, **Mixed Phase** (the default), and the **balanced** goal.
 5. Press **START**.
 6. Check the warnings and selected result.
 7. Export and load the filters into your convolver.
@@ -58,7 +58,7 @@ starting. To replace loaded measurements, use **Change files…**.
 For a first run in a packaged release:
 
 - Mode: **DecayCore automatic mode (recommended)**
-- Filter type: **Asymmetric**
+- Filter type: **Mixed Phase** (the default)
 - AUTO goal: **balanced**
 - Target strategy: **Adaptive: derive target from room acoustics**
 - Max boost: leave the default conservative limit
@@ -99,6 +99,6 @@ DecayCore does not include exported filters in its own measurement path. Measuri
 
 ## Next steps
 
-- [User Manual]({{ '/manual/' | relative_url }}) — settings, outputs, deployment, and troubleshooting
-- [Reading DecayCore Output]({{ '/manual/reading-output/' | relative_url }}) — result graphs and summary fields
-- [How DecayCore works]({{ '/how-it-works/' | relative_url }}) — correction principles and technical references
+- [User Manual]({{ '/manual/' | relative_url }}): settings, outputs, deployment, and troubleshooting
+- [Reading DecayCore Output]({{ '/manual/reading-output/' | relative_url }}): result graphs and summary fields
+- [How DecayCore works]({{ '/how-it-works/' | relative_url }}): correction principles and technical references

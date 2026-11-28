@@ -15,9 +15,9 @@ Adaptive Target makes small low-frequency changes to the selected built-in curve
 
 In AUTO mode, DecayCore can determine the target curve in three ways:
 
-- **Adaptive: derive target from room acoustics** (default) — scores built-in curves to choose a base, then adjusts it using broad, stereo-consistent bass evidence.
-- **Auto: search best built-in** — evaluates multiple built-in target curves in parallel and picks the best-ranked match.
-- **Use selected target curve from Target page** — uses the target curve manually selected in the Target tab and disables automatic target search.
+- **Adaptive: derive target from room acoustics** (default): scores built-in curves to choose a base, then adjusts it using broad, stereo-consistent bass evidence.
+- **Auto: search best built-in**: evaluates multiple built-in target curves in parallel and picks the best-ranked match.
+- **Use selected target curve from Target page**: uses the target curve manually selected in the Target tab and disables automatic target search.
 
 Adaptive Target uses the built-in curves for base selection but skips the full candidate search across those targets.
 
@@ -42,9 +42,7 @@ Adaptive target is useful when:
 - the room has unusual bass characteristics that may not match any single built-in target well
 - you are using DecayCore's built-in measurement tool, which captures RT60 data automatically
 
-## Limitations — RT60 requirement
-
-**RT60 data is useful but not required.**
+## RT60 is useful but not required
 
 DecayCore's built-in measurement is the recommended source: it analyses the recorded decay and saves RT60 automatically. The session also includes harmonic curves for boost-risk guidance elsewhere in the correction workflow. Adaptive Target itself uses reliable stereo RT60 data to decide whether additional bass lift is permissible and to restrain it in a slow-decay room. RT60 alone does not determine the target's tonal shape.
 
@@ -57,4 +55,4 @@ Ordinary REW frequency-response text exports do not carry recorded decay. A suit
 - [Getting Started]({{ '/getting-started/' | relative_url }})
 - [Modes: AUTO, BASIC, ADVANCED]({{ '/manual/modes/' | relative_url }})
 - [Built-in Measurement]({{ '/measurement-workflow/' | relative_url }})
-- [Technical Reference — Target formation]({{ '/how-it-works/pipeline/' | relative_url }})
+- [Technical Reference: Target formation]({{ '/how-it-works/pipeline/' | relative_url }})

@@ -25,6 +25,10 @@ The same number of PEQ filters follows the correction about twice as closely. Th
 
 DecayCore's own measurements read distortion and signal-to-noise at their true level, keep each speaker's and subwoofer's arrival time, and warn when background noise affects the bass. Re-measure older sessions to use this.
 
+### Start delay for measurements
+
+Set up to 20 seconds on the Measure page, and the sweep waits that long after Start or Continue. You get time to step away from the microphone and let the room go quiet.
+
 ### Safer Bass Integration
 
 Bass Integration tunes sub delay and polarity against the finished filters, and asks you to re-measure files that have lost the main/sub timing. Sub gain stops at +6 dB, and the mains keep their level when the sub gets a boost.

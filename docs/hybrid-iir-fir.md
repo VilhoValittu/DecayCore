@@ -13,7 +13,7 @@ Hybrid mode assigns supported narrow bass cuts to IIR filters and leaves broadba
 
 ## What it is
 
-Standard FIR correction distributes correction energy across the entire filter length. For very narrow, high-Q room modes — common in small or acoustically untreated rooms — a long FIR filter may not be the most efficient tool. An IIR biquad peaking filter can resolve a narrow resonance precisely, with no minimum tap-count requirement.
+Standard FIR correction distributes correction energy across the entire filter length. For very narrow, high-Q room modes, which are common in small or untreated rooms, a long FIR filter may not be the most efficient tool. An IIR biquad peaking filter can resolve a narrow resonance precisely, with no minimum tap-count requirement.
 
 The hybrid approach uses both:
 
@@ -50,11 +50,9 @@ Be more conservative or leave it disabled when:
 
 When hybrid IIR produces biquads, they are added to the exported CamillaDSP YAML configuration as Peaking EQ filter entries alongside the FIR convolver block.
 
-**Important:** the IIR and FIR must both be active in your CamillaDSP pipeline for the hybrid correction to work as intended. If you load only the FIR WAV without the IIR biquads, the transferred modal correction and any verified residual reduction will be missing.
+Keep both the IIR and FIR stages active in your CamillaDSP pipeline. If you load only the FIR WAV without the IIR biquads, the transferred modal correction and any verified residual reduction are missing.
 
-Verify your CamillaDSP pipeline includes both stages before finalizing the deployment.
-
-## Key parameters
+## Parameters
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -76,5 +74,5 @@ These parameters are available in the Advanced tab under the hybrid IIR tuning s
 
 - [FIR Room Correction]({{ '/fir-room-correction/' | relative_url }})
 - [CamillaDSP FIR Room Correction]({{ '/playback/camilladsp/' | relative_url }})
-- [Technical Reference — Hybrid IIR + FIR]({{ '/how-it-works/pipeline/' | relative_url }})
+- [Technical Reference: Hybrid IIR + FIR]({{ '/how-it-works/pipeline/' | relative_url }})
 - [Temporal Decay Control]({{ '/temporal-decay-control/' | relative_url }})

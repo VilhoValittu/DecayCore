@@ -22,12 +22,12 @@ PEQ filters change level at selected frequencies. A magnitude plot alone does no
 | Propagation delay (TOF) | No separate phase-analysis step | Removed before excess-phase analysis |
 | Phase strategy | Phase follows the selected PEQ filters | Linear / Minimum / Mixed / Asymmetric + optional 2058-safe mode |
 | Excess-phase safety | No separate excess-phase correction | Mixed-phase fade + excess-delay and pre-ringing guards |
-| Room modes / ringing | PEQ cuts change amplitude | **Temporal Decay Control (TDC)** with strength + max reduction + slope limit |
+| Room modes / ringing | PEQ cuts change amplitude | Temporal Decay Control (TDC) with strength + max reduction + slope limit |
 | Reflection handling | Depends on which peaks and dips are selected | Confidence-weighted correction + smoothing + A-FDW |
 | Correction bounds | Set through the chosen PEQ filters | Explicit limits for boost/cut/slope/phase band and low-bass safety |
 | Headroom handling | Set by the operator | Auto-headroom gain model with configurable margin |
 | Stereo consistency | Left and Right settings chosen separately | Stereo link with a shared leveling anchor, window and broadband gain |
-| Reproducible A/B | Requires a consistent comparison method | Optional **comparison mode** with fixed analysis grid |
+| Reproducible A/B | Requires a consistent comparison method | Optional comparison mode with fixed analysis grid |
 
 ## Listen to the result
 

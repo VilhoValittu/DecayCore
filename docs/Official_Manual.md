@@ -167,8 +167,8 @@ Cache entries are reusable only when their signatures cover every input that cha
 
 ## 14. Related references
 
-- [Why DecayCore Works]({{ '/how-it-works/why/' | relative_url }}) — practical design rationale
-- [Academic DSP Explanation]({{ '/how-it-works/math/' | relative_url }}) — mathematical model
-- [DSP Guards Reference]({{ '/how-it-works/guards/' | relative_url }}) — guard taxonomy and triggers
-- [Stability and Reproducibility]({{ '/how-it-works/stability/' | relative_url }}) — repeatable-run requirements
-- [Modes]({{ '/manual/modes/' | relative_url }}) — AUTO, Basic, and Advanced policy
+- [Why DecayCore Works]({{ '/how-it-works/why/' | relative_url }}): practical design rationale
+- [Academic DSP Explanation]({{ '/how-it-works/math/' | relative_url }}): mathematical model
+- [DSP Guards Reference]({{ '/how-it-works/guards/' | relative_url }}): guard taxonomy and triggers
+- [Stability and Reproducibility]({{ '/how-it-works/stability/' | relative_url }}): repeatable-run requirements
+- [Modes]({{ '/manual/modes/' | relative_url }}): AUTO, Basic, and Advanced policy

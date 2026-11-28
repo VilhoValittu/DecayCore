@@ -23,16 +23,11 @@ Each guard includes:
 - Why it exists (design intent)
 - What failure it prevents (engineering perspective)
 
----
-
-# PRINCIPLED GUARDS
+## Principled guards
 
 These define how DecayCore is *intended* to behave acoustically.
-They shape correction philosophy, realism, and robustness.
 
----
-
-## 1. Mixed Excess Mask (LF-only phase blending)
+### 1. Mixed Excess Mask (LF-only phase blending)
 **Location:** dsp_phase / mixed-phase logic
 **Stage:** Phase construction
 
@@ -44,9 +39,7 @@ Restricts excess-phase correction primarily to low frequencies with a soft trans
 - Audible timing artifacts in mid/high frequencies
 - Excessive group delay distortion
 
----
-
-## 2. Pre-Energy / Pre-Ringing Guard
+### 2. Pre-Energy / Pre-Ringing Guard
 **Location:** dsp/phase_ir_guards.py
 **Stage:** Post phase-IR generation
 
@@ -63,9 +56,7 @@ Limits excessive energy before the main impulse peak to preserve transient reali
 - Non-physical impulse shapes
 - Audible temporal smearing
 
----
-
-## 3. Max Boost / Max Cut Limits
+### 3. Max Boost / Max Cut Limits
 **Location:** dsp/correction_mag_parts/, dsp/limits.py
 **Stage:** Magnitude correction
 
@@ -82,9 +73,7 @@ Prevents unrealistic amplification demands on the system.
 - Driver overload
 - Unrealistic correction into deep nulls
 
----
-
-## 4. Peak Priority Shaping
+### 4. Peak Priority Shaping
 **Location:** dsp/correction_mag_parts/
 **Stage:** Error shaping
 
@@ -99,9 +88,7 @@ Reduces boost into narrow dips/nulls where correction is physically ineffective.
 - Aggressive null-filling
 - Excessive localized boost
 
----
-
-## 5. Regularization
+### 5. Regularization
 **Location:** dsp/correction_mag_parts/
 **Stage:** Target shaping
 
@@ -115,9 +102,7 @@ Globally pulls correction toward 0 dB to improve robustness.
 - Over-aggressive full-band correction
 - Excess reliance on hard caps
 
----
-
-## 6. Smoothing (Magnitude Domain)
+### 6. Smoothing (Magnitude Domain)
 **Location:** dsp/correction_mag_parts/
 **Stage:** Target conditioning
 
@@ -128,9 +113,7 @@ Smooths the correction curve to improve spatial robustness and perceptual stabil
 - Sawtooth filters
 - Overfitting to measurement noise
 
----
-
-## 7. Confidence-Based Weighting / Target Pull
+### 7. Confidence-Based Weighting / Target Pull
 **Location:** dsp/correction_mag_parts/, dsp/decaycore_dsp.py
 **Stage:** Target blending
 
@@ -145,9 +128,7 @@ Reduces correction strength in low-confidence regions.
 - Overcorrection in unreliable measurement areas
 - Excess boost in cancellation-dominated regions
 
----
-
-## 8. Auto Headroom / Auto Gain
+### 8. Auto Headroom / Auto Gain
 **Location:** dsp/phase_ir_autogain.py
 **Stage:** Final normalization
 
@@ -156,15 +137,13 @@ Reduces correction strength in low-confidence regions.
 - auto_gain_spike_threshold_db
 
 **Why:**
-Ensures safe global output level.
+Keeps the global output level safe.
 
 **Prevents:**
 - Clipping after filter export
 - Hidden overload caused by combined boosts
 
----
-
-## 9. GD Gradient Limiter
+### 9. GD Gradient Limiter
 **Location:** dsp/decaycore_dsp.py
 **Stage:** Phase-domain limiting
 
@@ -175,16 +154,12 @@ Constrains extreme group delay slope (ms/octave), especially in LF.
 - Unrealistic timing behavior
 - Excessively steep excess-phase transitions
 
----
+## Technical guards
 
-# TECHNICAL GUARDS
+These keep the math and array structure valid.
+They are always on and are not user-facing.
 
-These ensure numerical and structural stability.
-They must remain always-on and are not part of user-facing philosophy.
-
----
-
-## 1. IR Shift / Alignment Bounds
+### 1. IR Shift / Alignment Bounds
 **Location:** dsp/phase_ir_align.py
 **Stage:** IR alignment
 
@@ -196,22 +171,18 @@ Prevents illegal impulse shifts beyond window boundaries.
 - Index overflow
 - Truncated IR
 
----
-
-## 2. Alignment Fallback Logic
+### 2. Alignment Fallback Logic
 **Location:** dsp/phase_ir_align.py
 **Stage:** Alignment target computation
 
 **Why:**
-Ensures safe defaults if centroid/peak detection fails.
+Falls back to safe defaults if centroid/peak detection fails.
 
 **Prevents:**
 - Undefined alignment targets
 - Broken timing
 
----
-
-## 3. Window Auto-Asymmetry Cap
+### 3. Window Auto-Asymmetry Cap
 **Location:** dsp/phase_ir_window.py
 **Stage:** Windowing
 
@@ -222,23 +193,19 @@ Limits extreme asymmetric window selections.
 - Impulse truncation
 - Edge instability
 
----
-
-## 4. NaN / Inf Sanitization
+### 4. NaN / Inf Sanitization
 **Location:** Multiple modules
 **Stage:** Throughout pipeline
 
 **Why:**
-Ensures stable numerical behavior.
+Keeps numerical behavior stable.
 
 **Prevents:**
 - FFT explosions
 - Derivative instability
 - Invalid magnitude/phase arrays
 
----
-
-## 5. Frequency Axis Sanitization
+### 5. Frequency Axis Sanitization
 **Location:** dsp_preprocess / dsp_correction
 **Stage:** Preprocessing
 
@@ -249,9 +216,7 @@ Guarantees monotonic and unique frequency axis.
 - Derivative math failure
 - Interpolation instability
 
----
-
-# Dependency Map (Dominance Overview)
+## Dependency map
 
 This section describes which mechanisms typically dominate when multiple guards affect the same risk.
 
@@ -259,39 +224,29 @@ Legend:
 - A → B : If A is strong, B becomes mostly a safety net.
 - A ⇄ B : Partial overlap or tuning interaction.
 
----
-
-## Boost / Headroom Cluster
+### Boost / Headroom Cluster
 Regularization → Peak Priority → Max Boost/Cut → Auto Headroom
 
 Upstream shaping should reduce how often hard caps are needed.
 
----
-
-## Overfitting / Sawtooth Cluster
+### Overfitting / Sawtooth Cluster
 Smoothing → (reduces need for) Slope Limits
 Smoothing ⇄ Regularization
 Confidence Weighting ⇄ Regularization
 
 Slope limiting should rarely dominate if smoothing is well tuned.
 
----
-
-## Mixed-Phase Stability Cluster
+### Mixed-Phase Stability Cluster
 Mixed Excess Mask → (reduces need for) GD Gradient Limiter
 
 If GD limiter activates frequently, the excess mask is too permissive.
 
----
-
-## Time-Domain Stability Cluster
+### Time-Domain Stability Cluster
 Alignment Bounds → Window Cap → Pre-Energy Guard
 
 If pre-energy guard activates often, upstream alignment/window policy should be revised.
 
----
-
-# Trigger Matrix (Operational Monitoring)
+## Trigger matrix
 
 Healthy system expectations:
 
@@ -315,17 +270,13 @@ Rare last-resort guards:
 
 If a rare guard triggers frequently, treat it as an upstream design issue rather than a tuning feature.
 
----
-
-# Design Rule
+## Design rule
 
 Principled guards define intended acoustic behavior.
-Technical guards ensure mathematical and structural stability.
+Technical guards keep the math and structure stable.
 
 Principled guards may be user-adjustable.
 Technical guards must never be disabled.
 
----
-
-### 1. Overview
+## Overview
 ![Overview of DecayCore DSP guard relationships]({{ '/pics/DecayCore_dsp_guards.png' | relative_url }})

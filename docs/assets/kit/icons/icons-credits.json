@@ -1,0 +1,60 @@
+[
+  {
+    "file": "apple.svg",
+    "icon": "logos:apple",
+    "name": "Apple",
+    "kind": "colour",
+    "source": "gilbarbara/logos@d6960edc1b7309d392c76e40d3a320df7f9ff85c",
+    "author": "Gil Barbara",
+    "licence": "CC0-1.0",
+    "url": "https://github.com/gilbarbara/logos",
+    "trademark": true,
+    "markUrl": "https://www.apple.com/"
+  },
+  {
+    "file": "audio.svg",
+    "icon": "file:file-type-audio",
+    "name": "Audio",
+    "kind": "colour",
+    "source": "@iconify-json/vscode-icons@1.2.30",
+    "author": "Roberto Huertas",
+    "licence": "MIT",
+    "url": "https://github.com/vscode-icons/vscode-icons",
+    "trademark": false
+  },
+  {
+    "file": "linux-tux.svg",
+    "icon": "logos:linux-tux",
+    "name": "Linux",
+    "kind": "colour",
+    "source": "gilbarbara/logos@d6960edc1b7309d392c76e40d3a320df7f9ff85c",
+    "author": "Gil Barbara",
+    "licence": "CC0-1.0",
+    "url": "https://github.com/gilbarbara/logos",
+    "trademark": true,
+    "markUrl": "https://en.wikipedia.org/wiki/Tux_(mascot)"
+  },
+  {
+    "file": "txt.svg",
+    "icon": "file:file-type-text",
+    "name": "Text file",
+    "kind": "colour",
+    "source": "@iconify-json/vscode-icons@1.2.30",
+    "author": "Roberto Huertas",
+    "licence": "MIT",
+    "url": "https://github.com/vscode-icons/vscode-icons",
+    "trademark": false
+  },
+  {
+    "file": "windows.svg",
+    "icon": "logos:microsoft-windows-icon",
+    "name": "Windows",
+    "kind": "colour",
+    "source": "gilbarbara/logos@d6960edc1b7309d392c76e40d3a320df7f9ff85c",
+    "author": "Gil Barbara",
+    "licence": "CC0-1.0",
+    "url": "https://github.com/gilbarbara/logos",
+    "trademark": true,
+    "markUrl": "https://www.microsoft.com/windows"
+  }
+]

@@ -35,6 +35,7 @@ github:
 # Prevent unwanted files from being published
 exclude:
   - README.md
+  - dev
   - LICENSE
   - .github
   - src

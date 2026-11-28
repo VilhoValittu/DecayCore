@@ -1,0 +1,115 @@
+<!doctype html>
+<!-- The DecayCore home page. Built with the taste-skill kit (MIT, assets/kit/LICENSE.txt); the page's own
+     tokens and rules are in assets/home.css. Every other page uses _layouts/default.html. -->
+<html lang="{{ site.lang | default: 'en' }}" data-type="software" data-radius="soft" data-ground="sand" data-buttons="pill" data-motion>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" type="image/svg+xml" href="{{ '/pics/favicon.svg' | relative_url }}">
+{% seo %}
+<meta name="google-site-verification" content="-lDppG75tnSsL-qtF1eBLBQWsv3IctR9_RKh65WTiuY">
+<meta name="theme-color" content="#f7f9fa">
+<meta name="site-kind" content="software">
+<meta name="page-type" content="software">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ '/assets/kit/system.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/kit/ui/cards.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/kit/motion/motion.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/kit/backgrounds/backgrounds.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/kit/layout/layout.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/kit/icons/icon.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/kit/ui/base.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/kit/ui/window/fragment.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/kit/ui/toggles/fragment.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/home.css' | relative_url }}">
+<script>document.documentElement.classList.add('m-enter');setTimeout(()=>document.documentElement.classList.add('m-enter-done'),700)</script>
+<script src="{{ '/assets/kit/backgrounds/backgrounds.js' | relative_url }}"></script>
+<script>document.documentElement.classList.add('mo-js');setTimeout(()=>document.documentElement.classList.add('mo-safe'),2500)</script>
+<link rel="modulepreload" href="{{ '/assets/kit/moments/moments.js' | relative_url }}">
+<link rel="modulepreload" href="{{ '/assets/kit/moments/lib.js' | relative_url }}">
+<link rel="modulepreload" href="{{ '/assets/kit/moments/pinned-chapters/moment.js' | relative_url }}">
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav__bar">
+    <a class="skip-link" href="#top">Skip to content</a>
+    <a class="nav__logo" href="#top"><img src="{{ '/pics/DecayCore_logo.svg' | relative_url }}" alt="" width="32" height="32">DecayCore</a>
+    <nav class="nav__links" aria-label="Main">
+      <div class="nav__item">
+        <a class="nav__link" href="#how">Product <svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        <div class="nav__menu">
+          <div class="wrap grid">
+            <div class="menu-col span-3">
+              <p class="t-label">Workflow</p>
+              <a href="#how">Measure<span>Guided sweep with your mic</span></a>
+              <a href="#result">Automatic mode<span>Searches settings for you</span></a>
+              <a href="#playback">Export<span>WAV, FIR and PEQ files</span></a>
+            </div>
+            <div class="menu-col span-3">
+              <p class="t-label">Correction</p>
+              <a href="#features">Limits<span>Boost and gain kept in bounds</span></a>
+              <a href="#features">Decay control<span>Shorter ringing bass notes</span></a>
+            </div>
+            <a class="menu-card span-3 start-10" href="#result">
+              <div class="panel"><img class="frame__img" src="{{ '/pics/home/result-thumb.webp' | relative_url }}" alt="DecayCore result view with the left channel response graph" width="640" height="272" loading="lazy"></div>
+              <span class="t-card">Version 1.4.7</span>
+              <span class="t-small muted">The latest packaged release</span>
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="nav__item"><a class="nav__link" href="#features">Features</a></div>
+      <div class="nav__item"><a class="nav__link" href="#playback">Playback</a></div>
+      <div class="nav__item"><a class="nav__link" href="#faq">Questions</a></div>
+    </nav>
+    <div class="nav__actions">
+      <a class="btn btn--primary" href="https://github.com/VilhoValittu/DecayCore/releases/latest">Download DecayCore</a>
+    </div>
+    <button class="nav__toggle" type="button" aria-expanded="false" aria-label="Menu">
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 5h14M2 13h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</header>
+
+{{ content }}
+
+
+<footer class="footer closing footer--dark ground-inverse" id="contact" aria-labelledby="close-h">
+  <div class="wrap">
+    <div class="closing__cta close--type">
+      <div class="section-head">
+        <h2 id="close-h">Download DecayCore</h2>
+        <p>Windows, Linux and macOS. Free for non-commercial use.</p>
+      </div>
+      <a class="btn btn--primary btn--xl btn--wide" href="https://github.com/VilhoValittu/DecayCore/releases/latest">Download DecayCore<svg class="m-arrow" viewBox="0 0 12 12" aria-hidden="true"><path class="m-arrow__stem" d="M1 6h8"/><path class="m-arrow__head" d="M4.5 2.5 8 6l-3.5 3.5"/></svg></a>
+    </div>
+    <div class="closing__links">
+      <div class="grid">
+        <div class="span-4 stack-4">
+          <a class="nav__logo" href="#top"><img src="{{ '/pics/DecayCore_logo.svg' | relative_url }}" alt="" width="32" height="32" loading="lazy">DecayCore</a>
+          <p class="footer__lede">Measures speakers in the room and builds FIR correction filters.</p>
+        </div>
+        <div class="span-2 start-7 footer__col"><h3>Get started</h3><ul><li><a href="{{ '/getting-started/' | relative_url }}">First filter</a></li><li><a href="{{ '/installation/' | relative_url }}">Installation</a></li><li><a href="{{ '/measurement-workflow/' | relative_url }}">Measurement</a></li></ul></div>
+        <div class="span-2 footer__col"><h3>Learn</h3><ul><li><a href="{{ '/manual/' | relative_url }}">Manual</a></li><li><a href="{{ '/how-it-works/' | relative_url }}">How it works</a></li><li><a href="{{ '/glossary/' | relative_url }}">Glossary</a></li></ul></div>
+        <div class="span-2 footer__col"><h3>Project</h3><ul><li><a href="{{ '/changelog/' | relative_url }}">Changelog</a></li><li><a href="https://github.com/VilhoValittu/DecayCore">GitHub</a></li></ul></div>
+      </div>
+      <div class="footer__legal">
+        <span>&copy; 2026 Vilho Valittu. Free for non-commercial use. Source-available up to 1.2.5.</span>
+        <span>Product names are trademarks of their owners.</span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<nav class="actionbar" aria-label="Quick actions">
+  <a class="btn btn--primary" href="https://github.com/VilhoValittu/DecayCore/releases/latest">Download DecayCore</a>
+</nav>
+
+<script type="module" src="{{ '/assets/kit/system.js' | relative_url }}"></script>
+<script type="module" src="{{ '/assets/kit/motion/motion.js' | relative_url }}"></script>
+<script type="module" src="{{ '/assets/kit/layout/layout.js' | relative_url }}"></script>
+</body>
+</html>
